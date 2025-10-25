@@ -1,0 +1,734 @@
+---
+description: "Testing стандарты и TDD подход"
+globs: ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "__tests__/**/*"]
+---
+
+# Testing Standards - Apricode Exchange
+
+## 🧪 Философия тестирования
+
+### Test-Driven Development (TDD)
+
+```
+1. Напиши тест (RED) ❌
+2. Напиши минимальный код для прохождения (GREEN) ✅
+3. Рефактори код (REFACTOR) ♻️
+4. Повтори
+```
+
+### Что тестировать?
+
+**✅ Обязательно тестируй:**
+- Бизнес-логика
+- API endpoints
+- Валидация данных
+- Auth & Authorization
+- Edge cases и граничные условия
+- Error handling
+
+**⚠️ Опционально:**
+- UI компоненты (при необходимости)
+- Утилитарные функции
+
+**❌ НЕ тестируй:**
+- Third-party библиотеки
+- Тривиальный код (геттеры/сеттеры)
+- Код без логики
+
+## 📦 Testing Stack
+
+```json
+{
+  "devDependencies": {
+    "vitest": "^1.0.0",
+    "@testing-library/react": "^14.0.0",
+    "@testing-library/user-event": "^14.5.0",
+    "@testing-library/jest-dom": "^6.1.0",
+    "msw": "^2.0.0"
+  }
+}
+```
+
+## 🎯 Unit Tests
+
+### API Route Tests
+
+```typescript
+// __tests__/api/orders.test.ts
+
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { POST } from '@/app/api/orders/route';
+import { NextRequest } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { prisma } from '@/lib/prisma';
+
+// Mock зависимости
+vi.mock('next-auth');
+vi.mock('@/lib/prisma');
+
+describe('POST /api/orders', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should create order when user is authenticated and KYC approved', async () => {
+    // Arrange - подготовь данные
+    const mockSession = {
+      user: { 
+        id: 'user123', 
+        email: 'test@test.com',
+        role: 'CLIENT' 
+      }
+    };
+    
+    const mockUser = {
+      id: 'user123',
+      email: 'test@test.com',
+      kycSession: { status: 'APPROVED' }
+    };
+    
+    const mockOrder = {
+      id: 'order123',
+      userId: 'user123',
+      currency: 'BTC',
+      amount: 1000,
+      status: 'PENDING'
+    };
+
+    vi.mocked(getServerSession).mockResolvedValue(mockSession);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser);
+    vi.mocked(prisma.order.create).mockResolvedValue(mockOrder);
+
+    const request = new NextRequest('http://localhost:3000/api/orders', {
+      method: 'POST',
+      body: JSON.stringify({
+        currency: 'BTC',
+        amount: 1000,
+        walletAddress: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
+        fiatCurrency: 'EUR'
+      })
+    });
+
+    // Act - выполни действие
+    const response = await POST(request);
+    const data = await response.json();
+
+    // Assert - проверь результат
+    expect(response.status).toBe(201);
+    expect(data.order).toEqual(mockOrder);
+    expect(prisma.order.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: 'user123',
+        currency: 'BTC',
+        amount: 1000
+      })
+    });
+  });
+
+  it('should return 401 when user not authenticated', async () => {
+    vi.mocked(getServerSession).mockResolvedValue(null);
+
+    const request = new NextRequest('http://localhost:3000/api/orders', {
+      method: 'POST',
+      body: JSON.stringify({
+        currency: 'BTC',
+        amount: 1000,
+        walletAddress: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
+        fiatCurrency: 'EUR'
+      })
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(data.error).toBe('Unauthorized');
+  });
+
+  it('should return 403 when KYC not approved', async () => {
+    const mockSession = {
+      user: { id: 'user123', role: 'CLIENT' }
+    };
+    
+    const mockUser = {
+      id: 'user123',
+      kycSession: { status: 'PENDING' }
+    };
+
+    vi.mocked(getServerSession).mockResolvedValue(mockSession);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser);
+
+    const request = new NextRequest('http://localhost:3000/api/orders', {
+      method: 'POST',
+      body: JSON.stringify({
+        currency: 'BTC',
+        amount: 1000,
+        walletAddress: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
+        fiatCurrency: 'EUR'
+      })
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(data.error).toBe('KYC verification required');
+  });
+
+  it('should return 400 on validation error', async () => {
+    const mockSession = {
+      user: { id: 'user123', role: 'CLIENT' }
+    };
+
+    vi.mocked(getServerSession).mockResolvedValue(mockSession);
+
+    const request = new NextRequest('http://localhost:3000/api/orders', {
+      method: 'POST',
+      body: JSON.stringify({
+        currency: 'INVALID',
+        amount: -100, // Отрицательное
+        walletAddress: 'short',
+        fiatCurrency: 'USD'
+      })
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Validation error');
+    expect(data.details).toBeDefined();
+  });
+});
+```
+
+### Utility Function Tests
+
+```typescript
+// __tests__/lib/utils.test.ts
+
+import { describe, it, expect } from 'vitest';
+import { calculateOrderTotal, formatCurrency } from '@/lib/utils';
+
+describe('calculateOrderTotal', () => {
+  it('should calculate total with 1.5% fee', () => {
+    const amount = 1000;
+    const rate = 50000;
+    const fee = 0.015;
+
+    const total = calculateOrderTotal(amount, rate, fee);
+
+    expect(total).toBe(50750); // 1000 * 50000 * 1.015
+  });
+
+  it('should handle zero amount', () => {
+    const total = calculateOrderTotal(0, 50000, 0.015);
+    expect(total).toBe(0);
+  });
+
+  it('should handle zero rate', () => {
+    const total = calculateOrderTotal(1000, 0, 0.015);
+    expect(total).toBe(0);
+  });
+
+  it('should handle no fee', () => {
+    const total = calculateOrderTotal(1000, 50000, 0);
+    expect(total).toBe(50000);
+  });
+});
+
+describe('formatCurrency', () => {
+  it('should format EUR correctly', () => {
+    const formatted = formatCurrency(1234.56, 'EUR');
+    expect(formatted).toBe('€1,234.56');
+  });
+
+  it('should format PLN correctly', () => {
+    const formatted = formatCurrency(1234.56, 'PLN');
+    expect(formatted).toBe('1 234,56 zł');
+  });
+
+  it('should handle zero', () => {
+    const formatted = formatCurrency(0, 'EUR');
+    expect(formatted).toBe('€0.00');
+  });
+
+  it('should handle large numbers', () => {
+    const formatted = formatCurrency(1000000, 'EUR');
+    expect(formatted).toBe('€1,000,000.00');
+  });
+});
+```
+
+## 🧩 Integration Tests
+
+### Database Tests
+
+```typescript
+// __tests__/integration/orders.test.ts
+
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { prisma } from '@/lib/prisma';
+import { createOrder } from '@/lib/orders';
+
+describe('Order Creation Integration', () => {
+  let testUser;
+
+  beforeEach(async () => {
+    // Создай тестового пользователя
+    testUser = await prisma.user.create({
+      data: {
+        email: 'test@test.com',
+        password: 'hashedpassword',
+        role: 'CLIENT',
+        kycSession: {
+          create: {
+            status: 'APPROVED'
+          }
+        }
+      }
+    });
+  });
+
+  afterEach(async () => {
+    // Очисти тестовые данные
+    await prisma.order.deleteMany();
+    await prisma.kycSession.deleteMany();
+    await prisma.user.deleteMany();
+  });
+
+  it('should create order in database', async () => {
+    const orderData = {
+      userId: testUser.id,
+      currency: 'BTC',
+      amount: 1000,
+      walletAddress: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
+      fiatCurrency: 'EUR',
+      rate: 50000
+    };
+
+    const order = await createOrder(orderData);
+
+    expect(order.id).toBeDefined();
+    expect(order.userId).toBe(testUser.id);
+    expect(order.status).toBe('PENDING');
+
+    // Проверь, что order создан в БД
+    const dbOrder = await prisma.order.findUnique({
+      where: { id: order.id }
+    });
+
+    expect(dbOrder).not.toBeNull();
+    expect(dbOrder.amount).toBe(1000);
+  });
+
+  it('should fail when KYC not approved', async () => {
+    // Обнови KYC статус
+    await prisma.kycSession.update({
+      where: { userId: testUser.id },
+      data: { status: 'PENDING' }
+    });
+
+    const orderData = {
+      userId: testUser.id,
+      currency: 'BTC',
+      amount: 1000,
+      walletAddress: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
+      fiatCurrency: 'EUR',
+      rate: 50000
+    };
+
+    await expect(createOrder(orderData)).rejects.toThrow('KYC not approved');
+  });
+});
+```
+
+## 🎭 Component Tests (опционально)
+
+```typescript
+// __tests__/components/OrderCard.test.tsx
+
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { OrderCard } from '@/components/OrderCard';
+
+describe('OrderCard', () => {
+  it('should render order details', () => {
+    const order = {
+      id: 'order123',
+      currency: 'BTC',
+      amount: 1000,
+      status: 'PENDING',
+      createdAt: new Date('2025-01-01')
+    };
+
+    render(<OrderCard order={order} />);
+
+    expect(screen.getByText('BTC')).toBeInTheDocument();
+    expect(screen.getByText('€1,000.00')).toBeInTheDocument();
+    expect(screen.getByText('Pending')).toBeInTheDocument();
+  });
+
+  it('should call onCancel when cancel button clicked', () => {
+    const onCancel = vi.fn();
+    const order = {
+      id: 'order123',
+      currency: 'BTC',
+      amount: 1000,
+      status: 'PENDING',
+      createdAt: new Date()
+    };
+
+    render(<OrderCard order={order} onCancel={onCancel} />);
+
+    const cancelButton = screen.getByRole('button', { name: /cancel/i });
+    fireEvent.click(cancelButton);
+
+    expect(onCancel).toHaveBeenCalledWith('order123');
+  });
+
+  it('should not show cancel button for completed orders', () => {
+    const order = {
+      id: 'order123',
+      currency: 'BTC',
+      amount: 1000,
+      status: 'COMPLETED',
+      createdAt: new Date()
+    };
+
+    render(<OrderCard order={order} />);
+
+    const cancelButton = screen.queryByRole('button', { name: /cancel/i });
+    expect(cancelButton).not.toBeInTheDocument();
+  });
+});
+```
+
+## 🌐 E2E Tests (опционально, Playwright)
+
+```typescript
+// e2e/order-flow.spec.ts
+
+import { test, expect } from '@playwright/test';
+
+test.describe('Order Flow', () => {
+  test.beforeEach(async ({ page }) => {
+    // Логин
+    await page.goto('/login');
+    await page.fill('input[name="email"]', 'test@test.com');
+    await page.fill('input[name="password"]', 'Test123!');
+    await page.click('button[type="submit"]');
+    await page.waitForURL('/dashboard');
+  });
+
+  test('should complete full order flow', async ({ page }) => {
+    // Navigate to buy page
+    await page.click('text=Buy Crypto');
+    await page.waitForURL('/buy');
+
+    // Fill form
+    await page.selectOption('select[name="currency"]', 'BTC');
+    await page.fill('input[name="amount"]', '1000');
+    await page.fill('input[name="walletAddress"]', 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh');
+    
+    // Submit
+    await page.click('button[type="submit"]');
+    
+    // Wait for order created
+    await page.waitForURL('/orders/*');
+    
+    // Verify order details
+    await expect(page.locator('text=Order Created')).toBeVisible();
+    await expect(page.locator('text=BTC')).toBeVisible();
+    await expect(page.locator('text=€1,000')).toBeVisible();
+  });
+});
+```
+
+## 🎪 Mocking
+
+### Mock External APIs
+
+```typescript
+// __tests__/lib/coingecko.test.ts
+
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { getExchangeRate } from '@/lib/coingecko';
+
+// Mock fetch
+global.fetch = vi.fn();
+
+describe('CoinGecko API', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should fetch BTC to EUR rate', async () => {
+    const mockResponse = {
+      bitcoin: {
+        eur: 50000
+      }
+    };
+
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse
+    } as Response);
+
+    const rate = await getExchangeRate('BTC', 'EUR');
+
+    expect(rate).toBe(50000);
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('bitcoin'),
+      expect.any(Object)
+    );
+  });
+
+  it('should throw error on API failure', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 500
+    } as Response);
+
+    await expect(getExchangeRate('BTC', 'EUR')).rejects.toThrow();
+  });
+});
+```
+
+### Mock Prisma
+
+```typescript
+// __tests__/__mocks__/prisma.ts
+
+import { vi } from 'vitest';
+import { PrismaClient } from '@prisma/client';
+
+export const prismaMock = {
+  user: {
+    create: vi.fn(),
+    findUnique: vi.fn(),
+    findMany: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn()
+  },
+  order: {
+    create: vi.fn(),
+    findUnique: vi.fn(),
+    findMany: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn()
+  }
+};
+
+vi.mock('@/lib/prisma', () => ({
+  prisma: prismaMock
+}));
+```
+
+## 📊 Test Coverage
+
+### Vitest Config
+
+```typescript
+// vitest.config.ts
+
+import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      exclude: [
+        'node_modules/',
+        '.next/',
+        'coverage/',
+        '**/*.config.*',
+        '**/types/**'
+      ],
+      // ✅ Целевые значения покрытия
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 75,
+        statements: 80
+      }
+    },
+    setupFiles: ['./vitest.setup.ts']
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src')
+    }
+  }
+});
+```
+
+### Setup File
+
+```typescript
+// vitest.setup.ts
+
+import '@testing-library/jest-dom';
+import { beforeAll, afterEach, afterAll } from 'vitest';
+import { cleanup } from '@testing-library/react';
+
+// Cleanup после каждого теста
+afterEach(() => {
+  cleanup();
+});
+
+// Mock environment variables
+beforeAll(() => {
+  process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
+  process.env.NEXTAUTH_SECRET = 'test-secret';
+  process.env.NEXTAUTH_URL = 'http://localhost:3000';
+});
+```
+
+## 🏃‍♂️ Running Tests
+
+```json
+{
+  "scripts": {
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
+    "test:watch": "vitest --watch",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui"
+  }
+}
+```
+
+## ✅ Testing Best Practices
+
+### 1. Arrange-Act-Assert Pattern
+
+```typescript
+it('should do something', () => {
+  // Arrange - подготовь данные и моки
+  const input = 'test';
+  const expected = 'TEST';
+  
+  // Act - выполни действие
+  const result = toUpperCase(input);
+  
+  // Assert - проверь результат
+  expect(result).toBe(expected);
+});
+```
+
+### 2. Описательные названия тестов
+
+```typescript
+// ❌ Плохо
+it('works', () => { ... });
+it('test 1', () => { ... });
+
+// ✅ Хорошо
+it('should return uppercase string', () => { ... });
+it('should throw error when input is null', () => { ... });
+it('should create order when user is authenticated and KYC approved', () => { ... });
+```
+
+### 3. Тестируй edge cases
+
+```typescript
+describe('calculateTotal', () => {
+  it('should handle normal values', () => { ... });
+  it('should handle zero amount', () => { ... });
+  it('should handle negative numbers', () => { ... });
+  it('should handle very large numbers', () => { ... });
+  it('should handle decimal precision', () => { ... });
+  it('should throw on invalid input', () => { ... });
+});
+```
+
+### 4. Изолированные тесты
+
+```typescript
+// ✅ Каждый тест независим
+describe('UserService', () => {
+  beforeEach(() => {
+    // Очисть состояние перед каждым тестом
+    vi.clearAllMocks();
+  });
+
+  it('test 1', () => { ... });
+  it('test 2', () => { ... });
+});
+
+// ❌ Тесты зависят друг от друга
+let userId;
+it('creates user', async () => {
+  userId = await createUser();
+});
+it('updates user', async () => {
+  await updateUser(userId); // Зависит от предыдущего!
+});
+```
+
+### 5. Не тестируй implementation details
+
+```typescript
+// ❌ Плохо - тестирует внутренности
+it('should call setState 3 times', () => {
+  const component = render(<MyComponent />);
+  // ...
+  expect(setState).toHaveBeenCalledTimes(3);
+});
+
+// ✅ Хорошо - тестирует поведение
+it('should display error message when form is invalid', () => {
+  const { getByText, getByRole } = render(<MyForm />);
+  fireEvent.click(getByRole('button'));
+  expect(getByText('Email is required')).toBeInTheDocument();
+});
+```
+
+## 🚫 Антипаттерны
+
+```typescript
+// ❌ Слишком много моков
+vi.mock('./everything');
+
+// ❌ Тесты зависят от порядка выполнения
+describe('dependent tests', () => {
+  let sharedState;
+  it('test 1', () => { sharedState = 'data'; });
+  it('test 2', () => { expect(sharedState).toBe('data'); });
+});
+
+// ❌ Тестирование приватных методов
+it('should test private method', () => {
+  const instance = new MyClass();
+  expect(instance._privateMethod()).toBe(true);
+});
+
+// ❌ Слишком общие assertions
+it('should work', () => {
+  const result = doSomething();
+  expect(result).toBeTruthy(); // Что именно проверяем?
+});
+```
+
+## 📝 Test Checklist
+
+Перед коммитом убедись:
+
+- [ ] Все тесты проходят (`npm test`)
+- [ ] Покрытие >= 80% для новых модулей
+- [ ] Тесты независимы друг от друга
+- [ ] Edge cases покрыты
+- [ ] Моки правильно настроены
+- [ ] Названия тестов описательны
+- [ ] Нет flaky tests (нестабильных)
+
+---
+
+**"Код без тестов - унаследованный код с первого дня" - Michael Feathers**

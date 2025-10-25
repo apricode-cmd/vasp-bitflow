@@ -1,0 +1,948 @@
+// Prisma Schema for Apricode Exchange - IMPROVED VERSION
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum Role {
+  CLIENT
+  ADMIN
+}
+
+enum KycStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum OrderStatus {
+  PENDING // Создан, ждёт оплаты
+  PAYMENT_PENDING // Пользователь загрузил proof, ждём проверки
+  PAYMENT_RECEIVED // Платёж подтверждён
+  PROCESSING // В обработке (админ отправляет крипту)
+  COMPLETED // Выполнен успешно
+  CANCELLED // Отменён пользователем
+  EXPIRED // Истёк срок оплаты (24 часа)
+  REFUNDED // Возврат средств
+  FAILED // Ошибка при отправке криптовалюты
+}
+
+enum EmailStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  BOUNCED
+}
+
+enum SettingType {
+  STRING
+  NUMBER
+  BOOLEAN
+  JSON
+}
+
+// ==========================================
+// USER & AUTHENTICATION
+// ==========================================
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String // Hashed with bcrypt (10 rounds)
+  role      Role      @default(CLIENT)
+  isActive  Boolean   @default(true)
+  lastLogin DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relations
+  profile       Profile?
+  kycSession    KycSession?
+  orders        Order[]
+  auditLogs     AuditLog[]
+  emailLogs     EmailLog[]
+  paymentProofs PaymentProof[]
+  userWallets   UserWallet[]
+  apiKeys       ApiKey[]
+  twoFactorAuth TwoFactorAuth?
+  kycLevelData  UserKycLevel?  @relation("UserKycLevelRelation")
+
+  @@index([email])
+  @@index([role])
+}
+
+model Profile {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  firstName   String
+  lastName    String
+  phoneNumber String?
+  country     String
+  city        String?
+  address     String?
+  postalCode  String?
+  dateOfBirth DateTime?
+  nationality String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([country])
+}
+
+// ==========================================
+// KYC VERIFICATION
+// ==========================================
+
+model KycSession {
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  kycaidVerificationId String?   @unique
+  kycaidApplicantId    String?
+  kycaidFormId         String?
+  status               KycStatus @default(PENDING)
+  submittedAt          DateTime?
+  reviewedAt           DateTime?
+  reviewedBy           String? // Admin user ID who reviewed
+  reviewNotes          String?   @db.Text
+  completedAt          DateTime?
+  expiresAt            DateTime? // KYC может истечь через N месяцев
+  rejectionReason      String?   @db.Text
+  webhookData          Json? // Raw KYCAID webhook data for debugging
+  metadata             Json? // Additional data
+  attempts             Int       @default(0)
+  lastAttemptAt        DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents KycDocument[]
+  formData  KycFormData[]
+
+  @@index([status])
+  @@index([kycaidVerificationId])
+}
+
+// ==========================================
+// CURRENCIES & TRADING
+// ==========================================
+
+model Currency {
+  code        String  @id // BTC, ETH, USDT, SOL
+  name        String // Bitcoin, Ethereum, Tether, Solana
+  symbol      String // ₿, Ξ, ₮, ◎
+  decimals    Int     @default(8)
+  precision   Int     @default(8) // Alias for decimals (CRM compatibility)
+  coingeckoId String // bitcoin, ethereum, tether, solana
+  isActive    Boolean @default(true)
+  priority    Int     @default(0) // Порядок отображения
+
+  // NEW: Token support
+  isToken         Boolean @default(false) // true if ERC-20, TRC-20, etc.
+  chain           String? // Chain code if token (ETHEREUM, BSC, POLYGON)
+  contractAddress String? // Smart contract address for tokens
+  iconUrl         String? // Icon/logo URL
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  orders          Order[]
+  tradingPairs    TradingPair[]    @relation("CryptoCurrency")
+  rateHistory     RateHistory[]    @relation("CryptoCurrency")
+  platformWallets PlatformWallet[]
+  userWallets     UserWallet[]
+
+  @@index([isToken])
+  @@index([chain])
+}
+
+model FiatCurrency {
+  code      String   @id // EUR, PLN, USD, GBP
+  name      String // Euro, Polish Zloty
+  symbol    String // €, zł, $, £
+  precision Int      @default(2) // Decimal places for display
+  isActive  Boolean  @default(true)
+  priority  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  orders         Order[]
+  tradingPairs   TradingPair[]   @relation("FiatCurrency")
+  bankDetails    BankDetails[]
+  rateHistory    RateHistory[]   @relation("FiatCurrency")
+  paymentMethods PaymentMethod[]
+  feeProfiles    FeeProfile[]
+  limitsMatrix   LimitsMatrix[]
+}
+
+// Торговые пары с настройками лимитов и комиссий
+model TradingPair {
+  id              String   @id @default(cuid())
+  cryptoCode      String
+  fiatCode        String
+  isActive        Boolean  @default(true)
+  minCryptoAmount Float // Минимум в крипте (например, 0.001 BTC)
+  maxCryptoAmount Float // Максимум в крипте
+  minFiatAmount   Float // Минимум в фиате (например, 50 EUR)
+  maxFiatAmount   Float // Максимум в фиате
+  feePercent      Float    @default(1.5) // Комиссия платформы (настраиваемая)
+  priority        Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  crypto Currency     @relation("CryptoCurrency", fields: [cryptoCode], references: [code])
+  fiat   FiatCurrency @relation("FiatCurrency", fields: [fiatCode], references: [code])
+
+  @@unique([cryptoCode, fiatCode])
+  @@index([isActive])
+}
+
+// История курсов для проверки и аналитики
+model RateHistory {
+  id         String   @id @default(cuid())
+  cryptoCode String
+  fiatCode   String
+  rate       Float // Курс на момент времени
+  source     String   @default("coingecko")
+  createdAt  DateTime @default(now())
+
+  crypto Currency     @relation("CryptoCurrency", fields: [cryptoCode], references: [code])
+  fiat   FiatCurrency @relation("FiatCurrency", fields: [fiatCode], references: [code])
+
+  @@index([cryptoCode, fiatCode, createdAt])
+}
+
+// ==========================================
+// ORDERS & PAYMENTS
+// ==========================================
+
+model Order {
+  id               String @id @default(cuid())
+  userId           String
+  currencyCode     String
+  fiatCurrencyCode String
+
+  // Уникальный референс для платежа (APR-2025-ABC123)
+  paymentReference String @unique
+
+  // Amounts
+  cryptoAmount Float // Сколько криптовалюты купить
+  fiatAmount   Float // Сумма в фиате без комиссии
+  rate         Float // Курс на момент создания
+  feePercent   Float // Процент комиссии (сохраняем на момент создания)
+  feeAmount    Float // Сумма комиссии
+  totalFiat    Float // Итого к оплате (fiatAmount + feeAmount)
+
+  // Wallet & Payment - IMPROVED: добавлена связь с UserWallet и BlockchainNetwork
+  userWalletId      String? // ID кошелька пользователя из UserWallet
+  walletAddress     String // Адрес кошелька пользователя (duplicate для backward compatibility)
+  blockchainCode    String? // Blockchain network для этого адреса (ETH, BSC, POLYGON, etc.)
+  paymentMethodCode String? // Способ оплаты (код)
+
+  // Status & Processing
+  status         OrderStatus @default(PENDING)
+  createdByAdmin Boolean     @default(false) // Заказ создан админом
+
+  // Admin fields
+  adminNotes      String?   @db.Text
+  transactionHash String? // TX hash после отправки криптовалюты
+  processedBy     String? // Admin user ID who processed
+  processedAt     DateTime?
+
+  // Timestamps
+  expiresAt DateTime // Когда истекает срок оплаты (24 часа)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currency      Currency             @relation(fields: [currencyCode], references: [code])
+  fiatCurrency  FiatCurrency         @relation(fields: [fiatCurrencyCode], references: [code])
+  userWallet    UserWallet?          @relation(fields: [userWalletId], references: [id], onDelete: SetNull)
+  blockchain    BlockchainNetwork?   @relation(fields: [blockchainCode], references: [code])
+  paymentMethod PaymentMethod?       @relation(fields: [paymentMethodCode], references: [code])
+  paymentProofs PaymentProof[]
+  statusHistory OrderStatusHistory[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([paymentReference])
+  @@index([userWalletId])
+  @@index([blockchainCode])
+}
+
+// Файлы подтверждения оплаты
+model PaymentProof {
+  id         String   @id @default(cuid())
+  orderId    String
+  fileUrl    String // Vercel Blob URL
+  fileName   String
+  fileSize   Int // Размер в байтах
+  mimeType   String // image/jpeg, image/png, application/pdf
+  uploadedBy String // User ID
+  uploadedAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [uploadedBy], references: [id])
+
+  @@index([orderId])
+}
+
+// ==========================================
+// BANK DETAILS
+// ==========================================
+
+model BankDetails {
+  id                String   @id @default(cuid())
+  currency          String
+  bankName          String
+  bankAddress       String?
+  accountHolder     String
+  iban              String
+  swift             String?
+  bic               String?
+  sortCode          String? // Для UK банков
+  referenceTemplate String   @default("APR-{orderId}")
+  instructions      String?  @db.Text // Дополнительные инструкции для пользователя
+  isActive          Boolean  @default(true)
+  priority          Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  fiatCurrency FiatCurrency @relation(fields: [currency], references: [code])
+
+  @@index([currency, isActive])
+}
+
+// ==========================================
+// SYSTEM & LOGGING
+// ==========================================
+
+// Аудит логи для отслеживания действий
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String? // Кто совершил действие (может быть system)
+  action    String // ORDER_CREATED, KYC_APPROVED, ORDER_STATUS_CHANGED
+  entity    String // Order, KycSession, User
+  entityId  String // ID сущности
+  oldValue  Json? // Старое значение
+  newValue  Json? // Новое значение
+  metadata  Json? // Дополнительная информация
+  ipAddress String?
+  userAgent String?  @db.Text
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// Лог отправленных email
+model EmailLog {
+  id          String      @id @default(cuid())
+  userId      String?
+  recipient   String
+  subject     String
+  template    String // WELCOME, ORDER_CREATED, KYC_APPROVED, etc.
+  status      EmailStatus @default(PENDING)
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  failedAt    DateTime?
+  error       String?     @db.Text
+  metadata    Json? // Email variables, Resend ID, etc.
+  createdAt   DateTime    @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([status])
+  @@index([template])
+  @@index([createdAt])
+}
+
+// Настройки системы
+model SystemSettings {
+  key         String      @id
+  value       String      @db.Text
+  type        SettingType @default(STRING)
+  category    String      @default("general") // general, email, kyc, payment, trading
+  description String?     @db.Text
+  isPublic    Boolean     @default(false) // Можно ли показать на фронтенде
+  updatedAt   DateTime    @updatedAt
+  updatedBy   String? // Admin user ID
+
+  @@index([category])
+  @@index([isPublic])
+}
+
+// ==========================================
+// BLOCKCHAIN & WALLETS
+// ==========================================
+
+// Blockchain Networks - справочник блокчейнов (chains)
+model BlockchainNetwork {
+  id               String   @id @default(cuid())
+  code             String   @unique // ETH, BSC, POLYGON, SOLANA, BITCOIN
+  name             String // Ethereum, Binance Smart Chain, Polygon, Solana, Bitcoin
+  nativeToken      String // ETH, BNB, MATIC, SOL, BTC
+  nativeAsset      String? // NEW: Redundant with nativeToken for CRM compatibility
+  explorerUrl      String // https://etherscan.io
+  rpcUrl           String? // Optional RPC endpoint
+  chainId          Int? // For EVM chains
+  minConfirmations Int      @default(12) // Required confirmations (renamed from confirmations)
+  confirmations    Int      @default(12) // Keep for backward compatibility
+  isActive         Boolean  @default(true)
+  priority         Int      @default(0)
+  metadata         Json? // Additional chain info
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  userWallets     UserWallet[]
+  platformWallets PlatformWallet[]
+  transactions    Transaction[]
+  orders          Order[] // Заказы, использующие эту сеть
+
+  @@index([isActive])
+}
+
+// User Wallets - кошельки пользователей
+model UserWallet {
+  id             String   @id @default(cuid())
+  userId         String
+  blockchainCode String
+  currencyCode   String // BTC, ETH, USDT, etc.
+  address        String
+  label          String? // "My Main BTC Wallet"
+  isVerified     Boolean  @default(false) // Верификация через тестовую транзакцию
+  isDefault      Boolean  @default(false) // Кошелек по умолчанию для валюты
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  blockchain BlockchainNetwork @relation(fields: [blockchainCode], references: [code])
+  currency   Currency          @relation(fields: [currencyCode], references: [code])
+  orders     Order[] // Заказы, использующие этот кошелек
+
+  @@unique([userId, address])
+  @@index([userId, currencyCode])
+  @@index([address])
+}
+
+// Platform Wallets - кошельки платформы
+model PlatformWallet {
+  id             String    @id @default(cuid())
+  currencyCode   String
+  blockchainCode String
+  address        String    @unique
+  label          String // "Main BTC Wallet", "Cold Storage ETH"
+  isActive       Boolean   @default(true)
+  balance        Float     @default(0) // Опционально, для tracking
+  lastUsed       DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  currency   Currency          @relation(fields: [currencyCode], references: [code])
+  blockchain BlockchainNetwork @relation(fields: [blockchainCode], references: [code])
+
+  @@index([currencyCode, isActive])
+}
+
+// ==========================================
+// ORDER STATUS TRACKING
+// ==========================================
+
+// Order Status History - история изменений статуса заказа (для Kanban)
+model OrderStatusHistory {
+  id        String      @id @default(cuid())
+  orderId   String
+  oldStatus OrderStatus
+  newStatus OrderStatus
+  changedBy String // User ID (admin)
+  note      String?     @db.Text
+  createdAt DateTime    @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([createdAt])
+}
+
+// ==========================================
+// KYC EXTENDED MODELS
+// ==========================================
+
+// KYC Form Fields - настраиваемые поля KYC
+model KycFormField {
+  id         String   @id @default(cuid())
+  fieldName  String   @unique // first_name, passport_number, etc.
+  label      String // Отображаемое название
+  fieldType  String // text, number, date, file, select
+  isRequired Boolean  @default(true)
+  isEnabled  Boolean  @default(true)
+  category   String // personal, documents, address
+  validation Json? // JSON с правилами валидации
+  options    Json? // Для select/radio
+  priority   Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([category])
+  @@index([isEnabled])
+}
+
+// KYC Documents - хранение загруженных документов
+model KycDocument {
+  id               String   @id @default(cuid())
+  kycSessionId     String
+  documentType     String // passport, id_card, driver_license, selfie
+  fileUrl          String // Vercel Blob URL
+  fileName         String
+  fileSize         Int
+  mimeType         String
+  verifiedByAI     Boolean  @default(false) // KYCAID liveness check
+  verificationData Json? // Результат от KYCAID
+  uploadedAt       DateTime @default(now())
+
+  kycSession KycSession @relation(fields: [kycSessionId], references: [id], onDelete: Cascade)
+
+  @@index([kycSessionId])
+  @@index([documentType])
+}
+
+// KYC Form Data - заполненные данные KYC
+model KycFormData {
+  id           String   @id @default(cuid())
+  kycSessionId String
+  fieldName    String
+  fieldValue   String   @db.Text
+  createdAt    DateTime @default(now())
+
+  kycSession KycSession @relation(fields: [kycSessionId], references: [id], onDelete: Cascade)
+
+  @@unique([kycSessionId, fieldName])
+  @@index([kycSessionId])
+}
+
+// ==========================================
+// PAYMENT METHODS
+// ==========================================
+
+// Payment Methods - способы оплаты (REFACTORED for CRM)
+model PaymentMethod {
+  code           String   @id @unique // card, sepa, swift, blik
+  type           String // bank_transfer, card_payment, instant
+  name           String // "SEPA Transfer EUR", "Visa/Mastercard"
+  direction      String   @default("in") // in, out, both
+  pspConnector   String? // tpay, stripe, manual
+  currency       String // EUR, PLN
+  isActive       Boolean  @default(true)
+  processingTime String? // "1-3 business days"
+  minAmount      Float?
+  maxAmount      Float?
+  feeFixed       Float    @default(0)
+  feePercent     Float    @default(0)
+  instructions   String?  @db.Text
+  config         Json? // Настройки (например, API ключи для карт)
+  priority       Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  fiatCurrency FiatCurrency   @relation(fields: [currency], references: [code])
+  psp          PspConnector?  @relation(fields: [pspConnector], references: [code])
+  orders       Order[]
+  limitsMatrix LimitsMatrix[]
+
+  @@index([type, isActive])
+  @@index([currency])
+  @@index([direction])
+}
+
+// ==========================================
+// EXCHANGE RATES
+// ==========================================
+
+// Manual Exchange Rates - ручные переопределения курсов
+model ManualRate {
+  id         String    @id @default(cuid())
+  cryptoCode String
+  fiatCode   String
+  rate       Float
+  validFrom  DateTime  @default(now())
+  validTo    DateTime?
+  isActive   Boolean   @default(true)
+  createdBy  String // Admin user ID
+  reason     String?   @db.Text
+  createdAt  DateTime  @default(now())
+
+  @@index([cryptoCode, fiatCode, isActive])
+  @@index([validFrom, validTo])
+}
+
+// ==========================================
+// INTEGRATIONS
+// ==========================================
+
+// Integration Settings - настройки интеграций
+model IntegrationSetting {
+  id         String    @id @default(cuid())
+  service    String    @unique // kycaid, resend, coingecko
+  isEnabled  Boolean   @default(true)
+  config     Json // API keys, webhook secrets, etc. (ENCRYPTED)
+  lastTested DateTime?
+  status     String    @default("unconfigured") // unconfigured, active, error
+  errorLog   String?   @db.Text
+  updatedAt  DateTime  @updatedAt
+  updatedBy  String? // Admin user ID
+
+  @@index([service])
+  @@index([status])
+}
+
+// ==========================================
+// API KEYS & ACCESS
+// ==========================================
+
+// API Keys для внешнего доступа
+model ApiKey {
+  id          String    @id @default(cuid())
+  userId      String? // Null = admin-generated key
+  key         String    @unique // Hashed API key
+  name        String // Описание ключа ("Production Bot", "Test Integration")
+  prefix      String // Первые символы для идентификации (apx_abc...)
+  permissions Json // { "orders": ["read", "create"], "rates": ["read"] }
+  isActive    Boolean   @default(true)
+  expiresAt   DateTime? // Опционально, срок действия
+  lastUsedAt  DateTime?
+  lastUsedIp  String?
+  usageCount  Int       @default(0)
+  rateLimit   Int       @default(100) // Requests per hour
+  createdBy   String // Admin user ID
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user  User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usage ApiKeyUsage[]
+
+  @@index([key])
+  @@index([userId])
+  @@index([isActive])
+  @@index([prefix])
+}
+
+// API Key Usage Logs
+model ApiKeyUsage {
+  id           String   @id @default(cuid())
+  apiKeyId     String
+  endpoint     String // /api/v1/orders
+  method       String // GET, POST
+  statusCode   Int
+  responseTime Int // milliseconds
+  ipAddress    String
+  userAgent    String?  @db.Text
+  errorMessage String?  @db.Text
+  createdAt    DateTime @default(now())
+
+  apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@index([apiKeyId, createdAt])
+  @@index([endpoint])
+  @@index([createdAt])
+}
+
+// ==========================================
+// SECURITY
+// ==========================================
+
+// IP Whitelist/Blacklist
+model IpRule {
+  id        String    @id @default(cuid())
+  ipAddress String    @unique
+  type      String // whitelist, blacklist
+  reason    String?   @db.Text
+  createdBy String // Admin user ID
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+
+  @@index([ipAddress, type])
+  @@index([type])
+}
+
+// Two-Factor Authentication для админов
+model TwoFactorAuth {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  secret      String // Encrypted TOTP secret
+  isEnabled   Boolean  @default(false)
+  backupCodes String[] // Encrypted
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// DATA RETENTION & GDPR
+// ==========================================
+
+// Data Retention Policies
+model DataRetentionPolicy {
+  id            String   @id @default(cuid())
+  entityType    String // User, Order, KycSession
+  retentionDays Int // Сколько дней хранить
+  autoDelete    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([entityType])
+}
+
+// ==========================================
+// CRM REFERENCE TABLES
+// ==========================================
+
+// Rate Providers - источники курсов
+model RateProvider {
+  code      String   @id @unique // coingecko, binance, kraken, aggregator
+  name      String // CoinGecko, Binance, Kraken
+  type      String // market, average, aggregator
+  weight    Float    @default(1.0) // For weighted average
+  isActive  Boolean  @default(true)
+  apiConfig Json? // API endpoints, keys (encrypted)
+  priority  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  rateSnapshots RateSnapshot[]
+
+  @@index([isActive])
+  @@index([type])
+}
+
+// Rate Snapshots - история курсов по провайдерам
+model RateSnapshot {
+  id         String   @id @default(cuid())
+  providerId String
+  assetCode  String
+  fiatCode   String
+  rate       Float
+  timestamp  DateTime @default(now())
+
+  provider RateProvider @relation(fields: [providerId], references: [code])
+
+  @@index([assetCode, fiatCode, timestamp])
+  @@index([providerId, timestamp])
+}
+
+// Fee Profiles - профили комиссий
+model FeeProfile {
+  code              String   @id @unique // standard, vip, wholesale
+  name              String // Standard Fee, VIP Client, Wholesale
+  spreadBps         Int // Spread in basis points (150 = 1.5%)
+  fixedFeeFiat      Float    @default(0) // Fixed fee amount
+  fiatCurrency      String? // EUR, PLN
+  networkFeePolicy  String   @default("pass-through") // pass-through, fixed, markup
+  networkFeeAmount  Float? // If fixed
+  networkFeePercent Float? // If markup
+  isActive          Boolean  @default(true)
+  priority          Int      @default(0)
+  description       String?  @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  fiat FiatCurrency? @relation(fields: [fiatCurrency], references: [code])
+
+  @@index([isActive])
+}
+
+// KYC Levels - уровни верификации
+model KycLevel {
+  code         String   @id @unique // L0, L1, L2, L3
+  name         String // Unverified, Basic, Advanced, VIP
+  description  String?  @db.Text
+  allowMethods String[] // ["card", "bank", "blik"]
+  requirements Json? // What documents/data needed
+  dailyLimit   Float? // Daily transaction limit
+  monthlyLimit Float? // Monthly transaction limit
+  isActive     Boolean  @default(true)
+  priority     Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  limitsMatrix LimitsMatrix[]
+
+  @@index([isActive])
+}
+
+// Limits Matrix - лимиты по KYC уровню и способу оплаты
+model LimitsMatrix {
+  id            String   @id @default(cuid())
+  kycLevel      String // L0, L1, L2
+  paymentMethod String // card, sepa, blik
+  fiatCurrency  String // EUR, PLN
+  period        String // day, month, year
+  limitAmount   Float // Maximum amount per period
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  kycLevelRel KycLevel      @relation(fields: [kycLevel], references: [code])
+  paymentRel  PaymentMethod @relation(fields: [paymentMethod], references: [code])
+  fiatRel     FiatCurrency  @relation(fields: [fiatCurrency], references: [code])
+
+  @@unique([kycLevel, paymentMethod, fiatCurrency, period])
+  @@index([kycLevel])
+  @@index([paymentMethod])
+}
+
+// PSP Connectors - платежные провайдеры
+model PspConnector {
+  code               String    @id @unique // tpay, stripe, revolut, manual
+  name               String // TPay, Stripe
+  capabilities       String[] // ["card", "bank", "blik"]
+  settlementCurrency String // EUR, PLN
+  apiConfig          Json? // Encrypted config
+  isEnabled          Boolean   @default(true)
+  lastTested         DateTime?
+  status             String    @default("unconfigured")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relations
+  paymentMethods PaymentMethod[]
+
+  @@index([isEnabled])
+  @@index([status])
+}
+
+// Order Status Config - справочник статусов заказов
+model OrderStatusConfig {
+  code         String   @id @unique // created, kyc_pending, payment_pending, etc.
+  name         String // Created, KYC Pending
+  description  String?  @db.Text
+  color        String   @default("#6b7280") // Hex color for UI
+  isTerminal   Boolean  @default(false) // Can't change from this status
+  priority     Int      @default(0)
+  nextStatuses String[] @default([]) // Allowed next statuses
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([priority])
+}
+
+// Transaction Status - справочник статусов транзакций
+model TransactionStatusConfig {
+  code        String   @id @unique // queued, broadcast, confirming, confirmed, failed
+  name        String // Queued, Broadcasting
+  description String?  @db.Text
+  color       String   @default("#6b7280")
+  isTerminal  Boolean  @default(false)
+  priority    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([priority])
+}
+
+// Transactions - блокчейн транзакции
+model Transaction {
+  id            String    @id @default(cuid())
+  orderId       String? // Link to order
+  walletId      String? // Platform wallet ID
+  txHash        String?   @unique
+  currencyCode  String // BTC, ETH, USDT
+  chainCode     String // BITCOIN, ETHEREUM, BSC
+  amount        Float
+  fee           Float?
+  statusCode    String // References TransactionStatusConfig
+  confirmations Int       @default(0)
+  broadcastAt   DateTime?
+  confirmedAt   DateTime?
+  failedAt      DateTime?
+  errorMessage  String?   @db.Text
+  metadata      Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  chain BlockchainNetwork @relation(fields: [chainCode], references: [code])
+
+  @@index([orderId])
+  @@index([txHash])
+  @@index([statusCode])
+  @@index([chainCode])
+}
+
+// Widget Configuration - настройки виджетов
+model WidgetConfig {
+  id               String   @id @default(cuid())
+  code             String   @unique // main, partner_1, mobile_app
+  name             String // Main Widget, Partner 1
+  supportedPairs   String[] // ["EUR→BTC", "PLN→ETH"]
+  defaultFiat      String // EUR
+  defaultCrypto    String? // BTC
+  theme            Json // { logo, colors, fonts }
+  minKycForMethods Json // { "card": "L1", "bank": "L0" }
+  allowedMethods   String[] // ["card", "sepa"]
+  feeProfileCode   String? // Reference to FeeProfile
+  isActive         Boolean  @default(true)
+  domain           String? // Allowed domain for CORS
+  webhookUrl       String? // Callback URL for order updates
+  apiKey           String? // Widget-specific API key
+  metadata         Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([code])
+  @@index([isActive])
+}
+
+// User Extensions - добавить KYC level к User
+model UserKycLevel {
+  userId    String   @unique
+  kycLevel  String // L0, L1, L2
+  updatedAt DateTime @updatedAt
+  updatedBy String? // Admin who updated
+
+  user User @relation("UserKycLevelRelation", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([kycLevel])
+}
+
+// External Service Integrations
+model Integration {
+  id          String    @id @default(cuid())
+  service     String    @unique // coingecko, kycaid, resend, etc.
+  isEnabled   Boolean   @default(false)
+  status      String    @default("inactive") // active, inactive, error
+  apiKey      String? // Encrypted API key
+  apiEndpoint String? // API endpoint URL
+  lastTested  DateTime? // Last connection test
+  config      Json? // Additional configuration
+  rates       Json? // Current exchange rates (for CoinGecko)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([service])
+  @@index([isEnabled])
+  @@index([status])
+}

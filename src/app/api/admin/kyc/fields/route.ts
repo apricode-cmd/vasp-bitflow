@@ -1,0 +1,44 @@
+/**
+ * Admin KYC Fields Configuration API
+ * 
+ * GET /api/admin/kyc/fields - Get all KYC form fields
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { requireRole } from '@/lib/auth-utils';
+import { kycFormService } from '@/lib/services/kyc-form.service';
+
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  try {
+    // Check admin permission
+    const sessionOrError = await requireRole('ADMIN');
+    if (sessionOrError instanceof NextResponse) {
+      return sessionOrError;
+    }
+
+    // Get all fields (including disabled)
+    const fields = await kycFormService.getAllFields();
+
+    // Group by category
+    const grouped = await kycFormService.getFieldsByCategory();
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        fields,
+        grouped
+      }
+    });
+  } catch (error) {
+    console.error('Get KYC fields error:', error);
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Failed to retrieve KYC fields'
+      },
+      { status: 500 }
+    );
+  }
+}
+

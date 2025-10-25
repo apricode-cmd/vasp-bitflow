@@ -1,0 +1,72 @@
+/**
+ * Admin Orders API Route
+ * 
+ * GET /api/admin/orders - List all orders with filtering
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { requireRole } from '@/lib/auth-utils';
+import { prisma } from '@/lib/prisma';
+
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  // Check admin authorization
+  const { error } = await requireRole('ADMIN');
+  if (error) return error;
+
+  try {
+    const { searchParams } = new URL(request.url);
+    
+    // Pagination
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const skip = (page - 1) * limit;
+
+    // Filters
+    const status = searchParams.get('status');
+    const currencyCode = searchParams.get('currency');
+
+    // Build where clause
+    const where: Record<string, unknown> = {};
+    if (status) {
+      where.status = status;
+    }
+    if (currencyCode) {
+      where.currencyCode = currencyCode;
+    }
+
+    // Get orders
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        include: {
+          user: {
+            include: { profile: true }
+          },
+          currency: true,
+          fiatCurrency: true
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit
+      }),
+      prisma.order.count({ where })
+    ]);
+
+    return NextResponse.json({
+      orders,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Admin get orders error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch orders' },
+      { status: 500 }
+    );
+  }
+}
+

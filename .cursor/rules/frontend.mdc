@@ -1,0 +1,509 @@
+---
+description: "Frontend и UI стандарты"
+globs: ["src/app/**/*.tsx", "src/components/**/*.tsx", "src/app/**/page.tsx", "src/app/**/layout.tsx"]
+---
+
+# Frontend Standards - Apricode Exchange
+
+## ⚛️ React & Next.js правила
+
+### Server vs Client Components
+
+**Server Components (по умолчанию):**
+```tsx
+// ✅ НЕ нужно 'use client' для статичного контента
+export default function OrdersPage() {
+  // Fetch data прямо в компоненте
+  const orders = await prisma.order.findMany();
+  
+  return <OrdersList orders={orders} />;
+}
+```
+
+**Client Components (только когда нужно):**
+```tsx
+'use client';
+
+// ✅ Используй для:
+// - useState, useEffect
+// - Event handlers (onClick, onChange)
+// - Browser APIs (localStorage, window)
+// - Third-party interactive libraries
+
+import { useState } from 'react';
+
+export function BuyForm() {
+  const [amount, setAmount] = useState('');
+  // ...
+}
+```
+
+### Структура компонентов
+
+```tsx
+// ✅ Правильная структура компонента
+import { type FC } from 'react';
+import { Button } from '@/components/ui/button';
+
+interface OrderCardProps {
+  orderId: string;
+  amount: number;
+  status: OrderStatus;
+  onCancel?: () => void;
+}
+
+/**
+ * Карточка заказа с кратким описанием и статусом
+ */
+export const OrderCard: FC<OrderCardProps> = ({ 
+  orderId, 
+  amount, 
+  status,
+  onCancel 
+}) => {
+  return (
+    <div className="border rounded-lg p-4">
+      {/* Component JSX */}
+    </div>
+  );
+};
+
+OrderCard.displayName = 'OrderCard';
+```
+
+## 🎨 Styling с Tailwind CSS
+
+### Общие принципы
+1. ✅ Используй только Tailwind утилиты
+2. ❌ НЕ используй inline styles (`style={{}}`)
+3. ✅ Используй `cn()` для условных классов
+4. ✅ Responsive: `sm:`, `md:`, `lg:`, `xl:`
+
+### Паттерны стилизации
+
+```tsx
+import { cn } from '@/lib/utils';
+
+// ✅ Условные классы
+<div className={cn(
+  "base-class-always-applied",
+  isActive && "active-state-class",
+  variant === 'primary' && "primary-variant",
+  className // пропс для внешней кастомизации
+)} />
+
+// ✅ Responsive дизайн
+<div className="w-full md:w-1/2 lg:w-1/3" />
+
+// ✅ Тёмная тема (если используется)
+<div className="bg-white dark:bg-slate-900" />
+```
+
+### Цветовая схема проекта
+
+```tsx
+// Основные цвета (из Tailwind)
+primary: "slate"     // slate-500, slate-600, slate-900
+success: "green"     // green-500, green-600
+error: "red"         // red-500, red-600
+warning: "yellow"    // yellow-500, yellow-600
+
+// Примеры использования
+<Button className="bg-slate-600 hover:bg-slate-700" />
+<Badge className="bg-green-100 text-green-800" />
+```
+
+## 📝 Формы (React Hook Form + Zod)
+
+### Паттерн создания формы
+
+```tsx
+'use client';
+
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+
+// 1. Создай Zod схему
+const buyFormSchema = z.object({
+  currency: z.enum(['BTC', 'ETH', 'USDT', 'SOL']),
+  amount: z.number().positive('Amount must be positive'),
+  walletAddress: z.string().min(26, 'Invalid wallet address'),
+  fiatCurrency: z.enum(['EUR', 'PLN'])
+});
+
+type BuyFormData = z.infer<typeof buyFormSchema>;
+
+// 2. Используй в компоненте
+export function BuyForm() {
+  const form = useForm<BuyFormData>({
+    resolver: zodResolver(buyFormSchema),
+    defaultValues: {
+      currency: 'BTC',
+      fiatCurrency: 'EUR'
+    }
+  });
+
+  const onSubmit = async (data: BuyFormData) => {
+    try {
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+      
+      if (!response.ok) throw new Error('Failed to create order');
+      
+      // Success handling
+    } catch (error) {
+      // Error handling
+    }
+  };
+
+  return (
+    <form onSubmit={form.handleSubmit(onSubmit)}>
+      {/* Form fields */}
+    </form>
+  );
+}
+```
+
+### Работа с полями формы
+
+```tsx
+import { 
+  Form, 
+  FormControl, 
+  FormField, 
+  FormItem, 
+  FormLabel, 
+  FormMessage 
+} from '@/components/ui/form';
+
+<Form {...form}>
+  <FormField
+    control={form.control}
+    name="amount"
+    render={({ field }) => (
+      <FormItem>
+        <FormLabel>Amount (EUR)</FormLabel>
+        <FormControl>
+          <Input 
+            type="number" 
+            placeholder="1000" 
+            {...field}
+            onChange={(e) => field.onChange(parseFloat(e.target.value))}
+          />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    )}
+  />
+</Form>
+```
+
+## 🔔 UI Feedback (Toasts, Loading, Errors)
+
+### Success & Error feedback
+
+```tsx
+import { toast } from 'sonner';
+
+// ✅ Success
+toast.success('Order created successfully!');
+
+// ❌ Error
+toast.error('Failed to create order', {
+  description: 'Please try again later'
+});
+
+// ⚠️ Warning
+toast.warning('KYC verification required');
+
+// ℹ️ Info
+toast.info('Processing your request...');
+```
+
+### Loading states
+
+```tsx
+'use client';
+
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+
+export function SubmitButton() {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    setIsLoading(true);
+    try {
+      await submitOrder();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Button disabled={isLoading} onClick={handleSubmit}>
+      {isLoading ? 'Processing...' : 'Submit Order'}
+    </Button>
+  );
+}
+```
+
+### Suspense границы
+
+```tsx
+import { Suspense } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
+
+export default function OrdersPage() {
+  return (
+    <Suspense fallback={<OrdersSkeleton />}>
+      <OrdersList />
+    </Suspense>
+  );
+}
+
+function OrdersSkeleton() {
+  return (
+    <div className="space-y-4">
+      {[1, 2, 3].map(i => (
+        <Skeleton key={i} className="h-24 w-full" />
+      ))}
+    </div>
+  );
+}
+```
+
+## 🧩 shadcn/ui компоненты
+
+### Установка компонентов
+
+```bash
+# Используй CLI для добавления компонентов
+npx shadcn-ui@latest add button
+npx shadcn-ui@latest add card
+npx shadcn-ui@latest add dialog
+```
+
+### Кастомизация компонентов
+
+```tsx
+// ❌ НЕ изменяй файлы в components/ui напрямую
+
+// ✅ Создавай обёртки для кастомизации
+import { Button } from '@/components/ui/button';
+
+export function PrimaryButton({ children, ...props }) {
+  return (
+    <Button 
+      className="bg-slate-600 hover:bg-slate-700" 
+      {...props}
+    >
+      {children}
+    </Button>
+  );
+}
+```
+
+## 📍 Navigation & Routing
+
+### Link компонент
+
+```tsx
+import Link from 'next/link';
+
+// ✅ Для внутренних ссылок
+<Link href="/orders">View Orders</Link>
+
+// ✅ Для внешних ссылок
+<a href="https://kycaid.com" target="_blank" rel="noopener noreferrer">
+  KYC Provider
+</a>
+
+// ✅ Программная навигация
+'use client';
+import { useRouter } from 'next/navigation';
+
+const router = useRouter();
+router.push('/dashboard');
+router.back();
+router.refresh(); // Revalidate data
+```
+
+## 🔐 Protected Routes
+
+### Client-side protection
+
+```tsx
+'use client';
+
+import { useSession } from 'next-auth/react';
+import { redirect } from 'next/navigation';
+
+export function ProtectedPage() {
+  const { data: session, status } = useSession();
+  
+  if (status === 'loading') return <div>Loading...</div>;
+  if (!session) redirect('/login');
+  
+  return <div>Protected content</div>;
+}
+```
+
+### Middleware protection (предпочтительно)
+
+```tsx
+// src/middleware.ts
+// Middleware автоматически защищает маршруты
+export { default } from 'next-auth/middleware';
+
+export const config = {
+  matcher: ['/dashboard/:path*', '/buy/:path*', '/orders/:path*']
+};
+```
+
+## 💅 Компонентные паттерны
+
+### Compound Components
+
+```tsx
+// ✅ Создавай составные компоненты для гибкости
+export function Card({ children, className }) {
+  return <div className={cn("rounded-lg border", className)}>{children}</div>;
+}
+
+Card.Header = function CardHeader({ children }) {
+  return <div className="p-6 pb-4">{children}</div>;
+};
+
+Card.Body = function CardBody({ children }) {
+  return <div className="p-6 pt-0">{children}</div>;
+};
+
+// Использование
+<Card>
+  <Card.Header>Title</Card.Header>
+  <Card.Body>Content</Card.Body>
+</Card>
+```
+
+### Render Props & Children as Function
+
+```tsx
+// ✅ Для переиспользуемой логики
+interface DataFetcherProps<T> {
+  url: string;
+  children: (data: T | null, isLoading: boolean, error: Error | null) => ReactNode;
+}
+
+export function DataFetcher<T>({ url, children }: DataFetcherProps<T>) {
+  const [data, setData] = useState<T | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  
+  // Fetch logic...
+  
+  return <>{children(data, isLoading, error)}</>;
+}
+
+// Использование
+<DataFetcher url="/api/orders">
+  {(orders, isLoading, error) => {
+    if (isLoading) return <div>Loading...</div>;
+    if (error) return <div>Error: {error.message}</div>;
+    return <OrdersList orders={orders} />;
+  }}
+</DataFetcher>
+```
+
+## 📱 Responsive дизайн
+
+### Mobile-first подход
+
+```tsx
+// ✅ Начинай с mobile, расширяй для больших экранов
+<div className="
+  w-full           // mobile
+  md:w-1/2         // tablet
+  lg:w-1/3         // desktop
+  xl:w-1/4         // large desktop
+">
+  Content
+</div>
+
+// ✅ Адаптивная сетка
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  {/* Cards */}
+</div>
+```
+
+## ♿ Accessibility (A11y)
+
+### Всегда включай:
+
+1. **Aria labels** для иконочных кнопок
+2. **Alt text** для изображений
+3. **Keyboard navigation** (tabindex, focus states)
+4. **Semantic HTML** (header, nav, main, section, article)
+
+```tsx
+// ✅ Правильно
+<button aria-label="Close dialog" onClick={onClose}>
+  <X className="h-4 w-4" />
+</button>
+
+<img src="/logo.png" alt="Apricode Exchange Logo" />
+
+// ❌ Неправильно
+<div onClick={onClose}>Close</div> // должен быть button
+<img src="/logo.png" /> // missing alt
+```
+
+## 🚫 Антипаттерны (НЕ делай так)
+
+```tsx
+// ❌ Inline styles
+<div style={{ color: 'red' }}>Error</div>
+
+// ❌ Слишком большие компоненты (>200 строк)
+// Разбивай на подкомпоненты!
+
+// ❌ Прямая манипуляция DOM
+document.getElementById('element').classList.add('active');
+
+// ❌ any types
+const handleSubmit = (data: any) => { ... }
+
+// ❌ Не забывай displayName для компонентов
+export const MyComponent = () => { ... }
+// ✅ Добавь:
+MyComponent.displayName = 'MyComponent';
+
+// ❌ Unused imports
+import { useState, useEffect, useCallback } from 'react'; // если не все используются
+```
+
+## 📏 Размеры и отступы (Spacing)
+
+```tsx
+// ✅ Консистентные отступы
+padding: p-4, p-6, p-8     // 1rem, 1.5rem, 2rem
+margin: m-4, m-6, m-8
+gap: gap-4, gap-6, gap-8
+
+// ✅ Container
+<div className="container mx-auto px-4">
+  {/* Content centered with padding */}
+</div>
+
+// ✅ Section spacing
+<section className="py-12 md:py-16 lg:py-20">
+  {/* Responsive vertical spacing */}
+</section>
+```
+
+---
+
+**Помни:** Пользовательский опыт превыше всего. Быстрая загрузка, понятный интерфейс, доступность.

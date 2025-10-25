@@ -1,0 +1,138 @@
+/**
+ * Admin Order Management API Route
+ * 
+ * PATCH /api/admin/orders/[id] - Update order status
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { requireRole, getCurrentUserId } from '@/lib/auth-utils';
+import { prisma } from '@/lib/prisma';
+import { updateOrderStatusSchema } from '@/lib/validations/order';
+import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
+import { z } from 'zod';
+
+interface RouteContext {
+  params: {
+    id: string;
+  };
+}
+
+export async function PATCH(request: NextRequest, { params }: RouteContext): Promise<NextResponse> {
+  // Check admin authorization
+  const sessionOrError = await requireRole('ADMIN');
+  if (sessionOrError instanceof NextResponse) {
+    return sessionOrError;
+  }
+
+  try {
+    const body = await request.json();
+    
+    // Validate input
+    const validatedData = updateOrderStatusSchema.parse(body);
+
+    // Get admin ID
+    const adminId = await getCurrentUserId();
+    if (!adminId) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    // Check if order exists
+    const order = await prisma.order.findUnique({
+      where: { id: params.id }
+    });
+
+    if (!order) {
+      return NextResponse.json(
+        { error: 'Order not found' },
+        { status: 404 }
+      );
+    }
+
+    const oldStatus = order.status;
+    const newStatus = validatedData.status;
+
+    // Update order with transaction
+    const updatedOrder = await prisma.$transaction(async (tx) => {
+      // Update order
+      const updated = await tx.order.update({
+        where: { id: params.id },
+        data: {
+          status: newStatus,
+          adminNotes: validatedData.adminNotes,
+          transactionHash: validatedData.transactionHash,
+          processedBy: adminId,
+          processedAt: newStatus === 'COMPLETED' ? new Date() : order.processedAt
+        },
+        include: {
+          user: {
+            include: { profile: true }
+          },
+          currency: true,
+          fiatCurrency: true
+        }
+      });
+
+      // Create status history entry
+      if (oldStatus !== newStatus) {
+        await tx.orderStatusHistory.create({
+          data: {
+            orderId: params.id,
+            oldStatus,
+            newStatus,
+            changedBy: adminId,
+            note: validatedData.adminNotes
+          }
+        });
+      }
+
+      return updated;
+    });
+
+    // Log admin action
+    await auditService.logAdminAction(
+      adminId,
+      AUDIT_ACTIONS.ORDER_STATUS_CHANGED,
+      AUDIT_ENTITIES.ORDER,
+      params.id,
+      {
+        status: oldStatus,
+        adminNotes: order.adminNotes,
+        transactionHash: order.transactionHash
+      },
+      {
+        status: newStatus,
+        adminNotes: validatedData.adminNotes,
+        transactionHash: validatedData.transactionHash
+      },
+      {
+        paymentReference: order.paymentReference,
+        userId: order.userId
+      }
+    );
+
+    // TODO: Send email notification to user about status change
+
+    return NextResponse.json(updatedOrder);
+  } catch (error) {
+    console.error('Admin update order error:', error);
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        {
+          error: 'Validation failed',
+          details: error.errors
+        },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to update order' },
+      { status: 500 }
+    );
+  }
+}
+

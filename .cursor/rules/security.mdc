@@ -1,0 +1,742 @@
+---
+description: "Security и безопасность приложения"
+alwaysApply: true
+---
+
+# Security Standards - Apricode Exchange
+
+## 🔐 КРИТИЧЕСКИЕ ПРАВИЛА БЕЗОПАСНОСТИ
+
+### ⚠️ НИКОГДА не делай:
+
+1. ❌ **НЕ храни секреты в клиентском коде**
+2. ❌ **НЕ коммить .env файлы в Git**
+3. ❌ **НЕ логируй пароли или токены**
+4. ❌ **НЕ доверяй входным данным пользователя**
+5. ❌ **НЕ возвращай подробности ошибок в production**
+6. ❌ **НЕ используй eval() или Function()**
+7. ❌ **НЕ делай SQL запросы напрямую (используй Prisma)**
+8. ❌ **НЕ отключай CSRF защиту**
+
+## 🔑 Environment Variables
+
+### Настройка .env
+
+```bash
+# .env.local (НЕ коммитить!)
+
+# Database
+DATABASE_URL="postgresql://user:password@localhost:5432/apricode"
+
+# NextAuth
+NEXTAUTH_SECRET="generate-strong-secret-here"
+NEXTAUTH_URL="http://localhost:3000"
+
+# KYCAID
+KYCAID_API_KEY="your-kycaid-api-key"
+KYCAID_FORM_ID="your-form-id"
+KYCAID_WEBHOOK_SECRET="your-webhook-secret"
+
+# CoinGecko
+COINGECKO_API_URL="https://api.coingecko.com/api/v3"
+
+# Email
+RESEND_API_KEY="re_xxxxxxxxxxxx"
+EMAIL_FROM="noreply@apricode.io"
+
+# Admin
+ADMIN_EMAIL="admin@apricode.io"
+ADMIN_PASSWORD="SecurePassword123!"
+```
+
+### Безопасное использование
+
+```typescript
+// ✅ Server-only
+// src/lib/config.ts
+
+if (typeof window !== 'undefined') {
+  throw new Error('This file should only run on the server');
+}
+
+export const config = {
+  database: {
+    url: process.env.DATABASE_URL!
+  },
+  kycaid: {
+    apiKey: process.env.KYCAID_API_KEY!,
+    formId: process.env.KYCAID_FORM_ID!,
+    webhookSecret: process.env.KYCAID_WEBHOOK_SECRET!
+  },
+  email: {
+    apiKey: process.env.RESEND_API_KEY!,
+    from: process.env.EMAIL_FROM!
+  }
+};
+
+// ✅ Используй так
+import { config } from '@/lib/config';
+const apiKey = config.kycaid.apiKey;
+
+// ❌ НЕ так
+const apiKey = process.env.KYCAID_API_KEY; // В клиентском коде!
+```
+
+### Environment validation
+
+```typescript
+// src/lib/env.ts
+
+import { z } from 'zod';
+
+const envSchema = z.object({
+  DATABASE_URL: z.string().url(),
+  NEXTAUTH_SECRET: z.string().min(32),
+  NEXTAUTH_URL: z.string().url(),
+  KYCAID_API_KEY: z.string().min(10),
+  KYCAID_FORM_ID: z.string(),
+  KYCAID_WEBHOOK_SECRET: z.string().min(20),
+  RESEND_API_KEY: z.string().startsWith('re_'),
+  EMAIL_FROM: z.string().email(),
+  NODE_ENV: z.enum(['development', 'production', 'test'])
+});
+
+// ✅ Валидируй при старте приложения
+try {
+  envSchema.parse(process.env);
+} catch (error) {
+  console.error('❌ Invalid environment variables:', error);
+  process.exit(1);
+}
+```
+
+## 🔒 Authentication
+
+### Password Hashing
+
+```typescript
+import bcrypt from 'bcryptjs';
+
+// ✅ Хеширование пароля (минимум 10 rounds)
+const SALT_ROUNDS = 10;
+
+async function hashPassword(password: string): Promise<string> {
+  return await bcrypt.hash(password, SALT_ROUNDS);
+}
+
+// ✅ Проверка пароля
+async function verifyPassword(
+  password: string, 
+  hashedPassword: string
+): Promise<boolean> {
+  return await bcrypt.compare(password, hashedPassword);
+}
+
+// ❌ НИКОГДА не храни пароли в открытом виде
+await prisma.user.create({
+  data: {
+    email,
+    password: password // ❌ НЕТ!
+  }
+});
+
+// ✅ ВСЕГДА хешируй
+await prisma.user.create({
+  data: {
+    email,
+    password: await hashPassword(password) // ✅ ДА!
+  }
+});
+```
+
+### Password Requirements
+
+```typescript
+import { z } from 'zod';
+
+// ✅ Строгие требования к паролю
+const passwordSchema = z.string()
+  .min(8, 'Password must be at least 8 characters')
+  .regex(/[A-Z]/, 'Password must contain uppercase letter')
+  .regex(/[a-z]/, 'Password must contain lowercase letter')
+  .regex(/[0-9]/, 'Password must contain number')
+  .regex(/[^A-Za-z0-9]/, 'Password must contain special character');
+
+// Использование
+try {
+  passwordSchema.parse(userPassword);
+} catch (error) {
+  // Покажи ошибку пользователю
+}
+```
+
+### Session Management
+
+```typescript
+// src/lib/auth.ts
+
+import { NextAuthOptions } from 'next-auth';
+import CredentialsProvider from 'next-auth/providers/credentials';
+import { prisma } from '@/lib/prisma';
+import bcrypt from 'bcryptjs';
+
+export const authOptions: NextAuthOptions = {
+  providers: [
+    CredentialsProvider({
+      name: 'credentials',
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' }
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error('Missing credentials');
+        }
+
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email },
+          include: { profile: true }
+        });
+
+        if (!user) {
+          // ✅ НЕ раскрывай, существует ли email
+          throw new Error('Invalid credentials');
+        }
+
+        const isValid = await bcrypt.compare(
+          credentials.password,
+          user.password
+        );
+
+        if (!isValid) {
+          throw new Error('Invalid credentials');
+        }
+
+        // ❌ НЕ возвращай пароль!
+        const { password, ...userWithoutPassword } = user;
+
+        return {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          name: user.profile?.firstName
+        };
+      }
+    })
+  ],
+  
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.role = user.role;
+      }
+      return token;
+    },
+    
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.id as string;
+        session.user.role = token.role as string;
+      }
+      return session;
+    }
+  },
+  
+  pages: {
+    signIn: '/login',
+    error: '/login'
+  },
+  
+  session: {
+    strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60, // 30 дней
+  },
+  
+  // ✅ Сильный секрет
+  secret: process.env.NEXTAUTH_SECRET
+};
+```
+
+## 🛡️ Input Validation
+
+### ВСЕГДА валидируй входные данные
+
+```typescript
+import { z } from 'zod';
+
+// ✅ Определи схему
+const createOrderSchema = z.object({
+  currency: z.enum(['BTC', 'ETH', 'USDT', 'SOL']),
+  amount: z.number()
+    .positive('Amount must be positive')
+    .max(1000000, 'Amount too large'),
+  walletAddress: z.string()
+    .min(26, 'Invalid wallet address')
+    .max(62, 'Invalid wallet address')
+    .regex(/^[a-zA-Z0-9]+$/, 'Invalid characters in wallet address'),
+  fiatCurrency: z.enum(['EUR', 'PLN'])
+});
+
+// ✅ В API route
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    
+    // Валидация
+    const validatedData = createOrderSchema.parse(body);
+    
+    // Используй validatedData (не body!)
+    await createOrder(validatedData);
+    
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: error.errors },
+        { status: 400 }
+      );
+    }
+  }
+}
+```
+
+### Sanitization
+
+```typescript
+// ✅ Очистка строк
+function sanitizeString(input: string): string {
+  return input
+    .trim()
+    .replace(/[<>]/g, '') // Удали HTML теги
+    .slice(0, 1000); // Ограничь длину
+}
+
+// ✅ Email валидация
+const emailSchema = z.string()
+  .email('Invalid email')
+  .toLowerCase()
+  .transform(email => email.trim());
+
+// ✅ URL валидация
+const urlSchema = z.string()
+  .url('Invalid URL')
+  .refine(url => {
+    const parsed = new URL(url);
+    return ['http:', 'https:'].includes(parsed.protocol);
+  }, 'Only HTTP/HTTPS allowed');
+```
+
+## 🔓 Authorization
+
+### Route Protection
+
+```typescript
+// src/middleware.ts
+
+import { withAuth } from 'next-auth/middleware';
+
+export default withAuth({
+  callbacks: {
+    authorized: ({ req, token }) => {
+      const path = req.nextUrl.pathname;
+      
+      // Public routes
+      if (path === '/' || path.startsWith('/login') || path.startsWith('/register')) {
+        return true;
+      }
+      
+      // Must be authenticated
+      if (!token) {
+        return false;
+      }
+      
+      // Admin routes
+      if (path.startsWith('/admin')) {
+        return token.role === 'ADMIN';
+      }
+      
+      // Client routes
+      return true;
+    }
+  },
+  pages: {
+    signIn: '/login'
+  }
+});
+
+export const config = {
+  matcher: [
+    '/dashboard/:path*',
+    '/buy/:path*',
+    '/orders/:path*',
+    '/kyc/:path*',
+    '/profile/:path*',
+    '/admin/:path*'
+  ]
+};
+```
+
+### API Authorization
+
+```typescript
+// src/lib/auth-utils.ts
+
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { NextResponse } from 'next/server';
+
+// ✅ Проверка аутентификации
+export async function requireAuth() {
+  const session = await getServerSession(authOptions);
+  
+  if (!session?.user) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    );
+  }
+  
+  return session;
+}
+
+// ✅ Проверка роли
+export async function requireRole(role: 'CLIENT' | 'ADMIN') {
+  const session = await getServerSession(authOptions);
+  
+  if (!session?.user) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    );
+  }
+  
+  if (session.user.role !== role) {
+    return NextResponse.json(
+      { error: 'Forbidden' },
+      { status: 403 }
+    );
+  }
+  
+  return session;
+}
+
+// ✅ Проверка владения ресурсом
+export async function requireResourceOwnership(
+  resourceUserId: string
+) {
+  const session = await getServerSession(authOptions);
+  
+  if (!session?.user) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    );
+  }
+  
+  // Admin может всё
+  if (session.user.role === 'ADMIN') {
+    return session;
+  }
+  
+  // Обычный пользователь - только свои ресурсы
+  if (session.user.id !== resourceUserId) {
+    return NextResponse.json(
+      { error: 'Forbidden' },
+      { status: 403 }
+    );
+  }
+  
+  return session;
+}
+```
+
+## 🔗 API Security
+
+### Webhook Signature Verification
+
+```typescript
+import crypto from 'crypto';
+
+// ✅ Проверка подписи KYCAID webhook
+export function verifyKycaidSignature(
+  body: string,
+  signature: string,
+  secret: string
+): boolean {
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(body)
+    .digest('hex');
+    
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expectedSignature)
+  );
+}
+
+// Использование в webhook
+export async function POST(request: NextRequest) {
+  const signature = request.headers.get('x-signature');
+  const body = await request.text();
+  
+  if (!signature) {
+    return NextResponse.json(
+      { error: 'Missing signature' },
+      { status: 401 }
+    );
+  }
+  
+  const isValid = verifyKycaidSignature(
+    body,
+    signature,
+    process.env.KYCAID_WEBHOOK_SECRET!
+  );
+  
+  if (!isValid) {
+    return NextResponse.json(
+      { error: 'Invalid signature' },
+      { status: 401 }
+    );
+  }
+  
+  // Обработай webhook
+}
+```
+
+### Rate Limiting (рекомендуется для production)
+
+```typescript
+// src/lib/rate-limit.ts
+
+import { LRUCache } from 'lru-cache';
+
+type RateLimitOptions = {
+  uniqueTokenPerInterval?: number;
+  interval?: number;
+};
+
+export function rateLimit(options?: RateLimitOptions) {
+  const tokenCache = new LRUCache({
+    max: options?.uniqueTokenPerInterval || 500,
+    ttl: options?.interval || 60000
+  });
+
+  return {
+    check: (limit: number, token: string) =>
+      new Promise<void>((resolve, reject) => {
+        const tokenCount = (tokenCache.get(token) as number[]) || [0];
+        
+        if (tokenCount[0] === 0) {
+          tokenCache.set(token, tokenCount);
+        }
+        
+        tokenCount[0] += 1;
+
+        const currentUsage = tokenCount[0];
+        const isRateLimited = currentUsage >= limit;
+
+        return isRateLimited ? reject() : resolve();
+      })
+  };
+}
+
+// Использование
+const limiter = rateLimit({
+  interval: 60 * 1000, // 1 минута
+  uniqueTokenPerInterval: 500
+});
+
+export async function POST(request: NextRequest) {
+  const ip = request.ip || 'unknown';
+  
+  try {
+    await limiter.check(10, ip); // 10 запросов в минуту
+  } catch {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429 }
+    );
+  }
+  
+  // Обработай запрос
+}
+```
+
+## 📝 Sensitive Data
+
+### НИКОГДА не логируй:
+
+```typescript
+// ❌ НЕТ!
+console.log('User password:', user.password);
+console.log('API Key:', process.env.KYCAID_API_KEY);
+console.log('Card details:', cardNumber);
+
+// ✅ ДА! (masked)
+console.log('Processing order for user:', userId);
+console.log('Using API (masked):', apiKey.slice(0, 4) + '****');
+```
+
+### НИКОГДА не возвращай:
+
+```typescript
+// ❌ НЕТ!
+return NextResponse.json({
+  user: {
+    id: user.id,
+    email: user.email,
+    password: user.password, // ❌
+    kycDocuments: user.kycDocuments // ❌ (может содержать паспорта)
+  }
+});
+
+// ✅ ДА!
+return NextResponse.json({
+  user: {
+    id: user.id,
+    email: user.email,
+    kycStatus: user.kycSession?.status
+  }
+});
+```
+
+### Filtering sensitive fields
+
+```typescript
+// ✅ Helper функция
+function sanitizeUser(user: User) {
+  const { password, ...safeUser } = user;
+  return safeUser;
+}
+
+// ✅ Или через Prisma select
+const user = await prisma.user.findUnique({
+  where: { id },
+  select: {
+    id: true,
+    email: true,
+    role: true,
+    profile: true
+    // НЕ включай password
+  }
+});
+```
+
+## 🛡️ CORS & CSP
+
+### CORS Headers (если нужно)
+
+```typescript
+// src/app/api/public/route.ts
+
+export async function GET(request: NextRequest) {
+  const response = NextResponse.json({ data: 'public' });
+  
+  // ✅ Ограничь allowed origins
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
+  const origin = request.headers.get('origin');
+  
+  if (origin && allowedOrigins.includes(origin)) {
+    response.headers.set('Access-Control-Allow-Origin', origin);
+  }
+  
+  return response;
+}
+```
+
+### Content Security Policy
+
+```typescript
+// next.config.js
+
+const securityHeaders = [
+  {
+    key: 'X-DNS-Prefetch-Control',
+    value: 'on'
+  },
+  {
+    key: 'Strict-Transport-Security',
+    value: 'max-age=63072000; includeSubDomains; preload'
+  },
+  {
+    key: 'X-Frame-Options',
+    value: 'SAMEORIGIN'
+  },
+  {
+    key: 'X-Content-Type-Options',
+    value: 'nosniff'
+  },
+  {
+    key: 'X-XSS-Protection',
+    value: '1; mode=block'
+  },
+  {
+    key: 'Referrer-Policy',
+    value: 'origin-when-cross-origin'
+  }
+];
+
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: securityHeaders
+      }
+    ];
+  }
+};
+```
+
+## 🚨 Error Handling
+
+### Безопасное логирование ошибок
+
+```typescript
+// ✅ В development - подробно
+if (process.env.NODE_ENV === 'development') {
+  console.error('Full error:', error);
+  return NextResponse.json(
+    { 
+      error: error.message,
+      stack: error.stack
+    },
+    { status: 500 }
+  );
+}
+
+// ✅ В production - минимально
+console.error('Error occurred:', {
+  message: error.message,
+  code: error.code,
+  timestamp: new Date().toISOString()
+});
+
+return NextResponse.json(
+  { error: 'Internal server error' },
+  { status: 500 }
+);
+```
+
+## 📋 Security Checklist
+
+### Перед деплоем проверь:
+
+- [ ] Все секреты в .env (не в коде)
+- [ ] .env* добавлен в .gitignore
+- [ ] Пароли хешируются перед сохранением
+- [ ] Все API routes защищены аутентификацией
+- [ ] Входные данные валидируются (Zod)
+- [ ] Webhook подписи проверяются
+- [ ] Sensitive данные не логируются
+- [ ] Sensitive данные не возвращаются клиенту
+- [ ] HTTPS используется для всех запросов
+- [ ] Security headers настроены
+- [ ] Rate limiting включен (опционально)
+- [ ] SQL injection защита (Prisma)
+- [ ] XSS защита (React автоматически)
+- [ ] CSRF защита (NextAuth автоматически)
+
+---
+
+**Безопасность - не опция, а обязательство. Один баг может стоить доверия всех пользователей.**

@@ -1,0 +1,682 @@
+---
+description: "API Routes стандарты и безопасность"
+globs: ["src/app/api/**/*.ts", "src/app/api/**/route.ts"]
+---
+
+# API Routes Standards - Apricode Exchange
+
+## 🛣️ Структура API Route
+
+### Next.js 14 App Router формат
+
+```typescript
+// src/app/api/orders/route.ts
+
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { z } from 'zod';
+
+/**
+ * GET /api/orders - Получить список заказов пользователя
+ */
+export async function GET(request: NextRequest) {
+  try {
+    // 1. Аутентификация
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    // 2. Query параметры (опционально)
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get('status');
+
+    // 3. Получение данных
+    const orders = await prisma.order.findMany({
+      where: {
+        userId: session.user.id,
+        ...(status && { status })
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // 4. Успешный ответ
+    return NextResponse.json({ orders });
+    
+  } catch (error) {
+    // 5. Обработка ошибок
+    console.error('GET /api/orders failed:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * POST /api/orders - Создать новый заказ
+ */
+export async function POST(request: NextRequest) {
+  try {
+    // 1. Аутентификация
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    // 2. Валидация входных данных
+    const body = await request.json();
+    
+    const orderSchema = z.object({
+      currency: z.enum(['BTC', 'ETH', 'USDT', 'SOL']),
+      amount: z.number().positive(),
+      walletAddress: z.string().min(26).max(62),
+      fiatCurrency: z.enum(['EUR', 'PLN'])
+    });
+
+    const validatedData = orderSchema.parse(body);
+
+    // 3. Бизнес-логика проверки
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      include: { kycSession: true }
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+
+    // Проверка KYC статуса
+    if (user.kycSession?.status !== 'APPROVED') {
+      return NextResponse.json(
+        { error: 'KYC verification required' },
+        { status: 403 }
+      );
+    }
+
+    // 4. Создание заказа
+    const order = await prisma.order.create({
+      data: {
+        userId: user.id,
+        currency: validatedData.currency,
+        amount: validatedData.amount,
+        walletAddress: validatedData.walletAddress,
+        fiatCurrency: validatedData.fiatCurrency,
+        status: 'PENDING',
+        // ... другие поля
+      }
+    });
+
+    // 5. Успешный ответ
+    return NextResponse.json(
+      { order },
+      { status: 201 }
+    );
+    
+  } catch (error) {
+    // Zod validation errors
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Validation error', details: error.errors },
+        { status: 400 }
+      );
+    }
+
+    console.error('POST /api/orders failed:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+## 🔐 Аутентификация и Авторизация
+
+### Проверка аутентификации (всегда первым шагом)
+
+```typescript
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+
+// ✅ Для всех защищённых эндпоинтов
+const session = await getServerSession(authOptions);
+if (!session?.user) {
+  return NextResponse.json(
+    { error: 'Unauthorized' },
+    { status: 401 }
+  );
+}
+```
+
+### Проверка прав (Role-based)
+
+```typescript
+// ✅ Admin-only эндпоинты
+const session = await getServerSession(authOptions);
+if (session?.user?.role !== 'ADMIN') {
+  return NextResponse.json(
+    { error: 'Forbidden - Admin access required' },
+    { status: 403 }
+  );
+}
+```
+
+### Проверка владения ресурсом
+
+```typescript
+// ✅ Проверка, что пользователь может изменять только свои данные
+const order = await prisma.order.findUnique({
+  where: { id: orderId }
+});
+
+if (order.userId !== session.user.id && session.user.role !== 'ADMIN') {
+  return NextResponse.json(
+    { error: 'Forbidden - Not your resource' },
+    { status: 403 }
+  );
+}
+```
+
+## ✅ Валидация входных данных
+
+### Всегда используй Zod schemas
+
+```typescript
+import { z } from 'zod';
+
+// ✅ Определи схему
+const createOrderSchema = z.object({
+  currency: z.enum(['BTC', 'ETH', 'USDT', 'SOL'], {
+    errorMap: () => ({ message: 'Invalid currency' })
+  }),
+  amount: z.number().positive('Amount must be positive'),
+  walletAddress: z.string()
+    .min(26, 'Wallet address too short')
+    .max(62, 'Wallet address too long')
+    .regex(/^[a-zA-Z0-9]+$/, 'Invalid wallet address format'),
+  fiatCurrency: z.enum(['EUR', 'PLN'])
+});
+
+// ✅ Валидируй данные
+try {
+  const validatedData = createOrderSchema.parse(body);
+  // Используй validatedData
+} catch (error) {
+  if (error instanceof z.ZodError) {
+    return NextResponse.json(
+      { 
+        error: 'Validation failed', 
+        details: error.errors.map(e => ({
+          field: e.path.join('.'),
+          message: e.message
+        }))
+      },
+      { status: 400 }
+    );
+  }
+}
+```
+
+### Сложная валидация с рефайнментом
+
+```typescript
+const orderSchema = z.object({
+  amount: z.number().positive(),
+  currency: z.enum(['BTC', 'ETH', 'USDT', 'SOL'])
+}).refine(
+  (data) => {
+    // Проверка минимальной суммы для каждой валюты
+    const minAmounts = { BTC: 50, ETH: 50, USDT: 20, SOL: 20 };
+    return data.amount >= minAmounts[data.currency];
+  },
+  {
+    message: 'Amount is below minimum for selected currency',
+    path: ['amount']
+  }
+);
+```
+
+## 📤 HTTP Response Patterns
+
+### Стандартные статус коды
+
+```typescript
+// ✅ 200 OK - Успешный GET/PATCH
+return NextResponse.json({ data });
+
+// ✅ 201 Created - Успешный POST (создание)
+return NextResponse.json({ order }, { status: 201 });
+
+// ✅ 204 No Content - Успешный DELETE (без тела)
+return new NextResponse(null, { status: 204 });
+
+// ✅ 400 Bad Request - Невалидные данные
+return NextResponse.json(
+  { error: 'Invalid input', details: validationErrors },
+  { status: 400 }
+);
+
+// ✅ 401 Unauthorized - Не аутентифицирован
+return NextResponse.json(
+  { error: 'Unauthorized' },
+  { status: 401 }
+);
+
+// ✅ 403 Forbidden - Нет прав доступа
+return NextResponse.json(
+  { error: 'Forbidden' },
+  { status: 403 }
+);
+
+// ✅ 404 Not Found - Ресурс не найден
+return NextResponse.json(
+  { error: 'Order not found' },
+  { status: 404 }
+);
+
+// ✅ 500 Internal Server Error - Ошибка сервера
+return NextResponse.json(
+  { error: 'Internal server error' },
+  { status: 500 }
+);
+```
+
+### Консистентный формат ошибок
+
+```typescript
+// ✅ Всегда возвращай ошибки в одном формате
+interface ErrorResponse {
+  error: string;           // Краткое описание
+  message?: string;        // Детальное сообщение (опционально)
+  details?: unknown;       // Доп. информация (опционально)
+  code?: string;           // Код ошибки для клиента (опционально)
+}
+
+return NextResponse.json(
+  {
+    error: 'Validation failed',
+    message: 'Invalid wallet address format',
+    code: 'INVALID_WALLET_ADDRESS'
+  },
+  { status: 400 }
+);
+```
+
+## 🔄 Обработка ошибок
+
+### Try-catch паттерн (всегда)
+
+```typescript
+export async function POST(request: NextRequest) {
+  try {
+    // Основная логика
+    
+  } catch (error) {
+    // Логируй с контекстом
+    console.error('POST /api/orders failed:', {
+      error,
+      url: request.url,
+      method: request.method
+    });
+    
+    // Специфичная обработка
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Validation error', details: error.errors },
+        { status: 400 }
+      );
+    }
+    
+    if (error.code === 'P2002') { // Prisma unique constraint
+      return NextResponse.json(
+        { error: 'Resource already exists' },
+        { status: 409 }
+      );
+    }
+    
+    // Общая обработка
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+## 🎯 Dynamic Routes
+
+### Параметры URL
+
+```typescript
+// src/app/api/orders/[id]/route.ts
+
+interface RouteParams {
+  params: {
+    id: string;
+  };
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: RouteParams
+) {
+  const orderId = params.id;
+  
+  // Валидация ID
+  if (!orderId || typeof orderId !== 'string') {
+    return NextResponse.json(
+      { error: 'Invalid order ID' },
+      { status: 400 }
+    );
+  }
+  
+  // ... остальная логика
+}
+```
+
+## 🔗 Внешние API вызовы
+
+### Паттерн для KYCAID
+
+```typescript
+// src/lib/kycaid.ts
+
+interface CreateKycSessionParams {
+  userId: string;
+  email: string;
+}
+
+export async function createKycSession({ 
+  userId, 
+  email 
+}: CreateKycSessionParams) {
+  try {
+    const response = await fetch('https://api.kycaid.com/v1/sessions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${process.env.KYCAID_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        form_id: process.env.KYCAID_FORM_ID,
+        external_applicant_id: userId,
+        email
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`KYCAID API error: ${error.message}`);
+    }
+
+    return await response.json();
+    
+  } catch (error) {
+    console.error('KYCAID session creation failed:', error);
+    throw error;
+  }
+}
+```
+
+### Паттерн для CoinGecko
+
+```typescript
+// src/lib/coingecko.ts
+
+export async function getExchangeRate(
+  cryptoCurrency: string,
+  fiatCurrency: string
+): Promise<number> {
+  try {
+    const coinIds = {
+      BTC: 'bitcoin',
+      ETH: 'ethereum',
+      USDT: 'tether',
+      SOL: 'solana'
+    };
+
+    const response = await fetch(
+      `https://api.coingecko.com/api/v3/simple/price?ids=${coinIds[cryptoCurrency]}&vs_currencies=${fiatCurrency.toLowerCase()}`,
+      {
+        next: { revalidate: 60 } // Кеш на 60 секунд
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch exchange rate');
+    }
+
+    const data = await response.json();
+    return data[coinIds[cryptoCurrency]][fiatCurrency.toLowerCase()];
+    
+  } catch (error) {
+    console.error('CoinGecko API error:', error);
+    throw new Error('Failed to fetch exchange rate');
+  }
+}
+```
+
+## 🪝 Webhooks
+
+### Обработка KYCAID webhook
+
+```typescript
+// src/app/api/kyc/webhook/route.ts
+
+import crypto from 'crypto';
+
+export async function POST(request: NextRequest) {
+  try {
+    // 1. Верификация подписи
+    const signature = request.headers.get('x-signature');
+    const body = await request.text();
+    
+    const expectedSignature = crypto
+      .createHmac('sha256', process.env.KYCAID_WEBHOOK_SECRET!)
+      .update(body)
+      .digest('hex');
+
+    if (signature !== expectedSignature) {
+      return NextResponse.json(
+        { error: 'Invalid signature' },
+        { status: 401 }
+      );
+    }
+
+    // 2. Парсинг данных
+    const webhookData = JSON.parse(body);
+    const { applicant_id, verification_id, status } = webhookData;
+
+    // 3. Обновление KYC статуса
+    await prisma.kycSession.update({
+      where: { 
+        userId: applicant_id 
+      },
+      data: {
+        status: status === 'completed' ? 'APPROVED' : 'REJECTED',
+        verificationId: verification_id,
+        completedAt: new Date()
+      }
+    });
+
+    // 4. Логирование события
+    await prisma.auditLog.create({
+      data: {
+        action: 'KYC_WEBHOOK_RECEIVED',
+        details: { status, applicant_id }
+      }
+    });
+
+    return NextResponse.json({ success: true });
+    
+  } catch (error) {
+    console.error('KYC webhook error:', error);
+    return NextResponse.json(
+      { error: 'Webhook processing failed' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+## 📊 Query Parameters
+
+### Обработка фильтров и пагинации
+
+```typescript
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  
+  // ✅ Pagination
+  const page = parseInt(searchParams.get('page') || '1');
+  const limit = parseInt(searchParams.get('limit') || '10');
+  const skip = (page - 1) * limit;
+  
+  // ✅ Filters
+  const status = searchParams.get('status'); // ?status=PENDING
+  const currency = searchParams.get('currency'); // ?currency=BTC
+  
+  // ✅ Sorting
+  const sortBy = searchParams.get('sortBy') || 'createdAt';
+  const sortOrder = searchParams.get('sortOrder') || 'desc';
+  
+  const orders = await prisma.order.findMany({
+    where: {
+      ...(status && { status }),
+      ...(currency && { currency })
+    },
+    orderBy: {
+      [sortBy]: sortOrder
+    },
+    skip,
+    take: limit
+  });
+  
+  // Вернуть с метаданными
+  const total = await prisma.order.count({ where: { /* same filters */ } });
+  
+  return NextResponse.json({
+    data: orders,
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit)
+    }
+  });
+}
+```
+
+## 🛡️ Security Best Practices
+
+### 1. Rate Limiting (опционально, но рекомендуется)
+
+```typescript
+// Используй Vercel Edge Config или Redis для rate limiting
+import { ratelimit } from '@/lib/ratelimit';
+
+export async function POST(request: NextRequest) {
+  const ip = request.ip || 'unknown';
+  
+  const { success } = await ratelimit.limit(ip);
+  
+  if (!success) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429 }
+    );
+  }
+  
+  // ... остальная логика
+}
+```
+
+### 2. CORS Headers (если нужно)
+
+```typescript
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+    }
+  });
+}
+```
+
+### 3. Sensitive Data
+
+```typescript
+// ❌ НЕ возвращай чувствительные данные
+return NextResponse.json({
+  user: {
+    id: user.id,
+    email: user.email,
+    password: user.password, // ❌ НИКОГДА!
+    kycDocuments: user.kycDocuments // ❌ Будь осторожен
+  }
+});
+
+// ✅ Фильтруй данные
+const { password, ...safeUser } = user;
+return NextResponse.json({ user: safeUser });
+
+// ✅ Или используй select в Prisma
+const user = await prisma.user.findUnique({
+  where: { id },
+  select: {
+    id: true,
+    email: true,
+    role: true,
+    // НЕ включай password
+  }
+});
+```
+
+## 🚫 Антипаттерны (НЕ делай так)
+
+```typescript
+// ❌ Нет аутентификации
+export async function POST(request: NextRequest) {
+  const body = await request.json();
+  await prisma.order.create({ data: body });
+}
+
+// ❌ Нет валидации
+export async function POST(request: NextRequest) {
+  const body = await request.json();
+  // Прямое использование без проверки
+  await doSomething(body.amount);
+}
+
+// ❌ Не логируй ошибки
+catch (error) {
+  return NextResponse.json({ error: 'Error' }, { status: 500 });
+}
+
+// ❌ Раскрытие деталей ошибок клиенту
+catch (error) {
+  return NextResponse.json({ error: error.message }, { status: 500 });
+}
+
+// ❌ Использование any
+export async function POST(request: any) { ... }
+```
+
+---
+
+**Помни:** Безопасность > Удобство. Каждый API endpoint - потенциальная точка атаки.
