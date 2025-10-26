@@ -80,6 +80,7 @@ model User {
   kycLevelData  UserKycLevel?  @relation("UserKycLevelRelation")
   systemLogs    SystemLog[]
   blockedIPs    IPBlacklist[]  @relation("BlockedBy")
+  adminSettings AdminSettings? @relation("AdminSettings")
   
   // Payment Relations
   payInsAsUser      PayIn[]  @relation("PayInUser")
@@ -1251,4 +1252,41 @@ model IPBlacklist {
   @@index([isActive])
   @@index([expiresAt])
   @@index([blockedBy])
+}
+
+// ==========================================
+// ADMIN SETTINGS
+// ==========================================
+
+// Admin Security Settings - настройки безопасности администратора
+model AdminSettings {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  // Session Management
+  sessionTimeout Int @default(30) // Timeout in minutes (15, 30, 60, 120, 480, 1440)
+
+  // Two-Factor Authentication
+  twoFactorEnabled Boolean @default(false)
+  twoFactorMethod  String? // "EMAIL", "SMS", "AUTHENTICATOR"
+
+  // Notifications
+  loginNotifications  Boolean @default(true) // Email on new login
+  activityDigest      Boolean @default(false) // Daily activity summary
+  securityAlerts      Boolean @default(true) // Security-related notifications
+
+  // IP Restrictions
+  allowedIPs String[] // List of allowed IP addresses (empty = all allowed)
+  blockUnknownDevices Boolean @default(false)
+
+  // Audit Preferences
+  logAllActions Boolean @default(true)
+  retainLogsFor Int     @default(90) // Days to retain logs
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation("AdminSettings", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

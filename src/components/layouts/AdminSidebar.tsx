@@ -12,7 +12,7 @@ import { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, ShoppingCart, Settings, CreditCard,
   TrendingUp, Shield, Database, Activity, Coins,
-  Wallet, Globe, Key,
+  Wallet, Globe, Key, User,
   ChevronDown, ChevronRight, Search,
   ArrowDownCircle, ArrowUpCircle
 } from 'lucide-react';
@@ -143,6 +143,12 @@ const navigation = [
   {
     section: 'System & Settings',
     items: [
+      { 
+        name: 'Admin Profile', 
+        href: '/admin/profile', 
+        icon: User,
+        description: 'Account & Security'
+      },
       { 
         name: 'Settings', 
         href: '/admin/settings', 
