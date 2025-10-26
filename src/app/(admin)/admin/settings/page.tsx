@@ -90,10 +90,6 @@ export default function SettingsPage(): JSX.Element {
     }
   };
 
-  useEffect(() => {
-    fetchSettings();
-  }, []);
-
   const fetchSettings = async () => {
     try {
       const response = await fetch('/api/admin/settings');
@@ -117,8 +113,14 @@ export default function SettingsPage(): JSX.Element {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Add preview color to settings before saving
+      const settingsToSave = {
+        ...settings,
+        primaryColor: previewColor
+      };
+
       // Convert settings object to array format expected by API
-      const settingsArray = Object.entries(settings).map(([key, value]) => ({
+      const settingsArray = Object.entries(settingsToSave).map(([key, value]) => ({
         key,
         value: String(value)
       }));
@@ -273,7 +275,8 @@ export default function SettingsPage(): JSX.Element {
                           const color = Color.rgb(rgba);
                           const hex = color.hex();
                           setPreviewColor(hex);
-                          updateSetting('primaryColor', hex);
+                          // Don't update settings here - only on save
+                          // This prevents infinite loop
                         } catch (error) {
                           console.error('Color conversion error:', error);
                         }
