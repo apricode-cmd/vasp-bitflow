@@ -66,7 +66,7 @@ interface FiatCurrency {
 interface BlockchainNetwork {
   code: string;
   name: string;
-  symbol: string;
+  symbol?: string; // Make optional since it might be undefined
   isActive: boolean;
 }
 
@@ -186,16 +186,20 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
         blockchainRes.json()
       ]);
 
-      if (cryptoData.success) {
+      console.log('Loaded data:', { cryptoData, fiatData, blockchainData });
+
+      if (cryptoData.success && Array.isArray(cryptoData.data)) {
         setCryptocurrencies(cryptoData.data);
       }
 
-      if (fiatData.success) {
+      if (fiatData.success && Array.isArray(fiatData.data)) {
         setFiatCurrencies(fiatData.data);
       }
 
-      if (blockchainData.success) {
-        setBlockchainNetworks(blockchainData.data.filter((n: any) => n.isActive));
+      if (blockchainData.success && Array.isArray(blockchainData.data)) {
+        const activeNetworks = blockchainData.data.filter((n: any) => n.isActive);
+        console.log('Active blockchain networks:', activeNetworks);
+        setBlockchainNetworks(activeNetworks);
       }
     } catch (error) {
       console.error('Failed to fetch currencies/networks:', error);
@@ -419,7 +423,7 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
                     .map(network => ({
                       value: network.code,
                       label: `${network.name} (${network.code})`,
-                      description: `${network.symbol} Network`
+                      description: network.symbol ? `${network.symbol}` : network.code
                     }))}
                   value={watchedFields.blockchainCode || ''}
                   onValueChange={(value) => setValue('blockchainCode', value)}
