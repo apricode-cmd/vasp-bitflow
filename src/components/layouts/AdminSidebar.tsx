@@ -28,6 +28,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { ApricodeLogo } from '@/components/icons/ApricodeLogo';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 
 const navigation = [
   {
@@ -429,6 +430,16 @@ export function AdminSidebar(): JSX.Element {
                 </div>
               </div>
             )}
+
+            <Separator />
+
+            {/* Theme Toggle */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted-foreground uppercase">
+                Theme
+              </span>
+              <ThemeToggle />
+            </div>
 
             <Separator />
 

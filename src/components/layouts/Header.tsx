@@ -34,6 +34,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { useState } from 'react';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 
 export function Header(): React.ReactElement {
   const pathname = usePathname();
