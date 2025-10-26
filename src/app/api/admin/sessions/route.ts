@@ -10,12 +10,19 @@ import { requireRole } from '@/lib/auth-utils';
 
 export async function GET(request: NextRequest) {
   try {
-    const authResult = await requireRole('ADMIN');
-    if (authResult instanceof NextResponse) {
-      return authResult;
+    const { error, session } = await requireRole('ADMIN');
+    if (error) {
+      return error;
     }
 
-    const userId = authResult.user.id;
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { success: false, error: 'User not authenticated' },
+        { status: 401 }
+      );
+    }
+
+    const userId = session.user.id;
 
     // Get recent system logs for this user (login and API activities)
     // Consider a session active if there was activity in the last 24 hours

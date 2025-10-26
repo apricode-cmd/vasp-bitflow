@@ -18,12 +18,19 @@ const profileUpdateSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const authResult = await requireRole('ADMIN');
-    if (authResult instanceof NextResponse) {
-      return authResult;
+    const { error, session } = await requireRole('ADMIN');
+    if (error) {
+      return error;
     }
 
-    const userId = authResult.user.id;
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { success: false, error: 'User not authenticated' },
+        { status: 401 }
+      );
+    }
+
+    const userId = session.user.id;
 
     // Get user with profile
     const user = await prisma.user.findUnique({
@@ -73,19 +80,26 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const authResult = await requireRole('ADMIN');
-    if (authResult instanceof NextResponse) {
-      return authResult;
+    const { error, session } = await requireRole('ADMIN');
+    if (error) {
+      return error;
     }
 
-    const userId = authResult.user.id;
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { success: false, error: 'User not authenticated' },
+        { status: 401 }
+      );
+    }
+
+    const userId = session.user.id;
     const body = await request.json();
 
     // Validate input
     const validatedData = profileUpdateSchema.parse(body);
 
     // Check if email is already taken by another user
-    if (validatedData.email !== authResult.user.email) {
+    if (validatedData.email !== session.user.email) {
       const existingUser = await prisma.user.findFirst({
         where: {
           email: validatedData.email,
