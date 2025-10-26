@@ -12,8 +12,8 @@ import { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, ShoppingCart, Settings, CreditCard,
   TrendingUp, Shield, Database, Activity, Coins,
-  Wallet, Globe, Key, Wrench, Package,
-  ChevronDown, ChevronRight, Search, Menu, X,
+  Wallet, Globe, Key,
+  ChevronDown, ChevronRight, Search,
   ArrowDownCircle, ArrowUpCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -21,7 +21,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
   Collapsible,
   CollapsibleContent,
@@ -183,7 +182,6 @@ export function AdminSidebar(): JSX.Element {
     }), {})
   );
   const [searchQuery, setSearchQuery] = useState('');
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const [stats, setStats] = useState<{ 
     pendingOrders: number; 
     pendingKyc: number;
@@ -243,43 +241,28 @@ export function AdminSidebar(): JSX.Element {
   };
 
   return (
-    <div className={cn(
-      "bg-card border-r flex flex-col h-screen transition-all duration-300",
-      isCollapsed ? "w-16" : "w-64"
+    <aside className={cn(
+      "bg-card/95 backdrop-blur-sm flex flex-col h-full transition-all duration-300",
+      "shadow-[4px_0_24px_-2px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_24px_-2px_rgba(0,0,0,0.3)]"
     )}>
       {/* Logo/Header */}
-      <div className="p-4 border-b">
-        <div className="flex items-center justify-between">
-          {!isCollapsed && (
-            <div>
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 flex items-center justify-center">
-                  <ApricodeLogo className="text-primary w-full h-full" />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold text-primary">
-                    CryptoExchange
-                  </h2>
-                  <p className="text-xs text-muted-foreground">Admin CRM</p>
-                </div>
-              </div>
-            </div>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className={cn(!isCollapsed && "ml-auto")}
-          >
-            {isCollapsed ? <Menu className="h-4 w-4" /> : <X className="h-4 w-4" />}
-          </Button>
+      <div className="p-4 border-b border-border/50">
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 flex items-center justify-center">
+            <ApricodeLogo className="text-primary w-full h-full" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-primary">
+              CryptoExchange
+            </h2>
+            <p className="text-xs text-muted-foreground">Admin CRM</p>
+          </div>
         </div>
       </div>
 
       {/* Search */}
-      {!isCollapsed && (
-        <div className="p-3 border-b">
-          <div className="relative">
+      <div className="p-3 border-b border-border/50">
+        <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search menu..."
@@ -289,7 +272,6 @@ export function AdminSidebar(): JSX.Element {
             />
           </div>
         </div>
-      )}
 
       <Separator />
 
@@ -302,31 +284,26 @@ export function AdminSidebar(): JSX.Element {
             return (
               <Collapsible
                 key={section.section}
-                open={isCollapsed ? false : openSections[section.section]}
-                onOpenChange={() => !isCollapsed && toggleSection(section.section)}
+                open={openSections[section.section]}
+                onOpenChange={() => toggleSection(section.section)}
               >
-                {!isCollapsed && (
-                  <CollapsibleTrigger className={cn(
-                    "flex items-center justify-between w-full px-2 py-2 text-xs font-semibold uppercase transition-colors rounded-md",
-                    hasHighPriority 
-                      ? "text-foreground hover:text-primary" 
-                      : "text-muted-foreground hover:text-foreground"
-                  )}>
-                    <span className={hasHighPriority ? "text-primary" : ""}>
-                      {section.section}
-                    </span>
-                    {openSections[section.section] ? (
-                      <ChevronDown className="h-4 w-4" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4" />
-                    )}
-                  </CollapsibleTrigger>
-                )}
-                
-                <CollapsibleContent className={cn(
-                  "space-y-1",
-                  !isCollapsed && "mt-1"
+                <CollapsibleTrigger className={cn(
+                  "flex items-center justify-between w-full px-2 py-2 text-xs font-semibold uppercase transition-colors rounded-md",
+                  hasHighPriority 
+                    ? "text-foreground hover:text-primary" 
+                    : "text-muted-foreground hover:text-foreground"
                 )}>
+                  <span className={hasHighPriority ? "text-primary" : ""}>
+                    {section.section}
+                  </span>
+                  {openSections[section.section] ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </CollapsibleTrigger>
+                
+                <CollapsibleContent className="space-y-1 mt-1">
                   {section.items.map((item) => {
                     const Icon = item.icon;
                     const isActive = pathname === item.href || 
@@ -343,38 +320,33 @@ export function AdminSidebar(): JSX.Element {
                             ? 'bg-primary text-primary-foreground shadow-md'
                             : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                         )}
-                        title={isCollapsed ? item.name : ''}
                       >
                         <Icon className={cn(
                           "w-5 h-5 shrink-0 transition-transform group-hover:scale-110",
                           isActive && "drop-shadow"
                         )} />
                         
-                        {!isCollapsed && (
-                          <>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="truncate">{item.name}</span>
-                                {badgeCount !== null && badgeCount > 0 && (
-                                  <Badge 
-                                    variant={isActive ? "secondary" : "default"}
-                                    className={cn(
-                                      "h-5 min-w-5 px-1.5 text-xs font-bold",
-                                      isActive && "bg-primary-foreground text-primary"
-                                    )}
-                                  >
-                                    {badgeCount}
-                                  </Badge>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate">{item.name}</span>
+                            {badgeCount !== null && badgeCount > 0 && (
+                              <Badge 
+                                variant={isActive ? "secondary" : "default"}
+                                className={cn(
+                                  "h-5 min-w-5 px-1.5 text-xs font-bold",
+                                  isActive && "bg-primary-foreground text-primary"
                                 )}
-                              </div>
-                              {item.description && !isActive && (
-                                <p className="text-xs text-muted-foreground/70 truncate mt-0.5">
-                                  {item.description}
-                                </p>
-                              )}
-                            </div>
-                          </>
-                        )}
+                              >
+                                {badgeCount}
+                              </Badge>
+                            )}
+                          </div>
+                          {item.description && !isActive && (
+                            <p className="text-xs text-muted-foreground/70 truncate mt-0.5">
+                              {item.description}
+                            </p>
+                          )}
+                        </div>
                       </Link>
                     );
                   })}
@@ -386,10 +358,9 @@ export function AdminSidebar(): JSX.Element {
       </ScrollArea>
 
       {/* Footer Info */}
-      {!isCollapsed && (
-        <>
-          <Separator />
-          <div className="p-4 space-y-3">
+      <>
+        <Separator />
+        <div className="p-4 space-y-3">
             {/* Quick Stats */}
             {stats && (stats.pendingOrders > 0 || stats.pendingKyc > 0) && (
               <div className="space-y-2">
@@ -450,7 +421,6 @@ export function AdminSidebar(): JSX.Element {
             </div>
           </div>
         </>
-      )}
-    </div>
+      </aside>
   );
 }

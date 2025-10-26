@@ -6,8 +6,7 @@
 
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
-import { AdminSidebar } from '@/components/layouts/AdminSidebar';
-import { AdminFooter } from '@/components/layouts/AdminFooter';
+import { AdminLayoutClient } from '@/components/layouts/AdminLayoutClient';
 
 export default async function AdminLayout({
   children
@@ -21,17 +20,5 @@ export default async function AdminLayout({
     redirect('/dashboard');
   }
 
-  return (
-    <div className="flex min-h-screen bg-background">
-      <AdminSidebar />
-      <div className="flex-1 flex flex-col overflow-auto">
-        <main className="flex-1">
-          <div className="container mx-auto p-6 max-w-[1600px]">
-            {children}
-          </div>
-        </main>
-        <AdminFooter />
-      </div>
-    </div>
-  );
+  return <AdminLayoutClient>{children}</AdminLayoutClient>;
 }
