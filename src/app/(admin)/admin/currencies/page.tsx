@@ -76,10 +76,11 @@ export default function CurrenciesPage(): JSX.Element {
                 label: 'Chain (if token)', 
                 type: 'select', 
                 options: [
-                  { value: '', label: 'None (native coin)' },
+                  { value: 'NONE', label: 'None (native coin)' },
                   { value: 'ETHEREUM', label: 'Ethereum (ERC20)' },
                   { value: 'BSC', label: 'Binance Smart Chain (BEP20)' },
                   { value: 'POLYGON', label: 'Polygon' },
+                  { value: 'TRON', label: 'Tron (TRC20)' },
                   { value: 'SOLANA', label: 'Solana (SPL)' }
                 ]
               },

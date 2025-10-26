@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getCurrentUserId } from '@/lib/auth-utils';
-import prisma from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { auditService, AUDIT_ACTIONS } from '@/lib/services/audit.service';
 import { z } from 'zod';
 
@@ -25,12 +25,17 @@ const createSchema = z.object({
 
 const updateSchema = createSchema.partial().omit({ code: true });
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(req: NextRequest): Promise<NextResponse> {
   try {
     const sessionOrError = await requireRole('ADMIN');
     if (sessionOrError instanceof NextResponse) return sessionOrError;
 
+    // Check if only active items should be returned (for selects/comboboxes)
+    const { searchParams } = new URL(req.url);
+    const activeOnly = searchParams.get('active') === 'true';
+
     const currencies = await prisma.currency.findMany({
+      where: activeOnly ? { isActive: true } : undefined,
       orderBy: { priority: 'asc' }
     });
 

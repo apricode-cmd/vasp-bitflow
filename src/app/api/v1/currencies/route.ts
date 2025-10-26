@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireApiKey, logApiRequest } from '@/lib/middleware/api-auth';
-import prisma from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const startTime = Date.now();

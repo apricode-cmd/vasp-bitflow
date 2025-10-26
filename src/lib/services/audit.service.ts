@@ -13,6 +13,7 @@ export interface AuditFilters {
   action?: string;
   entity?: string;
   entityId?: string;
+  ipAddress?: string;
   fromDate?: Date;
   toDate?: Date;
   limit?: number;
@@ -146,6 +147,13 @@ class AuditService {
 
     if (filters.entityId) {
       where.entityId = filters.entityId;
+    }
+
+    if (filters.ipAddress) {
+      where.ipAddress = {
+        contains: filters.ipAddress,
+        mode: 'insensitive'
+      };
     }
 
     if (filters.fromDate || filters.toDate) {

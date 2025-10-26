@@ -78,6 +78,15 @@ model User {
   apiKeys       ApiKey[]
   twoFactorAuth TwoFactorAuth?
   kycLevelData  UserKycLevel?  @relation("UserKycLevelRelation")
+  systemLogs    SystemLog[]
+  blockedIPs    IPBlacklist[]  @relation("BlockedBy")
+  
+  // Payment Relations
+  payInsAsUser      PayIn[]  @relation("PayInUser")
+  payInsVerified    PayIn[]  @relation("PayInVerifier")
+  payInsReconciled  PayIn[]  @relation("PayInReconciler")
+  payOutsAsUser     PayOut[] @relation("PayOutUser")
+  payOutsProcessed  PayOut[] @relation("PayOutProcessor")
 
   @@index([email])
   @@index([role])
@@ -160,11 +169,14 @@ model Currency {
   updatedAt DateTime @updatedAt
 
   // Relations
+  blockchain      BlockchainNetwork? @relation(fields: [chain], references: [code])
   orders          Order[]
-  tradingPairs    TradingPair[]    @relation("CryptoCurrency")
-  rateHistory     RateHistory[]    @relation("CryptoCurrency")
+  tradingPairs    TradingPair[]      @relation("CryptoCurrency")
+  rateHistory     RateHistory[]      @relation("CryptoCurrency")
   platformWallets PlatformWallet[]
   userWallets     UserWallet[]
+  payIns          PayIn[]            @relation("PayInCrypto") // Входящие платежи криптой
+  payOuts         PayOut[]           // Исходящие платежи криптой
 
   @@index([isToken])
   @@index([chain])
@@ -188,6 +200,8 @@ model FiatCurrency {
   paymentMethods PaymentMethod[]
   feeProfiles    FeeProfile[]
   limitsMatrix   LimitsMatrix[]
+  payIns         PayIn[] // Входящие платежи в этой валюте
+  payOuts        PayOut[] @relation("PayOutFiat") // Исходящие фиатные платежи
 }
 
 // Торговые пары с настройками лимитов и комиссий
@@ -278,6 +292,8 @@ model Order {
   paymentMethod PaymentMethod?       @relation(fields: [paymentMethodCode], references: [code])
   paymentProofs PaymentProof[]
   statusHistory OrderStatusHistory[]
+  payIn         PayIn? // Входящий платеж (1:1)
+  payOut        PayOut? // Исходящий платеж (1:1)
 
   @@index([userId])
   @@index([status])
@@ -328,6 +344,185 @@ model BankDetails {
   fiatCurrency FiatCurrency @relation(fields: [currency], references: [code])
 
   @@index([currency, isActive])
+}
+
+// ==========================================
+// PAYMENT TRACKING (PAY IN / PAY OUT)
+// ==========================================
+
+// Pay In - Входящие платежи (фиат от клиента)
+model PayIn {
+  id               String   @id @default(cuid())
+  orderId          String   @unique // Связь 1:1 с заказом
+  userId           String // Кто платит
+  
+  // Payment Details
+  amount           Float // Сумма платежа
+  currency         String // EUR, PLN, BTC, ETH, USDT, etc.
+  currencyType     CurrencyType // FIAT or CRYPTO
+  paymentMethodCode String? // SEPA, SWIFT, BLIK (для фиата)
+  
+  // For FIAT payments
+  senderName       String? // Имя отправителя
+  senderAccount    String? // Счет/карта отправителя
+  senderBank       String? // Банк отправителя
+  reference        String? // Reference из платежа
+  
+  // For CRYPTO payments
+  networkCode      String? // ETHEREUM, BSC, POLYGON, TRON (для крипты)
+  senderAddress    String? // Адрес отправителя крипты
+  transactionHash  String? // TX hash в блокчейне
+  blockNumber      Int? // Номер блока
+  confirmations    Int @default(0) // Количество подтверждений
+  
+  // Universal transaction ID
+  transactionId    String? @unique // ID транзакции (bank ID или TX hash)
+  
+  // Status & Verification
+  status           PayInStatus @default(PENDING)
+  expectedAmount   Float // Ожидаемая сумма (для сверки)
+  receivedAmount   Float? // Фактически полученная сумма
+  amountMismatch   Boolean @default(false) // Несоответствие суммы
+  
+  // Verification
+  verifiedBy       String? // Admin ID who verified
+  verifiedAt       DateTime?
+  verificationNotes String? @db.Text
+  
+  // Reconciliation
+  reconciledWith   String? // Bank statement reference или block explorer
+  reconciledAt     DateTime?
+  reconciledBy     String?
+  
+  // Receipt/Proof
+  proofUrls        String[] // URLs документов подтверждения
+  explorerUrl      String? // Ссылка на block explorer (для крипты)
+  
+  // Timestamps
+  paymentDate      DateTime? // Дата платежа
+  receivedDate     DateTime? // Когда получили
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  // Relations
+  order         Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user          User               @relation("PayInUser", fields: [userId], references: [id])
+  fiatCurrency  FiatCurrency?      @relation(fields: [currency], references: [code], map: "PayIn_fiatCurrency_fkey")
+  cryptocurrency Currency?         @relation("PayInCrypto", fields: [currency], references: [code], map: "PayIn_cryptocurrency_fkey")
+  network       BlockchainNetwork? @relation("PayInNetwork", fields: [networkCode], references: [code])
+  paymentMethod PaymentMethod?     @relation(fields: [paymentMethodCode], references: [code])
+  verifier      User?              @relation("PayInVerifier", fields: [verifiedBy], references: [id])
+  reconciler    User?              @relation("PayInReconciler", fields: [reconciledBy], references: [id])
+  
+  @@index([orderId])
+  @@index([userId])
+  @@index([status])
+  @@index([paymentDate])
+  @@index([transactionId])
+  @@index([transactionHash])
+  @@index([currencyType])
+  @@index([createdAt])
+}
+
+// Pay Out - Исходящие платежи (криптой или фиатом клиенту)
+model PayOut {
+  id                String   @id @default(cuid())
+  orderId           String   @unique // Связь 1:1 с заказом
+  userId            String // Кому отправляем
+  
+  // Payment Details
+  amount            Float // Количество для отправки
+  currency          String // BTC, ETH, USDT, EUR, PLN, etc.
+  currencyType      CurrencyType // CRYPTO or FIAT
+  
+  // For CRYPTO payments
+  networkCode       String? // ETHEREUM, BSC, POLYGON, TRON
+  destinationAddress String? // Адрес получателя
+  destinationTag     String? // Tag/Memo для некоторых сетей
+  userWalletId       String? // Связь с UserWallet
+  transactionHash    String? @unique // TX hash в блокчейне
+  explorerUrl        String? // Ссылка на explorer
+  blockNumber        Int?
+  confirmations      Int @default(0)
+  networkFee         Float? // Комиссия сети
+  networkFeeCurrency String? // В какой валюте комиссия
+  
+  // For FIAT payments
+  recipientName      String? // Имя получателя
+  recipientAccount   String? // IBAN/Account получателя
+  recipientBank      String? // Банк получателя
+  paymentReference   String? // Reference для перевода
+  bankTransactionId  String? // ID транзакции в банке
+  paymentMethodCode  String? // SEPA, SWIFT, BLIK
+  
+  // Status & Processing
+  status             PayOutStatus @default(PENDING)
+  failureReason      String? @db.Text
+  retryCount         Int @default(0)
+  
+  // Processing
+  processedBy        String? // Admin ID who sent
+  processedAt        DateTime?
+  processingNotes    String? @db.Text
+  
+  // Source Wallet
+  fromWalletId       String? // Platform wallet или bank account
+  
+  // Timestamps
+  scheduledFor       DateTime? // Запланировано на
+  sentAt             DateTime? // Фактически отправлено
+  confirmedAt        DateTime? // Подтверждено
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  
+  // Relations
+  order         Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user          User               @relation("PayOutUser", fields: [userId], references: [id])
+  cryptocurrency Currency?         @relation(fields: [currency], references: [code], map: "PayOut_cryptocurrency_fkey")
+  fiatCurrency  FiatCurrency?      @relation("PayOutFiat", fields: [currency], references: [code], map: "PayOut_fiatCurrency_fkey")
+  network       BlockchainNetwork? @relation(fields: [networkCode], references: [code])
+  userWallet    UserWallet?        @relation(fields: [userWalletId], references: [id])
+  processor     User?              @relation("PayOutProcessor", fields: [processedBy], references: [id])
+  platformWallet PlatformWallet?   @relation(fields: [fromWalletId], references: [id])
+  paymentMethod PaymentMethod?     @relation("PayOutMethod", fields: [paymentMethodCode], references: [code])
+  
+  @@index([orderId])
+  @@index([userId])
+  @@index([status])
+  @@index([transactionHash])
+  @@index([destinationAddress])
+  @@index([currencyType])
+  @@index([scheduledFor])
+  @@index([createdAt])
+}
+
+// Payment Status Enums
+enum PayInStatus {
+  PENDING          // Ожидается платеж
+  RECEIVED         // Получен, но не проверен
+  VERIFIED         // Проверен и подтвержден
+  PARTIAL          // Частичная оплата
+  MISMATCH         // Несоответствие суммы
+  RECONCILED       // Сверен с выпиской
+  FAILED           // Не получен
+  REFUNDED         // Возвращен
+  EXPIRED          // Истек срок
+}
+
+enum PayOutStatus {
+  PENDING          // Ожидает отправки
+  QUEUED           // В очереди на отправку
+  PROCESSING       // Обрабатывается
+  SENT             // Отправлено
+  CONFIRMING       // Ждем подтверждений
+  CONFIRMED        // Подтверждено в сети
+  FAILED           // Ошибка отправки
+  CANCELLED        // Отменено
+}
+
+enum CurrencyType {
+  FIAT             // Фиатные валюты (EUR, USD, PLN)
+  CRYPTO           // Криптовалюты (BTC, ETH, USDT)
 }
 
 // ==========================================
@@ -417,10 +612,13 @@ model BlockchainNetwork {
   updatedAt        DateTime @updatedAt
 
   // Relations
+  currencies      Currency[] // Currencies/tokens on this blockchain
   userWallets     UserWallet[]
   platformWallets PlatformWallet[]
   transactions    Transaction[]
   orders          Order[] // Заказы, использующие эту сеть
+  payIns          PayIn[] @relation("PayInNetwork") // Входящие платежи в этой сети
+  payOuts         PayOut[] // Исходящие платежи в этой сети
 
   @@index([isActive])
 }
@@ -442,6 +640,7 @@ model UserWallet {
   blockchain BlockchainNetwork @relation(fields: [blockchainCode], references: [code])
   currency   Currency          @relation(fields: [currencyCode], references: [code])
   orders     Order[] // Заказы, использующие этот кошелек
+  payOuts    PayOut[] // Исходящие платежи на этот кошелек
 
   @@unique([userId, address])
   @@index([userId, currencyCode])
@@ -463,6 +662,7 @@ model PlatformWallet {
 
   currency   Currency          @relation(fields: [currencyCode], references: [code])
   blockchain BlockchainNetwork @relation(fields: [blockchainCode], references: [code])
+  payOuts    PayOut[] // Исходящие платежи с этого кошелька
 
   @@index([currencyCode, isActive])
 }
@@ -571,6 +771,8 @@ model PaymentMethod {
   psp          PspConnector?  @relation(fields: [pspConnector], references: [code])
   orders       Order[]
   limitsMatrix LimitsMatrix[]
+  payIns       PayIn[] // Входящие платежи через этот метод
+  payOuts      PayOut[] @relation("PayOutMethod") // Исходящие платежи через этот метод
 
   @@index([type, isActive])
   @@index([currency])
@@ -626,7 +828,8 @@ model IntegrationSetting {
 model ApiKey {
   id          String    @id @default(cuid())
   userId      String? // Null = admin-generated key
-  key         String    @unique // Hashed API key
+  key         String // Encrypted API key (AES-256-GCM)
+  keyHash     String    @unique // SHA-256 hash for fast lookup
   name        String // Описание ключа ("Production Bot", "Test Integration")
   prefix      String // Первые символы для идентификации (apx_abc...)
   permissions Json // { "orders": ["read", "create"], "rates": ["read"] }
@@ -643,7 +846,7 @@ model ApiKey {
   user  User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   usage ApiKeyUsage[]
 
-  @@index([key])
+  @@index([keyHash])
   @@index([userId])
   @@index([isActive])
   @@index([prefix])
@@ -945,4 +1148,82 @@ model Integration {
   @@index([service])
   @@index([isEnabled])
   @@index([status])
+}
+
+// System Logs - детальное логирование всех действий пользователей
+model SystemLog {
+  id         String  @id @default(cuid())
+  userId     String? // User who performed the action (null for anonymous)
+  sessionId  String? // Session identifier
+  action     String // Action performed (PAGE_VIEW, API_CALL, LOGIN, LOGOUT, etc.)
+  method     String? // HTTP method (GET, POST, PUT, DELETE, etc.)
+  path       String // URL path
+  query      Json? // Query parameters
+  body       Json? // Request body (sanitized, no passwords)
+  statusCode Int? // HTTP status code
+
+  // Request details
+  ipAddress String // IP address
+  userAgent String? @db.Text // Full user agent string
+
+  // Parsed device info
+  deviceType     String? // desktop, mobile, tablet
+  browser        String? // Chrome, Firefox, Safari, etc.
+  browserVersion String?
+  os             String? // Windows, macOS, Linux, iOS, Android
+  osVersion      String?
+  isMobile       Boolean @default(false)
+  isBot          Boolean @default(false)
+
+  // Geographic info (optional, can be added later)
+  country String?
+  city    String?
+
+  // Response details
+  responseTime Int? // Response time in ms
+  errorMessage String? @db.Text
+  errorStack   String? @db.Text
+
+  // Additional metadata
+  referrer String?
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([ipAddress])
+  @@index([action])
+  @@index([createdAt])
+  @@index([isBot])
+  @@index([deviceType])
+}
+
+// IP Blacklist - блокировка IP адресов
+model IPBlacklist {
+  id        String    @id @default(cuid())
+  ipAddress String    @unique // IP address to block
+  reason    String    @db.Text // Reason for blocking
+  blockedBy String // Admin user ID who blocked
+  isActive  Boolean   @default(true)
+  expiresAt DateTime? // Optional expiration date
+
+  // Statistics
+  blockedAttempts Int       @default(0) // Count of blocked attempts
+  lastAttemptAt   DateTime?
+
+  // Metadata
+  metadata Json?
+  notes    String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  blockedByUser User @relation("BlockedBy", fields: [blockedBy], references: [id])
+
+  @@index([ipAddress])
+  @@index([isActive])
+  @@index([expiresAt])
+  @@index([blockedBy])
 }

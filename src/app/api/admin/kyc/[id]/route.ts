@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole } from '@/lib/auth-utils';
-import prisma from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { kycFormService } from '@/lib/services/kyc-form.service';
 
 export async function GET(

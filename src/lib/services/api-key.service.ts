@@ -1,12 +1,75 @@
 /**
  * API Key Service
  * 
- * Manages API keys for external access
+ * Manages API keys for external access with AES-256-GCM encryption
  */
 
-import prisma from '@/lib/prisma';
-import bcrypt from 'bcryptjs';
+import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
+
+// Encryption settings
+const ALGORITHM = 'aes-256-gcm';
+const IV_LENGTH = 16;
+const AUTH_TAG_LENGTH = 16;
+const SALT_LENGTH = 64;
+
+// Get encryption key from environment
+const getEncryptionKey = (): Buffer => {
+  const secret = process.env.API_KEY_ENCRYPTION_SECRET || process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    throw new Error('API_KEY_ENCRYPTION_SECRET or NEXTAUTH_SECRET must be set');
+  }
+  // Derive a 32-byte key from the secret
+  return crypto.pbkdf2Sync(secret, 'apricode-api-keys', 100000, 32, 'sha256');
+};
+
+/**
+ * Encrypt API key using AES-256-GCM
+ */
+function encryptApiKey(plainKey: string): string {
+  const key = getEncryptionKey();
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+  
+  let encrypted = cipher.update(plainKey, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  
+  const authTag = cipher.getAuthTag();
+  
+  // Format: iv:authTag:encrypted
+  return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
+}
+
+/**
+ * Decrypt API key using AES-256-GCM
+ */
+function decryptApiKey(encryptedData: string): string {
+  const key = getEncryptionKey();
+  const parts = encryptedData.split(':');
+  
+  if (parts.length !== 3) {
+    throw new Error('Invalid encrypted data format');
+  }
+  
+  const iv = Buffer.from(parts[0], 'hex');
+  const authTag = Buffer.from(parts[1], 'hex');
+  const encrypted = parts[2];
+  
+  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+  decipher.setAuthTag(authTag);
+  
+  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  
+  return decrypted;
+}
+
+/**
+ * Hash API key for prefix-based lookup (timing-safe)
+ */
+function hashApiKey(key: string): string {
+  return crypto.createHash('sha256').update(key).digest('hex');
+}
 
 export interface UsageStats {
   totalRequests: number;
@@ -22,7 +85,7 @@ export interface UsageStats {
 
 class ApiKeyService {
   /**
-   * Generate new API key
+   * Generate new API key with AES-256-GCM encryption
    */
   async generateApiKey(
     name: string,
@@ -35,74 +98,122 @@ class ApiKeyService {
     key: string; // Plain text key (show only once)
     apiKey: any; // Saved record
   }> {
-    // Generate random API key
-    const randomBytes = crypto.randomBytes(32);
-    const key = `apx_live_${randomBytes.toString('hex')}`;
-    const prefix = key.substring(0, 12); // apx_live_abc
+    try {
+      console.log('[API Key] Generating new API key:', { name, rateLimit, createdBy });
+      
+      // Generate cryptographically secure random API key
+      const randomBytes = crypto.randomBytes(32);
+      const key = `apx_live_${randomBytes.toString('hex')}`;
+      const prefix = key.substring(0, 12); // apx_live_abc
+      
+      console.log('[API Key] Generated key with prefix:', prefix);
+      
+      // Hash for fast lookup
+      const keyHash = hashApiKey(key);
+      console.log('[API Key] Key hashed successfully');
 
-    // Hash the key for storage
-    const hashedKey = await bcrypt.hash(key, 10);
+      // Encrypt the key for secure storage
+      const encryptedKey = encryptApiKey(key);
+      console.log('[API Key] Key encrypted successfully');
 
-    // Create API key record
-    const apiKey = await prisma.apiKey.create({
-      data: {
-        userId,
-        key: hashedKey,
-        name,
-        prefix,
-        permissions,
-        isActive: true,
-        expiresAt,
-        rateLimit,
-        createdBy
-      }
-    });
+      // Create API key record
+      console.log('[API Key] Creating database record...');
+      const apiKey = await prisma.apiKey.create({
+        data: {
+          userId,
+          key: encryptedKey, // Store encrypted version
+          keyHash, // Store hash for fast lookup
+          name,
+          prefix,
+          permissions,
+          isActive: true,
+          expiresAt,
+          rateLimit,
+          createdBy
+        }
+      });
 
-    return {
-      key, // Return plain text key (only time it's shown)
-      apiKey
-    };
+      console.log('[API Key] API key created successfully:', apiKey.id);
+
+      return {
+        key, // Return plain text key (only time it's shown)
+        apiKey
+      };
+    } catch (error) {
+      console.error('[API Key] Error generating API key:', error);
+      console.error('[API Key] Error details:', error instanceof Error ? error.message : 'Unknown');
+      console.error('[API Key] Error stack:', error instanceof Error ? error.stack : 'No stack');
+      throw error;
+    }
   }
 
   /**
-   * Validate API key
+   * Validate API key using hash + encryption
    */
   async validateApiKey(key: string): Promise<any | null> {
-    // Get prefix
-    const prefix = key.substring(0, 12);
+    try {
+      // Hash the provided key
+      const keyHash = hashApiKey(key);
 
-    // Find API keys with matching prefix
-    const apiKeys = await prisma.apiKey.findMany({
-      where: {
-        prefix,
-        isActive: true
-      }
-    });
-
-    // Check each one (timing-safe comparison)
-    for (const apiKey of apiKeys) {
-      const isValid = await bcrypt.compare(key, apiKey.key);
-      
-      if (isValid) {
-        // Check expiration
-        if (apiKey.expiresAt && apiKey.expiresAt < new Date()) {
-          return null; // Expired
-        }
-
-        // Update last used
-        await prisma.apiKey.update({
-          where: { id: apiKey.id },
-          data: {
-            lastUsedAt: new Date(),
-            usageCount: { increment: 1 }
+      // Find API key by hash (fast lookup)
+      const apiKey = await prisma.apiKey.findFirst({
+        where: {
+          keyHash,
+          isActive: true
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              role: true,
+              isActive: true
+            }
           }
-        });
+        }
+      });
 
-        return apiKey;
+      if (!apiKey) {
+        return null;
       }
-    }
 
-    return null;
+      // Decrypt and verify the key matches (timing-safe)
+      const decryptedKey = decryptApiKey(apiKey.key);
+      
+      // Constant-time comparison
+      const isValid = crypto.timingSafeEqual(
+        Buffer.from(key),
+        Buffer.from(decryptedKey)
+      );
+
+      if (!isValid) {
+        return null;
+      }
+
+      // Check expiration
+      if (apiKey.expiresAt && apiKey.expiresAt < new Date()) {
+        return null; // Expired
+      }
+
+      // Check if user is active (if associated with a user)
+      if (apiKey.user && !apiKey.user.isActive) {
+        return null; // User deactivated
+      }
+
+      // Update last used
+      await prisma.apiKey.update({
+        where: { id: apiKey.id },
+        data: {
+          lastUsedAt: new Date(),
+          usageCount: { increment: 1 }
+        }
+      });
+
+      return apiKey;
+    } catch (error) {
+      console.error('API key validation error:', error);
+      return null;
+    }
   }
 
   /**

@@ -9,7 +9,7 @@ import { requireRole, getCurrentUserId } from '@/lib/auth-utils';
 import { kycFormService } from '@/lib/services/kyc-form.service';
 import { updateKycFieldSchema } from '@/lib/validations/kyc-admin';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
-import prisma from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 
 export async function PATCH(

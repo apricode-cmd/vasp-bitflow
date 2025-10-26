@@ -13,7 +13,8 @@ import {
   LayoutDashboard, Users, ShoppingCart, Settings, CreditCard,
   TrendingUp, Shield, Database, Activity, Coins,
   Wallet, Globe, Key, Wrench, Package,
-  ChevronDown, ChevronRight, Search, Menu, X, Zap
+  ChevronDown, ChevronRight, Search, Menu, X, Zap,
+  ArrowDownCircle, ArrowUpCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -97,6 +98,20 @@ const navigation = [
     section: 'Payments & Wallets',
     items: [
       { 
+        name: 'Pay In', 
+        href: '/admin/pay-in', 
+        icon: ArrowDownCircle,
+        description: 'Incoming fiat payments',
+        badge: 'pending'
+      },
+      { 
+        name: 'Pay Out', 
+        href: '/admin/pay-out', 
+        icon: ArrowUpCircle,
+        description: 'Outgoing crypto payments',
+        badge: 'pending'
+      },
+      { 
         name: 'Payment Setup', 
         href: '/admin/payments', 
         icon: CreditCard,
@@ -108,9 +123,21 @@ const navigation = [
         icon: Wallet,
         description: 'Crypto wallets'
       },
+      { 
+        name: 'User Wallets', 
+        href: '/admin/user-wallets', 
+        icon: Wallet,
+        description: 'Customer wallets'
+      },
+      { 
+        name: 'Blockchain Networks', 
+        href: '/admin/blockchains', 
+        icon: Globe,
+        description: 'ETH, BSC, Polygon, etc.'
+      },
     ],
     defaultOpen: false,
-    priority: 'medium'
+    priority: 'high'
   },
   {
     section: 'System & Settings',
@@ -155,7 +182,12 @@ export function AdminSidebar(): JSX.Element {
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [stats, setStats] = useState<{ pendingOrders: number; pendingKyc: number } | null>(null);
+  const [stats, setStats] = useState<{ 
+    pendingOrders: number; 
+    pendingKyc: number;
+    pendingPayIn: number;
+    pendingPayOut: number;
+  } | null>(null);
 
   // Fetch pending counts for badges
   useEffect(() => {
@@ -166,7 +198,9 @@ export function AdminSidebar(): JSX.Element {
         if (data.success) {
           setStats({
             pendingOrders: data.data.orders?.pending || 0,
-            pendingKyc: data.data.kyc?.pending || 0
+            pendingKyc: data.data.kyc?.pending || 0,
+            pendingPayIn: data.data.payIn?.pending || 0,
+            pendingPayOut: data.data.payOut?.pending || 0
           });
         }
       } catch (error) {
@@ -201,6 +235,8 @@ export function AdminSidebar(): JSX.Element {
     if (!stats) return null;
     if (itemName === 'Orders') return stats.pendingOrders;
     if (itemName === 'KYC Reviews') return stats.pendingKyc;
+    if (itemName === 'Pay In') return stats.pendingPayIn;
+    if (itemName === 'Pay Out') return stats.pendingPayOut;
     return null;
   };
 

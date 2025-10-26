@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getCurrentUserId } from '@/lib/auth-utils';
-import prisma from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { createAdminOrderSchema } from '@/lib/validations/admin-order';
 import { rateManagementService } from '@/lib/services/rate-management.service';
 import { calculateOrderTotal } from '@/lib/utils/order-calculations';

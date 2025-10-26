@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, getCurrentUserId } from '@/lib/auth-utils';
-import prisma from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { documentUploadService } from '@/lib/services/document-upload.service';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 

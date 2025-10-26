@@ -119,8 +119,12 @@ export function ResourceSheet({
               {field.label} {field.required && <span className="text-destructive">*</span>}
             </Label>
             <Select
-              value={value || ''}
-              onValueChange={(val) => handleChange(field.name, val)}
+              value={value === null || value === undefined ? 'NONE' : value}
+              onValueChange={(val) => {
+                // Convert 'NONE' to null for database
+                const finalValue = val === 'NONE' ? null : val;
+                handleChange(field.name, finalValue);
+              }}
               required={field.required}
             >
               <SelectTrigger>

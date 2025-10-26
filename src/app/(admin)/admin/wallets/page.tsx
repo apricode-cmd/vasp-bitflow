@@ -82,7 +82,7 @@ export default function PlatformWalletsPage(): JSX.Element {
     try {
       const [walletsRes, currRes] = await Promise.all([
         fetch('/api/admin/wallets'),
-        fetch('/api/admin/resources/currencies')
+        fetch('/api/admin/resources/currencies?active=true') // Only active
       ]);
 
       const [walletsData, currData] = await Promise.all([
@@ -97,7 +97,7 @@ export default function PlatformWalletsPage(): JSX.Element {
         })));
       }
       if (currData.success) {
-        setCurrencies(currData.data.filter((c: any) => c.isActive));
+        setCurrencies(currData.data); // Already filtered by active=true
       }
     } catch (error) {
       console.error('Fetch error:', error);

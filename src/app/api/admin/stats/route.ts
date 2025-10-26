@@ -50,7 +50,11 @@ export async function GET(request: Request): Promise<NextResponse> {
       activeUsers,
       pendingKyc,
       approvedKyc,
-      rejectedKyc
+      rejectedKyc,
+      pendingPayIn,
+      receivedPayIn,
+      pendingPayOut,
+      sentPayOut
     ] = await Promise.all([
       prisma.order.count(),
       prisma.order.count({ where: { status: 'PENDING' } }),
@@ -61,7 +65,11 @@ export async function GET(request: Request): Promise<NextResponse> {
       prisma.user.count({ where: { role: 'CLIENT', isActive: true } }),
       prisma.kycSession.count({ where: { status: 'PENDING' } }),
       prisma.kycSession.count({ where: { status: 'APPROVED' } }),
-      prisma.kycSession.count({ where: { status: 'REJECTED' } })
+      prisma.kycSession.count({ where: { status: 'REJECTED' } }),
+      prisma.payIn.count({ where: { status: { in: ['PENDING', 'RECEIVED'] } } }),
+      prisma.payIn.count({ where: { status: 'RECEIVED' } }),
+      prisma.payOut.count({ where: { status: { in: ['PENDING', 'QUEUED'] } } }),
+      prisma.payOut.count({ where: { status: { in: ['SENT', 'CONFIRMING'] } } })
     ]);
 
     // Get total volume (completed orders only)
@@ -256,6 +264,16 @@ export async function GET(request: Request): Promise<NextResponse> {
           approved: approvedKyc,
           rejected: rejectedKyc,
           total: pendingKyc + approvedKyc + rejectedKyc
+        },
+        payIn: {
+          pending: pendingPayIn,
+          received: receivedPayIn,
+          total: pendingPayIn + receivedPayIn
+        },
+        payOut: {
+          pending: pendingPayOut,
+          sent: sentPayOut,
+          total: pendingPayOut + sentPayOut
         },
         volume: {
           totalFiat: volumeResult._sum.totalFiat || 0,

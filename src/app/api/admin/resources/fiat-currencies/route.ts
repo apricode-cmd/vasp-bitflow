@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getCurrentUserId } from '@/lib/auth-utils';
-import prisma from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { auditService, AUDIT_ACTIONS } from '@/lib/services/audit.service';
 import { z } from 'zod';
 
@@ -17,12 +17,19 @@ const createSchema = z.object({
   priority: z.number().int().optional().default(0)
 });
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(req: NextRequest): Promise<NextResponse> {
   try {
     const sessionOrError = await requireRole('ADMIN');
     if (sessionOrError instanceof NextResponse) return sessionOrError;
 
-    const data = await prisma.fiatCurrency.findMany({ orderBy: { priority: 'asc' } });
+    // Check if only active items should be returned (for selects/comboboxes)
+    const { searchParams } = new URL(req.url);
+    const activeOnly = searchParams.get('active') === 'true';
+
+    const data = await prisma.fiatCurrency.findMany({ 
+      where: activeOnly ? { isActive: true } : undefined,
+      orderBy: { priority: 'asc' } 
+    });
     return NextResponse.json({ success: true, data });
   } catch (error) {
     return NextResponse.json({ success: false, error: 'Failed to fetch' }, { status: 500 });

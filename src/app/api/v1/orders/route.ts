@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireApiKey, logApiRequest } from '@/lib/middleware/api-auth';
-import prisma from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { createOrderSchema } from '@/lib/validations/order';
 import { rateManagementService } from '@/lib/services/rate-management.service';
 import { calculateOrderTotal, validateOrderLimits } from '@/lib/utils/order-calculations';

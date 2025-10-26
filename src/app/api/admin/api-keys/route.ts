@@ -94,22 +94,34 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       success: true,
       data: {
         apiKey: {
-          ...apiKey,
-          key: undefined // Don't return hashed key
+          id: apiKey.id,
+          name: apiKey.name,
+          prefix: apiKey.prefix,
+          permissions: apiKey.permissions,
+          isActive: apiKey.isActive,
+          expiresAt: apiKey.expiresAt,
+          rateLimit: apiKey.rateLimit,
+          usageCount: apiKey.usageCount,
+          createdAt: apiKey.createdAt
         },
         key // Plain text key - show only once!
       },
-      message: 'API key generated. Save it securely - it will not be shown again!'
+      message: 'API key generated successfully. Save it securely - it will not be shown again!'
     }, { status: 201 });
   } catch (error) {
     console.error('Generate API key error:', error);
+    console.error('Error details:', error instanceof Error ? error.message : 'Unknown');
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         {
           success: false,
           error: 'Invalid request data',
-          details: error.errors
+          details: error.errors.map(e => ({
+            field: e.path.join('.'),
+            message: e.message
+          }))
         },
         { status: 400 }
       );
@@ -118,7 +130,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to generate API key'
+        error: 'Failed to generate API key',
+        details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
     );

@@ -98,8 +98,8 @@ export default function TradingPairsPage(): JSX.Element {
     try {
       const [pairsRes, cryptoRes, fiatRes] = await Promise.all([
         fetch('/api/admin/trading-pairs'),
-        fetch('/api/admin/resources/currencies'), // Crypto currencies
-        fetch('/api/admin/resources/fiat-currencies')
+        fetch('/api/admin/resources/currencies?active=true'), // Only active crypto
+        fetch('/api/admin/resources/fiat-currencies?active=true') // Only active fiat
       ]);
 
       const pairsData = await pairsRes.json();
@@ -317,6 +317,7 @@ export default function TradingPairsPage(): JSX.Element {
     },
     {
       id: 'actions',
+      header: 'Actions',
       cell: ({ row }) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

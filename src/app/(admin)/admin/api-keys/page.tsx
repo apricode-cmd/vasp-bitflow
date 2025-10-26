@@ -62,11 +62,17 @@ export default function ApiKeysPage(): JSX.Element {
 
   const createApiKey = async (): Promise<void> => {
     try {
+      // Validate name
+      if (!newKeyData.name || newKeyData.name.trim().length < 3) {
+        toast.error('Name is required (minimum 3 characters)');
+        return;
+      }
+
       const response = await fetch('/api/admin/api-keys', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: newKeyData.name,
+          name: newKeyData.name.trim(),
           permissions: {
             rates: ['read'],
             currencies: ['read'],
@@ -81,11 +87,25 @@ export default function ApiKeysPage(): JSX.Element {
       if (data.success) {
         setGeneratedKey(data.data.key);
         toast.success('API key generated! Save it securely - it won\'t be shown again');
+        setShowCreateForm(false);
+        setNewKeyData({ name: '', rateLimit: 100 }); // Reset form
         await fetchApiKeys();
       } else {
-        toast.error(data.error || 'Failed to generate API key');
+        // Show detailed error
+        if (data.details) {
+          if (Array.isArray(data.details)) {
+            const errorMsg = data.details.map((e: any) => e.message || e).join(', ');
+            toast.error(`Validation error: ${errorMsg}`);
+          } else {
+            toast.error(`Error: ${data.details}`);
+          }
+        } else {
+          toast.error(data.error || 'Failed to generate API key');
+        }
+        console.error('API error details:', data);
       }
     } catch (error) {
+      console.error('Create API key error:', error);
       toast.error('Failed to generate API key');
     }
   };
@@ -127,13 +147,32 @@ export default function ApiKeysPage(): JSX.Element {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">API Keys</h1>
-          <p className="text-muted-foreground">Manage API keys for external access</p>
+          <p className="text-muted-foreground">
+            Manage API keys for REST API integrations · Keys are encrypted with AES-256-GCM
+          </p>
         </div>
         <Button onClick={() => setShowCreateForm(!showCreateForm)}>
           <Plus className="w-4 h-4 mr-2" />
           Generate New Key
         </Button>
       </div>
+
+      {/* Security Notice */}
+      <Card className="border-blue-500 bg-blue-50 dark:bg-blue-950/20">
+        <CardContent className="p-4">
+          <div className="flex gap-3">
+            <div className="text-blue-600 dark:text-blue-400">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+            <div className="flex-1 text-sm text-blue-900 dark:text-blue-100">
+              <p className="font-semibold mb-1">Secure API Key Storage</p>
+              <p>All API keys are encrypted using AES-256-GCM before storage. Keys are only shown once during generation.</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Generated Key Display */}
       {generatedKey && (
@@ -161,27 +200,66 @@ export default function ApiKeysPage(): JSX.Element {
         <Card>
           <CardHeader>
             <CardTitle>Generate New API Key</CardTitle>
+            <CardDescription>
+              Create a new API key for REST API integration. The key will be encrypted with AES-256-GCM.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="text-sm font-medium">Name</label>
+              <label className="text-sm font-medium flex items-center gap-1">
+                Name <span className="text-red-500">*</span>
+              </label>
               <Input
                 value={newKeyData.name}
                 onChange={(e) => setNewKeyData({ ...newKeyData, name: e.target.value })}
                 placeholder="Production Integration"
+                required
+                minLength={3}
+                maxLength={100}
+                className="mt-1"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Minimum 3 characters. Used to identify the API key (e.g., "Production Bot", "Test Integration")
+              </p>
             </div>
             <div>
               <label className="text-sm font-medium">Rate Limit (requests/hour)</label>
               <Input
                 type="number"
                 value={newKeyData.rateLimit}
-                onChange={(e) => setNewKeyData({ ...newKeyData, rateLimit: parseInt(e.target.value) })}
+                onChange={(e) => setNewKeyData({ ...newKeyData, rateLimit: parseInt(e.target.value) || 100 })}
+                min={1}
+                max={10000}
+                className="mt-1"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Default: 100 requests/hour. Adjust based on expected usage.
+              </p>
+            </div>
+            <div className="bg-muted p-3 rounded-lg">
+              <p className="text-sm font-medium mb-2">Default Permissions:</p>
+              <ul className="text-xs text-muted-foreground space-y-1">
+                <li>✅ Read rates</li>
+                <li>✅ Read currencies</li>
+                <li>✅ Read & create orders</li>
+              </ul>
             </div>
             <div className="flex gap-2">
-              <Button onClick={createApiKey}>Generate Key</Button>
-              <Button variant="outline" onClick={() => setShowCreateForm(false)}>Cancel</Button>
+              <Button 
+                onClick={createApiKey}
+                disabled={!newKeyData.name || newKeyData.name.trim().length < 3}
+              >
+                Generate Key
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowCreateForm(false);
+                  setNewKeyData({ name: '', rateLimit: 100 });
+                }}
+              >
+                Cancel
+              </Button>
             </div>
           </CardContent>
         </Card>
