@@ -244,11 +244,13 @@ export function OrderTransitionDialog({
                   options={filteredPayInMethods.map(pm => ({
                     value: pm.code,
                     label: pm.name,
-                    description: pm.currency
+                    description: `${pm.currency} - ${pm.providerType}`
                   }))}
                   value={formData.payInPaymentMethod}
                   onValueChange={(value) => setFormData({ ...formData, payInPaymentMethod: value })}
                   placeholder="Select payment method..."
+                  searchPlaceholder="Search methods..."
+                  emptyText="No payment methods available"
                 />
               </div>
 
@@ -274,11 +276,30 @@ export function OrderTransitionDialog({
 
               <div>
                 <Label>Payment Reference</Label>
-                <Input
-                  value={formData.payInReference}
-                  onChange={(e) => setFormData({ ...formData, payInReference: e.target.value })}
-                  placeholder="Bank reference or transaction ID"
+                <Combobox
+                  options={[
+                    { value: order.paymentReference, label: order.paymentReference, description: 'Order reference' },
+                    { value: 'CUSTOM', label: 'Custom Reference', description: 'Enter custom reference' }
+                  ]}
+                  value={formData.payInReference || order.paymentReference}
+                  onValueChange={(value) => {
+                    if (value === 'CUSTOM') {
+                      setFormData({ ...formData, payInReference: '' });
+                    } else {
+                      setFormData({ ...formData, payInReference: value });
+                    }
+                  }}
+                  placeholder="Select or enter reference..."
+                  searchPlaceholder="Search references..."
                 />
+                {formData.payInReference === '' && (
+                  <Input
+                    className="mt-2"
+                    value={formData.payInReference}
+                    onChange={(e) => setFormData({ ...formData, payInReference: e.target.value })}
+                    placeholder="Enter custom payment reference"
+                  />
+                )}
               </div>
             </div>
           )}
@@ -323,11 +344,13 @@ export function OrderTransitionDialog({
                   options={filteredPayOutMethods.map(pm => ({
                     value: pm.code,
                     label: pm.name,
-                    description: pm.currency
+                    description: `${pm.currency} - ${pm.providerType}`
                   }))}
                   value={formData.payOutPaymentMethod}
                   onValueChange={(value) => setFormData({ ...formData, payOutPaymentMethod: value })}
                   placeholder="Select payment method..."
+                  searchPlaceholder="Search methods..."
+                  emptyText="No payment methods available"
                 />
               </div>
 
