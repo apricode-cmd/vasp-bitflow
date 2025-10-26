@@ -13,7 +13,7 @@ import {
   LayoutDashboard, Users, ShoppingCart, Settings, CreditCard,
   TrendingUp, Shield, Database, Activity, Coins,
   Wallet, Globe, Key, Wrench, Package,
-  ChevronDown, ChevronRight, Search, Menu, X, Zap,
+  ChevronDown, ChevronRight, Search, Menu, X,
   ArrowDownCircle, ArrowUpCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -27,6 +27,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import { ApricodeLogo } from '@/components/icons/ApricodeLogo';
 
 const navigation = [
   {
@@ -251,8 +252,8 @@ export function AdminSidebar(): JSX.Element {
           {!isCollapsed && (
             <div>
               <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-                  <Zap className="h-5 w-5 text-primary-foreground" />
+                <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center p-1.5">
+                  <ApricodeLogo className="text-primary-foreground w-full h-full" />
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-primary">
