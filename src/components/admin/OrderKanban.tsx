@@ -12,7 +12,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -206,12 +206,26 @@ export function OrderKanban({
     toStatus: null
   });
 
+  // Delete confirmation dialog state
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean;
+    orderId: string | null;
+    orderReference: string | null;
+  }>({
+    open: false,
+    orderId: null,
+    orderReference: null
+  });
+
+  // Time filter state
+  const [timeFilter, setTimeFilter] = useState<'all' | '1h' | '24h' | '7d' | '30d'>('all');
+
   // Validate if status transition is allowed
   const isTransitionAllowed = (from: OrderStatus, to: OrderStatus): boolean => {
     return STATUS_TRANSITIONS[from]?.includes(to) || false;
   };
 
-  // Filter orders by search and currency
+  // Filter orders by search, currency, and time
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
       const matchesSearch = searchQuery === '' || 
@@ -221,9 +235,33 @@ export function OrderKanban({
       
       const matchesCurrency = currencyFilter === 'all' || order.currencyCode === currencyFilter;
       
-      return matchesSearch && matchesCurrency;
+      // Time filter
+      let matchesTime = true;
+      if (timeFilter !== 'all') {
+        const orderDate = new Date(order.createdAt);
+        const now = new Date();
+        const diffMs = now.getTime() - orderDate.getTime();
+        const diffHours = diffMs / (1000 * 60 * 60);
+        
+        switch (timeFilter) {
+          case '1h':
+            matchesTime = diffHours <= 1;
+            break;
+          case '24h':
+            matchesTime = diffHours <= 24;
+            break;
+          case '7d':
+            matchesTime = diffHours <= 24 * 7;
+            break;
+          case '30d':
+            matchesTime = diffHours <= 24 * 30;
+            break;
+        }
+      }
+      
+      return matchesSearch && matchesCurrency && matchesTime;
     });
-  }, [orders, searchQuery, currencyFilter]);
+  }, [orders, searchQuery, currencyFilter, timeFilter]);
 
   // Get unique currencies for filter
   const availableCurrencies = useMemo(() => {
@@ -438,6 +476,58 @@ export function OrderKanban({
     }
   };
 
+  // Handle delete order
+  const handleDeleteOrder = async (): Promise<void> => {
+    if (!deleteDialog.orderId) return;
+
+    try {
+      const response = await fetch(`/api/admin/orders/${deleteDialog.orderId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        toast.success('Order deleted successfully', {
+          description: `#${deleteDialog.orderReference}`
+        });
+        // Refresh orders by calling parent callback
+        window.location.reload(); // Simple refresh, or you can pass a callback from parent
+      } else {
+        const data = await response.json();
+        toast.error(data.error || 'Failed to delete order');
+      }
+    } catch (error) {
+      console.error('Delete order error:', error);
+      toast.error('An error occurred');
+    } finally {
+      setDeleteDialog({ open: false, orderId: null, orderReference: null });
+    }
+  };
+
+  // Calculate order counts for each time filter
+  const timeFilterCounts = useMemo(() => {
+    const now = new Date();
+    return {
+      '1h': orders.filter(o => (now.getTime() - new Date(o.createdAt).getTime()) <= 1000 * 60 * 60).length,
+      '24h': orders.filter(o => (now.getTime() - new Date(o.createdAt).getTime()) <= 1000 * 60 * 60 * 24).length,
+      '7d': orders.filter(o => (now.getTime() - new Date(o.createdAt).getTime()) <= 1000 * 60 * 60 * 24 * 7).length,
+      '30d': orders.filter(o => (now.getTime() - new Date(o.createdAt).getTime()) <= 1000 * 60 * 60 * 24 * 30).length,
+      'all': orders.length
+    };
+  }, [orders]);
+
+  // Save time filter to localStorage
+  useEffect(() => {
+    localStorage.setItem('orderKanbanTimeFilter', timeFilter);
+  }, [timeFilter]);
+
+  // Load time filter from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('orderKanbanTimeFilter');
+    if (saved && ['all', '1h', '24h', '7d', '30d'].includes(saved)) {
+      setTimeFilter(saved as any);
+    }
+  }, []);
+
   return (
     <TooltipProvider>
       <div className="space-y-4">
@@ -481,6 +571,36 @@ export function OrderKanban({
                       {currency}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+
+              {/* Time Filter */}
+              <Select value={timeFilter} onValueChange={(value: any) => setTimeFilter(value)}>
+                <SelectTrigger className="w-full md:w-[200px]">
+                  <Clock className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Time period" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    All Time
+                    <Badge variant="outline" className="ml-2">{timeFilterCounts.all}</Badge>
+                  </SelectItem>
+                  <SelectItem value="1h">
+                    Last Hour
+                    <Badge variant="outline" className="ml-2">{timeFilterCounts['1h']}</Badge>
+                  </SelectItem>
+                  <SelectItem value="24h">
+                    Last 24 Hours
+                    <Badge variant="outline" className="ml-2">{timeFilterCounts['24h']}</Badge>
+                  </SelectItem>
+                  <SelectItem value="7d">
+                    Last 7 Days
+                    <Badge variant="outline" className="ml-2">{timeFilterCounts['7d']}</Badge>
+                  </SelectItem>
+                  <SelectItem value="30d">
+                    Last 30 Days
+                    <Badge variant="outline" className="ml-2">{timeFilterCounts['30d']}</Badge>
+                  </SelectItem>
                 </SelectContent>
               </Select>
 
@@ -852,6 +972,20 @@ export function OrderKanban({
                                 Cancel Order
                               </ContextMenuItem>
                             )}
+                            <ContextMenuSeparator />
+                            <ContextMenuItem
+                              onClick={() => {
+                                setDeleteDialog({
+                                  open: true,
+                                  orderId: order.id,
+                                  orderReference: order.paymentReference
+                                });
+                              }}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete Order
+                            </ContextMenuItem>
                           </ContextMenuContent>
                         </ContextMenu>
                       );
@@ -956,6 +1090,27 @@ export function OrderKanban({
             networks={networks}
           />
         )}
+
+        {/* Delete Order Confirmation Dialog */}
+        <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Order?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete order <span className="font-mono font-semibold">{deleteDialog.orderReference}</span>?
+                <br /><br />
+                <span className="text-destructive font-medium">This action cannot be undone.</span> All related data (PayIn, PayOut, history) will be permanently deleted.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteOrder} className="bg-destructive hover:bg-destructive/90">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Order
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </TooltipProvider>
   );

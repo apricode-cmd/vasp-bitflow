@@ -264,9 +264,21 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
     setIsSubmitting(true);
 
     try {
+      // Always send the rate that was shown in UI to ensure consistency
+      // Either custom rate or the current market rate
+      const effectiveRate = useCustomRate && data.customRate 
+        ? data.customRate 
+        : currentRate;
+
+      if (!effectiveRate) {
+        toast.error('Exchange rate not available. Please try again.');
+        setIsSubmitting(false);
+        return;
+      }
+
       const payload = {
         ...data,
-        customRate: useCustomRate ? data.customRate : undefined
+        customRate: effectiveRate // Send the rate user saw in preview
       };
 
       const response = await fetch('/api/admin/orders/create-for-client', {

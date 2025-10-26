@@ -237,3 +237,76 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
   }
 }
 
+export async function DELETE(
+  request: NextRequest,
+  { params }: RouteContext
+): Promise<NextResponse> {
+  try {
+    // Check admin authorization
+    const sessionOrError = await requireRole('ADMIN');
+    if (sessionOrError instanceof NextResponse) {
+      return sessionOrError;
+    }
+
+    const { id } = params;
+
+    // Get admin ID
+    const adminId = await getCurrentUserId();
+    if (!adminId) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    // Check if order exists
+    const order = await prisma.order.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        paymentReference: true,
+        userId: true,
+        status: true
+      }
+    });
+
+    if (!order) {
+      return NextResponse.json(
+        { error: 'Order not found' },
+        { status: 404 }
+      );
+    }
+
+    // Delete order (cascade will delete related PayIn, PayOut, StatusHistory, PaymentProofs)
+    await prisma.order.delete({
+      where: { id }
+    });
+
+    // Log admin action
+    await auditService.logAdminAction(
+      adminId,
+      AUDIT_ACTIONS.ORDER_DELETED,
+      AUDIT_ENTITIES.ORDER,
+      id,
+      order,
+      {},
+      {
+        paymentReference: order.paymentReference,
+        userId: order.userId
+      }
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: 'Order deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete order error:', error);
+
+    return NextResponse.json(
+      { error: 'Failed to delete order' },
+      { status: 500 }
+    );
+  }
+}
+
