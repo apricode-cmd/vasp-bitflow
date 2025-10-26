@@ -65,7 +65,7 @@ export default function SettingsPage(): JSX.Element {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('brand');
-  const [previewColor, setPreviewColor] = useState<string>('#06b6d4'); // Default cyan like in screenshot
+  const [previewColor, setPreviewColor] = useState<string>('#06b6d4'); // Default cyan - ensure always defined
   const [mounted, setMounted] = useState(false);
 
   // Mark as mounted to avoid hydration mismatch
@@ -294,14 +294,13 @@ export default function SettingsPage(): JSX.Element {
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <ColorPicker
-                      value={previewColor}
-                      onChange={(rgba) => {
+                      value={previewColor || '#06b6d4'}
+                      onChange={(color) => {
                         try {
-                          const color = Color.rgb(rgba);
-                          const hex = color.hex();
+                          // color is already in rgba format from ColorPicker
+                          const colorObj = Color.rgb(color);
+                          const hex = colorObj.hex();
                           setPreviewColor(hex);
-                          // Don't update settings here - only on save
-                          // This prevents infinite loop
                         } catch (error) {
                           console.error('Color conversion error:', error);
                         }
