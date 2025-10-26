@@ -115,6 +115,11 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    // Check if profile exists
+    const existingProfile = await prisma.profile.findUnique({
+      where: { userId },
+    });
+
     // Update user email
     await prisma.user.update({
       where: { id: userId },
@@ -122,18 +127,26 @@ export async function PUT(request: NextRequest) {
     });
 
     // Update or create profile
-    await prisma.profile.upsert({
-      where: { userId },
-      update: {
-        firstName: validatedData.firstName,
-        lastName: validatedData.lastName,
-      },
-      create: {
-        userId,
-        firstName: validatedData.firstName,
-        lastName: validatedData.lastName,
-      },
-    });
+    if (existingProfile) {
+      // Profile exists, update it
+      await prisma.profile.update({
+        where: { userId },
+        data: {
+          firstName: validatedData.firstName,
+          lastName: validatedData.lastName,
+        },
+      });
+    } else {
+      // Profile doesn't exist, create with default country
+      await prisma.profile.create({
+        data: {
+          userId,
+          firstName: validatedData.firstName,
+          lastName: validatedData.lastName,
+          country: 'UA', // Default country (can be changed later in full profile edit)
+        },
+      });
+    }
 
     return NextResponse.json({
       success: true,

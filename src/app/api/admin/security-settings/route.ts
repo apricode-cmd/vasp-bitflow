@@ -15,6 +15,44 @@ const securitySettingsSchema = z.object({
   loginNotifications: z.boolean(),
 });
 
+export async function GET(request: NextRequest) {
+  try {
+    const { error, session } = await requireRole('ADMIN');
+    if (error) {
+      return error;
+    }
+
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { success: false, error: 'User not authenticated' },
+        { status: 401 }
+      );
+    }
+
+    const userId = session.user.id;
+
+    // Get settings or return defaults
+    const settings = await prisma.adminSettings.findUnique({
+      where: { userId },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: settings || {
+        sessionTimeout: 30,
+        twoFactorEnabled: false,
+        loginNotifications: true,
+      },
+    });
+  } catch (error) {
+    console.error('Get security settings error:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to fetch security settings' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PUT(request: NextRequest) {
   try {
     const { error, session } = await requireRole('ADMIN');

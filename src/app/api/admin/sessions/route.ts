@@ -29,12 +29,12 @@ export async function GET(request: NextRequest) {
     const recentActivity = await prisma.systemLog.findMany({
       where: {
         userId,
-        timestamp: {
+        createdAt: {
           // Activity in the last 24 hours
           gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
         },
       },
-      orderBy: { timestamp: 'desc' },
+      orderBy: { createdAt: 'desc' },
     });
 
     // Group by unique device/IP combinations to identify unique sessions
@@ -51,16 +51,16 @@ export async function GET(request: NextRequest) {
           browser: log.browser || 'Unknown Browser',
           os: log.os || 'Unknown OS',
           ipAddress: log.ipAddress,
-          lastActive: log.timestamp,
-          firstSeen: log.timestamp,
+          lastActive: log.createdAt,
+          firstSeen: log.createdAt,
           activityCount: 1,
         });
       } else {
-        const session = sessionMap.get(sessionKey);
-        session.activityCount++;
+        const sessionItem = sessionMap.get(sessionKey);
+        sessionItem.activityCount++;
         // Update first seen if this log is older
-        if (log.timestamp < session.firstSeen) {
-          session.firstSeen = log.timestamp;
+        if (log.createdAt < sessionItem.firstSeen) {
+          sessionItem.firstSeen = log.createdAt;
         }
       }
     }
@@ -85,6 +85,7 @@ export async function GET(request: NextRequest) {
         data: {
           userId,
           action: 'SESSION_VIEW',
+          path: '/api/admin/sessions',
           ipAddress: currentIp,
           deviceType: 'Admin Panel',
           browser: userAgent.includes('Chrome') ? 'Chrome' : 
@@ -93,7 +94,7 @@ export async function GET(request: NextRequest) {
           os: userAgent.includes('Windows') ? 'Windows' :
               userAgent.includes('Mac') ? 'macOS' :
               userAgent.includes('Linux') ? 'Linux' : 'Unknown',
-          metadata: JSON.stringify({ action: 'Viewing sessions page' }),
+          metadata: { action: 'Viewing sessions page' },
         },
       });
 
@@ -104,8 +105,8 @@ export async function GET(request: NextRequest) {
         browser: currentLog.browser,
         os: currentLog.os,
         ipAddress: currentIp,
-        lastActive: currentLog.timestamp,
-        firstSeen: currentLog.timestamp,
+        lastActive: currentLog.createdAt,
+        firstSeen: currentLog.createdAt,
         activityCount: 1,
         isCurrent: true,
       });
