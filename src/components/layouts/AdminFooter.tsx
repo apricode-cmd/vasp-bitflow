@@ -5,6 +5,7 @@
  */
 
 import Link from 'next/link';
+import { ApricodeLogo } from '@/components/icons/ApricodeLogo';
 
 export function AdminFooter(): React.ReactElement {
   const currentYear = new Date().getFullYear();
@@ -29,15 +30,16 @@ export function AdminFooter(): React.ReactElement {
           </div>
 
           {/* Right: Developer */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <span>Powered by</span>
             <a 
               href="https://apricode.io" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="font-semibold text-primary hover:text-primary/80 transition-colors"
+              className="flex items-center gap-1.5 font-semibold text-primary hover:text-primary/80 transition-colors group"
             >
-              Apricode
+              <ApricodeLogo size={14} className="text-primary group-hover:text-primary/80 transition-colors" />
+              <span>Apricode</span>
             </a>
           </div>
         </div>

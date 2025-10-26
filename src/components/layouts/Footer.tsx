@@ -6,6 +6,7 @@
 
 import Link from 'next/link';
 import { Zap } from 'lucide-react';
+import { ApricodeLogo } from '@/components/icons/ApricodeLogo';
 
 export function Footer(): React.ReactElement {
   return (
@@ -72,9 +73,10 @@ export function Footer(): React.ReactElement {
               href="https://apricode.io" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="font-semibold text-primary hover:text-primary/80 transition-colors"
+              className="flex items-center gap-2 font-semibold text-primary hover:text-primary/80 transition-colors group"
             >
-              Apricode
+              <ApricodeLogo size={16} className="text-primary group-hover:text-primary/80 transition-colors" />
+              <span>Apricode</span>
             </a>
           </div>
         </div>
