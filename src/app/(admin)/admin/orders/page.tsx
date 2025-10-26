@@ -123,21 +123,29 @@ export default function AdminOrdersPage(): JSX.Element {
     }
   };
 
-  const handleStatusUpdate = async (orderId: string, newStatus: OrderStatus): Promise<void> => {
+  const handleStatusUpdate = async (orderId: string, newStatus: OrderStatus, transitionData?: any): Promise<void> => {
     try {
+      const payload = transitionData || { status: newStatus };
+      
       const response = await fetch(`/api/admin/orders/${orderId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify(payload)
       });
+
+      const data = await response.json();
 
       if (response.ok) {
         toast.success('Order status updated');
         await fetchOrders();
         setSheetOpen(false);
       } else {
-        const data = await response.json();
-        toast.error(data.error || 'Failed to update order');
+        // Check if API requires additional data
+        if (data.requiresPayIn || data.requiresPayOut) {
+          toast.error(data.message || 'Additional information required');
+        } else {
+          toast.error(data.error || 'Failed to update order');
+        }
       }
     } catch (error) {
       console.error('Failed to update order:', error);

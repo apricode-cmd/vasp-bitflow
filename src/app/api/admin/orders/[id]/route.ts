@@ -39,9 +39,15 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
       );
     }
 
-    // Check if order exists
+    // Check if order exists with full data
     const order = await prisma.order.findUnique({
-      where: { id: params.id }
+      where: { id: params.id },
+      include: {
+        payIn: true,
+        payOut: true,
+        currency: true,
+        fiatCurrency: true
+      }
     });
 
     if (!order) {
@@ -54,15 +60,95 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
     const oldStatus = order.status;
     const newStatus = validatedData.status;
 
+    // Smart status transition logic
+    const requiresPayIn = oldStatus === 'PENDING' && newStatus === 'PAYMENT_PENDING';
+    const requiresPayOut = oldStatus === 'PROCESSING' && newStatus === 'COMPLETED';
+
+    // Validate required data for transitions
+    if (requiresPayIn && !validatedData.payInData) {
+      return NextResponse.json(
+        { 
+          error: 'PayIn data required',
+          requiresPayIn: true,
+          message: 'Please provide payment information to move order to Payment Received'
+        },
+        { status: 400 }
+      );
+    }
+
+    if (requiresPayOut && !validatedData.payOutData) {
+      return NextResponse.json(
+        { 
+          error: 'PayOut data required',
+          requiresPayOut: true,
+          message: 'Please provide payout information to complete the order'
+        },
+        { status: 400 }
+      );
+    }
+
     // Update order with transaction
     const updatedOrder = await prisma.$transaction(async (tx) => {
+      // Create PayIn if transitioning to PAYMENT_PENDING
+      if (requiresPayIn && validatedData.payInData) {
+        const payInExists = await tx.payIn.findUnique({
+          where: { orderId: params.id }
+        });
+
+        if (!payInExists) {
+          await tx.payIn.create({
+            data: {
+              orderId: params.id,
+              userId: order.userId,
+              amount: validatedData.payInData.amount,
+              fiatCurrencyCode: validatedData.payInData.fiatCurrencyCode || order.fiatCurrencyCode,
+              cryptocurrencyCode: validatedData.payInData.cryptocurrencyCode,
+              currencyType: validatedData.payInData.currencyType,
+              paymentMethodCode: validatedData.payInData.paymentMethodCode,
+              expectedAmount: validatedData.payInData.expectedAmount || validatedData.payInData.amount,
+              senderName: validatedData.payInData.senderName,
+              senderAccount: validatedData.payInData.senderAccount,
+              reference: validatedData.payInData.reference,
+              status: 'RECEIVED'
+            }
+          });
+        }
+      }
+
+      // Create PayOut if transitioning to COMPLETED
+      if (requiresPayOut && validatedData.payOutData) {
+        const payOutExists = await tx.payOut.findUnique({
+          where: { orderId: params.id }
+        });
+
+        if (!payOutExists) {
+          await tx.payOut.create({
+            data: {
+              orderId: params.id,
+              userId: order.userId,
+              amount: validatedData.payOutData.amount,
+              fiatCurrencyCode: validatedData.payOutData.fiatCurrencyCode,
+              cryptocurrencyCode: validatedData.payOutData.cryptocurrencyCode || order.currencyCode,
+              currencyType: validatedData.payOutData.currencyType,
+              networkCode: validatedData.payOutData.networkCode || order.blockchainCode,
+              destinationAddress: validatedData.payOutData.destinationAddress || order.walletAddress,
+              transactionHash: validatedData.payOutData.transactionHash,
+              paymentMethodCode: validatedData.payOutData.paymentMethodCode,
+              status: 'SENT',
+              processedBy: adminId,
+              processedAt: new Date()
+            }
+          });
+        }
+      }
+
       // Update order
       const updated = await tx.order.update({
         where: { id: params.id },
         data: {
           status: newStatus,
           adminNotes: validatedData.adminNotes,
-          transactionHash: validatedData.transactionHash,
+          transactionHash: validatedData.transactionHash || validatedData.payOutData?.transactionHash,
           processedBy: adminId,
           processedAt: newStatus === 'COMPLETED' ? new Date() : order.processedAt
         },
@@ -71,7 +157,22 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
             include: { profile: true }
           },
           currency: true,
-          fiatCurrency: true
+          fiatCurrency: true,
+          payIn: {
+            include: {
+              fiatCurrency: true,
+              cryptocurrency: true,
+              paymentMethod: true
+            }
+          },
+          payOut: {
+            include: {
+              fiatCurrency: true,
+              cryptocurrency: true,
+              paymentMethod: true,
+              network: true
+            }
+          }
         }
       });
 

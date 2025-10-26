@@ -7,6 +7,7 @@
  * - Advanced filters & search
  * - Bulk actions support
  * - Real-time updates
+ * - Smart PayIn/PayOut creation on status transitions
  */
 
 'use client';
@@ -55,6 +56,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { OrderTransitionDialog } from './OrderTransitionDialog';
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/formatters';
 import { toast } from 'sonner';
 import { 
@@ -87,7 +89,7 @@ interface Order {
 
 interface OrderKanbanProps {
   orders: Order[];
-  onStatusChange: (orderId: string, newStatus: OrderStatus) => Promise<void>;
+  onStatusChange: (orderId: string, newStatus: OrderStatus, transitionData?: any) => Promise<void>;
   onOrderClick?: (order: Order) => void;
 }
 
@@ -161,7 +163,7 @@ const KANBAN_COLUMNS = [
   }
 ];
 
-export function OrderKanban({ orders, onStatusChange, onOrderClick }: OrderKanbanProps): JSX.Element {
+export function OrderKanban({ orders, onStatusChange, onOrderClick }: OrderKanbanProps): JSX.Element {  
   const [draggedOrder, setDraggedOrder] = useState<Order | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<OrderStatus | null>(null);
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
@@ -172,6 +174,19 @@ export function OrderKanban({ orders, onStatusChange, onOrderClick }: OrderKanba
     open: boolean;
     action: 'complete' | 'cancel' | 'process' | null;
   }>({ open: false, action: null });
+  
+  // NEW: Transition dialog state
+  const [transitionDialog, setTransitionDialog] = useState<{
+    open: boolean;
+    order: Order | null;
+    fromStatus: OrderStatus | null;
+    toStatus: OrderStatus | null;
+  }>({
+    open: false,
+    order: null,
+    fromStatus: null,
+    toStatus: null
+  });
 
   // Validate if status transition is allowed
   const isTransitionAllowed = (from: OrderStatus, to: OrderStatus): boolean => {
@@ -333,6 +348,23 @@ export function OrderKanban({ orders, onStatusChange, onOrderClick }: OrderKanba
       return;
     }
 
+    // Check if this transition requires additional data
+    const requiresPayIn = draggedOrder.status === 'PENDING' && newStatus === 'PAYMENT_PENDING';
+    const requiresPayOut = draggedOrder.status === 'PROCESSING' && newStatus === 'COMPLETED';
+
+    if (requiresPayIn || requiresPayOut) {
+      // Show dialog to collect PayIn/PayOut data
+      setTransitionDialog({
+        open: true,
+        order: draggedOrder,
+        fromStatus: draggedOrder.status,
+        toStatus: newStatus
+      });
+      setDraggedOrder(null);
+      return;
+    }
+
+    // Simple status change (no additional data needed)
     try {
       await onStatusChange(draggedOrder.id, newStatus);
       
@@ -357,6 +389,35 @@ export function OrderKanban({ orders, onStatusChange, onOrderClick }: OrderKanba
 
   const calculateColumnTotal = (orders: Order[]): number => {
     return orders.reduce((sum, order) => sum + order.totalFiat, 0);
+  };
+  
+  // NEW: Handle transition dialog confirmation
+  const handleTransitionConfirm = async (data: any): Promise<void> => {
+    if (!transitionDialog.order) return;
+    
+    try {
+      // Pass the full transition data to parent
+      await onStatusChange(transitionDialog.order.id, data.status, data);
+      
+      const column = KANBAN_COLUMNS.find(c => c.id === data.status);
+      toast.success(
+        `Order moved to ${column?.label}`,
+        {
+          description: `#${transitionDialog.order.paymentReference.slice(-6)}`
+        }
+      );
+      
+      // Close dialog
+      setTransitionDialog({
+        open: false,
+        order: null,
+        fromStatus: null,
+        toStatus: null
+      });
+    } catch (error) {
+      console.error('Transition error:', error);
+      toast.error('Failed to update order');
+    }
   };
 
   return (
@@ -841,6 +902,22 @@ export function OrderKanban({ orders, onStatusChange, onOrderClick }: OrderKanba
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Order Transition Dialog with PayIn/PayOut */}
+        {transitionDialog.order && transitionDialog.fromStatus && transitionDialog.toStatus && (
+          <OrderTransitionDialog
+            open={transitionDialog.open}
+            onOpenChange={(open) => setTransitionDialog({ ...transitionDialog, open })}
+            order={transitionDialog.order}
+            fromStatus={transitionDialog.fromStatus}
+            toStatus={transitionDialog.toStatus}
+            onConfirm={handleTransitionConfirm}
+            paymentMethods={[]} // TODO: Pass from parent
+            fiatCurrencies={[]} // TODO: Pass from parent
+            cryptocurrencies={[]} // TODO: Pass from parent
+            networks={[]} // TODO: Pass from parent
+          />
+        )}
       </div>
     </TooltipProvider>
   );

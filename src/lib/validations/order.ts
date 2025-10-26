@@ -50,15 +50,55 @@ export const uploadProofSchema = z.object({
 export type UploadProofInput = z.infer<typeof uploadProofSchema>;
 
 /**
+ * PayIn data schema for status transitions
+ */
+export const payInDataSchema = z.object({
+  amount: z.number().positive(),
+  fiatCurrencyCode: z.string().optional(),
+  cryptocurrencyCode: z.string().optional(),
+  currencyType: z.enum(['FIAT', 'CRYPTO']),
+  paymentMethodCode: z.string(),
+  expectedAmount: z.number().positive().optional(),
+  senderName: z.string().optional(),
+  senderAccount: z.string().optional(),
+  reference: z.string().optional()
+});
+
+/**
+ * PayOut data schema for status transitions
+ */
+export const payOutDataSchema = z.object({
+  amount: z.number().positive(),
+  fiatCurrencyCode: z.string().optional(),
+  cryptocurrencyCode: z.string().optional(),
+  currencyType: z.enum(['FIAT', 'CRYPTO']),
+  networkCode: z.string().optional(),
+  destinationAddress: z.string().optional(),
+  transactionHash: z.string().optional(),
+  paymentMethodCode: z.string()
+});
+
+/**
  * Update order status schema (admin only)
  */
 export const updateOrderStatusSchema = z.object({
-  status: z.enum(['PENDING', 'PROCESSING', 'COMPLETED', 'CANCELLED']),
+  status: z.enum([
+    'PENDING',
+    'PAYMENT_PENDING',
+    'PROCESSING',
+    'COMPLETED',
+    'CANCELLED',
+    'REFUNDED',
+    'EXPIRED'
+  ]),
   adminNotes: z.string().max(500).optional(),
   transactionHash: z
     .string()
     .regex(/^(0x)?[a-fA-F0-9]{64}$/, 'Invalid transaction hash')
     .optional()
+    .nullable(), // Allow null for non-crypto orders
+  payInData: payInDataSchema.optional(), // For PENDING → PAYMENT_PENDING
+  payOutData: payOutDataSchema.optional() // For PROCESSING → COMPLETED
 });
 
 export type UpdateOrderStatusInput = z.infer<typeof updateOrderStatusSchema>;
