@@ -17,17 +17,27 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { LegalDocumentEditor } from '@/components/admin/LegalDocumentEditor';
+import { 
+  ColorPicker,
+  ColorPickerSelection,
+  ColorPickerHue,
+  ColorPickerFormat,
+  ColorPickerOutput,
+  ColorPickerEyeDropper
+} from '@/components/ui/shadcn-io/color-picker';
 import { toast } from 'sonner';
 import { 
   Building2, Globe, FileText, Settings as SettingsIcon, 
-  Save, Loader2, AlertCircle, Sparkles, Mail, Shield
+  Save, Loader2, AlertCircle, Sparkles, Mail, Shield, Palette
 } from 'lucide-react';
+import Color from 'color';
 
 interface SystemSettings {
   // Brand
   brandName: string;
   brandTagline: string;
   brandLogo: string;
+  primaryColor: string; // Brand primary color
   supportEmail: string;
   supportPhone: string;
   
@@ -55,6 +65,30 @@ export default function SettingsPage(): JSX.Element {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('brand');
+  const [previewColor, setPreviewColor] = useState<string>('#3b82f6'); // Default blue
+
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  // Apply theme color in real-time
+  useEffect(() => {
+    if (previewColor) {
+      applyThemeColor(previewColor);
+    }
+  }, [previewColor]);
+
+  const applyThemeColor = (hexColor: string) => {
+    try {
+      const color = Color(hexColor);
+      const hsl = color.hsl();
+      
+      // Apply to CSS variables
+      document.documentElement.style.setProperty('--primary', `${hsl.hue()} ${hsl.saturationl()}% ${hsl.lightness()}%`);
+    } catch (error) {
+      console.error('Invalid color:', error);
+    }
+  };
 
   useEffect(() => {
     fetchSettings();
@@ -67,6 +101,10 @@ export default function SettingsPage(): JSX.Element {
       
       if (data.success) {
         setSettings(data.settings || {});
+        // Set preview color from settings
+        if (data.settings?.primaryColor) {
+          setPreviewColor(data.settings.primaryColor);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch settings:', error);
@@ -211,6 +249,72 @@ export default function SettingsPage(): JSX.Element {
                 <p className="text-xs text-muted-foreground">
                   Recommended size: 200x50px, PNG format with transparency
                 </p>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Palette className="h-5 w-5 text-primary" />
+                  <div>
+                    <h4 className="font-semibold">Primary Brand Color</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Choose your brand's primary color - changes apply in real-time
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <ColorPicker
+                      value={previewColor}
+                      onChange={(rgba) => {
+                        try {
+                          const color = Color.rgb(rgba);
+                          const hex = color.hex();
+                          setPreviewColor(hex);
+                          updateSetting('primaryColor', hex);
+                        } catch (error) {
+                          console.error('Color conversion error:', error);
+                        }
+                      }}
+                      className="w-full"
+                    >
+                      <ColorPickerSelection className="h-48 w-full" />
+                      <ColorPickerHue className="mt-3" />
+                      <div className="mt-3 flex items-center gap-2">
+                        <ColorPickerFormat className="flex-1" />
+                        <ColorPickerOutput />
+                        <ColorPickerEyeDropper />
+                      </div>
+                    </ColorPicker>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-4 rounded-lg border bg-card">
+                      <span className="text-sm font-medium">Preview Color</span>
+                      <div 
+                        className="h-10 w-10 rounded-md border-2 shadow-sm"
+                        style={{ backgroundColor: previewColor }}
+                      />
+                    </div>
+                    
+                    <Alert>
+                      <Sparkles className="h-4 w-4" />
+                      <AlertTitle>Live Preview Active</AlertTitle>
+                      <AlertDescription>
+                        Color changes are applied instantly. Click "Save All Changes" to make them permanent.
+                      </AlertDescription>
+                    </Alert>
+
+                    <div className="p-4 rounded-lg bg-muted/50 space-y-2">
+                      <p className="text-sm font-medium">Current Value:</p>
+                      <code className="text-xs bg-background px-2 py-1 rounded border">
+                        {previewColor}
+                      </code>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <Separator />
