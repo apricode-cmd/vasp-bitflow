@@ -21,7 +21,7 @@ interface AdminLayoutClientProps {
 }
 
 const SIDEBAR_WIDTH_KEY = 'admin-sidebar-width';
-const DEFAULT_SIDEBAR_SIZE = 9;
+const DEFAULT_SIDEBAR_SIZE = 18; // Changed from 9 to 18 (must be >= minSize=15)
 
 export function AdminLayoutClient({ children }: AdminLayoutClientProps): React.ReactElement {
   const [sidebarSize, setSidebarSize] = useState(DEFAULT_SIDEBAR_SIZE);
@@ -62,7 +62,7 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps): React.R
           <ResizableHandle className="w-px bg-transparent hover:bg-primary/30 transition-all duration-200 group relative">
             <div className="absolute inset-y-0 -left-px w-[3px] bg-gradient-to-r from-transparent via-border/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           </ResizableHandle>
-          <ResizablePanel defaultSize={91} minSize={50}>
+          <ResizablePanel defaultSize={82} minSize={50}> {/* Changed from 91 to 82 (100-18) */}
             <div className="flex flex-col h-full overflow-auto">
               <main className="flex-1">
                 <div className="container mx-auto p-6 max-w-[1600px]">
@@ -105,7 +105,7 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps): React.R
         </ResizableHandle>
 
         {/* Main Content Panel */}
-        <ResizablePanel defaultSize={100 - sidebarSize} minSize={50}>
+        <ResizablePanel defaultSize={82} minSize={50}> {/* Changed from 100 - sidebarSize to static 82 */}
           <div className="flex flex-col h-full overflow-auto">
             <main className="flex-1">
               <div className="container mx-auto p-6 max-w-[1600px]">

@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
-import UAParser from 'ua-parser-js';
+import { UAParser } from 'ua-parser-js'; // Changed: Named import instead of default
 
 export async function POST(request: NextRequest) {
   try {
