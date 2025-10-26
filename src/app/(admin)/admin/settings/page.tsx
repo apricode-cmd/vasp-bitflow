@@ -65,7 +65,19 @@ export default function SettingsPage(): JSX.Element {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('brand');
-  const [previewColor, setPreviewColor] = useState<string>('#3b82f6'); // Default blue
+  const [previewColor, setPreviewColor] = useState<string>('#06b6d4'); // Default cyan like in screenshot
+  const [mounted, setMounted] = useState(false);
+
+  // Mark as mounted to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+    
+    // Load saved color from localStorage on mount
+    const savedColor = localStorage.getItem('brand-primary-color');
+    if (savedColor) {
+      setPreviewColor(savedColor);
+    }
+  }, []);
 
   useEffect(() => {
     fetchSettings();
@@ -73,18 +85,31 @@ export default function SettingsPage(): JSX.Element {
 
   // Apply theme color in real-time
   useEffect(() => {
-    if (previewColor) {
+    if (mounted && previewColor) {
       applyThemeColor(previewColor);
+      // Save to localStorage for persistence
+      localStorage.setItem('brand-primary-color', previewColor);
     }
-  }, [previewColor]);
+  }, [previewColor, mounted]);
 
   const applyThemeColor = (hexColor: string) => {
     try {
       const color = Color(hexColor);
-      const hsl = color.hsl();
       
-      // Apply to CSS variables
-      document.documentElement.style.setProperty('--primary', `${hsl.hue()} ${hsl.saturationl()}% ${hsl.lightness()}%`);
+      // Get HSL values using correct Color.js methods
+      const hue = Math.round(color.hue());
+      const saturation = Math.round(color.saturationl());
+      const lightness = Math.round(color.lightness());
+      
+      // Apply to both light and dark theme
+      const root = document.documentElement;
+      root.style.setProperty('--primary', `${hue} ${saturation}% ${lightness}%`);
+      
+      // Log for debugging
+      console.log('Applied theme color:', {
+        hex: hexColor,
+        hsl: `${hue} ${saturation}% ${lightness}%`
+      });
     } catch (error) {
       console.error('Invalid color:', error);
     }
