@@ -186,13 +186,19 @@ const CountrySelectOption = ({
   };
 
   return (
-    <CommandItem className="gap-2" onSelect={handleSelect}>
-      <FlagComponent country={country} countryName={countryName} />
-      <span className="flex-1 text-sm">{countryName}</span>
-      <span className="text-sm text-foreground/50">{`+${RPNInput.getCountryCallingCode(country)}`}</span>
-      <CheckIcon
-        className={`ml-auto size-4 ${country === selectedCountry ? "opacity-100" : "opacity-0"}`}
-      />
+    <CommandItem 
+      className="gap-2 cursor-pointer" 
+      onSelect={handleSelect}
+      style={{ pointerEvents: 'auto' }}
+    >
+      <div className="flex items-center gap-2 flex-1 [&>*]:pointer-events-none">
+        <FlagComponent country={country} countryName={countryName} />
+        <span className="flex-1 text-sm">{countryName}</span>
+        <span className="text-sm text-foreground/50">{`+${RPNInput.getCountryCallingCode(country)}`}</span>
+        <CheckIcon
+          className={`ml-auto size-4 ${country === selectedCountry ? "opacity-100" : "opacity-0"}`}
+        />
+      </div>
     </CommandItem>
   );
 };

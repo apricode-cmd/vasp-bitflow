@@ -157,11 +157,12 @@ const CountryDropdownComponent = (
                 .filter((x) => x.name)
                 .map((option, key: number) => (
                   <CommandItem
-                    className="flex items-center w-full gap-2"
+                    className="flex items-center w-full gap-2 cursor-pointer"
                     key={key}
                     onSelect={() => handleSelect(option)}
+                    style={{ pointerEvents: 'auto' }}
                   >
-                    <div className="flex flex-grow w-0 space-x-2 overflow-hidden">
+                    <div className="flex flex-grow w-0 space-x-2 overflow-hidden [&>*]:pointer-events-none">
                       <div className="inline-flex items-center justify-center w-5 h-5 shrink-0 overflow-hidden rounded-full">
                         <CircleFlag
                           countryCode={option.alpha2.toLowerCase()}
@@ -174,7 +175,7 @@ const CountryDropdownComponent = (
                     </div>
                     <CheckIcon
                       className={cn(
-                        "ml-auto h-4 w-4 shrink-0",
+                        "ml-auto h-4 w-4 shrink-0 pointer-events-none",
                         option.name === selectedCountry?.name
                           ? "opacity-100"
                           : "opacity-0"
