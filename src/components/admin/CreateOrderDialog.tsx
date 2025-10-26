@@ -123,7 +123,7 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
     ? calculateOrderTotal(
         watchedFields.cryptoAmount,
         useCustomRate && watchedFields.customRate ? watchedFields.customRate : currentRate,
-        rates.feePercentage / 100
+        rates.feePercentage // Already in decimal format (0.015 = 1.5%)
       )
     : null;
 

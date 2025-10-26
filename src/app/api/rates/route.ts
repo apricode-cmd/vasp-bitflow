@@ -22,29 +22,29 @@ export async function GET(): Promise<NextResponse> {
       rateManagementService.getCurrentRate('SOL', 'PLN')
     ]);
 
-    // Add platform fee to rates for display
-    const ratesWithFee = {
+    // Return real market rates (fee is applied during order calculation, not to the rate itself)
+    const rates = {
       BTC: {
-        EUR: btcEur * (1 + PLATFORM_CONFIG.FEE_PERCENTAGE),
-        PLN: btcPln * (1 + PLATFORM_CONFIG.FEE_PERCENTAGE)
+        EUR: btcEur,
+        PLN: btcPln
       },
       ETH: {
-        EUR: ethEur * (1 + PLATFORM_CONFIG.FEE_PERCENTAGE),
-        PLN: ethPln * (1 + PLATFORM_CONFIG.FEE_PERCENTAGE)
+        EUR: ethEur,
+        PLN: ethPln
       },
       USDT: {
-        EUR: usdtEur * (1 + PLATFORM_CONFIG.FEE_PERCENTAGE),
-        PLN: usdtPln * (1 + PLATFORM_CONFIG.FEE_PERCENTAGE)
+        EUR: usdtEur,
+        PLN: usdtPln
       },
       SOL: {
-        EUR: solEur * (1 + PLATFORM_CONFIG.FEE_PERCENTAGE),
-        PLN: solPln * (1 + PLATFORM_CONFIG.FEE_PERCENTAGE)
+        EUR: solEur,
+        PLN: solPln
       },
       updatedAt: new Date().toISOString(),
       feePercentage: PLATFORM_CONFIG.FEE_PERCENTAGE
     };
 
-    return NextResponse.json(ratesWithFee);
+    return NextResponse.json(rates);
   } catch (error) {
     console.error('Error fetching rates:', error);
     return NextResponse.json(
