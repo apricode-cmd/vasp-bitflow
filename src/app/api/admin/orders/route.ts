@@ -43,7 +43,23 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             include: { profile: true }
           },
           currency: true,
-          fiatCurrency: true
+          fiatCurrency: true,
+          payIn: {
+            include: {
+              fiatCurrency: true,
+              cryptocurrency: true,
+              paymentMethod: true,
+              network: true
+            }
+          },
+          payOut: {
+            include: {
+              fiatCurrency: true,
+              cryptocurrency: true,
+              paymentMethod: true,
+              network: true
+            }
+          }
         },
         orderBy: { createdAt: 'desc' },
         skip,

@@ -189,8 +189,9 @@ export default function AdminOrdersPage(): JSX.Element {
   // Define table columns
   const columns: ColumnDef<Order>[] = [
     {
-      accessorKey: 'user',
+      id: 'customer', // Changed from accessorKey to id
       header: 'Customer',
+      accessorFn: (row) => row.user.email, // For searching/filtering
       cell: ({ row }) => {
         const user = row.original.user;
         const initials = `${user.profile?.firstName?.charAt(0) || ''}${user.profile?.lastName?.charAt(0) || ''}`;
