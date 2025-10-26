@@ -1,9 +1,7 @@
 /**
- * Admin Payment Method Management API
- * 
- * GET /api/admin/payment-methods/[id] - Get payment method details
- * PATCH /api/admin/payment-methods/[id] - Update payment method
- * DELETE /api/admin/payment-methods/[id] - Deactivate payment method
+ * Payment Method by Code API
+ * PUT: Update payment method
+ * DELETE: Delete payment method
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -12,10 +10,11 @@ import { paymentMethodService } from '@/lib/services/payment-method.service';
 import { updatePaymentMethodSchema } from '@/lib/validations/payment-method';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 import { z } from 'zod';
+import { prisma } from '@/lib/prisma';
 
-export async function GET(
+export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { code: string } }
 ): Promise<NextResponse> {
   try {
     // Check admin permission
@@ -24,50 +23,6 @@ export async function GET(
       return sessionOrError;
     }
 
-    const { id } = await params;
-
-    // Get payment method
-    const method = await paymentMethodService.getMethodById(id);
-
-    if (!method) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Payment method not found'
-        },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: method
-    });
-  } catch (error) {
-    console.error('Get payment method error:', error);
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to retrieve payment method'
-      },
-      { status: 500 }
-    );
-  }
-}
-
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-): Promise<NextResponse> {
-  try {
-    // Check admin permission
-    const sessionOrError = await requireRole('ADMIN');
-    if (sessionOrError instanceof NextResponse) {
-      return sessionOrError;
-    }
-
-    const { id } = await params;
     const body = await request.json();
 
     // Validate
@@ -85,10 +40,12 @@ export async function PATCH(
       );
     }
 
-    // Get current method
-    const currentMethod = await paymentMethodService.getMethodById(id);
+    // Get existing method for audit
+    const existingMethod = await prisma.paymentMethod.findUnique({
+      where: { code: params.code },
+    });
 
-    if (!currentMethod) {
+    if (!existingMethod) {
       return NextResponse.json(
         {
           success: false,
@@ -99,31 +56,21 @@ export async function PATCH(
     }
 
     // Update payment method
-    const updatedMethod = await paymentMethodService.updateMethod(id, validated);
+    const method = await paymentMethodService.updateMethod(params.code, validated);
 
     // Log admin action
     await auditService.logAdminAction(
       adminId,
       AUDIT_ACTIONS.PAYMENT_METHOD_UPDATED,
       AUDIT_ENTITIES.PAYMENT_METHOD,
-      id,
-      {
-        name: currentMethod.name,
-        isActive: currentMethod.isActive,
-        feeFixed: currentMethod.feeFixed,
-        feePercent: currentMethod.feePercent
-      },
-      {
-        name: updatedMethod.name,
-        isActive: updatedMethod.isActive,
-        feeFixed: updatedMethod.feeFixed,
-        feePercent: updatedMethod.feePercent
-      }
+      method.code,
+      existingMethod,
+      method
     );
 
     return NextResponse.json({
       success: true,
-      data: updatedMethod
+      data: method
     });
   } catch (error) {
     console.error('Update payment method error:', error);
@@ -151,7 +98,7 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { code: string } }
 ): Promise<NextResponse> {
   try {
     // Check admin permission
@@ -159,8 +106,6 @@ export async function DELETE(
     if (sessionOrError instanceof NextResponse) {
       return sessionOrError;
     }
-
-    const { id } = await params;
 
     // Get admin ID
     const adminId = await getCurrentUserId();
@@ -174,8 +119,20 @@ export async function DELETE(
       );
     }
 
-    // Get method for logging
-    const method = await paymentMethodService.getMethodById(id);
+    // Check if method exists and has dependencies
+    const method = await prisma.paymentMethod.findUnique({
+      where: { code: params.code },
+      include: {
+        _count: {
+          select: {
+            orders: true,
+            payIns: true,
+            payOuts: true,
+            limitsMatrix: true,
+          },
+        },
+      },
+    });
 
     if (!method) {
       return NextResponse.json(
@@ -187,26 +144,42 @@ export async function DELETE(
       );
     }
 
-    // Deactivate payment method
-    await paymentMethodService.deleteMethod(id);
+    // Prevent deletion if there are related records
+    const totalDependencies = 
+      method._count.orders + 
+      method._count.payIns + 
+      method._count.payOuts + 
+      method._count.limitsMatrix;
+
+    if (totalDependencies > 0) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: `Cannot delete payment method with ${totalDependencies} related records. Deactivate it instead.`,
+          dependencies: method._count
+        },
+        { status: 400 }
+      );
+    }
+
+    // Delete payment method
+    await prisma.paymentMethod.delete({
+      where: { code: params.code },
+    });
 
     // Log admin action
     await auditService.logAdminAction(
       adminId,
-      AUDIT_ACTIONS.PAYMENT_METHOD_UPDATED,
+      'PAYMENT_METHOD_DELETE',
       AUDIT_ENTITIES.PAYMENT_METHOD,
-      id,
-      { isActive: true },
-      { isActive: false },
-      {
-        name: method.name,
-        action: 'deactivated'
-      }
+      params.code,
+      method,
+      null
     );
 
     return NextResponse.json({
       success: true,
-      message: 'Payment method deactivated'
+      message: 'Payment method deleted successfully'
     });
   } catch (error) {
     console.error('Delete payment method error:', error);

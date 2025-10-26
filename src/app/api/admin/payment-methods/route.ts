@@ -20,12 +20,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return sessionOrError;
     }
 
-    // Get all payment methods
+    // Get all payment methods with full details
     const methods = await paymentMethodService.getAllMethods();
 
     return NextResponse.json({
       success: true,
-      data: methods
+      methods,
+      total: methods.length,
     });
   } catch (error) {
     console.error('Get payment methods error:', error);

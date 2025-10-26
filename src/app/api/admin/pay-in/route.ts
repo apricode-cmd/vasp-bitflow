@@ -1,9 +1,3 @@
-/**
- * PayIn API - GET /api/admin/pay-in
- * List all incoming payments with filtering
- * POST /api/admin/pay-in - Create new PayIn manually
- */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole } from '@/lib/auth-utils';
 import { prisma } from '@/lib/prisma';
@@ -38,58 +32,51 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return sessionOrError;
     }
 
-    // Parse filters
-    const searchParams = request.nextUrl.searchParams;
-    const params = {
-      status: searchParams.get('status') || undefined,
-      orderId: searchParams.get('orderId') || undefined,
-      userId: searchParams.get('userId') || undefined,
-      fromDate: searchParams.get('fromDate') || undefined,
-      toDate: searchParams.get('toDate') || undefined,
-      page: searchParams.get('page') || undefined,
-      limit: searchParams.get('limit') || undefined
-    };
+    const { searchParams } = new URL(request.url);
+    const filters = payInFiltersSchema.parse(Object.fromEntries(searchParams.entries()));
 
-    const validated = payInFiltersSchema.parse(params);
+    const { status, orderId, userId, fromDate, toDate, page, limit } = filters;
+
+    const skip = (page - 1) * limit;
 
     // Build where clause
     const where: any = {};
-
-    if (validated.status) {
-      where.status = validated.status;
+    
+    if (status) {
+      where.status = status;
     }
-
-    if (validated.orderId) {
-      where.orderId = validated.orderId;
+    
+    if (orderId) {
+      where.orderId = orderId;
     }
-
-    if (validated.userId) {
-      where.userId = validated.userId;
+    
+    if (userId) {
+      where.userId = userId;
     }
-
-    if (validated.fromDate || validated.toDate) {
+    
+    if (fromDate || toDate) {
       where.createdAt = {};
-      if (validated.fromDate) {
-        where.createdAt.gte = new Date(validated.fromDate);
+      if (fromDate) {
+        where.createdAt.gte = new Date(fromDate);
       }
-      if (validated.toDate) {
-        where.createdAt.lte = new Date(validated.toDate);
+      if (toDate) {
+        where.createdAt.lte = new Date(toDate);
       }
     }
 
-    // Get total count and data
-    const [total, payIns] = await Promise.all([
-      prisma.payIn.count({ where }),
+    // Fetch PayIn records
+    const [payIns, total] = await Promise.all([
       prisma.payIn.findMany({
         where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
         include: {
           order: {
             select: {
               id: true,
               paymentReference: true,
-              cryptoAmount: true,
-              currencyCode: true,
-              fiatCurrencyCode: true
+              status: true
             }
           },
           user: {
@@ -105,43 +92,48 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
               symbol: true
             }
           },
-          paymentMethod: {
+          cryptocurrency: {
+            select: {
+              code: true,
+              name: true,
+              symbol: true
+            }
+          },
+          network: {
             select: {
               code: true,
               name: true
             }
           },
-          verifier: {
+          paymentMethod: {
             select: {
-              id: true,
-              email: true
+              code: true,
+              name: true
             }
           }
-        },
-        orderBy: { createdAt: 'desc' },
-        skip: (validated.page - 1) * validated.limit,
-        take: validated.limit
-      })
+        }
+      }),
+      prisma.payIn.count({ where })
     ]);
 
     return NextResponse.json({
       success: true,
       data: payIns,
       pagination: {
+        page,
+        limit,
         total,
-        page: validated.page,
-        limit: validated.limit,
-        pages: Math.ceil(total / validated.limit)
+        totalPages: Math.ceil(total / limit)
       }
     });
   } catch (error) {
-    console.error('Get PayIn error:', error);
+    console.error('Get PayIns error:', error);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Invalid query parameters',
+          error: 'Invalid request parameters',
           details: error.errors
         },
         { status: 400 }
@@ -151,7 +143,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to retrieve payments'
+        error: 'Failed to fetch PayIns'
       },
       { status: 500 }
     );
@@ -169,21 +161,109 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const body = await request.json();
     const validated = createPayInSchema.parse(body);
 
+    console.log('🔍 Creating PayIn with data:', {
+      currency: validated.currency,
+      currencyType: validated.currencyType,
+      orderId: validated.orderId,
+      userId: validated.userId,
+      amount: validated.amount
+    });
+
+    // Validate order exists
+    const order = await prisma.order.findUnique({
+      where: { id: validated.orderId },
+      select: { id: true, userId: true }
+    });
+
+    if (!order) {
+      return NextResponse.json(
+        { success: false, error: 'Order not found' },
+        { status: 404 }
+      );
+    }
+
+    // Validate user exists
+    const user = await prisma.user.findUnique({
+      where: { id: validated.userId },
+      select: { id: true }
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: 'User not found' },
+        { status: 404 }
+      );
+    }
+
+    // Prepare data based on currency type
+    const payInData: any = {
+      order: { connect: { id: validated.orderId } },
+      user: { connect: { id: validated.userId } },
+      amount: validated.amount,
+      currencyType: validated.currencyType,
+      expectedAmount: validated.expectedAmount || validated.amount,
+      status: 'PENDING',
+      amountMismatch: false,
+      confirmations: 0
+    };
+
+    // Connect currency relations explicitly based on type
+    if (validated.currencyType === 'FIAT') {
+      // Verify fiat currency exists
+      const fiatCurrency = await prisma.fiatCurrency.findUnique({
+        where: { code: validated.currency },
+        select: { code: true }
+      });
+      
+      if (!fiatCurrency) {
+        return NextResponse.json(
+          { success: false, error: `Fiat currency '${validated.currency}' not found` },
+          { status: 404 }
+        );
+      }
+      
+      payInData.fiatCurrency = { connect: { code: validated.currency } };
+      
+      // Connect payment method only if provided and exists
+      if (validated.paymentMethodCode) {
+        const paymentMethodExists = await prisma.paymentMethod.findUnique({
+          where: { code: validated.paymentMethodCode },
+          select: { code: true }
+        });
+        if (paymentMethodExists) {
+          payInData.paymentMethod = { connect: { code: validated.paymentMethodCode } };
+        }
+      }
+    } else {
+      // Verify cryptocurrency exists
+      const cryptocurrency = await prisma.currency.findUnique({
+        where: { code: validated.currency },
+        select: { code: true }
+      });
+      
+      if (!cryptocurrency) {
+        return NextResponse.json(
+          { success: false, error: `Cryptocurrency '${validated.currency}' not found` },
+          { status: 404 }
+        );
+      }
+      
+      payInData.cryptocurrency = { connect: { code: validated.currency } };
+      
+      if (validated.networkCode) {
+        const networkExists = await prisma.blockchainNetwork.findUnique({
+          where: { code: validated.networkCode },
+          select: { code: true }
+        });
+        if (networkExists) {
+          payInData.network = { connect: { code: validated.networkCode } };
+        }
+      }
+    }
+
     // Create PayIn
     const payIn = await prisma.payIn.create({
-      data: {
-        orderId: validated.orderId,
-        userId: validated.userId,
-        amount: validated.amount,
-        currency: validated.currency,
-        currencyType: validated.currencyType,
-        paymentMethodCode: validated.paymentMethodCode || null,
-        networkCode: validated.networkCode || null,
-        expectedAmount: validated.expectedAmount || validated.amount,
-        status: 'PENDING',
-        amountMismatch: false,
-        confirmations: 0
-      },
+      data: payInData,
       include: {
         order: true,
         user: {
@@ -191,7 +271,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             id: true,
             email: true
           }
-        }
+        },
+        fiatCurrency: true,
+        cryptocurrency: true,
+        network: true,
+        paymentMethod: true
       }
     });
 
@@ -202,6 +286,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }, { status: 201 });
   } catch (error) {
     console.error('Create PayIn error:', error);
+    console.error('Error details:', JSON.stringify(error, null, 2));
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -217,10 +302,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to create PayIn'
+        error: 'Failed to create PayIn',
+        details: error instanceof Error ? error.message : String(error)
       },
       { status: 500 }
     );
   }
 }
-

@@ -6,19 +6,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Combobox } from '@/components/shared/Combobox';
 import { toast } from 'sonner';
-import { Search, Filter, CheckCircle, XCircle, Clock, AlertTriangle, FileCheck, ArrowDownCircle, DollarSign, Plus } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Clock, AlertTriangle, FileCheck, ArrowDownCircle, DollarSign, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface PayIn {
@@ -27,6 +26,7 @@ interface PayIn {
   userId: string;
   amount: number;
   currency: string;
+  currencyType: string; // 'FIAT' or 'CRYPTO'
   paymentMethodCode: string;
   status: string;
   expectedAmount: number;
@@ -52,11 +52,20 @@ interface PayIn {
     code: string;
     name: string;
     symbol: string;
-  };
+  } | null;
+  cryptocurrency: {
+    code: string;
+    name: string;
+    symbol: string;
+  } | null;
   paymentMethod: {
     code: string;
     name: string;
-  };
+  } | null;
+  network: {
+    code: string;
+    name: string;
+  } | null;
 }
 
 const statusConfig: Record<string, { label: string; icon: any; color: string }> = {
@@ -81,7 +90,10 @@ export default function PayInPage(): JSX.Element {
   // Options for Combobox
   const [orders, setOrders] = useState<Array<{ value: string; label: string; description?: string; data?: any }>>([]);
   const [users, setUsers] = useState<Array<{ value: string; label: string; description?: string }>>([]);
-  const [currencies, setCurrencies] = useState<Array<{ value: string; label: string; description?: string }>>([]);
+  const [fiatCurrencies, setFiatCurrencies] = useState<any[]>([]);
+  const [cryptocurrencies, setCryptocurrencies] = useState<any[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [paymentAccounts, setPaymentAccounts] = useState<any[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(false);
   
   // Filters
@@ -99,7 +111,8 @@ export default function PayInPage(): JSX.Element {
     currencyType: 'FIAT' as 'FIAT' | 'CRYPTO',
     paymentMethodCode: '',
     networkCode: '',
-    expectedAmount: 0
+    expectedAmount: 0,
+    paymentAccountId: '' // NEW: connected account
   });
 
   useEffect(() => {
@@ -158,27 +171,39 @@ export default function PayInPage(): JSX.Element {
       const fiatData = await fiatRes.json();
       const cryptoData = await cryptoRes.json();
 
-      const allCurrencies = [
-        ...(fiatData.success ? fiatData.data.map((c: any) => ({
-          value: c.code,
-          label: `${c.code} - ${c.name}`,
-          description: `${c.symbol} (FIAT)`,
-          type: 'FIAT'
-        })) : []),
-        ...(cryptoData.success ? cryptoData.data.map((c: any) => ({
-          value: c.code,
-          label: `${c.code} - ${c.name}`,
-          description: `${c.symbol} (CRYPTO)`,
-          type: 'CRYPTO'
-        })) : [])
-      ];
+      if (fiatData.success) {
+        setFiatCurrencies(fiatData.data || []);
+      }
+      if (cryptoData.success) {
+        setCryptocurrencies(cryptoData.data || []);
+      }
 
-      setCurrencies(allCurrencies);
+      // Load payment methods (IN or BOTH direction)
+      const methodsRes = await fetch('/api/admin/payment-methods');
+      const methodsData = await methodsRes.json();
+      
+      if (methodsData.success) {
+        const inMethods = methodsData.methods.filter((m: any) => 
+          m.direction === 'IN' || m.direction === 'BOTH'
+        );
+        setPaymentMethods(inMethods);
+      }
+      
+      // Load payment accounts
+      const accountsRes = await fetch('/api/admin/payment-accounts');
+      const accountsData = await accountsRes.json();
+      
+      if (accountsData.success) {
+        setPaymentAccounts(accountsData.accounts || []);
+      }
       
       console.log('Loaded options:', {
         orders: availableOrders.length,
         users: usersData.success ? usersData.data.length : 0,
-        currencies: allCurrencies.length
+        fiatCurrencies: fiatData.success ? fiatData.data.length : 0,
+        cryptocurrencies: cryptoData.success ? cryptoData.data.length : 0,
+        paymentMethods: methodsData.success ? methodsData.methods.length : 0,
+        paymentAccounts: accountsData.success ? accountsData.accounts.length : 0
       });
     } catch (error) {
       console.error('Failed to load options:', error);
@@ -209,9 +234,70 @@ export default function PayInPage(): JSX.Element {
       amount: isBuyOrder ? order.totalFiat : order.cryptoAmount,
       expectedAmount: isBuyOrder ? order.totalFiat : order.cryptoAmount,
       networkCode: isBuyOrder ? '' : (order.blockchainCode || ''),
-      paymentMethodCode: isBuyOrder ? 'sepa' : '' // Default payment method
+      paymentMethodCode: '', // Reset to let user select appropriate method
+      paymentAccountId: '' // Reset
     }));
   };
+  
+  // NEW: Handle payment method selection
+  const handlePaymentMethodChange = (methodCode: string): void => {
+    const selectedMethod = paymentMethods.find(m => m.code === methodCode);
+    if (!selectedMethod) return;
+    
+    console.log('📝 Selected Payment Method:', selectedMethod);
+    
+    // Auto-fill from payment method
+    setCreateForm(prev => ({
+      ...prev,
+      paymentMethodCode: methodCode,
+      currency: selectedMethod.currency, // Set default, user can change
+      paymentAccountId: selectedMethod.paymentAccountId || '',
+      networkCode: selectedMethod.supportedNetworks?.[0] || prev.networkCode
+    }));
+  };
+  
+  // Get available currencies based on payment method type
+  const getAvailableCurrencies = () => {
+    if (!createForm.paymentMethodCode) return [];
+    
+    const selectedMethod = paymentMethods.find(m => m.code === createForm.paymentMethodCode);
+    if (!selectedMethod) return [];
+    
+    // CRYPTO_WALLET -> cryptocurrencies
+    if (selectedMethod.providerType === 'CRYPTO_WALLET') {
+      return cryptocurrencies.map(c => ({
+        value: c.code,
+        label: `${c.code} - ${c.name}`,
+        description: c.symbol
+      }));
+    }
+    
+    // BANK_ACCOUNT, PSP, MANUAL -> fiat currencies
+    return fiatCurrencies.map(c => ({
+      value: c.code,
+      label: `${c.code} - ${c.name}`,
+      description: c.symbol
+    }));
+  };
+  
+  // Filter payment methods by currency type
+  const filteredPaymentMethods = paymentMethods.filter(method => {
+    if (createForm.currencyType === 'FIAT') {
+      return method.providerType !== 'CRYPTO_WALLET';
+    } else {
+      return method.providerType === 'CRYPTO_WALLET' || method.providerType === 'MANUAL';
+    }
+  });
+  
+  // Get selected payment method details
+  const selectedPaymentMethod = createForm.paymentMethodCode 
+    ? paymentMethods.find(m => m.code === createForm.paymentMethodCode)
+    : null;
+    
+  // Get connected payment account if exists
+  const connectedAccount = selectedPaymentMethod?.paymentAccountId
+    ? paymentAccounts.find(a => a.id === selectedPaymentMethod.paymentAccountId)
+    : null;
 
   const fetchPayIns = async (): Promise<void> => {
     try {
@@ -292,7 +378,8 @@ export default function PayInPage(): JSX.Element {
           currencyType: 'FIAT',
           paymentMethodCode: '',
           networkCode: '',
-          expectedAmount: 0
+          expectedAmount: 0,
+          paymentAccountId: ''
         });
         await fetchPayIns();
       } else {
@@ -388,36 +475,106 @@ export default function PayInPage(): JSX.Element {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Currency *</Label>
-                  <Combobox
-                    options={currencies.filter((c: any) => c.type === createForm.currencyType)}
-                    value={createForm.currency}
-                    onValueChange={(value) => setCreateForm({ ...createForm, currency: value })}
-                    placeholder={`Select ${createForm.currencyType} currency...`}
-                    searchPlaceholder="Search currencies..."
-                    emptyText="No currencies found"
-                    disabled={loadingOptions || !createForm.currencyType}
+                  <Label>Currency Type *</Label>
+                  <Input
+                    value={createForm.currencyType}
+                    disabled
+                    className="bg-muted"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Determined by order type
+                  </p>
                 </div>
               </div>
 
-              {createForm.currencyType === 'FIAT' ? (
+              {/* Payment Method Selection - NEW */}
+              <div className="space-y-2">
+                <Label>Payment Method *</Label>
+                <Combobox
+                  options={filteredPaymentMethods.map(pm => ({
+                    value: pm.code,
+                    label: pm.name,
+                    description: `${pm.currency} - ${pm.providerType}${pm.isActive ? '' : ' (Inactive)'}`
+                  }))}
+                  value={createForm.paymentMethodCode}
+                  onValueChange={handlePaymentMethodChange}
+                  placeholder="Select payment method..."
+                  searchPlaceholder="Search methods..."
+                  emptyText={filteredPaymentMethods.length === 0 ? 
+                    `No ${createForm.currencyType} payment methods available` : 
+                    'No methods found'
+                  }
+                  disabled={loadingOptions || !createForm.orderId}
+                />
+                {!createForm.orderId && (
+                  <p className="text-xs text-yellow-600">
+                    Please select an order first
+                  </p>
+                )}
+                
+                {/* Show payment method details */}
+                {selectedPaymentMethod && (
+                  <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded border border-blue-200 dark:border-blue-800 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Provider:</span>
+                      <Badge variant="outline">{selectedPaymentMethod.providerType}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Automation:</span>
+                      <Badge variant="outline">{selectedPaymentMethod.automationLevel}</Badge>
+                    </div>
+                    {connectedAccount && (
+                      <>
+                        <div className="h-px bg-blue-200 dark:bg-blue-800" />
+                        <div className="text-xs">
+                          <p className="font-semibold text-blue-900 dark:text-blue-100">
+                            Connected Account:
+                          </p>
+                          <p className="text-blue-700 dark:text-blue-300">
+                            {connectedAccount.name}
+                          </p>
+                          <p className="text-blue-600 dark:text-blue-400">
+                            {connectedAccount.type === 'BANK_ACCOUNT' 
+                              ? `${connectedAccount.bankName} - ${connectedAccount.iban || 'N/A'}`
+                              : `${connectedAccount.address || 'N/A'}`
+                            }
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Currency - editable based on payment method type */}
+              <div className="space-y-2">
+                <Label>Currency *</Label>
+                <Combobox
+                  options={getAvailableCurrencies()}
+                  value={createForm.currency}
+                  onValueChange={(value) => setCreateForm({ ...createForm, currency: value })}
+                  placeholder="Select currency..."
+                  searchPlaceholder="Search currencies..."
+                  emptyText={!createForm.paymentMethodCode ? 
+                    'Please select a payment method first' : 
+                    'No currencies available'
+                  }
+                  disabled={loadingOptions || !createForm.paymentMethodCode}
+                />
+              </div>
+
+              {/* Additional fields based on currency type */}
+              {createForm.currencyType === 'CRYPTO' && createForm.networkCode && (
                 <div className="space-y-2">
-                  <Label>Payment Method Code</Label>
-                  <Input
-                    value={createForm.paymentMethodCode}
-                    onChange={(e) => setCreateForm({ ...createForm, paymentMethodCode: e.target.value })}
-                    placeholder="sepa, swift, blik"
-                  />
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Label>Network Code</Label>
+                  <Label>Network</Label>
                   <Input
                     value={createForm.networkCode}
-                    onChange={(e) => setCreateForm({ ...createForm, networkCode: e.target.value.toUpperCase() })}
-                    placeholder="ETHEREUM, BSC, POLYGON"
+                    disabled
+                    className="bg-muted"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    From payment method
+                  </p>
                 </div>
               )}
 
@@ -578,17 +735,23 @@ export default function PayInPage(): JSX.Element {
                         <div>
                           <div className="text-muted-foreground">Amount</div>
                           <div className="font-medium">
-                            {payIn.fiatCurrency.symbol}{payIn.amount.toFixed(2)}
+                            {payIn.fiatCurrency?.symbol || payIn.cryptocurrency?.symbol || ''}
+                            {payIn.amount.toFixed(2)}
                             {payIn.receivedAmount && payIn.receivedAmount !== payIn.expectedAmount && (
                               <span className="text-red-500 ml-1">
-                                (Received: {payIn.fiatCurrency.symbol}{payIn.receivedAmount.toFixed(2)})
+                                (Received: {payIn.fiatCurrency?.symbol || payIn.cryptocurrency?.symbol || ''}{payIn.receivedAmount.toFixed(2)})
                               </span>
                             )}
                           </div>
                         </div>
                         <div>
                           <div className="text-muted-foreground">Method</div>
-                          <div className="font-medium">{payIn.paymentMethod.name}</div>
+                          <div className="font-medium">
+                            {payIn.currencyType === 'FIAT' 
+                              ? (payIn.paymentMethod?.name || 'N/A')
+                              : (payIn.network?.name || 'N/A')
+                            }
+                          </div>
                         </div>
                         <div>
                           <div className="text-muted-foreground">Date</div>
@@ -672,20 +835,29 @@ export default function PayInPage(): JSX.Element {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Expected Amount:</span>
                       <span className="font-medium">
-                        {selectedPayIn.fiatCurrency.symbol}{selectedPayIn.expectedAmount.toFixed(2)}
+                        {selectedPayIn.fiatCurrency?.symbol || selectedPayIn.cryptocurrency?.symbol || ''}
+                        {selectedPayIn.expectedAmount.toFixed(2)}
                       </span>
                     </div>
                     {selectedPayIn.receivedAmount && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Received Amount:</span>
                         <span className={`font-medium ${selectedPayIn.amountMismatch ? 'text-red-500' : ''}`}>
-                          {selectedPayIn.fiatCurrency.symbol}{selectedPayIn.receivedAmount.toFixed(2)}
+                          {selectedPayIn.fiatCurrency?.symbol || selectedPayIn.cryptocurrency?.symbol || ''}
+                          {selectedPayIn.receivedAmount.toFixed(2)}
                         </span>
                       </div>
                     )}
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Payment Method:</span>
-                      <span className="font-medium">{selectedPayIn.paymentMethod.name}</span>
+                      <span className="text-muted-foreground">
+                        {selectedPayIn.currencyType === 'FIAT' ? 'Payment Method:' : 'Network:'}
+                      </span>
+                      <span className="font-medium">
+                        {selectedPayIn.currencyType === 'FIAT' 
+                          ? (selectedPayIn.paymentMethod?.name || 'N/A')
+                          : (selectedPayIn.network?.name || 'N/A')
+                        }
+                      </span>
                     </div>
                     {selectedPayIn.senderName && (
                       <div className="flex justify-between">

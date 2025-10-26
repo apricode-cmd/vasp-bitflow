@@ -63,7 +63,11 @@ export default function PayOutPage(): JSX.Element {
   // Options for Combobox
   const [orders, setOrders] = useState<Array<{ value: string; label: string; description?: string; data?: any }>>([]);
   const [users, setUsers] = useState<Array<{ value: string; label: string; description?: string }>>([]);
-  const [currencies, setCurrencies] = useState<Array<{ value: string; label: string; description?: string }>>([]);
+  const [fiatCurrencies, setFiatCurrencies] = useState<any[]>([]);
+  const [cryptocurrencies, setCryptocurrencies] = useState<any[]>([]);
+  const [networks, setNetworks] = useState<any[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [paymentAccounts, setPaymentAccounts] = useState<any[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(false);
   
   const [processForm, setProcessForm] = useState({
@@ -81,6 +85,7 @@ export default function PayOutPage(): JSX.Element {
     networkCode: '',
     destinationAddress: '',
     paymentMethodCode: '',
+    paymentAccountId: '', // NEW: connected account
     recipientAccount: '',
     recipientName: ''
   });
@@ -146,27 +151,48 @@ export default function PayOutPage(): JSX.Element {
       const fiatData = await fiatRes.json();
       const cryptoData = await cryptoRes.json();
 
-      const allCurrencies = [
-        ...(fiatData.success ? fiatData.data.map((c: any) => ({
-          value: c.code,
-          label: `${c.code} - ${c.name}`,
-          description: `${c.symbol} (FIAT)`,
-          type: 'FIAT'
-        })) : []),
-        ...(cryptoData.success ? cryptoData.data.map((c: any) => ({
-          value: c.code,
-          label: `${c.code} - ${c.name}`,
-          description: `${c.symbol} (CRYPTO)`,
-          type: 'CRYPTO'
-        })) : [])
-      ];
+      if (fiatData.success) {
+        setFiatCurrencies(fiatData.data || []);
+      }
+      if (cryptoData.success) {
+        setCryptocurrencies(cryptoData.data || []);
+      }
 
-      setCurrencies(allCurrencies);
+      // Load blockchain networks
+      const networksRes = await fetch('/api/admin/blockchains');
+      const networksData = await networksRes.json();
+      
+      if (networksData.success) {
+        setNetworks(networksData.networks || []);
+      }
+      
+      // Load payment methods (OUT or BOTH direction)
+      const methodsRes = await fetch('/api/admin/payment-methods');
+      const methodsData = await methodsRes.json();
+      
+      if (methodsData.success) {
+        const outMethods = methodsData.methods.filter((m: any) => 
+          m.direction === 'OUT' || m.direction === 'BOTH'
+        );
+        setPaymentMethods(outMethods);
+      }
+      
+      // Load payment accounts
+      const accountsRes = await fetch('/api/admin/payment-accounts');
+      const accountsData = await accountsRes.json();
+      
+      if (accountsData.success) {
+        setPaymentAccounts(accountsData.accounts || []);
+      }
       
       console.log('Loaded PayOut options:', {
         orders: availableOrders.length,
         users: usersData.success ? usersData.data.length : 0,
-        currencies: allCurrencies.length
+        fiatCurrencies: fiatData.success ? fiatData.data.length : 0,
+        cryptocurrencies: cryptoData.success ? cryptoData.data.length : 0,
+        networks: networksData.success ? networksData.networks.length : 0,
+        paymentMethods: methodsData.success ? methodsData.methods.length : 0,
+        paymentAccounts: accountsData.success ? accountsData.accounts.length : 0
       });
     } catch (error) {
       console.error('Failed to load options:', error);
@@ -197,11 +223,72 @@ export default function PayOutPage(): JSX.Element {
       amount: isBuyOrder ? order.cryptoAmount : order.totalFiat,
       networkCode: isBuyOrder ? (order.blockchainCode || 'ETHEREUM') : '',
       destinationAddress: isBuyOrder ? order.walletAddress : '',
-      paymentMethodCode: isBuyOrder ? '' : 'sepa',
+      paymentMethodCode: '', // Reset to let user select
+      paymentAccountId: '', // Reset
       recipientAccount: '',
       recipientName: ''
     }));
   };
+  
+  // NEW: Handle payment method selection
+  const handlePaymentMethodChange = (methodCode: string): void => {
+    const selectedMethod = paymentMethods.find(m => m.code === methodCode);
+    if (!selectedMethod) return;
+    
+    console.log('📝 Selected Payment Method (PayOut):', selectedMethod);
+    
+    // Auto-fill from payment method
+    setCreateForm(prev => ({
+      ...prev,
+      paymentMethodCode: methodCode,
+      currency: selectedMethod.currency, // Set default, user can change
+      paymentAccountId: selectedMethod.paymentAccountId || '',
+      networkCode: selectedMethod.supportedNetworks?.[0] || prev.networkCode
+    }));
+  };
+  
+  // Get available currencies based on payment method type
+  const getAvailableCurrencies = () => {
+    if (!createForm.paymentMethodCode) return [];
+    
+    const selectedMethod = paymentMethods.find(m => m.code === createForm.paymentMethodCode);
+    if (!selectedMethod) return [];
+    
+    // CRYPTO_WALLET -> cryptocurrencies
+    if (selectedMethod.providerType === 'CRYPTO_WALLET') {
+      return cryptocurrencies.map(c => ({
+        value: c.code,
+        label: `${c.code} - ${c.name}`,
+        description: c.symbol
+      }));
+    }
+    
+    // BANK_ACCOUNT, PSP, MANUAL -> fiat currencies
+    return fiatCurrencies.map(c => ({
+      value: c.code,
+      label: `${c.code} - ${c.name}`,
+      description: c.symbol
+    }));
+  };
+  
+  // Filter payment methods by currency type
+  const filteredPaymentMethods = paymentMethods.filter(method => {
+    if (createForm.currencyType === 'FIAT') {
+      return method.providerType !== 'CRYPTO_WALLET';
+    } else {
+      return method.providerType === 'CRYPTO_WALLET' || method.providerType === 'MANUAL';
+    }
+  });
+  
+  // Get selected payment method details
+  const selectedPaymentMethod = createForm.paymentMethodCode 
+    ? paymentMethods.find(m => m.code === createForm.paymentMethodCode)
+    : null;
+    
+  // Get connected payment account if exists
+  const connectedAccount = selectedPaymentMethod?.paymentAccountId
+    ? paymentAccounts.find(a => a.id === selectedPaymentMethod.paymentAccountId)
+    : null;
 
   const fetchPayOuts = async (): Promise<void> => {
     try {
@@ -293,6 +380,7 @@ export default function PayOutPage(): JSX.Element {
           networkCode: '',
           destinationAddress: '',
           paymentMethodCode: '',
+          paymentAccountId: '',
           recipientAccount: '',
           recipientName: ''
         });
@@ -389,29 +477,110 @@ export default function PayOutPage(): JSX.Element {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Currency *</Label>
-                  <Combobox
-                    options={currencies.filter((c: any) => c.type === createForm.currencyType)}
-                    value={createForm.currency}
-                    onValueChange={(value) => setCreateForm({ ...createForm, currency: value })}
-                    placeholder={`Select ${createForm.currencyType} currency...`}
-                    searchPlaceholder="Search currencies..."
-                    emptyText="No currencies found"
-                    disabled={loadingOptions || !createForm.currencyType}
+                  <Label>Currency Type *</Label>
+                  <Input
+                    value={createForm.currencyType}
+                    disabled
+                    className="bg-muted"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Determined by order type
+                  </p>
                 </div>
+              </div>
+
+              {/* Payment Method Selection - NEW */}
+              <div className="space-y-2">
+                <Label>Payment Method *</Label>
+                <Combobox
+                  options={filteredPaymentMethods.map(pm => ({
+                    value: pm.code,
+                    label: pm.name,
+                    description: `${pm.currency} - ${pm.providerType}${pm.isActive ? '' : ' (Inactive)'}`
+                  }))}
+                  value={createForm.paymentMethodCode}
+                  onValueChange={handlePaymentMethodChange}
+                  placeholder="Select payment method..."
+                  searchPlaceholder="Search methods..."
+                  emptyText={filteredPaymentMethods.length === 0 ? 
+                    `No ${createForm.currencyType} payment methods available` : 
+                    'No methods found'
+                  }
+                  disabled={loadingOptions || !createForm.orderId}
+                />
+                {!createForm.orderId && (
+                  <p className="text-xs text-yellow-600">
+                    Please select an order first
+                  </p>
+                )}
+                
+                {/* Show payment method details */}
+                {selectedPaymentMethod && (
+                  <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded border border-blue-200 dark:border-blue-800 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Provider:</span>
+                      <Badge variant="outline">{selectedPaymentMethod.providerType}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Automation:</span>
+                      <Badge variant="outline">{selectedPaymentMethod.automationLevel}</Badge>
+                    </div>
+                    {connectedAccount && (
+                      <>
+                        <div className="h-px bg-blue-200 dark:bg-blue-800" />
+                        <div className="text-xs">
+                          <p className="font-semibold text-blue-900 dark:text-blue-100">
+                            Connected Account:
+                          </p>
+                          <p className="text-blue-700 dark:text-blue-300">
+                            {connectedAccount.name}
+                          </p>
+                          <p className="text-blue-600 dark:text-blue-400">
+                            {connectedAccount.type === 'BANK_ACCOUNT' 
+                              ? `${connectedAccount.bankName} - ${connectedAccount.iban || 'N/A'}`
+                              : `${connectedAccount.address || 'N/A'}`
+                            }
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Currency - editable based on payment method type */}
+              <div className="space-y-2">
+                <Label>Currency *</Label>
+                <Combobox
+                  options={getAvailableCurrencies()}
+                  value={createForm.currency}
+                  onValueChange={(value) => setCreateForm({ ...createForm, currency: value })}
+                  placeholder="Select currency..."
+                  searchPlaceholder="Search currencies..."
+                  emptyText={!createForm.paymentMethodCode ? 
+                    'Please select a payment method first' : 
+                    'No currencies available'
+                  }
+                  disabled={loadingOptions || !createForm.paymentMethodCode}
+                />
               </div>
 
               {createForm.currencyType === 'CRYPTO' ? (
                 <>
-                  <div className="space-y-2">
-                    <Label>Network Code *</Label>
-                    <Input
-                      value={createForm.networkCode}
-                      onChange={(e) => setCreateForm({ ...createForm, networkCode: e.target.value.toUpperCase() })}
-                      placeholder="ETHEREUM, BSC, POLYGON"
-                    />
-                  </div>
+                  {/* Additional fields based on currency type */}
+                  {createForm.networkCode && (
+                    <div className="space-y-2">
+                      <Label>Network</Label>
+                      <Input
+                        value={createForm.networkCode}
+                        disabled
+                        className="bg-muted"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        From payment method
+                      </p>
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <Label>Destination Address *</Label>
@@ -424,15 +593,6 @@ export default function PayOutPage(): JSX.Element {
                 </>
               ) : (
                 <>
-                  <div className="space-y-2">
-                    <Label>Payment Method Code</Label>
-                    <Input
-                      value={createForm.paymentMethodCode}
-                      onChange={(e) => setCreateForm({ ...createForm, paymentMethodCode: e.target.value })}
-                      placeholder="sepa, swift, blik"
-                    />
-                  </div>
-
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Recipient Name</Label>

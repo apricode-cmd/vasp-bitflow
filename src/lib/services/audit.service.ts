@@ -56,10 +56,24 @@ class AuditService {
                      'unknown';
     const userAgent = headersList.get('user-agent') || null;
 
+    // Validate userId exists in database if provided
+    let validUserId: string | null = null;
+    if (userId) {
+      const userExists = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true }
+      });
+      validUserId = userExists ? userId : null;
+      
+      if (!userExists) {
+        console.warn(`⚠️  AuditLog: userId "${userId}" not found in database, setting to null`);
+      }
+    }
+
     // Create audit log entry
     const auditLog = await prisma.auditLog.create({
       data: {
-        userId,
+        userId: validUserId,
         action,
         entity,
         entityId,

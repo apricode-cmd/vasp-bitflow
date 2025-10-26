@@ -74,7 +74,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     if (validated.currency) {
-      where.currency = validated.currency;
+      // Support filtering by either fiat or crypto currency
+      where.OR = [
+        { fiatCurrencyCode: validated.currency },
+        { cryptocurrencyCode: validated.currency }
+      ];
     }
 
     if (validated.networkCode) {
@@ -114,6 +118,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             }
           },
           cryptocurrency: {
+            select: {
+              code: true,
+              name: true,
+              symbol: true
+            }
+          },
+          fiatCurrency: {
             select: {
               code: true,
               name: true,
@@ -192,23 +203,56 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const body = await request.json();
     const validated = createPayOutSchema.parse(body);
 
+    // Prepare data based on currency type
+    const payOutData: any = {
+      order: { connect: { id: validated.orderId } },
+      user: { connect: { id: validated.userId } },
+      amount: validated.amount,
+      currencyType: validated.currencyType,
+      status: 'PENDING',
+      retryCount: 0,
+      confirmations: 0
+    };
+
+    // Connect currency relations explicitly based on type
+    if (validated.currencyType === 'FIAT') {
+      payOutData.fiatCurrency = { connect: { code: validated.currency } };
+      if (validated.paymentMethodCode) {
+        // Check if payment method exists
+        const paymentMethodExists = await prisma.paymentMethod.findUnique({
+          where: { code: validated.paymentMethodCode },
+          select: { code: true }
+        });
+        if (paymentMethodExists) {
+          payOutData.paymentMethod = { connect: { code: validated.paymentMethodCode } };
+        }
+      }
+      if (validated.recipientAccount) {
+        payOutData.recipientAccount = validated.recipientAccount;
+      }
+      if (validated.recipientName) {
+        payOutData.recipientName = validated.recipientName;
+      }
+    } else {
+      payOutData.cryptocurrency = { connect: { code: validated.currency } };
+      if (validated.networkCode) {
+        // Check if network exists
+        const networkExists = await prisma.blockchainNetwork.findUnique({
+          where: { code: validated.networkCode },
+          select: { code: true }
+        });
+        if (networkExists) {
+          payOutData.network = { connect: { code: validated.networkCode } };
+        }
+      }
+      if (validated.destinationAddress) {
+        payOutData.destinationAddress = validated.destinationAddress;
+      }
+    }
+
     // Create PayOut
     const payOut = await prisma.payOut.create({
-      data: {
-        orderId: validated.orderId,
-        userId: validated.userId,
-        amount: validated.amount,
-        currency: validated.currency,
-        currencyType: validated.currencyType,
-        networkCode: validated.networkCode || null,
-        destinationAddress: validated.destinationAddress || null,
-        paymentMethodCode: validated.paymentMethodCode || null,
-        recipientAccount: validated.recipientAccount || null,
-        recipientName: validated.recipientName || null,
-        status: 'PENDING',
-        retryCount: 0,
-        confirmations: 0
-      },
+      data: payOutData,
       include: {
         order: true,
         user: {
@@ -227,6 +271,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }, { status: 201 });
   } catch (error) {
     console.error('Create PayOut error:', error);
+    console.error('Error details:', JSON.stringify(error, null, 2));
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -242,7 +287,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to create PayOut'
+        error: 'Failed to create PayOut',
+        details: error instanceof Error ? error.message : String(error)
       },
       { status: 500 }
     );

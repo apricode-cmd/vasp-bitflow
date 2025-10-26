@@ -14,6 +14,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { seedPaymentAccounts } from './seed-payment-accounts.js';
 
 const prisma = new PrismaClient();
 
@@ -456,7 +457,9 @@ async function main(): Promise<void> {
       code: 'sepa_eur',
       type: 'bank_transfer',
       name: 'SEPA Bank Transfer',
-      direction: 'in',
+      direction: 'IN' as const,
+      providerType: 'MANUAL' as const,
+      automationLevel: 'MANUAL' as const,
       currency: 'EUR',
       isActive: true,
       processingTime: '1-2 business days',
@@ -471,7 +474,9 @@ async function main(): Promise<void> {
       code: 'bank_pln',
       type: 'bank_transfer',
       name: 'Domestic Bank Transfer PLN',
-      direction: 'in',
+      direction: 'IN' as const,
+      providerType: 'MANUAL' as const,
+      automationLevel: 'MANUAL' as const,
       currency: 'PLN',
       isActive: true,
       processingTime: '1-2 business days',
@@ -486,7 +491,9 @@ async function main(): Promise<void> {
       code: 'card_eur',
       type: 'card_payment',
       name: 'Credit/Debit Card EUR',
-      direction: 'in',
+      direction: 'IN' as const,
+      providerType: 'PSP' as const,
+      automationLevel: 'FULLY_AUTO' as const,
       currency: 'EUR',
       isActive: false,
       processingTime: 'Instant',
@@ -871,6 +878,10 @@ async function main(): Promise<void> {
   console.log(`   - 5 Transaction Status Configs`);
   console.log(`   - 1 Widget Config`);
   console.log(`   - 1 User KYC Level Assignment`);
+  
+  // NEW: Seed Payment Accounts
+  await seedPaymentAccounts();
+  console.log(`   - 10+ Payment Accounts (Bank + Crypto)`);
 }
 
 main()

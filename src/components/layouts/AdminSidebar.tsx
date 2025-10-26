@@ -114,16 +114,10 @@ const navigation = [
         badge: 'pending'
       },
       { 
-        name: 'Payment Setup', 
+        name: 'Payment Accounts', 
         href: '/admin/payments', 
         icon: CreditCard,
-        description: 'Methods, PSP, Banks'
-      },
-      { 
-        name: 'Platform Wallets', 
-        href: '/admin/wallets', 
-        icon: Wallet,
-        description: 'Crypto wallets'
+        description: 'Banks, Wallets, Methods'
       },
       { 
         name: 'User Wallets', 

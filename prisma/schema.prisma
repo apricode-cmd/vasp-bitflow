@@ -180,10 +180,11 @@ model Currency {
   orders             Order[]
   tradingPairs       TradingPair[]               @relation("CryptoCurrency")
   rateHistory        RateHistory[]               @relation("CryptoCurrency")
-  platformWallets    PlatformWallet[]
+  platformWallets    PlatformWallet[]            // DEPRECATED
   userWallets        UserWallet[]
   payIns             PayIn[]                     @relation("PayInCrypto") // Входящие платежи криптой
   payOuts            PayOut[]                    // Исходящие платежи криптой
+  paymentAccounts    PaymentAccount[]            @relation("PaymentAccountCrypto") // NEW: криптовалютные счета
 
   @@index([isToken])
 }
@@ -200,14 +201,15 @@ model FiatCurrency {
 
   // Relations
   orders         Order[]
-  tradingPairs   TradingPair[]   @relation("FiatCurrency")
-  bankDetails    BankDetails[]
-  rateHistory    RateHistory[]   @relation("FiatCurrency")
+  tradingPairs   TradingPair[]    @relation("FiatCurrency")
+  bankDetails    BankDetails[]    // DEPRECATED
+  rateHistory    RateHistory[]    @relation("FiatCurrency")
   paymentMethods PaymentMethod[]
   feeProfiles    FeeProfile[]
   limitsMatrix   LimitsMatrix[]
   payIns         PayIn[] // Входящие платежи в этой валюте
-  payOuts        PayOut[] @relation("PayOutFiat") // Исходящие фиатные платежи
+  payOuts        PayOut[]         @relation("PayOutFiat") // Исходящие фиатные платежи
+  paymentAccounts PaymentAccount[] // NEW: фиатные счета
 }
 
 // Торговые пары с настройками лимитов и комиссий
@@ -330,6 +332,74 @@ model PaymentProof {
 // BANK DETAILS
 // ==========================================
 
+// ==========================================
+// PAYMENT ACCOUNTS (UNIFIED)
+// ==========================================
+
+// Payment Account Type
+enum PaymentAccountType {
+  BANK_ACCOUNT   // Банковский счёт (фиат)
+  CRYPTO_WALLET  // Криптовалютный кошелёк
+}
+
+// Payment Accounts - универсальная модель для банковских счетов и крипто-кошельков
+model PaymentAccount {
+  id          String             @id @default(cuid())
+  code        String             @unique // sepa_eur_main, btc_hot_wallet
+  name        String // "Main EUR SEPA Account", "BTC Hot Wallet"
+  type        PaymentAccountType
+  description String?            @db.Text
+  
+  // For BANK_ACCOUNT (фиат)
+  currency          String? // EUR, PLN (для фиата)
+  bankName          String?
+  bankAddress       String?
+  accountHolder     String?
+  iban              String?
+  swift             String?
+  bic               String?
+  sortCode          String? // Для UK банков
+  referenceTemplate String? // "APR-{orderId}"
+  
+  // For CRYPTO_WALLET (крипто)
+  cryptocurrencyCode String? // BTC, ETH, USDT
+  blockchainCode     String? // BITCOIN, ETHEREUM, BSC
+  address            String? // Wallet address
+  
+  // Common fields
+  balance        Float?   // Текущий баланс (опционально)
+  minBalance     Float? // Минимальный баланс для оповещений
+  instructions   String?  @db.Text // Инструкции для использования
+  isActive       Boolean  @default(true)
+  isDefault      Boolean  @default(false) // Использовать по умолчанию
+  priority       Int      @default(0)
+  
+  // Security & Monitoring
+  lastUsed       DateTime?
+  lastChecked    DateTime? // Последняя проверка баланса
+  alertsEnabled  Boolean   @default(true)
+  
+  // Metadata
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdBy      String? // Admin user ID
+  
+  // Relations
+  fiatCurrency   FiatCurrency?      @relation(fields: [currency], references: [code])
+  cryptocurrency Currency?          @relation("PaymentAccountCrypto", fields: [cryptocurrencyCode], references: [code])
+  blockchain     BlockchainNetwork? @relation(fields: [blockchainCode], references: [code])
+  
+  // Payment methods using this account
+  paymentMethods PaymentMethod[]
+  payOuts        PayOut[]           @relation("PaymentAccountPayOuts")
+  
+  @@index([type, isActive])
+  @@index([currency])
+  @@index([cryptocurrencyCode])
+  @@index([isDefault])
+}
+
+// DEPRECATED: Keep for migration compatibility, will be removed
 model BankDetails {
   id                String   @id @default(cuid())
   currency          String
@@ -339,17 +409,38 @@ model BankDetails {
   iban              String
   swift             String?
   bic               String?
-  sortCode          String? // Для UK банков
+  sortCode          String?
   referenceTemplate String   @default("APR-{orderId}")
-  instructions      String?  @db.Text // Дополнительные инструкции для пользователя
+  instructions      String?  @db.Text
   isActive          Boolean  @default(true)
   priority          Int      @default(0)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  fiatCurrency FiatCurrency @relation(fields: [currency], references: [code])
+  fiatCurrency   FiatCurrency @relation(fields: [currency], references: [code])
+  paymentMethods PaymentMethod[] // DEPRECATED
 
   @@index([currency, isActive])
+}
+
+// DEPRECATED: Keep for migration compatibility, will be removed
+model PlatformWallet {
+  id             String    @id @default(cuid())
+  currencyCode   String
+  blockchainCode String
+  address        String    @unique
+  label          String
+  isActive       Boolean   @default(true)
+  balance        Float     @default(0)
+  lastUsed       DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  currency   Currency          @relation(fields: [currencyCode], references: [code])
+  blockchain BlockchainNetwork @relation(fields: [blockchainCode], references: [code])
+  payOuts    PayOut[] // DEPRECATED
+
+  @@index([currencyCode, isActive])
 }
 
 // ==========================================
@@ -364,7 +455,8 @@ model PayIn {
   
   // Payment Details
   amount           Float // Сумма платежа
-  currency         String // EUR, PLN, BTC, ETH, USDT, etc.
+  fiatCurrencyCode String? // EUR, PLN (для фиатных платежей)
+  cryptocurrencyCode String? // BTC, ETH, USDT (для крипто платежей)
   currencyType     CurrencyType // FIAT or CRYPTO
   paymentMethodCode String? // SEPA, SWIFT, BLIK (для фиата)
   
@@ -413,8 +505,8 @@ model PayIn {
   // Relations
   order         Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
   user          User               @relation("PayInUser", fields: [userId], references: [id])
-  fiatCurrency  FiatCurrency?      @relation(fields: [currency], references: [code], map: "PayIn_fiatCurrency_fkey")
-  cryptocurrency Currency?         @relation("PayInCrypto", fields: [currency], references: [code], map: "PayIn_cryptocurrency_fkey")
+  fiatCurrency  FiatCurrency?      @relation(fields: [fiatCurrencyCode], references: [code])
+  cryptocurrency Currency?         @relation("PayInCrypto", fields: [cryptocurrencyCode], references: [code])
   network       BlockchainNetwork? @relation("PayInNetwork", fields: [networkCode], references: [code])
   paymentMethod PaymentMethod?     @relation(fields: [paymentMethodCode], references: [code])
   verifier      User?              @relation("PayInVerifier", fields: [verifiedBy], references: [id])
@@ -422,11 +514,13 @@ model PayIn {
   
   @@index([orderId])
   @@index([userId])
+  @@index([fiatCurrencyCode])
+  @@index([cryptocurrencyCode])
   @@index([status])
+  @@index([currencyType])
   @@index([paymentDate])
   @@index([transactionId])
   @@index([transactionHash])
-  @@index([currencyType])
   @@index([createdAt])
 }
 
@@ -438,7 +532,8 @@ model PayOut {
   
   // Payment Details
   amount            Float // Количество для отправки
-  currency          String // BTC, ETH, USDT, EUR, PLN, etc.
+  fiatCurrencyCode  String? // EUR, PLN (для фиатных платежей)
+  cryptocurrencyCode String? // BTC, ETH, USDT (для крипто платежей)
   currencyType      CurrencyType // CRYPTO or FIAT
   
   // For CRYPTO payments
@@ -471,8 +566,11 @@ model PayOut {
   processedAt        DateTime?
   processingNotes    String? @db.Text
   
-  // Source Wallet
-  fromWalletId       String? // Platform wallet или bank account
+  // Source Account (NEW: unified)
+  paymentAccountId   String? // PaymentAccount откуда отправляем (банк или кошелёк)
+  
+  // DEPRECATED: старые поля
+  fromWalletId       String? // DEPRECATED: use paymentAccountId
   
   // Timestamps
   scheduledFor       DateTime? // Запланировано на
@@ -482,18 +580,23 @@ model PayOut {
   updatedAt          DateTime @updatedAt
   
   // Relations
-  order         Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  user          User               @relation("PayOutUser", fields: [userId], references: [id])
-  cryptocurrency Currency?         @relation(fields: [currency], references: [code], map: "PayOut_cryptocurrency_fkey")
-  fiatCurrency  FiatCurrency?      @relation("PayOutFiat", fields: [currency], references: [code], map: "PayOut_fiatCurrency_fkey")
-  network       BlockchainNetwork? @relation(fields: [networkCode], references: [code])
-  userWallet    UserWallet?        @relation(fields: [userWalletId], references: [id])
-  processor     User?              @relation("PayOutProcessor", fields: [processedBy], references: [id])
+  order          Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user           User               @relation("PayOutUser", fields: [userId], references: [id])
+  cryptocurrency Currency?          @relation(fields: [cryptocurrencyCode], references: [code])
+  fiatCurrency   FiatCurrency?      @relation("PayOutFiat", fields: [fiatCurrencyCode], references: [code])
+  network        BlockchainNetwork? @relation(fields: [networkCode], references: [code])
+  userWallet     UserWallet?        @relation(fields: [userWalletId], references: [id])
+  processor      User?              @relation("PayOutProcessor", fields: [processedBy], references: [id])
+  paymentAccount PaymentAccount?    @relation("PaymentAccountPayOuts", fields: [paymentAccountId], references: [id])
+  paymentMethod  PaymentMethod?     @relation("PayOutMethod", fields: [paymentMethodCode], references: [code])
+  
+  // DEPRECATED relations
   platformWallet PlatformWallet?   @relation(fields: [fromWalletId], references: [id])
-  paymentMethod PaymentMethod?     @relation("PayOutMethod", fields: [paymentMethodCode], references: [code])
   
   @@index([orderId])
   @@index([userId])
+  @@index([fiatCurrencyCode])
+  @@index([cryptocurrencyCode])
   @@index([status])
   @@index([transactionHash])
   @@index([destinationAddress])
@@ -621,11 +724,12 @@ model BlockchainNetwork {
   // Relations
   currencies      CurrencyBlockchainNetwork[] // Many-to-many: Multiple currencies can use this blockchain
   userWallets     UserWallet[]
-  platformWallets PlatformWallet[]
+  platformWallets PlatformWallet[]            // DEPRECATED
   transactions    Transaction[]
   orders          Order[] // Заказы, использующие эту сеть
-  payIns          PayIn[] @relation("PayInNetwork") // Входящие платежи в этой сети
+  payIns          PayIn[]                     @relation("PayInNetwork") // Входящие платежи в этой сети
   payOuts         PayOut[] // Исходящие платежи в этой сети
+  paymentAccounts PaymentAccount[] // NEW: крипто-кошельки на этой сети
 
   @@index([isActive])
 }
@@ -675,26 +779,6 @@ model UserWallet {
   @@unique([userId, address])
   @@index([userId, currencyCode])
   @@index([address])
-}
-
-// Platform Wallets - кошельки платформы
-model PlatformWallet {
-  id             String    @id @default(cuid())
-  currencyCode   String
-  blockchainCode String
-  address        String    @unique
-  label          String // "Main BTC Wallet", "Cold Storage ETH"
-  isActive       Boolean   @default(true)
-  balance        Float     @default(0) // Опционально, для tracking
-  lastUsed       DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  currency   Currency          @relation(fields: [currencyCode], references: [code])
-  blockchain BlockchainNetwork @relation(fields: [blockchainCode], references: [code])
-  payOuts    PayOut[] // Исходящие платежи с этого кошелька
-
-  @@index([currencyCode, isActive])
 }
 
 // ==========================================
@@ -777,28 +861,81 @@ model KycFormData {
 // PAYMENT METHODS
 // ==========================================
 
-// Payment Methods - способы оплаты (REFACTORED for CRM)
+// Payment Method Direction
+enum PaymentDirection {
+  IN   // Только входящие (клиент → платформа)
+  OUT  // Только исходящие (платформа → клиент)
+  BOTH // Оба направления
+}
+
+// Payment Provider Type
+enum ProviderType {
+  MANUAL         // Ручная обработка (админ проверяет вручную)
+  BANK_ACCOUNT   // Привязан к банковскому счёту
+  PSP            // Через платёжный провайдер (Stripe, TPay)
+  CRYPTO_WALLET  // Криптовалютный кошелёк
+}
+
+// Automation Level
+enum AutomationLevel {
+  MANUAL      // Полностью вручную (админ всё делает)
+  SEMI_AUTO   // Полуавтомат (админ подтверждает)
+  FULLY_AUTO  // Полный автомат (система сама обрабатывает)
+}
+
+// Payment Methods - способы оплаты (REFACTORED v2)
 model PaymentMethod {
-  code           String   @id @unique // card, sepa, swift, blik
-  type           String // bank_transfer, card_payment, instant
-  name           String // "SEPA Transfer EUR", "Visa/Mastercard"
-  direction      String   @default("in") // in, out, both
-  pspConnector   String? // tpay, stripe, manual
-  currency       String // EUR, PLN
-  isActive       Boolean  @default(true)
-  processingTime String? // "1-3 business days"
+  code           String           @id @unique // sepa, swift, card_eur, blik, crypto_btc
+  name           String // "SEPA Transfer (EUR)", "Visa/Mastercard", "Bitcoin Network"
+  description    String?          @db.Text // Подробное описание
+  
+  // Classification
+  type           String // bank_transfer, card_payment, instant, crypto_transfer
+  direction      PaymentDirection @default(IN) // IN, OUT, BOTH
+  providerType   ProviderType     @default(MANUAL)
+  automationLevel AutomationLevel @default(MANUAL)
+  
+  // Payment Details
+  currency       String // EUR, PLN (для фиата)
+  supportedNetworks String[] @default([]) // Для крипты: ["ETHEREUM", "BSC", "POLYGON"]
+  
+  // Provider Connection (NEW: unified approach)
+  pspConnector     String? // stripe, tpay, revolut (если через PSP)
+  paymentAccountId String? // Связь с PaymentAccount (банк или крипто кошелёк)
+  
+  // DEPRECATED: старые поля (keep for backward compatibility)
+  bankAccountId  String? // DEPRECATED: use paymentAccountId instead
+  
+  // Limits & Fees
   minAmount      Float?
   maxAmount      Float?
   feeFixed       Float    @default(0)
   feePercent     Float    @default(0)
-  instructions   String?  @db.Text
-  config         Json? // Настройки (например, API ключи для карт)
-  priority       Int      @default(0)
+  processingTime String? // "Instant", "1-3 business days"
+  
+  // UI & Instructions
+  instructions   String?  @db.Text // Инструкции для пользователя
+  iconUrl        String? // Иконка метода оплаты
+  priority       Int      @default(0) // Порядок отображения
+  
+  // Config & Status
+  config         Json? // Дополнительные настройки (API ключи, webhook URLs)
+  isActive       Boolean  @default(true)
+  isAvailableForClients Boolean @default(true) // Показывать клиентам?
+  
+  // Metadata
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-
-  fiatCurrency FiatCurrency   @relation(fields: [currency], references: [code])
-  psp          PspConnector?  @relation(fields: [pspConnector], references: [code])
+  createdBy      String? // Admin user ID
+  
+  // Relations
+  fiatCurrency   FiatCurrency?   @relation(fields: [currency], references: [code])
+  psp            PspConnector?   @relation(fields: [pspConnector], references: [code])
+  paymentAccount PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
+  
+  // DEPRECATED relations
+  bankAccount  BankDetails?   @relation(fields: [bankAccountId], references: [id])
+  
   orders       Order[]
   limitsMatrix LimitsMatrix[]
   payIns       PayIn[] // Входящие платежи через этот метод
@@ -807,6 +944,9 @@ model PaymentMethod {
   @@index([type, isActive])
   @@index([currency])
   @@index([direction])
+  @@index([providerType])
+  @@index([automationLevel])
+  @@index([isAvailableForClients])
 }
 
 // ==========================================
