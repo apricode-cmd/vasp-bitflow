@@ -89,6 +89,13 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
   const [cryptocurrencies, setCryptocurrencies] = useState<Currency[]>([]);
   const [fiatCurrencies, setFiatCurrencies] = useState<FiatCurrency[]>([]);
   const [blockchainNetworks, setBlockchainNetworks] = useState<BlockchainNetwork[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<Array<{ 
+    code: string; 
+    name: string; 
+    currency: string; 
+    direction: string;
+    isActive: boolean;
+  }>>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
 
@@ -174,19 +181,21 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
   const fetchCurrenciesAndNetworks = async (): Promise<void> => {
     setLoadingData(true);
     try {
-      const [cryptoRes, fiatRes, blockchainRes] = await Promise.all([
+      const [cryptoRes, fiatRes, blockchainRes, methodsRes] = await Promise.all([
         fetch('/api/admin/resources/currencies?active=true'),
         fetch('/api/admin/resources/fiat-currencies?active=true'),
-        fetch('/api/admin/blockchains?active=true')
+        fetch('/api/admin/blockchains?active=true'),
+        fetch('/api/admin/payment-methods')
       ]);
 
-      const [cryptoData, fiatData, blockchainData] = await Promise.all([
+      const [cryptoData, fiatData, blockchainData, methodsData] = await Promise.all([
         cryptoRes.json(),
         fiatRes.json(),
-        blockchainRes.json()
+        blockchainRes.json(),
+        methodsRes.json()
       ]);
 
-      console.log('Loaded data:', { cryptoData, fiatData, blockchainData });
+      console.log('Loaded data:', { cryptoData, fiatData, blockchainData, methodsData });
 
       if (cryptoData.success && Array.isArray(cryptoData.data)) {
         setCryptocurrencies(cryptoData.data);
@@ -200,6 +209,11 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
         const activeNetworks = blockchainData.data.filter((n: any) => n.isActive);
         console.log('Active blockchain networks:', activeNetworks);
         setBlockchainNetworks(activeNetworks);
+      }
+
+      if (Array.isArray(methodsData.methods)) {
+        setPaymentMethods(methodsData.methods);
+        console.log('Payment methods loaded:', methodsData.methods.length);
       }
     } catch (error) {
       console.error('Failed to fetch currencies/networks:', error);
@@ -350,6 +364,49 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
             </p>
           </div>
 
+          {/* Payment Method Selection - Required field after Customer Email */}
+          <div className="space-y-2">
+            <Label htmlFor="paymentMethod">
+              Payment Method *
+            </Label>
+            {loadingData ? (
+              <Skeleton className="h-10 w-full" />
+            ) : (
+              <Combobox
+                options={paymentMethods
+                  .filter(method => {
+                    // Filter by active status and direction
+                    const direction = orderType === 'BUY' ? ['IN', 'BOTH'] : ['OUT', 'BOTH'];
+                    return method.isActive && direction.includes(method.direction);
+                  })
+                  .map(method => ({
+                    value: method.code,
+                    label: method.name,
+                    description: `${method.currency} - ${method.direction}${!method.isActive ? ' (Inactive)' : ''}`
+                  }))}
+                value={watchedFields.paymentMethodCode || ''}
+                onValueChange={(value) => {
+                  setValue('paymentMethodCode', value);
+                  // Auto-fill fiat currency from payment method
+                  const selectedMethod = paymentMethods.find(m => m.code === value);
+                  if (selectedMethod) {
+                    setValue('fiatCurrencyCode', selectedMethod.currency as 'EUR' | 'PLN');
+                  }
+                }}
+                placeholder="Select payment method..."
+                searchPlaceholder="Search methods..."
+                emptyText="No active payment methods available"
+              />
+            )}
+            {errors.paymentMethodCode && (
+              <p className="text-sm text-destructive">{errors.paymentMethodCode.message}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              <Info className="inline h-3 w-3 mr-1" />
+              Customer will use this method to pay
+            </p>
+          </div>
+
           <Separator />
 
           {/* Currency Pair */}
@@ -382,18 +439,27 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
               {loadingData ? (
                 <Skeleton className="h-10 w-full" />
               ) : (
-                <Combobox
-                  options={fiatCurrencies.map(fiat => ({
-                    value: fiat.code,
-                    label: `${fiat.name} (${fiat.code})`,
-                    description: `${fiat.symbol}`
-                  }))}
-                  value={watchedFields.fiatCurrencyCode}
-                  onValueChange={(value) => setValue('fiatCurrencyCode', value as any)}
-                  placeholder="Select fiat currency..."
-                  searchPlaceholder="Search currency..."
-                  emptyText="No active fiat currencies"
-                />
+                <>
+                  <Combobox
+                    options={fiatCurrencies.map(fiat => ({
+                      value: fiat.code,
+                      label: `${fiat.name} (${fiat.code})`,
+                      description: `${fiat.symbol}`
+                    }))}
+                    value={watchedFields.fiatCurrencyCode}
+                    onValueChange={(value) => setValue('fiatCurrencyCode', value as any)}
+                    placeholder="Select fiat currency..."
+                    searchPlaceholder="Search currency..."
+                    emptyText="No active fiat currencies"
+                    disabled={!!watchedFields.paymentMethodCode}
+                  />
+                  {watchedFields.paymentMethodCode && (
+                    <p className="text-xs text-muted-foreground">
+                      <Info className="inline h-3 w-3 mr-1" />
+                      Auto-filled from Payment Method
+                    </p>
+                  )}
+                </>
               )}
               {errors.fiatCurrencyCode && (
                 <p className="text-sm text-destructive">{errors.fiatCurrencyCode.message}</p>

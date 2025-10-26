@@ -110,36 +110,54 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
 
-    // Create order
-    const order = await prisma.order.create({
-      data: {
-        userId: user.id,
-        currencyCode: validated.currencyCode,
-        fiatCurrencyCode: validated.fiatCurrencyCode,
-        paymentReference,
-        cryptoAmount: validated.cryptoAmount,
-        fiatAmount: calculation.fiatAmount,
-        rate: calculation.rate,
-        feePercent: tradingPair.feePercent,
-        feeAmount: calculation.fee,
-        totalFiat: calculation.totalFiat,
-        walletAddress: validated.walletAddress,
-        paymentMethodId: validated.paymentMethodId,
-        status: 'PENDING',
-        createdByAdmin: true,
-        adminNotes: validated.adminNotes,
-        expiresAt
-      },
-      include: {
-        currency: true,
-        fiatCurrency: true,
-        paymentMethod: true,
-        user: {
-          include: {
-            profile: true
+    // Create order with history entry in a transaction
+    const order = await prisma.$transaction(async (tx) => {
+      // Create order
+      const newOrder = await tx.order.create({
+        data: {
+          userId: user.id,
+          currencyCode: validated.currencyCode,
+          fiatCurrencyCode: validated.fiatCurrencyCode,
+          paymentReference,
+          cryptoAmount: validated.cryptoAmount,
+          fiatAmount: calculation.fiatAmount,
+          rate: calculation.rate,
+          feePercent: tradingPair.feePercent,
+          feeAmount: calculation.fee,
+          totalFiat: calculation.totalFiat,
+          walletAddress: validated.walletAddress,
+          blockchainCode: validated.blockchainCode,
+          paymentMethodCode: validated.paymentMethodCode,
+          status: 'PENDING',
+          createdByAdmin: true,
+          adminNotes: validated.adminNotes,
+          expiresAt
+        },
+        include: {
+          currency: true,
+          fiatCurrency: true,
+          paymentMethod: true,
+          blockchain: true,
+          user: {
+            include: {
+              profile: true
+            }
           }
         }
-      }
+      });
+
+      // Create initial status history entry
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: newOrder.id,
+          oldStatus: 'PENDING', // Initial status
+          newStatus: 'PENDING',
+          changedBy: adminId,
+          note: `Order created by admin${validated.adminNotes ? `: ${validated.adminNotes}` : ''}`
+        }
+      });
+
+      return newOrder;
     });
 
     // Log admin action
