@@ -30,6 +30,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { ApricodeLogo } from '@/components/icons/ApricodeLogo';
+import { PhoneInput } from '@/components/ui/phone-input';
+import { CountryDropdown } from '@/components/ui/country-dropdown';
+import type { Value as PhoneValue } from 'react-phone-number-input';
 
 export default function RegisterPage(): React.ReactElement {
   const router = useRouter();
@@ -231,12 +234,12 @@ export default function RegisterPage(): React.ReactElement {
                         <FormItem>
                           <FormLabel>Phone Number</FormLabel>
                           <FormControl>
-                            <Input
-                              type="tel"
-                              placeholder="+48123456789"
+                            <PhoneInput
+                              value={field.value as PhoneValue}
+                              onChange={field.onChange}
+                              defaultCountry="PL"
+                              placeholder="Enter phone number"
                               disabled={isLoading}
-                              className="h-11"
-                              {...field}
                             />
                           </FormControl>
                           <FormMessage />
@@ -249,15 +252,13 @@ export default function RegisterPage(): React.ReactElement {
                       name="country"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Country Code *</FormLabel>
+                          <FormLabel>Country *</FormLabel>
                           <FormControl>
-                            <Input
-                              placeholder="PL"
-                              maxLength={2}
-                              className="uppercase h-11"
+                            <CountryDropdown
+                              defaultValue={field.value}
+                              onChange={(country) => field.onChange(country.alpha2)}
+                              placeholder="Select your country"
                               disabled={isLoading}
-                              {...field}
-                              onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                             />
                           </FormControl>
                           <FormMessage />
