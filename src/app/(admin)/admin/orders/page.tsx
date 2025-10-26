@@ -328,9 +328,11 @@ export default function AdminOrdersPage(): JSX.Element {
             View and manage all cryptocurrency orders
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Create Order */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          {/* Create Order - Make it prominent */}
           <CreateOrderDialog onSuccess={fetchOrders} />
+
+          <Separator orientation="vertical" className="hidden sm:block h-8" />
 
           {/* View Mode Toggle */}
           <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
@@ -338,6 +340,7 @@ export default function AdminOrdersPage(): JSX.Element {
               variant={viewMode === 'kanban' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setViewMode('kanban')}
+              className="flex-1 sm:flex-none"
             >
               <LayoutGrid className="h-4 w-4 mr-2" />
               Kanban
@@ -346,6 +349,7 @@ export default function AdminOrdersPage(): JSX.Element {
               variant={viewMode === 'table' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setViewMode('table')}
+              className="flex-1 sm:flex-none"
             >
               <List className="h-4 w-4 mr-2" />
               Table
@@ -357,6 +361,7 @@ export default function AdminOrdersPage(): JSX.Element {
             size="icon"
             onClick={fetchOrders}
             disabled={refreshing}
+            className="self-end sm:self-auto"
           >
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>

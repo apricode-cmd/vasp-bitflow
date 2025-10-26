@@ -32,13 +32,6 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Combobox } from '@/components/shared/Combobox';
 import { toast } from 'sonner';
 import { 
@@ -207,7 +200,7 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
+        <Button size="default" className="font-semibold">
           <Plus className="h-4 w-4 mr-2" />
           Create Order
         </Button>
@@ -254,20 +247,19 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="currencyCode">Cryptocurrency *</Label>
-              <Select
+              <Combobox
+                options={[
+                  { value: 'BTC', label: 'Bitcoin (BTC)', description: 'The original cryptocurrency' },
+                  { value: 'ETH', label: 'Ethereum (ETH)', description: 'Smart contract platform' },
+                  { value: 'USDT', label: 'Tether (USDT)', description: 'Stablecoin pegged to USD' },
+                  { value: 'SOL', label: 'Solana (SOL)', description: 'High-performance blockchain' },
+                ]}
                 value={watchedFields.currencyCode}
                 onValueChange={(value) => setValue('currencyCode', value as any)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="BTC">Bitcoin (BTC)</SelectItem>
-                  <SelectItem value="ETH">Ethereum (ETH)</SelectItem>
-                  <SelectItem value="USDT">Tether (USDT)</SelectItem>
-                  <SelectItem value="SOL">Solana (SOL)</SelectItem>
-                </SelectContent>
-              </Select>
+                placeholder="Select cryptocurrency..."
+                searchPlaceholder="Search crypto..."
+                emptyText="No cryptocurrency found"
+              />
               {errors.currencyCode && (
                 <p className="text-sm text-destructive">{errors.currencyCode.message}</p>
               )}
@@ -275,18 +267,17 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
 
             <div className="space-y-2">
               <Label htmlFor="fiatCurrencyCode">Fiat Currency *</Label>
-              <Select
+              <Combobox
+                options={[
+                  { value: 'EUR', label: 'Euro (EUR)', description: '€ - European currency' },
+                  { value: 'PLN', label: 'Polish Zloty (PLN)', description: 'zł - Polish currency' },
+                ]}
                 value={watchedFields.fiatCurrencyCode}
                 onValueChange={(value) => setValue('fiatCurrencyCode', value as any)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="EUR">Euro (EUR)</SelectItem>
-                  <SelectItem value="PLN">Polish Zloty (PLN)</SelectItem>
-                </SelectContent>
-              </Select>
+                placeholder="Select fiat currency..."
+                searchPlaceholder="Search currency..."
+                emptyText="No currency found"
+              />
               {errors.fiatCurrencyCode && (
                 <p className="text-sm text-destructive">{errors.fiatCurrencyCode.message}</p>
               )}
