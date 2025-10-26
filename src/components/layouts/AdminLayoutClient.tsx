@@ -50,8 +50,12 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps): React.R
   if (!mounted) {
     // Prevent hydration mismatch
     return (
-      <div className="h-screen overflow-hidden bg-background">
-        <ResizablePanelGroup direction="horizontal" className="h-full">
+      <div className="h-screen overflow-hidden relative">
+        {/* Gradient Background */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,hsl(var(--primary)/0.4)_0%,hsl(var(--primary)/0.25)_20%,hsl(var(--background))_60%,hsl(var(--background))_100%)] dark:bg-[radial-gradient(ellipse_at_top_left,hsl(var(--primary)/0.6)_0%,hsl(var(--primary)/0.35)_20%,hsl(var(--background))_60%,hsl(var(--background))_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,hsl(var(--primary)/0.15)_0%,transparent_50%)] dark:bg-[radial-gradient(circle_at_bottom_right,hsl(var(--primary)/0.25)_0%,transparent_50%)]" />
+        
+        <ResizablePanelGroup direction="horizontal" className="h-full relative z-10">
           <ResizablePanel defaultSize={DEFAULT_SIDEBAR_SIZE} minSize={15} maxSize={30} className="min-w-[220px]">
             <AdminSidebar />
           </ResizablePanel>
@@ -59,7 +63,7 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps): React.R
             <div className="absolute inset-y-0 -left-px w-[3px] bg-gradient-to-r from-transparent via-border/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           </ResizableHandle>
           <ResizablePanel defaultSize={91} minSize={50}>
-            <div className="flex flex-col h-full overflow-auto bg-background">
+            <div className="flex flex-col h-full overflow-auto">
               <main className="flex-1">
                 <div className="container mx-auto p-6 max-w-[1600px]">
                   {children}
@@ -74,10 +78,14 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps): React.R
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-background">
+    <div className="h-screen overflow-hidden relative">
+      {/* Gradient Background */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,hsl(var(--primary)/0.4)_0%,hsl(var(--primary)/0.25)_20%,hsl(var(--background))_60%,hsl(var(--background))_100%)] dark:bg-[radial-gradient(ellipse_at_top_left,hsl(var(--primary)/0.6)_0%,hsl(var(--primary)/0.35)_20%,hsl(var(--background))_60%,hsl(var(--background))_100%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,hsl(var(--primary)/0.15)_0%,transparent_50%)] dark:bg-[radial-gradient(circle_at_bottom_right,hsl(var(--primary)/0.25)_0%,transparent_50%)]" />
+      
       <ResizablePanelGroup
         direction="horizontal"
-        className="h-full"
+        className="h-full relative z-10"
       >
         {/* Sidebar Panel */}
         <ResizablePanel
@@ -98,7 +106,7 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps): React.R
 
         {/* Main Content Panel */}
         <ResizablePanel defaultSize={100 - sidebarSize} minSize={50}>
-          <div className="flex flex-col h-full overflow-auto bg-background">
+          <div className="flex flex-col h-full overflow-auto">
             <main className="flex-1">
               <div className="container mx-auto p-6 max-w-[1600px]">
                 {children}
