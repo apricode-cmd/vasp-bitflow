@@ -161,13 +161,19 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
   }, [watchedFields.currencyCode, watchedFields.fiatCurrencyCode]);
 
   // Fetch exchange rates
-  const fetchRates = async (): Promise<void> => {
+  const fetchRates = async (forceRefresh = false): Promise<void> => {
     setRatesLoading(true);
     try {
-      const response = await fetch('/api/rates');
+      const url = forceRefresh ? '/api/rates?force=true' : '/api/rates';
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
         setRates(data);
+        if (forceRefresh) {
+          toast.success('Exchange rates updated', {
+            description: `Updated at ${new Date(data.updatedAt).toLocaleTimeString()}`
+          });
+        }
       } else {
         toast.error('Failed to load exchange rates');
       }
@@ -564,8 +570,9 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7"
-                        onClick={fetchRates}
+                        onClick={() => fetchRates(true)}
                         disabled={ratesLoading}
+                        title="Force refresh rates from CoinGecko"
                       >
                         <RefreshCw className={`h-3 w-3 ${ratesLoading ? 'animate-spin' : ''}`} />
                       </Button>

@@ -54,14 +54,15 @@ class CoinGeckoService {
    * Gets current exchange rates for all supported cryptocurrencies
    * Implements 30-second caching to avoid rate limits
    */
-  async getCurrentRates(): Promise<ExchangeRates> {
-    // Check cache
-    if (ratesCache && Date.now() - ratesCache.timestamp < CACHE_DURATION_MS) {
+  async getCurrentRates(forceRefresh = false): Promise<ExchangeRates> {
+    // Check cache (skip if force refresh requested)
+    if (!forceRefresh && ratesCache && Date.now() - ratesCache.timestamp < CACHE_DURATION_MS) {
+      console.log('📦 Returning cached rates (age: ' + Math.round((Date.now() - ratesCache.timestamp) / 1000) + 's)');
       return ratesCache.data;
     }
 
     try {
-      console.log('🔄 Fetching fresh rates from CoinGecko API...');
+      console.log('🔄 Fetching fresh rates from CoinGecko API' + (forceRefresh ? ' (forced refresh)' : '') + '...');
       
       // Build request parameters
       const params: Record<string, string> = {

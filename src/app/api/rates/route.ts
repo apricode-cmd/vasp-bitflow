@@ -2,14 +2,25 @@
  * Exchange Rates API Route
  * 
  * GET /api/rates - Returns current cryptocurrency exchange rates (with manual overrides)
+ * GET /api/rates?force=true - Forces fresh fetch from CoinGecko (bypasses cache)
  */
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { rateManagementService } from '@/lib/services/rate-management.service';
+import { coinGeckoService } from '@/lib/services/coingecko';
 import { PLATFORM_CONFIG } from '@/lib/constants';
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
+    // Check if force refresh is requested
+    const { searchParams } = new URL(request.url);
+    const forceRefresh = searchParams.get('force') === 'true';
+
+    if (forceRefresh) {
+      console.log('🔄 Force refresh requested - clearing cache');
+      coinGeckoService.clearCache();
+    }
+
     // Get rates using rate management service (includes manual overrides)
     const [btcEur, btcPln, ethEur, ethPln, usdtEur, usdtPln, solEur, solPln] = await Promise.all([
       rateManagementService.getCurrentRate('BTC', 'EUR'),
