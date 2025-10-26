@@ -37,33 +37,60 @@ import { toast } from 'sonner';
 import { 
   Plus, Loader2, TrendingUp, DollarSign, 
   Wallet as WalletIcon, User, Info, RefreshCw,
-  AlertCircle, CheckCircle2, CreditCard
+  AlertCircle, CheckCircle2, CreditCard, ArrowDownCircle,
+  ArrowUpCircle, ArrowLeftRight, Network
 } from 'lucide-react';
 import { createAdminOrderSchema, type CreateAdminOrderInput } from '@/lib/validations/admin-order';
 import { formatCurrency, formatCryptoAmount } from '@/lib/formatters';
 import { calculateOrderTotal } from '@/lib/utils/order-calculations';
 
 interface ExchangeRates {
-  BTC: { EUR: number; PLN: number };
-  ETH: { EUR: number; PLN: number };
-  USDT: { EUR: number; PLN: number };
-  SOL: { EUR: number; PLN: number };
+  [key: string]: { [key: string]: number };
   updatedAt: string;
   feePercentage: number;
+}
+
+interface Currency {
+  code: string;
+  name: string;
+  symbol: string;
+  chain?: string;
+}
+
+interface FiatCurrency {
+  code: string;
+  name: string;
+  symbol: string;
+}
+
+interface BlockchainNetwork {
+  code: string;
+  name: string;
+  symbol: string;
+  isActive: boolean;
 }
 
 interface CreateOrderDialogProps {
   onSuccess?: () => void;
 }
 
+type OrderType = 'BUY' | 'SELL';
+
 export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.Element {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [orderType, setOrderType] = useState<OrderType>('BUY');
   const [rates, setRates] = useState<ExchangeRates | null>(null);
   const [ratesLoading, setRatesLoading] = useState(false);
   const [useCustomRate, setUseCustomRate] = useState(false);
+  
+  // Data from API
   const [users, setUsers] = useState<Array<{ value: string; label: string; description?: string }>>([]);
+  const [cryptocurrencies, setCryptocurrencies] = useState<Currency[]>([]);
+  const [fiatCurrencies, setFiatCurrencies] = useState<FiatCurrency[]>([]);
+  const [blockchainNetworks, setBlockchainNetworks] = useState<BlockchainNetwork[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingData, setLoadingData] = useState(false);
 
   const {
     register,
@@ -72,7 +99,7 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
     setValue,
     reset,
     formState: { errors }
-  } = useForm<CreateAdminOrderInput>({
+  } = useForm<CreateAdminOrderInput & { blockchainCode?: string }>({
     resolver: zodResolver(createAdminOrderSchema),
     defaultValues: {
       currencyCode: 'BTC',
@@ -81,7 +108,8 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
       walletAddress: '',
       userEmail: '',
       customRate: undefined,
-      adminNotes: ''
+      adminNotes: '',
+      blockchainCode: ''
     }
   });
 
@@ -142,11 +170,47 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
     }
   };
 
+  // Fetch currencies, fiat currencies, and blockchain networks
+  const fetchCurrenciesAndNetworks = async (): Promise<void> => {
+    setLoadingData(true);
+    try {
+      const [cryptoRes, fiatRes, blockchainRes] = await Promise.all([
+        fetch('/api/admin/resources/currencies?active=true'),
+        fetch('/api/admin/resources/fiat-currencies?active=true'),
+        fetch('/api/admin/blockchains?active=true')
+      ]);
+
+      const [cryptoData, fiatData, blockchainData] = await Promise.all([
+        cryptoRes.json(),
+        fiatRes.json(),
+        blockchainRes.json()
+      ]);
+
+      if (cryptoData.success) {
+        setCryptocurrencies(cryptoData.data);
+      }
+
+      if (fiatData.success) {
+        setFiatCurrencies(fiatData.data);
+      }
+
+      if (blockchainData.success) {
+        setBlockchainNetworks(blockchainData.data.filter((n: any) => n.isActive));
+      }
+    } catch (error) {
+      console.error('Failed to fetch currencies/networks:', error);
+      toast.error('Failed to load currencies and networks');
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
   // Load rates and users when dialog opens
   useEffect(() => {
     if (open) {
       fetchRates();
       fetchUsers();
+      fetchCurrenciesAndNetworks();
       const interval = setInterval(fetchRates, 30000); // Refresh every 30 seconds
       return () => clearInterval(interval);
     }
@@ -217,6 +281,47 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Order Type Toggle - BUY/SELL */}
+          <Card className="border-2 border-primary/20">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label className="text-base font-semibold">Order Type</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {orderType === 'BUY' 
+                      ? 'Customer pays fiat, receives cryptocurrency' 
+                      : 'Customer pays cryptocurrency, receives fiat'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 p-1 bg-muted rounded-lg">
+                  <Button
+                    type="button"
+                    variant={orderType === 'BUY' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setOrderType('BUY')}
+                    className={`gap-2 ${orderType === 'BUY' ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                  >
+                    <ArrowDownCircle className="h-4 w-4" />
+                    BUY Crypto
+                  </Button>
+                  <div className="flex items-center justify-center">
+                    <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <Button
+                    type="button"
+                    variant={orderType === 'SELL' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setOrderType('SELL')}
+                    className={`gap-2 ${orderType === 'SELL' ? 'bg-red-600 hover:bg-red-700' : ''}`}
+                  >
+                    <ArrowUpCircle className="h-4 w-4" />
+                    SELL Crypto
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* User Selection */}
           <div className="space-y-2">
             <Label htmlFor="userEmail">
@@ -247,19 +352,22 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="currencyCode">Cryptocurrency *</Label>
-              <Combobox
-                options={[
-                  { value: 'BTC', label: 'Bitcoin (BTC)', description: 'The original cryptocurrency' },
-                  { value: 'ETH', label: 'Ethereum (ETH)', description: 'Smart contract platform' },
-                  { value: 'USDT', label: 'Tether (USDT)', description: 'Stablecoin pegged to USD' },
-                  { value: 'SOL', label: 'Solana (SOL)', description: 'High-performance blockchain' },
-                ]}
-                value={watchedFields.currencyCode}
-                onValueChange={(value) => setValue('currencyCode', value as any)}
-                placeholder="Select cryptocurrency..."
-                searchPlaceholder="Search crypto..."
-                emptyText="No cryptocurrency found"
-              />
+              {loadingData ? (
+                <Skeleton className="h-10 w-full" />
+              ) : (
+                <Combobox
+                  options={cryptocurrencies.map(crypto => ({
+                    value: crypto.code,
+                    label: `${crypto.name} (${crypto.code})`,
+                    description: `${crypto.symbol} - ${crypto.chain || 'Multiple chains'}`
+                  }))}
+                  value={watchedFields.currencyCode}
+                  onValueChange={(value) => setValue('currencyCode', value as any)}
+                  placeholder="Select cryptocurrency..."
+                  searchPlaceholder="Search crypto..."
+                  emptyText="No active cryptocurrencies"
+                />
+              )}
               {errors.currencyCode && (
                 <p className="text-sm text-destructive">{errors.currencyCode.message}</p>
               )}
@@ -267,22 +375,65 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
 
             <div className="space-y-2">
               <Label htmlFor="fiatCurrencyCode">Fiat Currency *</Label>
-              <Combobox
-                options={[
-                  { value: 'EUR', label: 'Euro (EUR)', description: '€ - European currency' },
-                  { value: 'PLN', label: 'Polish Zloty (PLN)', description: 'zł - Polish currency' },
-                ]}
-                value={watchedFields.fiatCurrencyCode}
-                onValueChange={(value) => setValue('fiatCurrencyCode', value as any)}
-                placeholder="Select fiat currency..."
-                searchPlaceholder="Search currency..."
-                emptyText="No currency found"
-              />
+              {loadingData ? (
+                <Skeleton className="h-10 w-full" />
+              ) : (
+                <Combobox
+                  options={fiatCurrencies.map(fiat => ({
+                    value: fiat.code,
+                    label: `${fiat.name} (${fiat.code})`,
+                    description: `${fiat.symbol}`
+                  }))}
+                  value={watchedFields.fiatCurrencyCode}
+                  onValueChange={(value) => setValue('fiatCurrencyCode', value as any)}
+                  placeholder="Select fiat currency..."
+                  searchPlaceholder="Search currency..."
+                  emptyText="No active fiat currencies"
+                />
+              )}
               {errors.fiatCurrencyCode && (
                 <p className="text-sm text-destructive">{errors.fiatCurrencyCode.message}</p>
               )}
             </div>
           </div>
+
+          {/* Blockchain Network Selection - Only for BUY orders */}
+          {orderType === 'BUY' && watchedFields.currencyCode && (
+            <div className="space-y-2">
+              <Label htmlFor="blockchainNetwork" className="flex items-center gap-2">
+                <Network className="h-4 w-4" />
+                Blockchain Network *
+              </Label>
+              {loadingData ? (
+                <Skeleton className="h-10 w-full" />
+              ) : (
+                <Combobox
+                  options={blockchainNetworks
+                    .filter(network => {
+                      // Filter networks by selected cryptocurrency
+                      const selectedCrypto = cryptocurrencies.find(c => c.code === watchedFields.currencyCode);
+                      if (!selectedCrypto?.chain) return true; // Show all if no chain specified
+                      return network.code === selectedCrypto.chain || 
+                             selectedCrypto.chain.includes(network.code);
+                    })
+                    .map(network => ({
+                      value: network.code,
+                      label: `${network.name} (${network.code})`,
+                      description: `${network.symbol} Network`
+                    }))}
+                  value={watchedFields.blockchainCode || ''}
+                  onValueChange={(value) => setValue('blockchainCode', value)}
+                  placeholder="Select blockchain network..."
+                  searchPlaceholder="Search network..."
+                  emptyText="No active blockchain networks"
+                />
+              )}
+              <p className="text-xs text-muted-foreground">
+                <Info className="inline h-3 w-3 mr-1" />
+                Select the blockchain network for cryptocurrency transfer
+              </p>
+            </div>
+          )}
 
           {/* Exchange Rate */}
           <Card className="bg-muted/50">
