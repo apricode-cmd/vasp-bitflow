@@ -214,3 +214,4 @@ rm -rf .next                    # Очистить кеш
 2. http://localhost:5555 - Prisma Studio
 3. Проверьте все функции!
 
+

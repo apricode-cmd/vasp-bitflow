@@ -29,3 +29,4 @@ export type CreatePlatformWalletInput = z.infer<typeof createPlatformWalletSchem
 export type UpdatePlatformWalletInput = z.infer<typeof updatePlatformWalletSchema>;
 export type CreateUserWalletInput = z.infer<typeof createUserWalletSchema>;
 
+

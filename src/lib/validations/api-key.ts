@@ -22,3 +22,4 @@ export const updateApiKeySchema = z.object({
 export type CreateApiKeyInput = z.infer<typeof createApiKeySchema>;
 export type UpdateApiKeyInput = z.infer<typeof updateApiKeySchema>;
 
+

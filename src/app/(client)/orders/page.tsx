@@ -33,6 +33,9 @@ interface Order {
   status: OrderStatus;
   createdAt: Date;
   paymentReference: string;
+  currency?: {
+    decimals: number;
+  };
 }
 
 export default function OrdersPage(): React.ReactElement {
@@ -50,7 +53,12 @@ export default function OrdersPage(): React.ReactElement {
     try {
       const response = await fetch('/api/orders');
       const data = await response.json();
-      if (Array.isArray(data)) {
+      
+      // API returns { orders: [...], pagination: {...} }
+      if (data.orders && Array.isArray(data.orders)) {
+        setOrders(data.orders);
+      } else if (Array.isArray(data)) {
+        // Fallback for old format
         setOrders(data);
       }
     } catch (error) {
@@ -206,7 +214,7 @@ export default function OrdersPage(): React.ReactElement {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-2">
                             <h3 className="text-lg font-semibold truncate">
-                              {formatCryptoAmount(order.cryptoAmount, order.currencyCode)} {order.currencyCode}
+                              {formatCryptoAmount(order.cryptoAmount, order.currency?.decimals || 8)} {order.currencyCode}
                             </h3>
                             <Badge variant="outline">
                               {order.currencyCode}/{order.fiatCurrencyCode}

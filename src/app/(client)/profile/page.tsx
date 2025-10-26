@@ -1,7 +1,7 @@
 /**
  * User Profile Page
  * 
- * Modern profile management with tabs, forms, and avatar
+ * Modern profile management with tabs, forms, PhoneInput, and CountryDropdown
  */
 
 'use client';
@@ -9,25 +9,19 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
+import { PhoneInput } from '@/components/ui/phone-input';
+import { CountryDropdown } from '@/components/ui/country-dropdown';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,6 +46,11 @@ const profileSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   phoneNumber: z.string().optional(),
+  phoneCountry: z.string().optional(),
+  country: z.string().optional(),
+  city: z.string().optional(),
+  address: z.string().optional(),
+  postalCode: z.string().optional(),
 });
 
 // Password change schema
@@ -106,6 +105,11 @@ export default function ProfilePage(): React.ReactElement {
           firstName: data.user.profile?.firstName || '',
           lastName: data.user.profile?.lastName || '',
           phoneNumber: data.user.profile?.phoneNumber || '',
+          phoneCountry: data.user.profile?.phoneCountry || 'PL',
+          country: data.user.profile?.country || '',
+          city: data.user.profile?.city || '',
+          address: data.user.profile?.address || '',
+          postalCode: data.user.profile?.postalCode || '',
         });
       }
     } catch (error) {
@@ -220,194 +224,241 @@ export default function ProfilePage(): React.ReactElement {
 
         {/* Profile Tab */}
         <TabsContent value="profile" className="space-y-6 mt-6">
-          <Card>
+          <Card className="bg-card/50 backdrop-blur-sm">
             <CardHeader>
               <CardTitle>Personal Information</CardTitle>
               <CardDescription>Update your personal details</CardDescription>
             </CardHeader>
             <CardContent>
-              <Form {...profileForm}>
-                <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6">
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <FormField
-                      control={profileForm.control}
-                      name="firstName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>First Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="John" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+              <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6">
+                {/* Name Fields */}
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name *</Label>
+                    <Input
+                      id="firstName"
+                      placeholder="John"
+                      {...profileForm.register('firstName')}
                     />
-
-                    <FormField
-                      control={profileForm.control}
-                      name="lastName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Last Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Doe" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    {profileForm.formState.errors.firstName && (
+                      <p className="text-sm text-destructive">
+                        {profileForm.formState.errors.firstName.message}
+                      </p>
+                    )}
                   </div>
 
-                  <FormField
-                    control={profileForm.control}
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name *</Label>
+                    <Input
+                      id="lastName"
+                      placeholder="Doe"
+                      {...profileForm.register('lastName')}
+                    />
+                    {profileForm.formState.errors.lastName && (
+                      <p className="text-sm text-destructive">
+                        {profileForm.formState.errors.lastName.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Phone Number */}
+                <div className="space-y-2">
+                  <Label htmlFor="phoneNumber">
+                    <Phone className="inline h-4 w-4 mr-2" />
+                    Phone Number
+                  </Label>
+                  <Controller
                     name="phoneNumber"
+                    control={profileForm.control}
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Phone Number</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="tel" 
-                            placeholder="+48123456789" 
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Optional. Used for important notifications.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
+                      <PhoneInput
+                        id="phoneNumber"
+                        value={field.value || ''}
+                        onChange={field.onChange}
+                        defaultCountry={profileForm.watch('phoneCountry') || 'PL'}
+                      />
                     )}
                   />
+                  <p className="text-sm text-muted-foreground">
+                    Optional. Used for important notifications.
+                  </p>
+                </div>
 
-                  <Separator />
+                {/* Address Fields */}
+                <Separator />
+                <div className="space-y-4">
+                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    Address Information
+                  </h4>
 
-                  <div className="grid md:grid-cols-2 gap-4 text-sm">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Country:</span>
-                      <span className="font-medium">{user.profile?.country}</span>
+                  <div className="space-y-2">
+                    <Label htmlFor="country">Country</Label>
+                    <Controller
+                      name="country"
+                      control={profileForm.control}
+                      render={({ field }) => (
+                        <CountryDropdown
+                          defaultValue={field.value || ''}
+                          onChange={(country) => field.onChange(country.alpha2)}
+                          placeholder="Select your country"
+                        />
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="city">City</Label>
+                      <Input
+                        id="city"
+                        placeholder="Warsaw"
+                        {...profileForm.register('city')}
+                      />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Member since:</span>
-                      <span className="font-medium">{formatDate(user.createdAt)}</span>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="postalCode">Postal Code</Label>
+                      <Input
+                        id="postalCode"
+                        placeholder="00-001"
+                        {...profileForm.register('postalCode')}
+                      />
                     </div>
                   </div>
 
-                  <Button type="submit" disabled={updating} className="w-full md:w-auto">
-                    {updating ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        Save Changes
-                      </>
-                    )}
-                  </Button>
-                </form>
-              </Form>
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Street Address</Label>
+                    <Input
+                      id="address"
+                      placeholder="123 Main Street"
+                      {...profileForm.register('address')}
+                    />
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Account Info */}
+                <div className="grid md:grid-cols-2 gap-4 text-sm bg-muted/50 p-4 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Email:</span>
+                    <span className="font-medium">{user.email}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Member since:</span>
+                    <span className="font-medium">{formatDate(user.createdAt)}</span>
+                  </div>
+                </div>
+
+                <Button type="submit" disabled={updating} className="w-full md:w-auto">
+                  {updating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+              </form>
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* Security Tab */}
         <TabsContent value="security" className="space-y-6 mt-6">
-          <Card>
+          <Card className="bg-card/50 backdrop-blur-sm">
             <CardHeader>
               <CardTitle>Change Password</CardTitle>
               <CardDescription>Update your password to keep your account secure</CardDescription>
             </CardHeader>
             <CardContent>
-              <Form {...passwordForm}>
-                <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-6">
-                  <FormField
-                    control={passwordForm.control}
-                    name="currentPassword"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Current Password</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="password" 
-                            placeholder="••••••••"
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+              <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-6">
+                {/* Current Password */}
+                <div className="space-y-2">
+                  <Label htmlFor="currentPassword">Current Password</Label>
+                  <Input
+                    id="currentPassword"
+                    type="password"
+                    placeholder="••••••••"
+                    {...passwordForm.register('currentPassword')}
                   />
+                  {passwordForm.formState.errors.currentPassword && (
+                    <p className="text-sm text-destructive">
+                      {passwordForm.formState.errors.currentPassword.message}
+                    </p>
+                  )}
+                </div>
 
-                  <Separator />
+                <Separator />
 
-                  <FormField
-                    control={passwordForm.control}
-                    name="newPassword"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>New Password</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="password" 
-                            placeholder="••••••••"
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                {/* New Password */}
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword">New Password</Label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    placeholder="••••••••"
+                    {...passwordForm.register('newPassword')}
                   />
+                  {passwordForm.formState.errors.newPassword && (
+                    <p className="text-sm text-destructive">
+                      {passwordForm.formState.errors.newPassword.message}
+                    </p>
+                  )}
+                </div>
 
-                  <FormField
-                    control={passwordForm.control}
-                    name="confirmPassword"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Confirm New Password</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="password" 
-                            placeholder="••••••••"
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                {/* Confirm Password */}
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="••••••••"
+                    {...passwordForm.register('confirmPassword')}
                   />
+                  {passwordForm.formState.errors.confirmPassword && (
+                    <p className="text-sm text-destructive">
+                      {passwordForm.formState.errors.confirmPassword.message}
+                    </p>
+                  )}
+                </div>
 
-                  <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      Password must be at least 8 characters with uppercase, lowercase, number, and special character.
-                    </AlertDescription>
-                  </Alert>
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Password must be at least 8 characters with uppercase, lowercase, number, and special character.
+                  </AlertDescription>
+                </Alert>
 
-                  <Button type="submit" disabled={updating}>
-                    {updating ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Updating...
-                      </>
-                    ) : (
-                      <>
-                        <Lock className="h-4 w-4 mr-2" />
-                        Change Password
-                      </>
-                    )}
-                  </Button>
-                </form>
-              </Form>
+                <Button type="submit" disabled={updating}>
+                  {updating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="h-4 w-4 mr-2" />
+                      Change Password
+                    </>
+                  )}
+                </Button>
+              </form>
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* Preferences Tab */}
         <TabsContent value="preferences" className="space-y-6 mt-6">
-          <Card>
+          <Card className="bg-card/50 backdrop-blur-sm">
             <CardHeader>
               <CardTitle>Account Preferences</CardTitle>
               <CardDescription>Manage your account settings and preferences</CardDescription>

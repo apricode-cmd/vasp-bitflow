@@ -68,7 +68,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Validate amount limits
     const limitsCheck = validateOrderLimits(
-      validatedData.amount,
+      validatedData.cryptoAmount,
       tradingPair.minCryptoAmount,
       tradingPair.maxCryptoAmount
     );
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Calculate order total using trading pair fee
     const calculation = calculateOrderTotal(
-      validatedData.amount,
+      validatedData.cryptoAmount,
       rate,
       tradingPair.feePercent / 100 // Convert percentage to decimal
     );
@@ -109,13 +109,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         currencyCode: validatedData.currencyCode,
         fiatCurrencyCode: validatedData.fiatCurrencyCode,
         paymentReference,
-        cryptoAmount: validatedData.amount,
+        cryptoAmount: validatedData.cryptoAmount,
         fiatAmount: calculation.fiatAmount,
         rate: calculation.rate,
         feePercent: tradingPair.feePercent,
         feeAmount: calculation.fee,
         totalFiat: calculation.totalFiat,
         walletAddress: validatedData.walletAddress,
+        paymentMethodCode: validatedData.paymentMethodCode,
+        blockchainCode: validatedData.blockchainCode,
         status: 'PENDING',
         expiresAt
       },

@@ -15,6 +15,7 @@
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { seedPaymentAccounts } from './seed-payment-accounts.js';
+import { seedKycFormFields } from './seed-kyc-fields.js';
 
 const prisma = new PrismaClient();
 
@@ -882,6 +883,12 @@ async function main(): Promise<void> {
   // NEW: Seed Payment Accounts
   await seedPaymentAccounts();
   console.log(`   - 10+ Payment Accounts (Bank + Crypto)`);
+  
+  // NEW: Seed KYC Form Fields
+  await seedKycFormFields();
+  console.log(`   - 37+ KYC Form Fields`);
+  
+  console.log('\n✅ Database seeding completed successfully!\n');
 }
 
 main()

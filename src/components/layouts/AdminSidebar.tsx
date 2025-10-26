@@ -12,7 +12,7 @@ import { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, ShoppingCart, Settings, CreditCard,
   TrendingUp, Shield, Database, Activity, Coins,
-  Wallet, Globe, Key, User,
+  Wallet, Globe, Key, User, FileText,
   ChevronDown, ChevronRight, Search,
   ArrowDownCircle, ArrowUpCircle
 } from 'lucide-react';
@@ -155,6 +155,12 @@ const navigation = [
         href: '/admin/integrations', 
         icon: Globe,
         description: 'CoinGecko, KYCAID'
+      },
+      { 
+        name: 'KYC Form Fields', 
+        href: '/admin/kyc-fields', 
+        icon: FileText,
+        description: 'Configure KYC fields'
       },
       { 
         name: 'API Keys', 

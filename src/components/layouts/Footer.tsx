@@ -1,16 +1,22 @@
 /**
  * Footer Component
  * 
- * Application footer with links and information.
+ * Application footer with dynamic branding and links
  */
+
+'use client';
 
 import Link from 'next/link';
 import { Zap } from 'lucide-react';
 import { ApricodeLogo } from '@/components/icons/ApricodeLogo';
+import { useBranding } from '@/hooks/useBranding';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export function Footer(): React.ReactElement {
+  const { branding, loading } = useBranding();
+
   return (
-    <footer className="bg-muted/30 border-t mt-auto">
+    <footer className="bg-muted/30 backdrop-blur-sm border-t mt-auto">
       <div className="container mx-auto px-4 py-8">
         <div className="grid md:grid-cols-3 gap-8">
           {/* About */}
@@ -19,14 +25,21 @@ export function Footer(): React.ReactElement {
               <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
                 <Zap className="h-5 w-5 text-primary-foreground" />
               </div>
-              <h3 className="text-lg font-bold text-primary">
-                CryptoExchange CRM
-              </h3>
+              {loading ? (
+                <Skeleton className="h-6 w-48" />
+              ) : (
+                <h3 className="text-lg font-bold text-primary">
+                  {branding.companyName}
+                </h3>
+              )}
             </div>
-            <p className="text-sm text-muted-foreground">
-              Secure platform for buying cryptocurrency with fiat currency. 
-              KYC verified and fully compliant.
-            </p>
+            {loading ? (
+              <Skeleton className="h-16 w-full" />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {branding.tagline || 'Secure platform for buying cryptocurrency with fiat currency. KYC verified and fully compliant.'}
+              </p>
+            )}
           </div>
 
           {/* Quick Links */}
@@ -64,9 +77,13 @@ export function Footer(): React.ReactElement {
         </div>
 
         <div className="border-t mt-8 pt-6 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} CryptoExchange CRM. All rights reserved.
-          </p>
+          {loading ? (
+            <Skeleton className="h-5 w-64" />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              &copy; {new Date().getFullYear()} {branding.companyName}. All rights reserved.
+            </p>
+          )}
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Powered by</span>
             <a 

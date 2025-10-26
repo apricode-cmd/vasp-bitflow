@@ -1,7 +1,7 @@
 /**
  * Header Component
  * 
- * Enhanced navigation header with Breadcrumb, Avatar menu, and Command K search
+ * Enhanced navigation header with dynamic branding, theme toggle, and mobile support
  */
 
 'use client';
@@ -9,9 +9,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
-import { LogOut, User, Settings, Search, Menu } from 'lucide-react';
+import { LogOut, User, Settings, Menu, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,11 +37,13 @@ import {
 } from '@/components/ui/sheet';
 import { useState } from 'react';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { useBranding } from '@/hooks/useBranding';
 
 export function Header(): React.ReactElement {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { branding, loading: brandingLoading } = useBranding();
 
   const handleSignOut = async (): Promise<void> => {
     await signOut({ callbackUrl: '/' });
@@ -72,7 +76,7 @@ export function Header(): React.ReactElement {
     const breadcrumbs: { href: string; label: string }[] = [];
     
     let currentPath = '';
-    paths.forEach((path, index) => {
+    paths.forEach((path) => {
       currentPath += `/${path}`;
       
       // Generate readable labels
@@ -97,15 +101,19 @@ export function Header(): React.ReactElement {
   };
 
   return (
-    <header className="bg-background border-b sticky top-0 z-50">
+    <header className="bg-card/50 backdrop-blur-xl border-b sticky top-0 z-50 supports-[backdrop-filter]:bg-card/30">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center gap-4">
             <Link href={session ? (session.user.role === 'ADMIN' ? '/admin' : '/dashboard') : '/'} className="flex items-center gap-2">
-              <span className="text-xl font-bold text-primary">
-                CryptoExchange CRM
-              </span>
+              {brandingLoading ? (
+                <Skeleton className="h-6 w-48" />
+              ) : (
+                <span className="text-xl font-bold text-primary">
+                  {branding.companyName}
+                </span>
+              )}
             </Link>
           </div>
 
@@ -131,6 +139,22 @@ export function Header(): React.ReactElement {
           {/* User Menu */}
           {session ? (
             <div className="flex items-center gap-2">
+              {/* Theme Toggle */}
+              <ThemeToggle />
+
+              {/* Notifications Bell - only for clients */}
+              {session.user.role !== 'ADMIN' && (
+                <Button variant="ghost" size="icon" className="relative">
+                  <Bell className="h-5 w-5" />
+                  <Badge 
+                    variant="destructive" 
+                    className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                  >
+                    3
+                  </Badge>
+                </Button>
+              )}
+
               {/* Mobile Menu */}
               <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
                 <SheetTrigger asChild className="md:hidden">

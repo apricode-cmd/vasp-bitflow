@@ -10,15 +10,16 @@ import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { CopyButton } from '@/components/ui/copy-button';
 import { OrderStatusBadge } from '@/components/features/OrderStatusBadge';
 import { CurrencyIcon } from '@/components/features/CurrencyIcon';
 import { formatDateTime, formatFiatCurrency, formatCryptoAmount } from '@/lib/formatters';
-import { ArrowLeft, Copy, CheckCircle, Clock } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Clock } from 'lucide-react';
 
 interface OrderDetailPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default async function OrderDetailPage({ params }: OrderDetailPageProps): Promise<React.ReactElement> {
@@ -28,9 +29,12 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
     redirect('/login');
   }
 
+  // Await params
+  const { id } = await params;
+
   // Get order details
   const order = await prisma.order.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       currency: true,
       fiatCurrency: true,
@@ -51,17 +55,13 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
     redirect('/orders');
   }
 
-  // Get bank details for the fiat currency
+  // Get bank details for the fiat currency (DEPRECATED - will use PaymentAccount)
   const bankDetails = await prisma.bankDetails.findFirst({
     where: {
       currency: order.fiatCurrencyCode,
       isActive: true
     }
   });
-
-  const copyToClipboard = (text: string): void => {
-    navigator.clipboard.writeText(text);
-  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -78,10 +78,10 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
         <div className="flex items-center gap-4">
           <CurrencyIcon currency={order.currencyCode as 'BTC' | 'ETH' | 'USDT' | 'SOL'} size={48} />
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              {formatCryptoAmount(order.cryptoAmount, order.currencyCode)} {order.currencyCode}
+            <h1 className="text-3xl font-bold">
+              {formatCryptoAmount(order.cryptoAmount, order.currency?.decimals || 8)} {order.currencyCode}
             </h1>
-            <p className="text-gray-600 mt-1">
+            <p className="text-muted-foreground mt-1">
               Order #{order.paymentReference} • {formatDateTime(order.createdAt)}
             </p>
           </div>
@@ -151,7 +151,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Amount:</span>
-              <span className="font-medium">{formatCryptoAmount(order.cryptoAmount, order.currencyCode)} {order.currencyCode}</span>
+              <span className="font-medium">{formatCryptoAmount(order.cryptoAmount, order.currency?.decimals || 8)} {order.currencyCode}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Exchange Rate:</span>
@@ -186,13 +186,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
                 <code className="flex-1 text-sm bg-gray-100 px-3 py-2 rounded font-mono break-all">
                   {order.walletAddress}
                 </code>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => copyToClipboard(order.walletAddress)}
-                >
-                  <Copy className="w-4 h-4" />
-                </Button>
+                <CopyButton text={order.walletAddress} />
               </div>
             </div>
 
@@ -203,13 +197,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
                   <code className="flex-1 text-sm bg-gray-100 px-3 py-2 rounded font-mono break-all">
                     {order.transactionHash}
                   </code>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => copyToClipboard(order.transactionHash!)}
-                  >
-                    <Copy className="w-4 h-4" />
-                  </Button>
+                  <CopyButton text={order.transactionHash} />
                 </div>
               </div>
             )}
@@ -240,13 +228,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
                 <span className="text-sm text-gray-600">IBAN:</span>
                 <div className="flex items-center gap-2">
                   <code className="font-mono text-sm">{bankDetails.iban}</code>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => copyToClipboard(bankDetails.iban)}
-                  >
-                    <Copy className="w-4 h-4" />
-                  </Button>
+                  <CopyButton text={bankDetails.iban} variant="ghost" size="sm" />
                 </div>
               </div>
               {bankDetails.swift && (
@@ -254,13 +236,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
                   <span className="text-sm text-gray-600">SWIFT/BIC:</span>
                   <div className="flex items-center gap-2">
                     <code className="font-mono text-sm">{bankDetails.swift}</code>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => copyToClipboard(bankDetails.swift!)}
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
+                    <CopyButton text={bankDetails.swift} variant="ghost" size="sm" />
                   </div>
                 </div>
               )}

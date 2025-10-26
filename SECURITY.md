@@ -218,3 +218,4 @@ Configured in `next.config.js`:
 **Last Updated:** October 2025
 **Version:** 1.0
 
+

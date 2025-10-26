@@ -10,32 +10,43 @@ import { format } from 'date-fns';
  * Formats a number as a fiat currency (EUR, PLN)
  */
 export function formatFiatCurrency(amount: number, currency: string = 'EUR'): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(amount);
+  // Validate currency code
+  if (!currency || currency.length !== 3) {
+    currency = 'EUR'; // Fallback to EUR
+  }
+
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount);
+  } catch (error) {
+    // Fallback if currency code is invalid
+    console.warn(`Invalid currency code: ${currency}`, error);
+    return `${currency} ${amount.toFixed(2)}`;
+  }
 }
 
 /**
  * Formats a number as a cryptocurrency amount
  */
-export function formatCryptoAmount(amount: number, currency: string): string {
-  // Different precision for different currencies
-  const decimals = currency === 'BTC' ? 8 : currency === 'ETH' ? 6 : 2;
+export function formatCryptoAmount(amount: number, decimals: number = 8): string {
+  // Validate decimals
+  const validDecimals = typeof decimals === 'number' && decimals >= 0 ? decimals : 8;
   
   return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals
+    minimumFractionDigits: validDecimals,
+    maximumFractionDigits: validDecimals
   }).format(amount);
 }
 
 /**
  * Formats a cryptocurrency amount with its symbol
  */
-export function formatCryptoWithSymbol(amount: number, currency: string): string {
-  return `${formatCryptoAmount(amount, currency)} ${currency}`;
+export function formatCryptoWithSymbol(amount: number, currency: string, decimals: number = 8): string {
+  return `${formatCryptoAmount(amount, decimals)} ${currency}`;
 }
 
 /**

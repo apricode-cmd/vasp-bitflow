@@ -104,35 +104,43 @@ export async function GET(request: NextRequest) {
 
     // If no sessions found, create one for current session
     if (sessions.length === 0) {
-      // Log current session
-      const currentLog = await prisma.systemLog.create({
-        data: {
-          userId,
-          action: 'SESSION_VIEW',
-          path: '/api/admin/sessions',
-          ipAddress: currentIp,
-          userAgent: currentUserAgent,
-          deviceType: currentDevice,
-          browser: currentBrowser,
-          os: currentUserAgent.includes('Windows') ? 'Windows' :
-              currentUserAgent.includes('Mac') ? 'macOS' :
-              currentUserAgent.includes('Linux') ? 'Linux' : 'Unknown',
-          metadata: { action: 'Viewing sessions page' },
-        },
+      // Verify user exists before creating log
+      const userExists = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true }
       });
 
-      sessions.push({
-        id: currentLog.id,
-        userId,
-        device: currentDevice,
-        browser: currentBrowser,
-        os: currentLog.os,
-        ipAddress: currentIp,
-        lastActive: currentLog.createdAt,
-        firstSeen: currentLog.createdAt,
-        activityCount: 1,
-        isCurrent: true,
-      });
+      if (userExists) {
+        // Log current session
+        const currentLog = await prisma.systemLog.create({
+          data: {
+            userId,
+            action: 'SESSION_VIEW',
+            path: '/api/admin/sessions',
+            ipAddress: currentIp,
+            userAgent: currentUserAgent,
+            deviceType: currentDevice,
+            browser: currentBrowser,
+            os: currentUserAgent.includes('Windows') ? 'Windows' :
+                currentUserAgent.includes('Mac') ? 'macOS' :
+                currentUserAgent.includes('Linux') ? 'Linux' : 'Unknown',
+            metadata: { action: 'Viewing sessions page' },
+          },
+        });
+
+        sessions.push({
+          id: currentLog.id,
+          userId,
+          device: currentDevice,
+          browser: currentBrowser,
+          os: currentLog.os,
+          ipAddress: currentIp,
+          lastActive: currentLog.createdAt,
+          firstSeen: currentLog.createdAt,
+          activityCount: 1,
+          isCurrent: true,
+        });
+      }
     }
 
     return NextResponse.json({

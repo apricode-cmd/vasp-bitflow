@@ -45,7 +45,7 @@ interface KycStatusBadgeProps {
 }
 
 export function OrderStatusBadge({ status, className }: OrderStatusBadgeProps): React.ReactElement {
-  const config = ORDER_STATUS_VARIANTS[status];
+  const config = ORDER_STATUS_VARIANTS[status] || { variant: 'default' as const, label: status || 'Unknown' };
   
   return (
     <Badge variant={config.variant} className={className}>
@@ -55,7 +55,7 @@ export function OrderStatusBadge({ status, className }: OrderStatusBadgeProps): 
 }
 
 export function KycStatusBadge({ status, className }: KycStatusBadgeProps): React.ReactElement {
-  const config = KYC_STATUS_VARIANTS[status];
+  const config = KYC_STATUS_VARIANTS[status] || { variant: 'default' as const, label: status || 'Not Started' };
   
   return (
     <Badge variant={config.variant} className={className}>

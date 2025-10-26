@@ -64,7 +64,6 @@ const KYC_STEPS = [
 export default function KycPage(): React.ReactElement {
   const [kycSession, setKycSession] = useState<KycSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isStarting, setIsStarting] = useState(false);
 
   // Fetch KYC status
   const fetchKycStatus = async () => {
@@ -88,34 +87,8 @@ export default function KycPage(): React.ReactElement {
   }, []);
 
   const handleStartKyc = async () => {
-    setIsStarting(true);
-
-    try {
-      const response = await fetch('/api/kyc/start', {
-        method: 'POST'
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        toast.error(data.error || 'Failed to start KYC verification');
-        setIsStarting(false);
-        return;
-      }
-
-      toast.success('KYC verification started');
-      
-      // In production, redirect to KYCAID form
-      // window.location.href = data.formUrl;
-      
-      // For development, just refresh the status
-      await fetchKycStatus();
-      setIsStarting(false);
-    } catch (error) {
-      console.error('Start KYC error:', error);
-      toast.error('An error occurred');
-      setIsStarting(false);
-    }
+    // Redirect to form page
+    window.location.href = '/kyc/form';
   };
 
   if (isLoading) {
@@ -222,21 +195,11 @@ export default function KycPage(): React.ReactElement {
             <Button 
               size="lg" 
               className="w-full gradient-primary" 
-              onClick={handleStartKyc} 
-              disabled={isStarting}
+              onClick={handleStartKyc}
             >
-              {isStarting ? (
-                <>
-                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                  Starting verification...
-                </>
-              ) : (
-                <>
-                  <Shield className="h-5 w-5 mr-2" />
-                  Start Verification
-                  <ArrowRight className="h-5 w-5 ml-2" />
-                </>
-              )}
+              <Shield className="h-5 w-5 mr-2" />
+              Start Verification
+              <ArrowRight className="h-5 w-5 ml-2" />
             </Button>
           </CardContent>
         </Card>

@@ -103,11 +103,13 @@ model Profile {
   firstName   String
   lastName    String
   phoneNumber String?
+  phoneCountry String?  // Country code for phone (PL, DE, etc.)
   country     String
   city        String?
   address     String?
   postalCode  String?
   dateOfBirth DateTime?
+  placeOfBirth String? // City/country of birth
   nationality String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -124,6 +126,7 @@ model Profile {
 model KycSession {
   id                   String    @id @default(cuid())
   userId               String    @unique
+  kycProviderId        String?   // Link to KYC provider
   kycaidVerificationId String?   @unique
   kycaidApplicantId    String?
   kycaidFormId         String?
@@ -143,11 +146,14 @@ model KycSession {
   updatedAt            DateTime  @updatedAt
 
   user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider  KycProvider?  @relation(fields: [kycProviderId], references: [id])
   documents KycDocument[]
   formData  KycFormData[]
+  profile   KycProfile?   // 1:1 relation to detailed KYC profile
 
   @@index([status])
   @@index([kycaidVerificationId])
+  @@index([kycProviderId])
 }
 
 // ==========================================
@@ -1462,4 +1468,135 @@ model AdminSettings {
   user User @relation("AdminSettings", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// ==========================================
+// EXTENDED KYC MODELS
+// ==========================================
+
+// KYC Provider Configuration - supports multiple KYC providers
+model KycProvider {
+  id          String   @id @default(cuid())
+  code        String   @unique // kycaid, sumsub, onfido
+  name        String // "KYCAID", "Sumsub", "Onfido"
+  isActive    Boolean  @default(true)
+  priority    Int      @default(0)
+  
+  // API Configuration
+  apiUrl      String
+  apiKey      String   @db.Text // Encrypted
+  webhookUrl  String?
+  webhookSecret String? @db.Text
+  
+  // Features
+  supportsLiveness Boolean @default(false)
+  supportsAml      Boolean @default(false)
+  supportsPep      Boolean @default(false)
+  supportsDocScan  Boolean @default(true)
+  
+  // Pricing
+  costPerCheck    Float?
+  monthlyFee      Float?
+  currency        String  @default("EUR")
+  
+  // Metadata
+  config      Json? // Provider-specific configuration
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  kycSessions KycSession[]
+  
+  @@index([code])
+  @@index([isActive])
+}
+
+// KYC Profile - Comprehensive CDD/KYC data storage
+model KycProfile {
+  id            String   @id @default(cuid())
+  kycSessionId  String   @unique
+  
+  // === PERSONAL IDENTIFICATION ===
+  firstName     String
+  lastName      String
+  dateOfBirth   DateTime
+  placeOfBirth  String?
+  nationality   String
+  
+  // === CONTACT ===
+  email         String
+  phone         String
+  phoneCountry  String? // Country code
+  
+  // === ADDRESS ===
+  addressStreet  String?
+  addressCity    String?
+  addressRegion  String?
+  addressCountry String?
+  addressPostal  String?
+  
+  // === IDENTITY DOCUMENT ===
+  idType           String? // passport, id_card, residence_permit
+  idNumber         String?
+  idIssuingCountry String?
+  idIssuingAuth    String?
+  idIssueDate      DateTime?
+  idExpiryDate     DateTime?
+  idScanFront      String? // Vercel Blob URL
+  idScanBack       String? // Vercel Blob URL
+  livenessSelfie   String? // Vercel Blob URL or video session ID
+  
+  // === PEP & SANCTIONS ===
+  pepStatus               Boolean @default(false)
+  pepCategory             String? // family, close_associate, etc.
+  sanctionsScreeningDone  Boolean @default(false)
+  sanctionsProvider       String? // WorldCheck, Dow Jones, etc.
+  sanctionsScreeningDate  DateTime?
+  sanctionsResult         String? // clean, match_found
+  sanctionsMatches        Json? // Array of matches
+  
+  // === EMPLOYMENT & PURPOSE ===
+  employmentStatus String? // employed, self_employed, unemployed, retired, student
+  occupation       String?
+  employerName     String?
+  purposeOfAccount String? @db.Text // "buying crypto for investment"
+  intendedUse      String? @db.Text
+  
+  // === EXPECTED ACTIVITY ===
+  expectedVolume      Float? // Average transaction amount
+  expectedFrequency   String? // daily, weekly, monthly
+  expectedCountries   String[] // Countries of counterparties
+  
+  // === SOURCE OF FUNDS & WEALTH ===
+  sourceOfFunds  String? // salary, business_income, investment, inheritance
+  sourceOfWealth String? @db.Text // For EDD
+  
+  // === RISK ASSESSMENT ===
+  riskScore       Int? // 0-100
+  riskFactors     Json? // Array of risk factors
+  riskJustification String? @db.Text
+  
+  // === CONSENTS & COMPLIANCE ===
+  consentKyc       Boolean @default(false)
+  consentAml       Boolean @default(false)
+  consentTfr       Boolean @default(false)
+  consentPrivacy   Boolean @default(false)
+  termsVersion     String?
+  privacyVersion   String?
+  
+  // === METADATA ===
+  ipAddress        String?
+  userAgent        String?
+  completedAt      DateTime?
+  verifiedBy       String? // Admin ID
+  verifiedAt       DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  kycSession KycSession @relation(fields: [kycSessionId], references: [id], onDelete: Cascade)
+  
+  @@index([kycSessionId])
+  @@index([email])
+  @@index([nationality])
+  @@index([pepStatus])
 }

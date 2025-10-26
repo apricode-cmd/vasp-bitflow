@@ -25,15 +25,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       where.status = status;
     }
 
-    // Get KYC sessions
+    // Get KYC sessions with explicit error handling
     const kycSessions = await prisma.kycSession.findMany({
       where,
       include: {
         user: {
-          include: { profile: true }
+          include: { 
+            profile: true 
+          }
         }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: status === 'PENDING' ? { submittedAt: 'desc' } : { createdAt: 'desc' }
     });
 
     return NextResponse.json({ kycSessions });

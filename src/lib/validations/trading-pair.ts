@@ -41,3 +41,4 @@ export const updateTradingPairSchema = z.object({
 export type CreateTradingPairInput = z.infer<typeof createTradingPairSchema>;
 export type UpdateTradingPairInput = z.infer<typeof updateTradingPairSchema>;
 
+

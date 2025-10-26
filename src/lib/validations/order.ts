@@ -17,7 +17,7 @@ export const createOrderSchema = z.object({
   fiatCurrencyCode: z.enum(['EUR', 'PLN'], {
     required_error: 'Fiat currency is required'
   }),
-  amount: z
+  cryptoAmount: z
     .number({
       required_error: 'Amount is required',
       invalid_type_error: 'Amount must be a number'
@@ -28,7 +28,21 @@ export const createOrderSchema = z.object({
     .string()
     .min(26, 'Invalid wallet address')
     .max(62, 'Invalid wallet address')
-    .regex(/^[a-zA-Z0-9]+$/, 'Wallet address can only contain alphanumeric characters')
+    .regex(/^[a-zA-Z0-9]+$/, 'Wallet address can only contain alphanumeric characters'),
+  paymentMethodCode: z
+    .string({
+      required_error: 'Payment method is required'
+    })
+    .min(1, 'Payment method is required'),
+  blockchainCode: z
+    .string({
+      required_error: 'Blockchain network is required'
+    })
+    .min(1, 'Blockchain network is required'),
+  clientNote: z
+    .string()
+    .max(500, 'Note is too long')
+    .optional()
 }).refine((data) => {
   // Validate wallet address format based on currency
   const pattern = WALLET_PATTERNS[data.currencyCode];

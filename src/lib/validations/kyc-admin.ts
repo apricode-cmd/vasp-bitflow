@@ -26,3 +26,4 @@ export type ApproveKycInput = z.infer<typeof approveKycSchema>;
 export type RejectKycInput = z.infer<typeof rejectKycSchema>;
 export type UpdateKycFieldInput = z.infer<typeof updateKycFieldSchema>;
 
+

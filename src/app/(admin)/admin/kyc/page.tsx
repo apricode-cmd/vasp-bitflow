@@ -29,13 +29,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { DataTable } from '@/components/admin/DataTable';
 import { KycStatusBadge } from '@/components/features/KycStatusBadge';
+import { Combobox } from '@/components/shared/Combobox';
+import type { ComboboxOption } from '@/components/shared/Combobox';
+import { DynamicKycForm } from '@/components/forms/DynamicKycForm';
 import { formatDateTime } from '@/lib/formatters';
 import { toast } from 'sonner';
 import type { KycStatus } from '@prisma/client';
@@ -68,14 +79,78 @@ interface KycSession {
       firstName: string;
       lastName: string;
       country: string;
+      phoneNumber?: string;
+      phoneCountry?: string;
+      dateOfBirth?: Date;
+      placeOfBirth?: string;
+      nationality?: string;
     } | null;
   };
+  profile?: {
+    // Personal
+    firstName: string;
+    lastName: string;
+    dateOfBirth: Date;
+    placeOfBirth?: string;
+    nationality: string;
+    // Contact
+    email: string;
+    phone: string;
+    phoneCountry?: string;
+    // Address
+    addressStreet?: string;
+    addressCity?: string;
+    addressRegion?: string;
+    addressCountry?: string;
+    addressPostal?: string;
+    // Document
+    idType?: string;
+    idNumber?: string;
+    idIssuingCountry?: string;
+    idIssueDate?: Date;
+    idExpiryDate?: Date;
+    idScanFront?: string;
+    idScanBack?: string;
+    livenessSelfie?: string;
+    // PEP & Sanctions
+    pepStatus: boolean;
+    pepCategory?: string;
+    sanctionsScreeningDone: boolean;
+    sanctionsResult?: string;
+    // Employment
+    employmentStatus?: string;
+    occupation?: string;
+    employerName?: string;
+    // Purpose
+    purposeOfAccount?: string;
+    intendedUse?: string;
+    // Funds
+    sourceOfFunds?: string;
+    sourceOfWealth?: string;
+    // Risk
+    riskScore?: number;
+    riskFactors?: any;
+    // Consents
+    consentKyc: boolean;
+    consentAml: boolean;
+    consentTfr: boolean;
+    consentPrivacy: boolean;
+  } | null;
+  formData?: Array<{
+    id: string;
+    fieldName: string;
+    fieldValue: string;
+  }>;
   documents?: Array<{
     id: string;
     documentType: string;
     fileUrl: string;
     fileName: string;
   }>;
+  provider?: {
+    name: string;
+    code: string;
+  } | null;
 }
 
 export default function AdminKycPage(): JSX.Element {
@@ -88,10 +163,23 @@ export default function AdminKycPage(): JSX.Element {
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editKycDialogOpen, setEditKycDialogOpen] = useState(false);
+  const [sessionToEdit, setSessionToEdit] = useState<KycSession | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [users, setUsers] = useState<Array<{ id: string; email: string; name: string }>>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
   useEffect(() => {
     fetchKycSessions();
   }, [selectedStatus]);
+
+  useEffect(() => {
+    if (createDialogOpen) {
+      fetchUsers();
+    }
+  }, [createDialogOpen]);
 
   const fetchKycSessions = async (): Promise<void> => {
     setRefreshing(true);
@@ -135,17 +223,18 @@ export default function AdminKycPage(): JSX.Element {
     if (!selectedSession || !actionType) return;
 
     try {
-      const response = await fetch(`/api/admin/kyc/${selectedSession.id}/${actionType}`, {
-        method: 'POST',
+      const response = await fetch(`/api/admin/kyc/${selectedSession.id}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          status: actionType === 'approve' ? 'APPROVED' : 'REJECTED',
           rejectionReason: actionType === 'reject' ? rejectionReason : undefined
         })
       });
 
       const data = await response.json();
 
-      if (data.success) {
+      if (response.ok && data.success) {
         toast.success(`KYC ${actionType === 'approve' ? 'approved' : 'rejected'} successfully`);
         await fetchKycSessions();
         setSheetOpen(false);
@@ -160,10 +249,118 @@ export default function AdminKycPage(): JSX.Element {
     }
   };
 
+  const handleDeleteKyc = async (): Promise<void> => {
+    if (!selectedSession) return;
+
+    try {
+      const response = await fetch(`/api/admin/kyc/${selectedSession.id}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        toast.success('KYC session deleted successfully');
+        await fetchKycSessions();
+        setDeleteDialogOpen(false);
+        setSelectedSession(null);
+      } else {
+        toast.error(data.error || 'Failed to delete KYC session');
+      }
+    } catch (error) {
+      console.error('Delete KYC error:', error);
+      toast.error('An error occurred');
+    }
+  };
+
+  const handleCreateKyc = async (): Promise<void> => {
+    if (!selectedUserId) {
+      toast.error('Please select a user');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/admin/kyc/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: selectedUserId })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        toast.success('KYC session created successfully');
+        await fetchKycSessions();
+        setCreateDialogOpen(false);
+        // State will be cleared by onOpenChange
+      } else {
+        toast.error(data.error || 'Failed to create KYC session');
+      }
+    } catch (error) {
+      console.error('Create KYC error:', error);
+      toast.error('An error occurred');
+    }
+  };
+
+  const handleSaveKycData = async (formData: Record<string, any>): Promise<void> => {
+    if (!sessionToEdit) return;
+
+    try {
+      const response = await fetch('/api/kyc/submit-form', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          formData,
+          sessionId: sessionToEdit.id // Admin submits on behalf of user
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        toast.success('KYC data saved successfully');
+        await fetchKycSessions();
+        setEditKycDialogOpen(false);
+        setSessionToEdit(null);
+      } else {
+        toast.error(data.error || 'Failed to save KYC data');
+      }
+    } catch (error) {
+      console.error('Save KYC data error:', error);
+      toast.error('An error occurred');
+    }
+  };
+
+  const fetchUsers = async (): Promise<void> => {
+    setLoadingUsers(true);
+    try {
+      const response = await fetch('/api/admin/users?limit=100&role=CLIENT');
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          setUsers(result.data.map((u: any) => ({
+            id: u.id,
+            email: u.email,
+            name: `${u.profile?.firstName || ''} ${u.profile?.lastName || ''}`.trim() || u.email
+          })));
+        } else {
+          toast.error('Failed to load users');
+        }
+      } else {
+        toast.error('Failed to load users');
+      }
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+      toast.error('Failed to load users');
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
   // Define table columns
   const columns: ColumnDef<KycSession>[] = [
     {
-      accessorKey: 'user',
+      id: 'user',
       header: 'User',
       cell: ({ row }) => {
         const session = row.original;
@@ -186,7 +383,7 @@ export default function AdminKycPage(): JSX.Element {
       },
     },
     {
-      accessorKey: 'user.profile.country',
+      id: 'country',
       header: 'Country',
       cell: ({ row }) => (
         <Badge variant="outline">
@@ -230,31 +427,61 @@ export default function AdminKycPage(): JSX.Element {
           <div className="text-right">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => viewKycDetails(session)}>
+                <DropdownMenuItem onClick={(e) => {
+                  e.stopPropagation();
+                  viewKycDetails(session);
+                }}>
                   <Eye className="h-4 w-4 mr-2" />
                   View Details
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => {
+                  e.stopPropagation();
+                  setSessionToEdit(session);
+                  setEditKycDialogOpen(true);
+                }}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Fill KYC Data
+                </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href={`/admin/users/${session.user.id}`}>
+                  <Link href={`/admin/users/${session.user.id}`} onClick={(e) => e.stopPropagation()}>
                     <Users className="h-4 w-4 mr-2" />
                     View User
                   </Link>
                 </DropdownMenuItem>
                 {session.kycaidVerificationId && (
                   <DropdownMenuItem
-                    onClick={() => window.open(`https://kycaid.com/verifications/${session.kycaidVerificationId}`, '_blank')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.open(`https://kycaid.com/verifications/${session.kycaidVerificationId}`, '_blank');
+                    }}
                   >
                     <ExternalLink className="h-4 w-4 mr-2" />
                     Open in KYCAID
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedSession(session);
+                    setDeleteDialogOpen(true);
+                  }}
+                  className="text-destructive"
+                >
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -273,14 +500,23 @@ export default function AdminKycPage(): JSX.Element {
             Monitor and manage user identity verifications
           </p>
         </div>
-        <Button 
-          variant="outline" 
-          size="icon"
-          onClick={fetchKycSessions}
-          disabled={refreshing}
-        >
-          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="default"
+            onClick={() => setCreateDialogOpen(true)}
+          >
+            <Shield className="h-4 w-4 mr-2" />
+            Create KYC Session
+          </Button>
+          <Button 
+            variant="outline" 
+            size="icon"
+            onClick={fetchKycSessions}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
       </div>
 
       {/* Status Tabs */}
@@ -312,7 +548,6 @@ export default function AdminKycPage(): JSX.Element {
       <DataTable
         columns={columns}
         data={kycSessions}
-        searchKey="user.email"
         searchPlaceholder="Search by name or email..."
         isLoading={loading}
         onRowClick={viewKycDetails}
@@ -387,6 +622,335 @@ export default function AdminKycPage(): JSX.Element {
                   </div>
                 </Card>
               </div>
+
+              {/* Extended KYC Profile Data */}
+              {selectedSession.profile && (
+                <>
+                  {/* Personal Information */}
+                  <div>
+                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Personal Information
+                    </h3>
+                    <Card>
+                      <div className="p-4 grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">Date of Birth</p>
+                          <p className="font-medium">
+                            {selectedSession.profile.dateOfBirth 
+                              ? new Date(selectedSession.profile.dateOfBirth).toLocaleDateString()
+                              : 'N/A'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Place of Birth</p>
+                          <p className="font-medium">{selectedSession.profile.placeOfBirth || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Nationality</p>
+                          <p className="font-medium">{selectedSession.profile.nationality || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Phone</p>
+                          <p className="font-medium">
+                            {selectedSession.profile.phoneCountry && `+${selectedSession.profile.phoneCountry} `}
+                            {selectedSession.profile.phone}
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+                  </div>
+
+                  {/* Address Information */}
+                  {(selectedSession.profile.addressStreet || selectedSession.profile.addressCity) && (
+                    <div>
+                      <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <Shield className="h-4 w-4" />
+                        Residential Address
+                      </h3>
+                      <Card>
+                        <div className="p-4 space-y-2 text-sm">
+                          {selectedSession.profile.addressStreet && (
+                            <p><span className="text-muted-foreground">Street:</span> {selectedSession.profile.addressStreet}</p>
+                          )}
+                          <div className="grid grid-cols-2 gap-4">
+                            {selectedSession.profile.addressCity && (
+                              <div>
+                                <p className="text-muted-foreground">City</p>
+                                <p className="font-medium">{selectedSession.profile.addressCity}</p>
+                              </div>
+                            )}
+                            {selectedSession.profile.addressRegion && (
+                              <div>
+                                <p className="text-muted-foreground">Region/State</p>
+                                <p className="font-medium">{selectedSession.profile.addressRegion}</p>
+                              </div>
+                            )}
+                            {selectedSession.profile.addressCountry && (
+                              <div>
+                                <p className="text-muted-foreground">Country</p>
+                                <p className="font-medium">{selectedSession.profile.addressCountry}</p>
+                              </div>
+                            )}
+                            {selectedSession.profile.addressPostal && (
+                              <div>
+                                <p className="text-muted-foreground">Postal Code</p>
+                                <p className="font-medium">{selectedSession.profile.addressPostal}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    </div>
+                  )}
+
+                  {/* Identity Document */}
+                  {selectedSession.profile.idType && (
+                    <div>
+                      <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Identity Document
+                      </h3>
+                      <Card>
+                        <div className="p-4 grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Document Type</p>
+                            <p className="font-medium capitalize">{selectedSession.profile.idType.replace('_', ' ')}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Document Number</p>
+                            <p className="font-medium font-mono">{selectedSession.profile.idNumber || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Issuing Country</p>
+                            <p className="font-medium">{selectedSession.profile.idIssuingCountry || 'N/A'}</p>
+                          </div>
+                          {selectedSession.profile.idIssueDate && (
+                            <div>
+                              <p className="text-muted-foreground">Issue Date</p>
+                              <p className="font-medium">
+                                {new Date(selectedSession.profile.idIssueDate).toLocaleDateString()}
+                              </p>
+                            </div>
+                          )}
+                          {selectedSession.profile.idExpiryDate && (
+                            <div>
+                              <p className="text-muted-foreground">Expiry Date</p>
+                              <p className="font-medium">
+                                {new Date(selectedSession.profile.idExpiryDate).toLocaleDateString()}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </Card>
+                    </div>
+                  )}
+
+                  {/* PEP & Sanctions */}
+                  <div>
+                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                      <Shield className="h-4 w-4" />
+                      PEP & Sanctions Screening
+                    </h3>
+                    <Card>
+                      <div className="p-4 grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">PEP Status</p>
+                          <Badge variant={selectedSession.profile.pepStatus ? 'destructive' : 'secondary'}>
+                            {selectedSession.profile.pepStatus ? 'Yes' : 'No'}
+                          </Badge>
+                        </div>
+                        {selectedSession.profile.pepCategory && (
+                          <div>
+                            <p className="text-muted-foreground">PEP Category</p>
+                            <p className="font-medium">{selectedSession.profile.pepCategory}</p>
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-muted-foreground">Sanctions Screening</p>
+                          <Badge variant={selectedSession.profile.sanctionsScreeningDone ? 'default' : 'secondary'}>
+                            {selectedSession.profile.sanctionsScreeningDone ? 'Completed' : 'Pending'}
+                          </Badge>
+                        </div>
+                        {selectedSession.profile.sanctionsResult && (
+                          <div>
+                            <p className="text-muted-foreground">Screening Result</p>
+                            <Badge variant={selectedSession.profile.sanctionsResult === 'clean' ? 'default' : 'destructive'}>
+                              {selectedSession.profile.sanctionsResult}
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  </div>
+
+                  {/* Employment & Purpose */}
+                  {(selectedSession.profile.employmentStatus || selectedSession.profile.purposeOfAccount) && (
+                    <div>
+                      <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Employment & Purpose
+                      </h3>
+                      <Card>
+                        <div className="p-4 space-y-4 text-sm">
+                          {selectedSession.profile.employmentStatus && (
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <p className="text-muted-foreground">Employment Status</p>
+                                <p className="font-medium capitalize">{selectedSession.profile.employmentStatus.replace('_', ' ')}</p>
+                              </div>
+                              {selectedSession.profile.occupation && (
+                                <div>
+                                  <p className="text-muted-foreground">Occupation</p>
+                                  <p className="font-medium">{selectedSession.profile.occupation}</p>
+                                </div>
+                              )}
+                              {selectedSession.profile.employerName && (
+                                <div className="col-span-2">
+                                  <p className="text-muted-foreground">Employer</p>
+                                  <p className="font-medium">{selectedSession.profile.employerName}</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {selectedSession.profile.purposeOfAccount && (
+                            <div>
+                              <p className="text-muted-foreground mb-1">Purpose of Account</p>
+                              <p className="text-sm bg-muted p-3 rounded-md">{selectedSession.profile.purposeOfAccount}</p>
+                            </div>
+                          )}
+                        </div>
+                      </Card>
+                    </div>
+                  )}
+
+                  {/* Source of Funds */}
+                  {selectedSession.profile.sourceOfFunds && (
+                    <div>
+                      <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Source of Funds & Wealth
+                      </h3>
+                      <Card>
+                        <div className="p-4 space-y-3 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Source of Funds</p>
+                            <p className="font-medium capitalize">{selectedSession.profile.sourceOfFunds.replace('_', ' ')}</p>
+                          </div>
+                          {selectedSession.profile.sourceOfWealth && (
+                            <div>
+                              <p className="text-muted-foreground mb-1">Source of Wealth (EDD)</p>
+                              <p className="text-sm bg-muted p-3 rounded-md">{selectedSession.profile.sourceOfWealth}</p>
+                            </div>
+                          )}
+                        </div>
+                      </Card>
+                    </div>
+                  )}
+
+                  {/* Risk Assessment */}
+                  {selectedSession.profile.riskScore !== null && selectedSession.profile.riskScore !== undefined && (
+                    <div>
+                      <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <Shield className="h-4 w-4" />
+                        Risk Assessment
+                      </h3>
+                      <Card>
+                        <div className="p-4 text-sm">
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-muted-foreground">Risk Score</p>
+                            <Badge variant={
+                              selectedSession.profile.riskScore <= 30 ? 'default' :
+                              selectedSession.profile.riskScore <= 60 ? 'secondary' : 'destructive'
+                            }>
+                              {selectedSession.profile.riskScore} / 100
+                            </Badge>
+                          </div>
+                          <div className="w-full bg-muted rounded-full h-2">
+                            <div 
+                              className={`h-2 rounded-full ${
+                                selectedSession.profile.riskScore <= 30 ? 'bg-green-500' :
+                                selectedSession.profile.riskScore <= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                              }`}
+                              style={{ width: `${selectedSession.profile.riskScore}%` }}
+                            />
+                          </div>
+                        </div>
+                      </Card>
+                    </div>
+                  )}
+
+                  {/* Consents */}
+                  <div>
+                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4" />
+                      Consents & Compliance
+                    </h3>
+                    <Card>
+                      <div className="p-4 grid grid-cols-2 gap-3 text-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">KYC Consent</span>
+                          {selectedSession.profile.consentKyc ? (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-red-600" />
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">AML Consent</span>
+                          {selectedSession.profile.consentAml ? (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-red-600" />
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">TFR Consent</span>
+                          {selectedSession.profile.consentTfr ? (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-red-600" />
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Privacy Policy</span>
+                          {selectedSession.profile.consentPrivacy ? (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-red-600" />
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  </div>
+                </>
+              )}
+
+              {/* Dynamic Form Data */}
+              {selectedSession.formData && selectedSession.formData.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    KYC Form Data ({selectedSession.formData.length} fields)
+                  </h3>
+                  <Card>
+                    <div className="p-4">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        {selectedSession.formData.map((field) => (
+                          <div key={field.id}>
+                            <p className="text-muted-foreground capitalize">
+                              {field.fieldName.replace(/_/g, ' ')}
+                            </p>
+                            <p className="font-medium break-words">
+                              {field.fieldValue || 'N/A'}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              )}
 
               {/* Documents */}
               {selectedSession.documents && selectedSession.documents.length > 0 && (
@@ -531,6 +1095,112 @@ export default function AdminKycPage(): JSX.Element {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete KYC Session?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the KYC session for{' '}
+              <strong>{selectedSession?.user.email}</strong>. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteKyc} className="bg-destructive hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Create KYC Session Dialog */}
+      <AlertDialog 
+        open={createDialogOpen} 
+        onOpenChange={(open) => {
+          setCreateDialogOpen(open);
+          if (!open) {
+            setSelectedUserId('');
+            setUsers([]);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Create KYC Session</AlertDialogTitle>
+            <AlertDialogDescription>
+              Select a user to create a new KYC verification session.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4 space-y-2">
+            <Label htmlFor="user-select" className="text-sm font-medium">
+              Select User *
+            </Label>
+            {loadingUsers ? (
+              <div className="flex items-center justify-center py-8 text-muted-foreground">
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Loading users...
+              </div>
+            ) : (
+              <Combobox
+                options={users.map((user): ComboboxOption => ({
+                  value: user.id,
+                  label: user.name,
+                  description: user.email
+                }))}
+                value={selectedUserId}
+                onValueChange={setSelectedUserId}
+                placeholder="Choose a user..."
+                searchPlaceholder="Search users..."
+                emptyText="No users found."
+                disabled={loadingUsers}
+              />
+            )}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCreateKyc}
+              disabled={!selectedUserId || loadingUsers}
+            >
+              Create Session
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Fill KYC Data Dialog */}
+      <Dialog 
+        open={editKycDialogOpen} 
+        onOpenChange={(open) => {
+          setEditKycDialogOpen(open);
+          if (!open) {
+            setSessionToEdit(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Fill KYC Data for {sessionToEdit?.user.profile?.firstName} {sessionToEdit?.user.profile?.lastName}
+            </DialogTitle>
+            <DialogDescription>
+              Fill out the KYC form on behalf of the user: {sessionToEdit?.user.email}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {sessionToEdit && (
+            <div className="pt-4">
+              <DynamicKycForm 
+                onSubmit={handleSaveKycData}
+                initialData={{}}
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
