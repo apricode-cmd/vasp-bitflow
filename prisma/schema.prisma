@@ -160,26 +160,27 @@ model Currency {
   priority    Int     @default(0) // Порядок отображения
 
   // NEW: Token support
-  isToken         Boolean @default(false) // true if ERC-20, TRC-20, etc.
-  chain           String? // Chain code if token (ETHEREUM, BSC, POLYGON)
-  contractAddress String? // Smart contract address for tokens
-  iconUrl         String? // Icon/logo URL
+  isToken Boolean @default(false) // true if ERC-20, TRC-20, etc.
+  iconUrl String? // Icon/logo URL
+
+  // Minimum and maximum order amounts
+  minOrderAmount Float @default(0.001)
+  maxOrderAmount Float @default(100)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  blockchain      BlockchainNetwork? @relation(fields: [chain], references: [code])
-  orders          Order[]
-  tradingPairs    TradingPair[]      @relation("CryptoCurrency")
-  rateHistory     RateHistory[]      @relation("CryptoCurrency")
-  platformWallets PlatformWallet[]
-  userWallets     UserWallet[]
-  payIns          PayIn[]            @relation("PayInCrypto") // Входящие платежи криптой
-  payOuts         PayOut[]           // Исходящие платежи криптой
+  blockchainNetworks CurrencyBlockchainNetwork[] // Many-to-many: Currency supports multiple blockchains
+  orders             Order[]
+  tradingPairs       TradingPair[]               @relation("CryptoCurrency")
+  rateHistory        RateHistory[]               @relation("CryptoCurrency")
+  platformWallets    PlatformWallet[]
+  userWallets        UserWallet[]
+  payIns             PayIn[]                     @relation("PayInCrypto") // Входящие платежи криптой
+  payOuts            PayOut[]                    // Исходящие платежи криптой
 
   @@index([isToken])
-  @@index([chain])
 }
 
 model FiatCurrency {
@@ -596,9 +597,10 @@ model SystemSettings {
 // Blockchain Networks - справочник блокчейнов (chains)
 model BlockchainNetwork {
   id               String   @id @default(cuid())
-  code             String   @unique // ETH, BSC, POLYGON, SOLANA, BITCOIN
-  name             String // Ethereum, Binance Smart Chain, Polygon, Solana, Bitcoin
-  nativeToken      String // ETH, BNB, MATIC, SOL, BTC
+  code             String   @unique // ETH, BSC, POLYGON, SOLANA, BITCOIN, TRON
+  name             String // Ethereum, Binance Smart Chain, Polygon, Solana, Bitcoin, Tron
+  symbol           String? // ETH, BNB, MATIC, SOL, BTC, TRX
+  nativeToken      String // ETH, BNB, MATIC, SOL, BTC, TRX
   nativeAsset      String? // NEW: Redundant with nativeToken for CRM compatibility
   explorerUrl      String // https://etherscan.io
   rpcUrl           String? // Optional RPC endpoint
@@ -612,7 +614,7 @@ model BlockchainNetwork {
   updatedAt        DateTime @updatedAt
 
   // Relations
-  currencies      Currency[] // Currencies/tokens on this blockchain
+  currencies      CurrencyBlockchainNetwork[] // Many-to-many: Multiple currencies can use this blockchain
   userWallets     UserWallet[]
   platformWallets PlatformWallet[]
   transactions    Transaction[]
@@ -620,6 +622,29 @@ model BlockchainNetwork {
   payIns          PayIn[] @relation("PayInNetwork") // Входящие платежи в этой сети
   payOuts         PayOut[] // Исходящие платежи в этой сети
 
+  @@index([isActive])
+}
+
+// Many-to-Many: Currency <-> BlockchainNetwork
+// Example: USDC can exist on Ethereum, Polygon, Solana, etc.
+model CurrencyBlockchainNetwork {
+  id              String   @id @default(cuid())
+  currencyCode    String
+  blockchainCode  String
+  contractAddress String? // Smart contract address for tokens (0x... for ERC-20, etc.)
+  isNative        Boolean  @default(false) // true if native coin (BTC on Bitcoin, ETH on Ethereum)
+  isActive        Boolean  @default(true) // Can disable specific currency-blockchain pair
+  priority        Int      @default(0) // Display order
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  currency   Currency          @relation(fields: [currencyCode], references: [code], onDelete: Cascade)
+  blockchain BlockchainNetwork @relation(fields: [blockchainCode], references: [code], onDelete: Cascade)
+
+  @@unique([currencyCode, blockchainCode]) // One currency can only be on one blockchain once
+  @@index([currencyCode])
+  @@index([blockchainCode])
   @@index([isActive])
 }
 

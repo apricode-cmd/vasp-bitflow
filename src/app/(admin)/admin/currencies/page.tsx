@@ -2,6 +2,7 @@
  * Currencies Management Page
  * 
  * Unified management for Cryptocurrencies and Fiat Currencies
+ * Cryptocurrencies can be linked to multiple blockchain networks (e.g., USDC on Ethereum, Polygon, Solana)
  */
 
 'use client';
@@ -15,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Sheet,
   SheetContent,
@@ -42,10 +44,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { DataTable } from '@/components/admin/DataTable';
 import { ColumnDef } from '@tanstack/react-table';
-import { Coins, TrendingUp, Plus, Edit, Trash2, RefreshCw, MoreHorizontal, Network, CheckCircle, XCircle } from 'lucide-react';
+import { Coins, TrendingUp, Plus, Edit, Trash2, RefreshCw, MoreHorizontal, Network, CheckCircle, XCircle, Layers } from 'lucide-react';
 import { toast } from 'sonner';
-import { Combobox } from '@/components/shared/Combobox';
 import { ResourceManager } from '@/components/crm/ResourceManager';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 
 interface Cryptocurrency {
   code: string;
@@ -55,8 +58,6 @@ interface Cryptocurrency {
   precision: number;
   coingeckoId: string;
   isToken: boolean;
-  chain: string | null;
-  contractAddress: string | null;
   iconUrl: string | null;
   minOrderAmount: number;
   maxOrderAmount: number;
@@ -64,6 +65,22 @@ interface Cryptocurrency {
   priority: number;
   createdAt: Date;
   updatedAt: Date;
+  blockchainNetworks?: CurrencyBlockchainNetwork[];
+}
+
+interface CurrencyBlockchainNetwork {
+  id: string;
+  currencyCode: string;
+  blockchainCode: string;
+  contractAddress: string | null;
+  isNative: boolean;
+  isActive: boolean;
+  priority: number;
+  blockchain: {
+    code: string;
+    name: string;
+    symbol?: string;
+  };
 }
 
 interface BlockchainNetwork {
@@ -71,6 +88,14 @@ interface BlockchainNetwork {
   name: string;
   symbol?: string;
   isActive: boolean;
+}
+
+interface BlockchainSelection {
+  blockchainCode: string;
+  contractAddress: string;
+  isNative: boolean;
+  isActive: boolean;
+  priority: number;
 }
 
 export default function CurrenciesPage(): JSX.Element {
@@ -95,14 +120,15 @@ export default function CurrenciesPage(): JSX.Element {
     precision: 8,
     coingeckoId: '',
     isToken: false,
-    chain: null,
-    contractAddress: null,
     iconUrl: null,
     minOrderAmount: 0.001,
     maxOrderAmount: 100,
     isActive: true,
     priority: 0,
   });
+
+  // Blockchain selection state
+  const [selectedBlockchains, setSelectedBlockchains] = useState<BlockchainSelection[]>([]);
 
   useEffect(() => {
     fetchData();
@@ -112,7 +138,7 @@ export default function CurrenciesPage(): JSX.Element {
   const fetchData = async (): Promise<void> => {
     setRefreshing(true);
     try {
-      const response = await fetch('/api/admin/resources/currencies');
+      const response = await fetch('/api/admin/resources/currencies?includeBlockchains=true');
       const result = await response.json();
 
       if (result.success) {
@@ -152,20 +178,35 @@ export default function CurrenciesPage(): JSX.Element {
       precision: 8,
       coingeckoId: '',
       isToken: false,
-      chain: null,
-      contractAddress: null,
       iconUrl: null,
       minOrderAmount: 0.001,
       maxOrderAmount: 100,
       isActive: true,
       priority: 0,
     });
+    setSelectedBlockchains([]);
     setShowSheet(true);
   };
 
   const handleEdit = (item: Cryptocurrency): void => {
     setEditingItem(item);
     setFormData(item);
+    
+    // Pre-populate blockchain selections
+    if (item.blockchainNetworks) {
+      setSelectedBlockchains(
+        item.blockchainNetworks.map(bn => ({
+          blockchainCode: bn.blockchainCode,
+          contractAddress: bn.contractAddress || '',
+          isNative: bn.isNative,
+          isActive: bn.isActive,
+          priority: bn.priority
+        }))
+      );
+    } else {
+      setSelectedBlockchains([]);
+    }
+    
     setShowSheet(true);
   };
 
@@ -202,6 +243,12 @@ export default function CurrenciesPage(): JSX.Element {
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
 
+    // Validation: must have at least one blockchain
+    if (selectedBlockchains.length === 0) {
+      toast.error('Please select at least one blockchain network');
+      return;
+    }
+
     try {
       const url = editingItem
         ? `/api/admin/resources/currencies/${editingItem.code}`
@@ -209,10 +256,15 @@ export default function CurrenciesPage(): JSX.Element {
       
       const method = editingItem ? 'PATCH' : 'POST';
 
+      const payload = {
+        ...formData,
+        blockchains: selectedBlockchains
+      };
+
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json();
@@ -228,6 +280,37 @@ export default function CurrenciesPage(): JSX.Element {
       console.error('Submit error:', error);
       toast.error(`Failed to ${editingItem ? 'update' : 'create'} cryptocurrency`);
     }
+  };
+
+  const toggleBlockchain = (blockchainCode: string): void => {
+    const index = selectedBlockchains.findIndex(b => b.blockchainCode === blockchainCode);
+    
+    if (index >= 0) {
+      // Remove blockchain
+      setSelectedBlockchains(selectedBlockchains.filter((_, i) => i !== index));
+    } else {
+      // Add blockchain
+      setSelectedBlockchains([
+        ...selectedBlockchains,
+        {
+          blockchainCode,
+          contractAddress: '',
+          isNative: false,
+          isActive: true,
+          priority: selectedBlockchains.length
+        }
+      ]);
+    }
+  };
+
+  const updateBlockchainDetail = (blockchainCode: string, field: keyof BlockchainSelection, value: any): void => {
+    setSelectedBlockchains(
+      selectedBlockchains.map(b => 
+        b.blockchainCode === blockchainCode 
+          ? { ...b, [field]: value }
+          : b
+      )
+    );
   };
 
   const columns: ColumnDef<Cryptocurrency>[] = [
@@ -252,26 +335,54 @@ export default function CurrenciesPage(): JSX.Element {
       ),
     },
     {
+      accessorKey: 'blockchainNetworks',
+      header: 'Blockchain Networks',
+      cell: ({ row }) => {
+        const networks = row.original.blockchainNetworks || [];
+        
+        if (networks.length === 0) {
+          return <span className="text-xs text-muted-foreground">None</span>;
+        }
+        
+        return (
+          <div className="flex flex-wrap gap-1">
+            {networks.slice(0, 3).map(network => (
+              <Badge key={network.id} variant="secondary" className="text-xs gap-1">
+                <Network className="h-3 w-3" />
+                {network.blockchain.name}
+                {network.isNative && ' (Native)'}
+              </Badge>
+            ))}
+            {networks.length > 3 && (
+              <Badge variant="outline" className="text-xs">
+                +{networks.length - 3} more
+              </Badge>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       accessorKey: 'isToken',
       header: 'Type',
       cell: ({ row }) => {
         const isToken = row.original.isToken;
-        const chain = row.original.chain;
+        const networks = row.original.blockchainNetworks || [];
+        const hasNative = networks.some(n => n.isNative);
         
-        if (isToken && chain) {
-          const network = blockchainNetworks.find(n => n.code === chain);
+        if (hasNative && !isToken) {
           return (
-            <Badge variant="secondary" className="gap-1">
-              <Network className="h-3 w-3" />
-              Token on {network?.name || chain}
+            <Badge variant="default" className="gap-1">
+              <Coins className="h-3 w-3" />
+              Native Coin
             </Badge>
           );
         }
         
         return (
-          <Badge variant="default" className="gap-1">
-            <Coins className="h-3 w-3" />
-            Native Coin
+          <Badge variant="secondary" className="gap-1">
+            <Layers className="h-3 w-3" />
+            Token
           </Badge>
         );
       },
@@ -370,7 +481,7 @@ export default function CurrenciesPage(): JSX.Element {
                 <div>
                   <CardTitle>Cryptocurrencies</CardTitle>
                   <CardDescription>
-                    Manage crypto assets including native coins and tokens
+                    Manage crypto assets with multi-blockchain support (e.g., USDC on Ethereum, Polygon, Solana)
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
@@ -415,14 +526,14 @@ export default function CurrenciesPage(): JSX.Element {
               { key: 'code', label: 'Code', type: 'badge' },
               { key: 'name', label: 'Name' },
               { key: 'symbol', label: 'Symbol' },
-              { key: 'decimals', label: 'Decimals', type: 'number' },
+              { key: 'precision', label: 'Decimals', type: 'number' },
               { key: 'isActive', label: 'Active', type: 'boolean' },
             ]}
             fields={[
               { name: 'code', label: 'Currency Code', type: 'text', required: true, placeholder: 'EUR' },
               { name: 'name', label: 'Full Name', type: 'text', required: true, placeholder: 'Euro' },
               { name: 'symbol', label: 'Symbol', type: 'text', required: true, placeholder: '€' },
-              { name: 'decimals', label: 'Decimals', type: 'number', required: true, placeholder: '2' },
+              { name: 'precision', label: 'Decimals', type: 'number', required: true, placeholder: '2' },
               { name: 'isActive', label: 'Active', type: 'boolean' },
               { name: 'priority', label: 'Display Priority', type: 'number', placeholder: '0' }
             ]}
@@ -432,11 +543,11 @@ export default function CurrenciesPage(): JSX.Element {
 
       {/* Create/Edit Sheet */}
       <Sheet open={showSheet} onOpenChange={setShowSheet}>
-        <SheetContent className="sm:max-w-[600px] overflow-y-auto">
+        <SheetContent className="sm:max-w-[700px] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>{editingItem ? 'Edit' : 'Create'} Cryptocurrency</SheetTitle>
             <SheetDescription>
-              {editingItem ? 'Update' : 'Add a new'} cryptocurrency to the system
+              {editingItem ? 'Update' : 'Add a new'} cryptocurrency. You can link it to multiple blockchain networks.
             </SheetDescription>
           </SheetHeader>
 
@@ -452,7 +563,7 @@ export default function CurrenciesPage(): JSX.Element {
                     id="code"
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                    placeholder="BTC"
+                    placeholder="USDC"
                     required
                     disabled={!!editingItem}
                   />
@@ -464,7 +575,7 @@ export default function CurrenciesPage(): JSX.Element {
                     id="symbol"
                     value={formData.symbol}
                     onChange={(e) => setFormData({ ...formData, symbol: e.target.value })}
-                    placeholder="₿"
+                    placeholder="$"
                     required
                   />
                 </div>
@@ -476,7 +587,7 @@ export default function CurrenciesPage(): JSX.Element {
                   id="name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Bitcoin"
+                  placeholder="USD Coin"
                   required
                 />
               </div>
@@ -489,7 +600,7 @@ export default function CurrenciesPage(): JSX.Element {
                     type="number"
                     value={formData.decimals}
                     onChange={(e) => setFormData({ ...formData, decimals: parseInt(e.target.value) })}
-                    placeholder="8"
+                    placeholder="6"
                     required
                   />
                 </div>
@@ -501,70 +612,106 @@ export default function CurrenciesPage(): JSX.Element {
                     type="number"
                     value={formData.precision}
                     onChange={(e) => setFormData({ ...formData, precision: parseInt(e.target.value) })}
-                    placeholder="8"
+                    placeholder="6"
                     required
                   />
                 </div>
               </div>
             </div>
 
-            {/* Blockchain Info */}
+            {/* Blockchain Networks Selection */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                <Network className="h-4 w-4" />
-                Blockchain Network
-              </h3>
-
-              <div className="flex items-center justify-between space-x-4 rounded-lg border p-4">
-                <div className="space-y-0.5">
-                  <Label>Is Token?</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Enable if this is a token (ERC20, BEP20, etc.)
-                  </p>
-                </div>
-                <Switch
-                  checked={formData.isToken}
-                  onCheckedChange={(checked) => 
-                    setFormData({ 
-                      ...formData, 
-                      isToken: checked,
-                      chain: checked ? formData.chain : null,
-                      contractAddress: checked ? formData.contractAddress : null
-                    })
-                  }
-                />
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Network className="h-4 w-4" />
+                  Blockchain Networks *
+                </h3>
+                <Badge variant="secondary">
+                  {selectedBlockchains.length} selected
+                </Badge>
               </div>
+              <p className="text-sm text-muted-foreground">
+                Select which blockchain networks support this cryptocurrency (e.g., USDC on Ethereum, Polygon, Solana)
+              </p>
 
-              {formData.isToken && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="chain">Blockchain Network *</Label>
-                    <Combobox
-                      options={blockchainNetworks.map(network => ({
-                        value: network.code,
-                        label: `${network.name} (${network.code})`,
-                        description: network.symbol || network.code
-                      }))}
-                      value={formData.chain || ''}
-                      onValueChange={(value) => setFormData({ ...formData, chain: value })}
-                      placeholder="Select blockchain network..."
-                      searchPlaceholder="Search network..."
-                      emptyText="No blockchain networks found"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="contractAddress">Contract Address</Label>
-                    <Input
-                      id="contractAddress"
-                      value={formData.contractAddress || ''}
-                      onChange={(e) => setFormData({ ...formData, contractAddress: e.target.value })}
-                      placeholder="0x..."
-                    />
-                  </div>
-                </>
-              )}
+              <ScrollArea className="h-[300px] rounded-md border p-4">
+                <div className="space-y-4">
+                  {blockchainNetworks.map(network => {
+                    const isSelected = selectedBlockchains.some(b => b.blockchainCode === network.code);
+                    const selection = selectedBlockchains.find(b => b.blockchainCode === network.code);
+                    
+                    return (
+                      <div key={network.code} className="space-y-3 pb-4 border-b last:border-0">
+                        <div className="flex items-center space-x-3">
+                          <Checkbox
+                            id={`blockchain-${network.code}`}
+                            checked={isSelected}
+                            onCheckedChange={() => toggleBlockchain(network.code)}
+                          />
+                          <Label
+                            htmlFor={`blockchain-${network.code}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-2"
+                          >
+                            <Network className="h-4 w-4" />
+                            {network.name} ({network.code})
+                          </Label>
+                        </div>
+                        
+                        {isSelected && selection && (
+                          <div className="ml-7 space-y-3 pl-4 border-l-2">
+                            <div className="space-y-2">
+                              <Label className="text-xs">Contract Address (for tokens)</Label>
+                              <Input
+                                value={selection.contractAddress}
+                                onChange={(e) => updateBlockchainDetail(network.code, 'contractAddress', e.target.value)}
+                                placeholder="0x... (leave empty for native coins)"
+                                className="text-xs font-mono"
+                              />
+                            </div>
+                            
+                            <div className="flex items-center space-x-4">
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`native-${network.code}`}
+                                  checked={selection.isNative}
+                                  onCheckedChange={(checked) => updateBlockchainDetail(network.code, 'isNative', checked)}
+                                />
+                                <Label htmlFor={`native-${network.code}`} className="text-xs cursor-pointer">
+                                  Native Coin
+                                </Label>
+                              </div>
+                              
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`active-${network.code}`}
+                                  checked={selection.isActive}
+                                  onCheckedChange={(checked) => updateBlockchainDetail(network.code, 'isActive', checked)}
+                                />
+                                <Label htmlFor={`active-${network.code}`} className="text-xs cursor-pointer">
+                                  Active
+                                </Label>
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label className="text-xs">Priority (display order)</Label>
+                              <Input
+                                type="number"
+                                value={selection.priority}
+                                onChange={(e) => updateBlockchainDetail(network.code, 'priority', parseInt(e.target.value))}
+                                className="text-xs"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
             </div>
+
+            <Separator />
 
             {/* CoinGecko Integration */}
             <div className="space-y-4">
@@ -576,7 +723,7 @@ export default function CurrenciesPage(): JSX.Element {
                   id="coingeckoId"
                   value={formData.coingeckoId}
                   onChange={(e) => setFormData({ ...formData, coingeckoId: e.target.value })}
-                  placeholder="bitcoin"
+                  placeholder="usd-coin"
                   required
                 />
                 <p className="text-xs text-muted-foreground">
@@ -642,6 +789,19 @@ export default function CurrenciesPage(): JSX.Element {
                 <p className="text-xs text-muted-foreground">
                   Higher priority = displayed first
                 </p>
+              </div>
+
+              <div className="flex items-center justify-between space-x-4 rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <Label>Is Token?</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Enable if this is a token (not a native coin like BTC/ETH)
+                  </p>
+                </div>
+                <Switch
+                  checked={formData.isToken}
+                  onCheckedChange={(checked) => setFormData({ ...formData, isToken: checked })}
+                />
               </div>
 
               <div className="flex items-center justify-between space-x-4 rounded-lg border p-4">
