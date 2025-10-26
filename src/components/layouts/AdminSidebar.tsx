@@ -251,11 +251,13 @@ export function AdminSidebar(): JSX.Element {
           {!isCollapsed && (
             <div>
               <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-gradient-primary flex items-center justify-center">
-                  <Zap className="h-5 w-5 text-white" />
+                <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+                  <Zap className="h-5 w-5 text-primary-foreground" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold">Apricode</h2>
+                  <h2 className="text-base font-bold text-primary">
+                    CryptoExchange
+                  </h2>
                   <p className="text-xs text-muted-foreground">Admin CRM</p>
                 </div>
               </div>

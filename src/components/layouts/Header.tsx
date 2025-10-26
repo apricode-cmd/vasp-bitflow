@@ -101,8 +101,10 @@ export function Header(): React.ReactElement {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center gap-4">
-            <Link href={session ? (session.user.role === 'ADMIN' ? '/admin' : '/dashboard') : '/'} className="text-xl font-bold text-primary">
-              Apricode Exchange
+            <Link href={session ? (session.user.role === 'ADMIN' ? '/admin' : '/dashboard') : '/'} className="flex items-center gap-2">
+              <span className="text-xl font-bold text-primary">
+                CryptoExchange CRM
+              </span>
             </Link>
           </div>
 
