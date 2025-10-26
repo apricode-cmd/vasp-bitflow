@@ -9,6 +9,7 @@ import Credentials from 'next-auth/providers/credentials';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { loginSchema } from '@/lib/validations/auth';
+import UAParser from 'ua-parser-js';
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -68,6 +69,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
 
   callbacks: {
+    async signIn({ user, account }) {
+      if (user && account?.provider === 'credentials') {
+        try {
+          // Get request info from headers (will be available in auth context)
+          // Note: We'll need to pass this info from the login API route
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { lastLogin: new Date() },
+          });
+        } catch (error) {
+          console.error('Failed to update lastLogin:', error);
+        }
+      }
+      return true;
+    },
+
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;

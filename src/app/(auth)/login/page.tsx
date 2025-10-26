@@ -63,6 +63,17 @@ export default function LoginPage(): React.ReactElement {
       const sessionResponse = await fetch('/api/auth/session');
       const session = await sessionResponse.json();
 
+      // Log the login to SystemLog
+      try {
+        await fetch('/api/auth/log-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+      } catch (logError) {
+        console.error('Failed to log login:', logError);
+        // Don't block login if logging fails
+      }
+
       // Redirect based on role (ADMIN → /admin, CLIENT → /dashboard)
       toast.success('Login successful!');
       if (session?.user?.role === 'ADMIN') {
