@@ -2,6 +2,11 @@
  * Next.js Middleware
  * 
  * Protects routes and handles authentication checks.
+ * 
+ * NOTE: Cannot use Prisma in Edge Middleware!
+ * Session revocation is checked in:
+ * - Server Components (layout.tsx)
+ * - API routes (via requireAuth)
  */
 
 import { NextResponse } from 'next/server';
@@ -38,6 +43,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
+  // Session revocation is checked server-side in:
+  // 1. Admin layout (src/app/(admin)/admin/layout.tsx)
+  // 2. Client layout (src/app/(client)/layout.tsx)
+  // 3. API routes (via requireAuth/requireRole)
+  
   return NextResponse.next();
 }
 

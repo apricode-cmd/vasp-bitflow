@@ -82,6 +82,10 @@ model User {
   blockedIPs    IPBlacklist[]  @relation("BlockedBy")
   adminSettings AdminSettings? @relation("AdminSettings")
   
+  // Session Revocation Relations
+  revokedSessions       SessionRevocation[] @relation("RevokedSessions") // Sessions revoked for this user
+  sessionRevocationsBy  SessionRevocation[] @relation("RevokedBy") // Sessions revoked by this admin
+  
   // Payment Relations
   payInsAsUser      PayIn[]  @relation("PayInUser")
   payInsVerified    PayIn[]  @relation("PayInVerifier")
@@ -1252,6 +1256,35 @@ model IPBlacklist {
   @@index([isActive])
   @@index([expiresAt])
   @@index([blockedBy])
+}
+
+// Session Revocation - отзыв активных сессий (Server-side logout)
+model SessionRevocation {
+  id          String   @id @default(cuid())
+  sessionKey  String   @unique // Format: "IP-device-browser"
+  userId      String   // User whose session is revoked
+  ipAddress   String   // IP address of the session
+  deviceType  String?  // desktop, mobile, tablet
+  browser     String?  // Chrome, Firefox, Safari, etc.
+  os          String?  // Windows, macOS, Linux, etc.
+  
+  // Revocation details
+  revokedBy   String   // Admin user ID who revoked the session
+  reason      String?  @db.Text // Reason for revocation
+  
+  // Expiration (auto-cleanup after 7 days)
+  expiresAt   DateTime // Sessions auto-expire after 7 days
+  
+  createdAt   DateTime @default(now())
+  
+  user          User @relation("RevokedSessions", fields: [userId], references: [id], onDelete: Cascade)
+  revokedByUser User @relation("RevokedBy", fields: [revokedBy], references: [id])
+  
+  @@index([sessionKey])
+  @@index([userId])
+  @@index([ipAddress])
+  @@index([expiresAt])
+  @@index([createdAt])
 }
 
 // ==========================================

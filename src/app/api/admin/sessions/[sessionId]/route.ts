@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-utils';
+import { revokeSession } from '@/lib/session-revocation-check';
 
 export async function DELETE(
   request: NextRequest,
@@ -53,18 +54,23 @@ export async function DELETE(
         userAgent: request.headers.get('user-agent') || 'unknown',
         deviceType: 'Admin Panel',
         browser: 'Admin',
-        metadata: { terminatedSessionId: sessionId }, // Metadata is already JSON
+        metadata: { terminatedSessionId: sessionId },
       },
     });
 
-    // In a real implementation, you would:
-    // 1. Revoke the JWT token or session token
-    // 2. Add to a blacklist
-    // 3. Force re-authentication on that device
+    // Revoke session (DATABASE-BACKED, SECURE, Edge-compatible)
+    const sessionKey = `${sessionLog.ipAddress}-${sessionLog.deviceType}-${sessionLog.browser}`;
+    
+    await revokeSession(
+      sessionKey,
+      sessionLog.userId!,
+      userId,
+      'Manual session termination by administrator'
+    );
 
     return NextResponse.json({
       success: true,
-      message: 'Session terminated successfully',
+      message: 'Session terminated successfully. User will be logged out on next page load.',
     });
   } catch (error) {
     console.error('Terminate session error:', error);
