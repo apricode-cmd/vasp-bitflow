@@ -34,6 +34,7 @@ import { Separator } from '@/components/ui/separator';
 import { DataTable } from '@/components/admin/DataTable';
 import { OrderKanban } from '@/components/admin/OrderKanban';
 import { OrderStatusBadge } from '@/components/features/OrderStatusBadge';
+import { OrderDetailsSheet } from '@/components/admin/OrderDetailsSheet';
 import { DateRangePicker } from '@/components/shared/DateRangePicker';
 import { QuickNav } from '@/components/crm/QuickNav';
 import { formatDateTime, formatCurrency, formatCryptoAmount } from '@/lib/formatters';
@@ -409,145 +410,17 @@ export default function AdminOrdersPage(): JSX.Element {
       )}
 
       {/* Order Details Sheet */}
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="sm:max-w-2xl overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Order Details</SheetTitle>
-            <SheetDescription>
-              View and manage order #{selectedOrder?.paymentReference}
-            </SheetDescription>
-          </SheetHeader>
-          
-          {selectedOrder && (
-            <div className="mt-6 space-y-6">
-              {/* Customer Info */}
-              <div>
-                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  Customer Information
-                </h3>
-                <Card>
-                  <div className="p-4 space-y-3">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-12 w-12">
-                        <AvatarFallback className="bg-primary/10 text-primary">
-                          {selectedOrder.user.profile?.firstName?.charAt(0)}
-                          {selectedOrder.user.profile?.lastName?.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-semibold">
-                          {selectedOrder.user.profile?.firstName} {selectedOrder.user.profile?.lastName}
-                        </p>
-                        <p className="text-sm text-muted-foreground">{selectedOrder.user.email}</p>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-
-              {/* Order Info */}
-              <div>
-                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                  <Coins className="h-4 w-4" />
-                  Order Information
-                </h3>
-                <Card>
-                  <div className="p-4 space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Reference</span>
-                      <Badge variant="outline" className="font-mono">
-                        {selectedOrder.paymentReference}
-                      </Badge>
-                    </div>
-                    <Separator />
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Cryptocurrency</span>
-                      <div className="font-semibold">
-                        {formatCryptoAmount(selectedOrder.cryptoAmount, selectedOrder.currencyCode)} {selectedOrder.currencyCode}
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Total Amount</span>
-                      <div className="font-semibold text-lg">
-                        {formatCurrency(selectedOrder.totalFiat, selectedOrder.fiatCurrencyCode)}
-                      </div>
-                    </div>
-                    <Separator />
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Status</span>
-                      <OrderStatusBadge status={selectedOrder.status} />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Created</span>
-                      <span className="text-sm">{formatDateTime(selectedOrder.createdAt)}</span>
-                    </div>
-                    <Separator />
-                    <div className="space-y-2">
-                      <span className="text-sm text-muted-foreground">Wallet Address</span>
-                      <div className="p-2 bg-muted rounded-md">
-                        <p className="text-xs font-mono break-all">{selectedOrder.walletAddress}</p>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-
-              {/* Quick Navigation */}
-              <QuickNav
-                from="order"
-                links={[
-                  {
-                    label: 'View Customer',
-                    href: `/admin/users/${selectedOrder.user.id}`,
-                    icon: Users
-                  }
-                ]}
-              />
-
-              <Separator />
-
-              {/* Quick Actions */}
-              <div>
-                <h3 className="text-sm font-semibold mb-3">Quick Actions</h3>
-                <div className="space-y-2">
-                  {selectedOrder.status === 'PENDING' && (
-                    <Button 
-                      className="w-full" 
-                      onClick={() => handleStatusUpdate(selectedOrder.id, 'PROCESSING')}
-                    >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Mark as Processing
-                    </Button>
-                  )}
-                  {selectedOrder.status === 'PROCESSING' && (
-                    <Button 
-                      className="w-full" 
-                      onClick={() => handleStatusUpdate(selectedOrder.id, 'COMPLETED')}
-                    >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Mark as Completed
-                    </Button>
-                  )}
-                  {selectedOrder.status !== 'CANCELLED' && selectedOrder.status !== 'COMPLETED' && (
-                    <Button 
-                      variant="destructive" 
-                      className="w-full"
-                      onClick={() => {
-                        openCancelDialog(selectedOrder.id);
-                        setSheetOpen(false);
-                      }}
-                    >
-                      <Ban className="h-4 w-4 mr-2" />
-                      Cancel Order
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
+      <OrderDetailsSheet
+        order={selectedOrder}
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        onStatusUpdate={handleStatusUpdate}
+        onCancel={(orderId) => {
+          setOrderToDelete(orderId);
+          setDeleteDialogOpen(true);
+          setSheetOpen(false);
+        }}
+      />
 
       {/* Cancel Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
