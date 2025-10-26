@@ -83,6 +83,7 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
   const [rates, setRates] = useState<ExchangeRates | null>(null);
   const [ratesLoading, setRatesLoading] = useState(false);
   const [useCustomRate, setUseCustomRate] = useState(false);
+  const [tradingPairFee, setTradingPairFee] = useState<number>(0.015); // Default 1.5%
   
   // Data from API
   const [users, setUsers] = useState<Array<{ value: string; label: string; description?: string }>>([]);
@@ -130,9 +131,34 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
     ? calculateOrderTotal(
         watchedFields.cryptoAmount,
         useCustomRate && watchedFields.customRate ? watchedFields.customRate : currentRate,
-        rates.feePercentage // Already in decimal format (0.015 = 1.5%)
+        tradingPairFee // Use trading pair specific fee
       )
     : null;
+
+  // Fetch trading pair fee when currency pair changes
+  useEffect(() => {
+    const fetchTradingPairFee = async () => {
+      if (!watchedFields.currencyCode || !watchedFields.fiatCurrencyCode) return;
+
+      try {
+        const response = await fetch(
+          `/api/admin/trading-pairs?cryptoCode=${watchedFields.currencyCode}&fiatCode=${watchedFields.fiatCurrencyCode}`
+        );
+        if (response.ok) {
+          const data = await response.json();
+          if (data.pairs && data.pairs.length > 0) {
+            // feePercent is stored as percentage (e.g. 1.5), convert to decimal
+            setTradingPairFee(data.pairs[0].feePercent / 100);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch trading pair fee:', error);
+        // Keep default fee if fetch fails
+      }
+    };
+
+    fetchTradingPairFee();
+  }, [watchedFields.currencyCode, watchedFields.fiatCurrencyCode]);
 
   // Fetch exchange rates
   const fetchRates = async (): Promise<void> => {
@@ -615,7 +641,7 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">
-                      Platform Fee ({rates?.feePercentage}%):
+                      Platform Fee ({(tradingPairFee * 100).toFixed(1)}%):
                     </span>
                     <span className="font-medium">
                       {formatCurrency(calculation.fee, watchedFields.fiatCurrencyCode)}

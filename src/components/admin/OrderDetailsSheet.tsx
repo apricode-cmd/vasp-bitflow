@@ -51,6 +51,12 @@ interface Order {
   paymentReference: string;
   createdAt: Date;
   walletAddress: string;
+  paymentMethodCode?: string | null;
+  paymentMethod?: {
+    code: string;
+    name: string;
+    type: string;
+  } | null;
   user: {
     id: string;
     email: string;
@@ -350,10 +356,25 @@ export function OrderDetailsSheet({
                         )}
                       </Button>
                     </div>
-                    <div className="p-3 bg-muted/50 rounded-md border">
-                      <p className="text-xs font-mono break-all">{order.walletAddress}</p>
-                    </div>
+                    <p className="text-sm font-mono bg-muted/50 rounded p-2 break-all">
+                      {order.walletAddress}
+                    </p>
                   </div>
+                  {order.paymentMethod && (
+                    <>
+                      <Separator />
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Payment Method</span>
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">{order.paymentMethod.name}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {order.paymentMethod.type}
+                          </Badge>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
 

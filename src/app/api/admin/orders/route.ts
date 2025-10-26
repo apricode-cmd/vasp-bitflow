@@ -44,6 +44,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           },
           currency: true,
           fiatCurrency: true,
+          paymentMethod: true,
+          blockchain: true,
           payIn: {
             include: {
               fiatCurrency: true,

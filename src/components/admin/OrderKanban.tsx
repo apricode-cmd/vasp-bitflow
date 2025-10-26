@@ -64,7 +64,7 @@ import {
   Clock, DollarSign, User, ArrowRight, Package,
   Mail, Calendar, Wallet, TrendingUp, AlertCircle,
   Search, X, Filter, CheckSquare, Trash2, PlayCircle,
-  Ban, Sparkles, ShieldCheck
+  Ban, Sparkles, ShieldCheck, CreditCard
 } from 'lucide-react';
 import type { OrderStatus } from '@prisma/client';
 
@@ -77,6 +77,12 @@ interface Order {
   totalFiat: number;
   status: OrderStatus;
   createdAt: string;
+  paymentMethodCode?: string | null;
+  paymentMethod?: {
+    code: string;
+    name: string;
+    type: string;
+  } | null;
   user: {
     id: string;
     email: string;
@@ -91,6 +97,10 @@ interface OrderKanbanProps {
   orders: Order[];
   onStatusChange: (orderId: string, newStatus: OrderStatus, transitionData?: any) => Promise<void>;
   onOrderClick?: (order: Order) => void;
+  paymentMethods?: any[];
+  fiatCurrencies?: any[];
+  cryptocurrencies?: any[];
+  networks?: any[];
 }
 
 // Status transition rules (what statuses can be changed to from current status)
@@ -163,7 +173,15 @@ const KANBAN_COLUMNS = [
   }
 ];
 
-export function OrderKanban({ orders, onStatusChange, onOrderClick }: OrderKanbanProps): JSX.Element {  
+export function OrderKanban({ 
+  orders, 
+  onStatusChange, 
+  onOrderClick,
+  paymentMethods = [],
+  fiatCurrencies = [],
+  cryptocurrencies = [],
+  networks = []
+}: OrderKanbanProps): JSX.Element {  
   const [draggedOrder, setDraggedOrder] = useState<Order | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<OrderStatus | null>(null);
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
@@ -708,6 +726,14 @@ export function OrderKanban({ orders, onStatusChange, onOrderClick }: OrderKanba
                                           {formatCurrency(order.totalFiat, order.fiatCurrencyCode)}
                                         </span>
                                       </div>
+                                      {order.paymentMethod && (
+                                        <div className="flex items-center justify-between">
+                                          <span className="text-xs text-muted-foreground">Payment:</span>
+                                          <Badge variant="outline" className="text-xs">
+                                            {order.paymentMethod.name}
+                                          </Badge>
+                                        </div>
+                                      )}
                                     </div>
 
                                     <Separator />
@@ -752,6 +778,18 @@ export function OrderKanban({ orders, onStatusChange, onOrderClick }: OrderKanba
                                           {formatCurrency(order.totalFiat, order.fiatCurrencyCode)}
                                         </span>
                                       </div>
+                                      {order.paymentMethod && (
+                                        <>
+                                          <Separator />
+                                          <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Payment Method:</span>
+                                            <div className="flex items-center gap-1">
+                                              <CreditCard className="h-3 w-3 text-muted-foreground" />
+                                              <span className="font-medium text-xs">{order.paymentMethod.name}</span>
+                                            </div>
+                                          </div>
+                                        </>
+                                      )}
                                     </div>
                                   </div>
                                   <Separator />
@@ -912,10 +950,10 @@ export function OrderKanban({ orders, onStatusChange, onOrderClick }: OrderKanba
             fromStatus={transitionDialog.fromStatus}
             toStatus={transitionDialog.toStatus}
             onConfirm={handleTransitionConfirm}
-            paymentMethods={[]} // TODO: Pass from parent
-            fiatCurrencies={[]} // TODO: Pass from parent
-            cryptocurrencies={[]} // TODO: Pass from parent
-            networks={[]} // TODO: Pass from parent
+            paymentMethods={paymentMethods}
+            fiatCurrencies={fiatCurrencies}
+            cryptocurrencies={cryptocurrencies}
+            networks={networks}
           />
         )}
       </div>
