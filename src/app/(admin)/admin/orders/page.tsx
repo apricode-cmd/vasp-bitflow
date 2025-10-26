@@ -35,6 +35,7 @@ import { DataTable } from '@/components/admin/DataTable';
 import { OrderKanban } from '@/components/admin/OrderKanban';
 import { OrderStatusBadge } from '@/components/features/OrderStatusBadge';
 import { OrderDetailsSheet } from '@/components/admin/OrderDetailsSheet';
+import { CreateOrderDialog } from '@/components/admin/CreateOrderDialog';
 import { DateRangePicker } from '@/components/shared/DateRangePicker';
 import { QuickNav } from '@/components/crm/QuickNav';
 import { formatDateTime, formatCurrency, formatCryptoAmount } from '@/lib/formatters';
@@ -328,6 +329,9 @@ export default function AdminOrdersPage(): JSX.Element {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Create Order */}
+          <CreateOrderDialog onSuccess={fetchOrders} />
+
           {/* View Mode Toggle */}
           <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
             <Button
