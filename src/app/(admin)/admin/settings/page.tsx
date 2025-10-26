@@ -297,9 +297,31 @@ export default function SettingsPage(): JSX.Element {
                       value={previewColor || '#06b6d4'}
                       onChange={(color) => {
                         try {
-                          // color is already in rgba format from ColorPicker
-                          const colorObj = Color.rgb(color);
-                          const hex = colorObj.hex();
+                          console.log('ColorPicker onChange received:', color);
+                          
+                          // ColorPicker returns rgba array like [r, g, b, a]
+                          // Sometimes alpha can be NaN, so we need to handle that
+                          let hex: string;
+                          
+                          if (typeof color === 'string') {
+                            // If it's already a string (hex/rgb/hsl)
+                            hex = Color(color).hex();
+                          } else if (Array.isArray(color)) {
+                            // If it's an array [r, g, b, a]
+                            // Replace NaN with 1 (fully opaque)
+                            const [r, g, b, a] = color;
+                            const alpha = isNaN(a) ? 1 : a;
+                            hex = Color.rgb(r, g, b, alpha).hex();
+                          } else if (typeof color === 'object' && 'r' in color) {
+                            // If it's an object { r, g, b, a }
+                            const alpha = isNaN(color.a) ? 1 : color.a;
+                            hex = Color.rgb(color.r, color.g, color.b, alpha).hex();
+                          } else {
+                            console.error('Unknown color format:', color);
+                            return;
+                          }
+                          
+                          console.log('Converted to hex:', hex);
                           setPreviewColor(hex);
                         } catch (error) {
                           console.error('Color conversion error:', error);

@@ -86,12 +86,18 @@ export const ColorPicker = ({
   // Update color when controlled value changes
   useEffect(() => {
     if (value) {
-      const color = Color.rgb(value).rgb().object();
-
-      setHue(color.r);
-      setSaturation(color.g);
-      setLightness(color.b);
-      setAlpha(color.a);
+      try {
+        // Parse the value correctly - it can be hex, rgb, hsl, etc.
+        const color = Color(value);
+        const hslValues = color.hsl();
+        
+        setHue(hslValues.color[0] || 0);
+        setSaturation(hslValues.color[1] || 0);
+        setLightness(hslValues.color[2] || 0);
+        setAlpha(color.alpha() * 100);
+      } catch (error) {
+        console.error('Failed to parse color value:', value, error);
+      }
     }
   }, [value]);
 
