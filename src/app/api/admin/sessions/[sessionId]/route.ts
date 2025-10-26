@@ -13,23 +13,30 @@ export async function DELETE(
   { params }: { params: { sessionId: string } }
 ) {
   try {
-    const authResult = await requireRole('ADMIN');
-    if (authResult instanceof NextResponse) {
-      return authResult;
+    const { error, session } = await requireRole('ADMIN');
+    if (error) {
+      return error;
     }
 
-    const userId = authResult.user.id;
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { success: false, error: 'User not authenticated' },
+        { status: 401 }
+      );
+    }
+
+    const userId = session.user.id;
     const { sessionId } = params;
 
-    // Verify the session belongs to this user
-    const session = await prisma.systemLog.findFirst({
+    // Verify the session log belongs to this user
+    const sessionLog = await prisma.systemLog.findFirst({
       where: {
         id: sessionId,
         userId,
       },
     });
 
-    if (!session) {
+    if (!sessionLog) {
       return NextResponse.json(
         { success: false, error: 'Session not found' },
         { status: 404 }
@@ -41,10 +48,12 @@ export async function DELETE(
       data: {
         userId,
         action: 'SESSION_TERMINATED',
+        path: `/api/admin/sessions/${sessionId}`,
         ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+        userAgent: request.headers.get('user-agent') || 'unknown',
         deviceType: 'Admin Panel',
-        browser: request.headers.get('user-agent') || 'unknown',
-        metadata: JSON.stringify({ terminatedSessionId: sessionId }),
+        browser: 'Admin',
+        metadata: { terminatedSessionId: sessionId }, // Metadata is already JSON
       },
     });
 
