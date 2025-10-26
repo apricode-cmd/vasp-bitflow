@@ -14,7 +14,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { registerSchema, type RegisterInput } from '@/lib/validations/auth';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, Info } from 'lucide-react';
+import { Loader2, CheckCircle2, Info, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -29,6 +29,7 @@ import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { ApricodeLogo } from '@/components/icons/ApricodeLogo';
 
 export default function RegisterPage(): React.ReactElement {
   const router = useRouter();
@@ -100,20 +101,34 @@ export default function RegisterPage(): React.ReactElement {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted px-4 py-12">
-      <div className="w-full max-w-2xl space-y-6">
-        {/* Logo */}
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-primary mb-2">
-            Apricode Exchange
-          </h1>
-          <p className="text-muted-foreground">Create your account to start trading</p>
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden px-4 py-12">
+      {/* Branded Gradient Background */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,hsl(var(--primary)/0.4)_0%,hsl(var(--primary)/0.25)_20%,hsl(var(--background))_60%,hsl(var(--background))_100%)] dark:bg-[radial-gradient(ellipse_at_top_left,hsl(var(--primary)/0.6)_0%,hsl(var(--primary)/0.35)_20%,hsl(var(--background))_60%,hsl(var(--background))_100%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,hsl(var(--primary)/0.15)_0%,transparent_50%)] dark:bg-[radial-gradient(circle_at_bottom_right,hsl(var(--primary)/0.25)_0%,transparent_50%)]" />
+
+      <div className="w-full max-w-2xl space-y-8 relative z-10">
+        {/* Logo & Brand */}
+        <div className="text-center space-y-4">
+          <div className="flex justify-center">
+            <div className="h-16 w-16 rounded-2xl bg-primary/10 backdrop-blur-sm flex items-center justify-center p-3 border border-primary/20 shadow-lg shadow-primary/10">
+              <ApricodeLogo className="text-primary w-full h-full" />
+            </div>
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary via-primary/80 to-primary bg-clip-text text-transparent">
+              CryptoExchange
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">Create your account to start trading</p>
+          </div>
         </div>
 
         {/* Registration Form Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Create Account</CardTitle>
+        <Card className="border-primary/10 shadow-xl shadow-primary/5">
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-primary" />
+              Create Account
+            </CardTitle>
             <CardDescription>
               Fill in your details below to create your account
             </CardDescription>
@@ -122,7 +137,7 @@ export default function RegisterPage(): React.ReactElement {
             <div className="pt-4">
               <div className="flex items-center justify-between text-sm mb-2">
                 <span className="text-muted-foreground">Completion</span>
-                <span className="font-medium">{Math.round(progressPercentage)}%</span>
+                <span className="font-semibold text-primary">{Math.round(progressPercentage)}%</span>
               </div>
               <Progress value={progressPercentage} className="h-2" />
             </div>
@@ -132,14 +147,14 @@ export default function RegisterPage(): React.ReactElement {
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 {/* Error Alert */}
                 {error && (
-                  <Alert variant="destructive">
+                  <Alert variant="destructive" className="border-destructive/50 bg-destructive/10">
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
                 )}
 
                 {/* Personal Information */}
                 <div className="space-y-4">
-                  <h3 className="text-sm font-semibold">Personal Information</h3>
+                  <h3 className="text-sm font-semibold text-primary">Personal Information</h3>
                   <div className="grid md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -151,6 +166,7 @@ export default function RegisterPage(): React.ReactElement {
                             <Input
                               placeholder="John"
                               disabled={isLoading}
+                              className="h-11"
                               {...field}
                             />
                           </FormControl>
@@ -169,6 +185,7 @@ export default function RegisterPage(): React.ReactElement {
                             <Input
                               placeholder="Doe"
                               disabled={isLoading}
+                              className="h-11"
                               {...field}
                             />
                           </FormControl>
@@ -183,7 +200,7 @@ export default function RegisterPage(): React.ReactElement {
 
                 {/* Contact Information */}
                 <div className="space-y-4">
-                  <h3 className="text-sm font-semibold">Contact Information</h3>
+                  <h3 className="text-sm font-semibold text-primary">Contact Information</h3>
                   
                   <FormField
                     control={form.control}
@@ -197,6 +214,7 @@ export default function RegisterPage(): React.ReactElement {
                             placeholder="you@example.com"
                             autoComplete="email"
                             disabled={isLoading}
+                            className="h-11"
                             {...field}
                           />
                         </FormControl>
@@ -217,6 +235,7 @@ export default function RegisterPage(): React.ReactElement {
                               type="tel"
                               placeholder="+48123456789"
                               disabled={isLoading}
+                              className="h-11"
                               {...field}
                             />
                           </FormControl>
@@ -235,7 +254,7 @@ export default function RegisterPage(): React.ReactElement {
                             <Input
                               placeholder="PL"
                               maxLength={2}
-                              className="uppercase"
+                              className="uppercase h-11"
                               disabled={isLoading}
                               {...field}
                               onChange={(e) => field.onChange(e.target.value.toUpperCase())}
@@ -252,7 +271,7 @@ export default function RegisterPage(): React.ReactElement {
 
                 {/* Security */}
                 <div className="space-y-4">
-                  <h3 className="text-sm font-semibold">Security</h3>
+                  <h3 className="text-sm font-semibold text-primary">Security</h3>
                   
                   <div className="grid md:grid-cols-2 gap-4">
                     <FormField
@@ -267,6 +286,7 @@ export default function RegisterPage(): React.ReactElement {
                               placeholder="••••••••"
                               autoComplete="new-password"
                               disabled={isLoading}
+                              className="h-11"
                               {...field}
                             />
                           </FormControl>
@@ -287,6 +307,7 @@ export default function RegisterPage(): React.ReactElement {
                               placeholder="••••••••"
                               autoComplete="new-password"
                               disabled={isLoading}
+                              className="h-11"
                               {...field}
                             />
                           </FormControl>
@@ -297,8 +318,8 @@ export default function RegisterPage(): React.ReactElement {
                   </div>
 
                   {/* Password Requirements Alert */}
-                  <Alert>
-                    <Info className="h-4 w-4" />
+                  <Alert className="border-primary/20 bg-primary/5">
+                    <Info className="h-4 w-4 text-primary" />
                     <AlertTitle>Password Requirements</AlertTitle>
                     <AlertDescription>
                       <ul className="list-disc list-inside space-y-1 mt-2 text-sm">
@@ -313,15 +334,19 @@ export default function RegisterPage(): React.ReactElement {
                 </div>
 
                 {/* Submit Button */}
-                <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+                <Button 
+                  type="submit" 
+                  className="w-full h-12 font-semibold text-base shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all" 
+                  disabled={isLoading}
+                >
                   {isLoading ? (
                     <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                       Creating account...
                     </>
                   ) : (
                     <>
-                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                      <CheckCircle2 className="w-5 h-5 mr-2" />
                       Create Account
                     </>
                   )}
@@ -336,9 +361,10 @@ export default function RegisterPage(): React.ReactElement {
               <span className="text-muted-foreground">Already have an account?</span>{' '}
               <Link
                 href="/login"
-                className="text-primary hover:underline font-medium"
+                className="text-primary hover:underline font-semibold inline-flex items-center gap-1 transition-colors"
               >
                 Sign in here
+                <span className="text-xs">→</span>
               </Link>
             </div>
           </CardContent>
@@ -346,8 +372,12 @@ export default function RegisterPage(): React.ReactElement {
 
         {/* Back to Home */}
         <div className="text-center">
-          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
-            ← Back to home
+          <Link 
+            href="/" 
+            className="text-sm text-muted-foreground hover:text-primary transition-colors inline-flex items-center gap-1"
+          >
+            <span className="text-xs">←</span>
+            Back to home
           </Link>
         </div>
       </div>
