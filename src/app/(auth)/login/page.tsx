@@ -63,19 +63,25 @@ export default function LoginPage(): React.ReactElement {
       const sessionResponse = await fetch('/api/auth/session');
       const session = await sessionResponse.json();
 
-      // Log the login to SystemLog
+      // Log the login to SystemLog (MUST complete before redirect)
       try {
         await fetch('/api/auth/log-login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
         });
+        console.log('Login logged to SystemLog');
       } catch (logError) {
         console.error('Failed to log login:', logError);
         // Don't block login if logging fails
       }
 
-      // Redirect based on role (ADMIN → /admin, CLIENT → /dashboard)
+      // Show success message
       toast.success('Login successful!');
+      
+      // Small delay to ensure log is written
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Redirect based on role (ADMIN → /admin, CLIENT → /dashboard)
       if (session?.user?.role === 'ADMIN') {
         window.location.href = '/admin';
       } else {
