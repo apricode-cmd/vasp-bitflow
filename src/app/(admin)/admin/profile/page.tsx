@@ -61,6 +61,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import { PasswordGenerator } from '@/components/ui/password-generator';
 
 // Profile update schema
 const profileSchema = z.object({
@@ -595,7 +596,15 @@ export default function AdminProfilePage(): React.ReactElement {
                     name="newPassword"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>New Password</FormLabel>
+                        <div className="flex items-center justify-between">
+                          <FormLabel>New Password</FormLabel>
+                          <PasswordGenerator 
+                            onGenerate={(password) => {
+                              field.onChange(password);
+                              passwordForm.setValue('confirmPassword', password);
+                            }}
+                          />
+                        </div>
                         <FormControl>
                           <div className="relative">
                             <Input
