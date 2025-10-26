@@ -52,7 +52,7 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps): React.R
     return (
       <div className="h-screen overflow-hidden bg-background">
         <ResizablePanelGroup direction="horizontal" className="h-full">
-          <ResizablePanel defaultSize={DEFAULT_SIDEBAR_SIZE} minSize={15} maxSize={30} className="min-w-[300px]">
+          <ResizablePanel defaultSize={DEFAULT_SIDEBAR_SIZE} minSize={15} maxSize={30} className="min-w-[250px]">
             <AdminSidebar />
           </ResizablePanel>
           <ResizableHandle className="w-px bg-transparent hover:bg-primary/30 transition-all duration-200 group relative">
@@ -86,7 +86,7 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps): React.R
           minSize={15}
           maxSize={30}
           onResize={handleResize}
-          className="min-w-[300px]"
+          className="min-w-[250px]"
         >
           <AdminSidebar />
         </ResizablePanel>
