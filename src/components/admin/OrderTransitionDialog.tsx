@@ -65,6 +65,7 @@ export function OrderTransitionDialog({
   const requiresPayOut = fromStatus === 'PROCESSING' && toStatus === 'COMPLETED';
   
   const [submitting, setSubmitting] = useState(false);
+  const [showCustomReference, setShowCustomReference] = useState(false);
   const [formData, setFormData] = useState({
     // PayIn fields
     payInAmount: 0,
@@ -75,6 +76,7 @@ export function OrderTransitionDialog({
     payInSenderName: '',
     payInSenderAccount: '',
     payInReference: '',
+    payInCustomReference: '', // NEW: separate field for custom reference
     
     // PayOut fields
     payOutAmount: 0,
@@ -97,11 +99,13 @@ export function OrderTransitionDialog({
         ...prev,
         payInAmount: order.totalFiat,
         payInFiatCurrency: order.fiatCurrencyCode,
+        payInReference: order.paymentReference, // Set default reference
         payOutAmount: order.cryptoAmount,
         payOutCryptoCurrency: order.currencyCode,
         payOutNetwork: order.blockchainCode || '',
         payOutDestinationAddress: order.walletAddress
       }));
+      setShowCustomReference(false); // Reset on dialog open
     }
   }, [order, open]);
 
@@ -116,6 +120,11 @@ export function OrderTransitionDialog({
       };
 
       if (requiresPayIn) {
+        // Use custom reference if provided, otherwise use order reference
+        const finalReference = showCustomReference 
+          ? formData.payInCustomReference 
+          : formData.payInReference;
+
         data.payInData = {
           amount: formData.payInAmount,
           currencyType: formData.payInCurrencyType,
@@ -125,7 +134,7 @@ export function OrderTransitionDialog({
           expectedAmount: formData.payInAmount,
           senderName: formData.payInSenderName || undefined,
           senderAccount: formData.payInSenderAccount || undefined,
-          reference: formData.payInReference || undefined
+          reference: finalReference || undefined
         };
       }
 
@@ -276,29 +285,47 @@ export function OrderTransitionDialog({
 
               <div>
                 <Label>Payment Reference</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Reference code that customer includes in their bank transfer
+                </p>
                 <Combobox
                   options={[
-                    { value: order.paymentReference, label: order.paymentReference, description: 'Order reference' },
-                    { value: 'CUSTOM', label: 'Custom Reference', description: 'Enter custom reference' }
+                    { 
+                      value: order.paymentReference, 
+                      label: order.paymentReference, 
+                      description: 'Use order reference (recommended)' 
+                    },
+                    { 
+                      value: 'CUSTOM', 
+                      label: 'Custom Reference', 
+                      description: 'Enter a different reference' 
+                    }
                   ]}
-                  value={formData.payInReference || order.paymentReference}
+                  value={showCustomReference ? 'CUSTOM' : order.paymentReference}
                   onValueChange={(value) => {
                     if (value === 'CUSTOM') {
-                      setFormData({ ...formData, payInReference: '' });
+                      setShowCustomReference(true);
+                      setFormData({ ...formData, payInCustomReference: '' });
                     } else {
+                      setShowCustomReference(false);
                       setFormData({ ...formData, payInReference: value });
                     }
                   }}
-                  placeholder="Select or enter reference..."
-                  searchPlaceholder="Search references..."
+                  placeholder="Select reference type..."
+                  searchPlaceholder="Search..."
                 />
-                {formData.payInReference === '' && (
+                {showCustomReference && (
                   <Input
                     className="mt-2"
-                    value={formData.payInReference}
-                    onChange={(e) => setFormData({ ...formData, payInReference: e.target.value })}
-                    placeholder="Enter custom payment reference"
+                    value={formData.payInCustomReference}
+                    onChange={(e) => setFormData({ ...formData, payInCustomReference: e.target.value })}
+                    placeholder="Enter custom payment reference (e.g. INV-2024-001)"
                   />
+                )}
+                {!showCustomReference && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Using: <span className="font-mono font-medium">{formData.payInReference}</span>
+                  </p>
                 )}
               </div>
             </div>
