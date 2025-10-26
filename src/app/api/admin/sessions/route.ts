@@ -17,31 +17,92 @@ export async function GET(request: NextRequest) {
 
     const userId = authResult.user.id;
 
-    // Get recent system logs for this user (login activities)
-    const recentLogins = await prisma.systemLog.findMany({
+    // Get recent system logs for this user (login and API activities)
+    // Consider a session active if there was activity in the last 24 hours
+    const recentActivity = await prisma.systemLog.findMany({
       where: {
         userId,
-        action: 'LOGIN',
         timestamp: {
-          // Sessions in the last 30 days
-          gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+          // Activity in the last 24 hours
+          gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
         },
       },
       orderBy: { timestamp: 'desc' },
-      take: 10,
     });
 
-    // Transform to session format
-    const sessions = recentLogins.map((log, index) => ({
-      id: log.id,
-      userId: log.userId,
-      device: log.deviceType || 'Unknown Device',
-      browser: log.browser || 'Unknown Browser',
-      os: log.os || 'Unknown OS',
-      ipAddress: log.ipAddress,
-      lastActive: log.timestamp,
-      isCurrent: index === 0, // Most recent is current
-    }));
+    // Group by unique device/IP combinations to identify unique sessions
+    const sessionMap = new Map<string, any>();
+
+    for (const log of recentActivity) {
+      const sessionKey = `${log.ipAddress}-${log.deviceType}-${log.browser}`;
+      
+      if (!sessionMap.has(sessionKey)) {
+        sessionMap.set(sessionKey, {
+          id: log.id,
+          userId: log.userId,
+          device: log.deviceType || 'Unknown Device',
+          browser: log.browser || 'Unknown Browser',
+          os: log.os || 'Unknown OS',
+          ipAddress: log.ipAddress,
+          lastActive: log.timestamp,
+          firstSeen: log.timestamp,
+          activityCount: 1,
+        });
+      } else {
+        const session = sessionMap.get(sessionKey);
+        session.activityCount++;
+        // Update first seen if this log is older
+        if (log.timestamp < session.firstSeen) {
+          session.firstSeen = log.timestamp;
+        }
+      }
+    }
+
+    // Convert map to array and sort by last active
+    const sessions = Array.from(sessionMap.values())
+      .sort((a, b) => b.lastActive.getTime() - a.lastActive.getTime())
+      .map((session, index) => ({
+        ...session,
+        isCurrent: index === 0, // Most recent is current
+      }));
+
+    // If no sessions found, create one for current session
+    if (sessions.length === 0) {
+      const currentIp = request.headers.get('x-forwarded-for') || 
+                        request.headers.get('x-real-ip') || 
+                        'unknown';
+      const userAgent = request.headers.get('user-agent') || 'unknown';
+      
+      // Log current session
+      const currentLog = await prisma.systemLog.create({
+        data: {
+          userId,
+          action: 'SESSION_VIEW',
+          ipAddress: currentIp,
+          deviceType: 'Admin Panel',
+          browser: userAgent.includes('Chrome') ? 'Chrome' : 
+                   userAgent.includes('Firefox') ? 'Firefox' :
+                   userAgent.includes('Safari') ? 'Safari' : 'Unknown',
+          os: userAgent.includes('Windows') ? 'Windows' :
+              userAgent.includes('Mac') ? 'macOS' :
+              userAgent.includes('Linux') ? 'Linux' : 'Unknown',
+          metadata: JSON.stringify({ action: 'Viewing sessions page' }),
+        },
+      });
+
+      sessions.push({
+        id: currentLog.id,
+        userId,
+        device: 'Admin Panel',
+        browser: currentLog.browser,
+        os: currentLog.os,
+        ipAddress: currentIp,
+        lastActive: currentLog.timestamp,
+        firstSeen: currentLog.timestamp,
+        activityCount: 1,
+        isCurrent: true,
+      });
+    }
 
     return NextResponse.json({
       success: true,
@@ -55,4 +116,5 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
 
