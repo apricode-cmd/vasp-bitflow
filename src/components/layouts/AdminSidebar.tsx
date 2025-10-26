@@ -242,7 +242,7 @@ export function AdminSidebar(): JSX.Element {
 
   return (
     <aside className={cn(
-      "bg-card/95 backdrop-blur-sm flex flex-col h-full transition-all duration-300",
+      "bg-card/70 backdrop-blur-xl flex flex-col h-full transition-all duration-300",
       "shadow-[4px_0_24px_-2px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_24px_-2px_rgba(0,0,0,0.3)]"
     )}>
       {/* Logo/Header */}
