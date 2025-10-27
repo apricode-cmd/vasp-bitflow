@@ -1,8 +1,7 @@
 /**
  * Integrations Management Page
  * 
- * Modular integration management with categories
- * Like WordPress plugins page
+ * Modern card-based UI with modal configuration
  */
 
 'use client';
@@ -13,15 +12,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { 
   Shield, Mail, TrendingUp, CreditCard, Loader2, 
   CheckCircle, XCircle, RefreshCw, ExternalLink, 
-  Key as KeyIcon, Settings, Plug
+  Key as KeyIcon, Settings, Plug, Check, X
 } from 'lucide-react';
 
 // Integration categories with icons
@@ -30,25 +29,29 @@ const CATEGORY_CONFIG = {
     label: 'KYC & Verification',
     icon: Shield,
     color: 'text-blue-600',
-    bgColor: 'bg-blue-50 dark:bg-blue-950/20'
+    bgColor: 'bg-blue-50 dark:bg-blue-950/20',
+    borderColor: 'border-blue-200 dark:border-blue-800'
   },
   RATES: {
     label: 'Exchange Rates',
     icon: TrendingUp,
     color: 'text-green-600',
-    bgColor: 'bg-green-50 dark:bg-green-950/20'
+    bgColor: 'bg-green-50 dark:bg-green-950/20',
+    borderColor: 'border-green-200 dark:border-green-800'
   },
   EMAIL: {
     label: 'Email & Notifications',
     icon: Mail,
     color: 'text-purple-600',
-    bgColor: 'bg-purple-50 dark:bg-purple-950/20'
+    bgColor: 'bg-purple-50 dark:bg-purple-950/20',
+    borderColor: 'border-purple-200 dark:border-purple-800'
   },
   PAYMENT: {
     label: 'Payment Gateways',
     icon: CreditCard,
     color: 'text-orange-600',
-    bgColor: 'bg-orange-50 dark:bg-orange-950/20'
+    bgColor: 'bg-orange-50 dark:bg-orange-950/20',
+    borderColor: 'border-orange-200 dark:border-orange-800'
   }
 };
 
@@ -72,6 +75,8 @@ export default function IntegrationsPage(): JSX.Element {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('KYC');
+  const [configModalOpen, setConfigModalOpen] = useState(false);
+  const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
 
   useEffect(() => {
     fetchIntegrations();
@@ -105,6 +110,16 @@ export default function IntegrationsPage(): JSX.Element {
       ...prev,
       [service]: { ...prev[service], ...updates }
     }));
+    
+    // Update selected integration if it's open
+    if (selectedIntegration?.service === service) {
+      setSelectedIntegration(prev => prev ? { ...prev, ...updates } : null);
+    }
+  };
+
+  const handleToggle = async (service: string, enabled: boolean) => {
+    updateIntegration(service, { isEnabled: enabled });
+    await handleSave(service);
   };
 
   const handleSave = async (service: string) => {
@@ -165,6 +180,16 @@ export default function IntegrationsPage(): JSX.Element {
     }
   };
 
+  const openConfigModal = (integration: Integration) => {
+    setSelectedIntegration(integration);
+    setConfigModalOpen(true);
+  };
+
+  const closeConfigModal = () => {
+    setConfigModalOpen(false);
+    setSelectedIntegration(null);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -183,100 +208,84 @@ export default function IntegrationsPage(): JSX.Element {
   }, {} as Record<string, Integration[]>);
 
   const renderIntegrationCard = (integration: Integration) => {
-    const CategoryIcon = CATEGORY_CONFIG[integration.category as keyof typeof CATEGORY_CONFIG]?.icon || Plug;
+    const categoryConfig = CATEGORY_CONFIG[integration.category as keyof typeof CATEGORY_CONFIG];
+    const CategoryIcon = categoryConfig?.icon || Plug;
     
     return (
-      <Card key={integration.service} className="relative overflow-hidden">
-        {/* Status indicator */}
-        <div className={`absolute top-0 left-0 right-0 h-1 ${
-          integration.status === 'active' ? 'bg-green-500' :
-          integration.status === 'error' ? 'bg-red-500' :
-          'bg-gray-300'
-        }`} />
-
-        <CardHeader>
+      <Card 
+        key={integration.service} 
+        className={`group hover:shadow-lg transition-all duration-200 border-2 ${
+          integration.status === 'active' ? categoryConfig?.borderColor : 'border-gray-200'
+        }`}
+      >
+        <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <CategoryIcon className="h-6 w-6 text-primary" />
+              <div className={`p-3 rounded-xl ${categoryConfig?.bgColor}`}>
+                <CategoryIcon className={`h-6 w-6 ${categoryConfig?.color}`} />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <CardTitle className="text-xl">{integration.displayName}</CardTitle>
-                  {integration.icon && <span className="text-2xl">{integration.icon}</span>}
+                  <CardTitle className="text-lg">{integration.displayName}</CardTitle>
+                  {integration.icon && <span className="text-xl">{integration.icon}</span>}
                 </div>
-                <CardDescription>{integration.description}</CardDescription>
+                <CardDescription className="text-xs mt-1">
+                  {integration.description}
+                </CardDescription>
               </div>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <Badge variant={integration.status === 'active' ? 'success' : 'secondary'}>
-                {integration.status}
-              </Badge>
-              <Switch
-                checked={integration.isEnabled}
-                onCheckedChange={(val) => updateIntegration(integration.service, { isEnabled: val })}
-              />
             </div>
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-6">
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor={`${integration.service}-key`}>API Key</Label>
-              <Input
-                id={`${integration.service}-key`}
-                type="password"
-                value={integration.apiKey || ''}
-                onChange={(e) => updateIntegration(integration.service, { apiKey: e.target.value })}
-                placeholder="Enter API key"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor={`${integration.service}-endpoint`}>API Endpoint</Label>
-              <Input
-                id={`${integration.service}-endpoint`}
-                value={integration.apiEndpoint || ''}
-                onChange={(e) => updateIntegration(integration.service, { apiEndpoint: e.target.value })}
-                placeholder="https://api.example.com"
-              />
-            </div>
-          </div>
-
-          <Separator />
-
+        <CardContent className="space-y-4">
+          {/* Status Badge */}
           <div className="flex items-center justify-between">
+            <Badge 
+              variant={integration.status === 'active' ? 'default' : 'secondary'}
+              className="flex items-center gap-1"
+            >
+              {integration.status === 'active' ? (
+                <CheckCircle className="h-3 w-3" />
+              ) : integration.status === 'error' ? (
+                <XCircle className="h-3 w-3" />
+              ) : (
+                <div className="h-3 w-3 rounded-full bg-gray-400" />
+              )}
+              {integration.status === 'active' ? 'Active' : 
+               integration.status === 'error' ? 'Error' : 'Inactive'}
+            </Badge>
+
+            {/* Last Tested */}
             {integration.lastTested && (
-              <span className="text-sm text-muted-foreground">
-                Last tested: {new Date(integration.lastTested).toLocaleString()}
+              <span className="text-xs text-muted-foreground">
+                Tested {new Date(integration.lastTested).toLocaleDateString()}
               </span>
             )}
-            <div className="flex gap-2 ml-auto">
-              <Button
-                variant="outline"
-                onClick={() => testConnection(integration.service)}
-                disabled={testing === integration.service}
-              >
-                {testing === integration.service ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Testing...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Test
-                  </>
-                )}
-              </Button>
-              <Button onClick={() => handleSave(integration.service)} disabled={saving}>
-                <Settings className="h-4 w-4 mr-2" />
-                Save
-              </Button>
-            </div>
           </div>
+
+          {/* Toggle Switch */}
+          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">
+                {integration.isEnabled ? 'Enabled' : 'Disabled'}
+              </span>
+            </div>
+            <Switch
+              checked={integration.isEnabled}
+              onCheckedChange={(val) => handleToggle(integration.service, val)}
+              disabled={saving}
+            />
+          </div>
+
+          {/* Configure Button */}
+          <Button 
+            variant="outline" 
+            className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
+            onClick={() => openConfigModal(integration)}
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Configure
+          </Button>
         </CardContent>
       </Card>
     );
@@ -302,7 +311,7 @@ export default function IntegrationsPage(): JSX.Element {
         <AlertTitle className="text-blue-900 dark:text-blue-100">Modular Integration System</AlertTitle>
         <AlertDescription className="text-blue-800 dark:text-blue-200">
           Each integration is a plugin that can be enabled/disabled independently. 
-          Add new providers without touching existing code.
+          Click <strong>Configure</strong> to manage API keys and settings.
         </AlertDescription>
       </Alert>
 
@@ -316,7 +325,7 @@ export default function IntegrationsPage(): JSX.Element {
             return (
               <TabsTrigger key={key} value={key} className="flex items-center gap-2">
                 <Icon className="h-4 w-4" />
-                {config.label}
+                <span className="hidden sm:inline">{config.label}</span>
                 <Badge variant="secondary" className="ml-1">{count}</Badge>
               </TabsTrigger>
             );
@@ -325,7 +334,8 @@ export default function IntegrationsPage(): JSX.Element {
 
         {Object.entries(CATEGORY_CONFIG).map(([key, config]) => (
           <TabsContent key={key} value={key} className="space-y-4">
-            <div className={`p-4 rounded-lg ${config.bgColor}`}>
+            {/* Category Header */}
+            <div className={`p-4 rounded-lg ${config.bgColor} border ${config.borderColor}`}>
               <h3 className={`text-lg font-semibold ${config.color} flex items-center gap-2`}>
                 <config.icon className="h-5 w-5" />
                 {config.label}
@@ -335,11 +345,12 @@ export default function IntegrationsPage(): JSX.Element {
               </p>
             </div>
 
-            <div className="space-y-4">
+            {/* Integration Cards Grid */}
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               {integrationsByCategory[key]?.length > 0 ? (
                 integrationsByCategory[key].map(renderIntegrationCard)
               ) : (
-                <Card>
+                <Card className="col-span-full">
                   <CardContent className="py-12 text-center text-muted-foreground">
                     <Plug className="h-12 w-12 mx-auto mb-4 opacity-20" />
                     <p>No integrations available for this category yet.</p>
@@ -351,6 +362,105 @@ export default function IntegrationsPage(): JSX.Element {
           </TabsContent>
         ))}
       </Tabs>
+
+      {/* Configuration Modal */}
+      {selectedIntegration && (
+        <Dialog open={configModalOpen} onOpenChange={setConfigModalOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Configure {selectedIntegration.displayName}
+              </DialogTitle>
+              <DialogDescription>
+                {selectedIntegration.description}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              {/* API Key */}
+              <div className="space-y-2">
+                <Label htmlFor="modal-api-key">API Key</Label>
+                <Input
+                  id="modal-api-key"
+                  type="password"
+                  value={selectedIntegration.apiKey || ''}
+                  onChange={(e) => updateIntegration(selectedIntegration.service, { apiKey: e.target.value })}
+                  placeholder="Enter API key"
+                />
+              </div>
+
+              {/* API Endpoint */}
+              <div className="space-y-2">
+                <Label htmlFor="modal-api-endpoint">API Endpoint</Label>
+                <Input
+                  id="modal-api-endpoint"
+                  value={selectedIntegration.apiEndpoint || ''}
+                  onChange={(e) => updateIntegration(selectedIntegration.service, { apiEndpoint: e.target.value })}
+                  placeholder="https://api.example.com"
+                />
+              </div>
+
+              {/* Status Display */}
+              <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Badge variant={selectedIntegration.status === 'active' ? 'default' : 'secondary'}>
+                    {selectedIntegration.status}
+                  </Badge>
+                  {selectedIntegration.lastTested && (
+                    <span className="text-sm text-muted-foreground">
+                      Last tested: {new Date(selectedIntegration.lastTested).toLocaleString()}
+                    </span>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => testConnection(selectedIntegration.service)}
+                  disabled={testing === selectedIntegration.service}
+                >
+                  {testing === selectedIntegration.service ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Testing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Test Connection
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={closeConfigModal}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => {
+                  handleSave(selectedIntegration.service);
+                  closeConfigModal();
+                }}
+                disabled={saving}
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
