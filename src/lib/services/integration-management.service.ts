@@ -327,6 +327,23 @@ export async function testIntegrationConnection(service: string, userId: string)
       throw new Error('Integration is disabled');
     }
 
+    console.log('🧪 Testing integration:', service);
+    console.log('🔑 API Key present:', !!integration.apiKey);
+    console.log('🔑 API Key type:', typeof integration.apiKey);
+    console.log('🔑 API Key length:', integration.apiKey?.length);
+    
+    // Clean API key (remove any prefixes or extra characters)
+    let cleanApiKey = integration.apiKey || '';
+    
+    // If key looks like it has non-ASCII chars, it might be corrupted
+    if (cleanApiKey && /[^\x00-\x7F]/.test(cleanApiKey)) {
+      console.warn('⚠️ API key contains non-ASCII characters, might be corrupted');
+      // Try to extract just ASCII characters
+      cleanApiKey = cleanApiKey.replace(/[^\x00-\x7F]/g, '');
+    }
+    
+    console.log('🔑 Clean API Key length:', cleanApiKey.length);
+
     // Get provider from registry
     const provider = integrationRegistry.getProvider(service);
     
@@ -335,18 +352,14 @@ export async function testIntegrationConnection(service: string, userId: string)
     }
 
     // Initialize provider with config
-    provider.init({
-      service,
-      category: integration.config?.category || 'UNKNOWN',
-      isEnabled: integration.isEnabled,
-      status: integration.status,
-      apiKey: integration.apiKey || undefined,
+    await provider.initialize({
+      apiKey: cleanApiKey,
       apiEndpoint: integration.apiEndpoint || undefined,
-      config: integration.config || {}
-    } as any);
+      ...integration.config
+    });
 
     // Test connection
-    const testResult = await provider.testConnection();
+    const testResult = await provider.test();
 
     // Update status based on test result
     const newStatus = testResult.success ? 'active' : 'error';

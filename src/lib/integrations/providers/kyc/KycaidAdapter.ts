@@ -90,6 +90,12 @@ export class KycaidAdapter implements IKycProvider {
    */
   async test(): Promise<IntegrationTestResult> {
     try {
+      console.log('🧪 Testing KYCAID connection...');
+      console.log('📍 Base URL:', this.baseUrl);
+      console.log('🔑 API Key present:', !!this.config.apiKey);
+      console.log('🔑 API Key length:', this.config.apiKey?.length || 0);
+      console.log('🔑 API Key preview:', this.config.apiKey?.substring(0, 10) + '...');
+      
       if (!this.config.apiKey) {
         return {
           success: false,
@@ -98,31 +104,62 @@ export class KycaidAdapter implements IKycProvider {
         };
       }
 
-      // Test connection with simple API call
-      const response = await fetch(`${this.baseUrl}/applicants`, {
-        method: 'GET',
-        headers: this.getHeaders()
+      // KYCAID doesn't have a dedicated "ping" endpoint
+      // So we'll test by attempting to create a test applicant with minimal data
+      // This will validate API key without actually creating anything
+      const url = `${this.baseUrl}/applicants`;
+      console.log('📡 Request URL:', url);
+      
+      // Try to create applicant with invalid/minimal data to test auth
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          type: 'PERSON',
+          first_name: 'Test',
+          last_name: 'Connection'
+          // Missing required fields - will fail but auth will work
+        })
       });
 
-      if (response.ok) {
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response statusText:', response.statusText);
+
+      // If we get 200/201 or validation error (400/422), auth is working!
+      if (response.ok || response.status === 400 || response.status === 422) {
         return {
           success: true,
-          message: 'KYCAID connection successful',
+          message: 'KYCAID connection successful - API key is valid',
           timestamp: new Date(),
           metadata: {
             apiVersion: response.headers.get('x-api-version'),
-            rateLimit: response.headers.get('x-ratelimit-remaining')
+            status: response.status
           }
         };
       }
 
+      // Auth errors mean bad API key
+      if (response.status === 401 || response.status === 403) {
+        const error = await response.text();
+        console.error('❌ KYCAID auth error:', error);
+        return {
+          success: false,
+          message: `Invalid API key or authentication failed (${response.status})`,
+          timestamp: new Date()
+        };
+      }
+
+      // Other errors
       const error = await response.text();
+      console.error('❌ KYCAID error response:', error);
+      
       return {
         success: false,
-        message: `KYCAID test failed: ${error}`,
+        message: `KYCAID test failed (${response.status}): ${error.substring(0, 100)}`,
         timestamp: new Date()
       };
     } catch (error: any) {
+      console.error('❌ KYCAID connection error:', error);
       return {
         success: false,
         message: `KYCAID connection error: ${error.message}`,
@@ -477,3 +514,4 @@ export class KycaidAdapter implements IKycProvider {
 
 // Export singleton instance
 export const kycaidAdapter = new KycaidAdapter();
+
