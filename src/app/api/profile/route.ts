@@ -20,6 +20,9 @@ const updateProfileSchema = z.object({
   city: z.string().optional(),
   address: z.string().optional(),
   postalCode: z.string().optional(),
+  dateOfBirth: z.string().optional().nullable(),
+  placeOfBirth: z.string().optional().nullable(),
+  nationality: z.string().optional().nullable(),
 });
 
 export async function GET(): Promise<NextResponse> {
@@ -90,15 +93,34 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     
     // Validate input
     const validated = updateProfileSchema.parse(body);
+    
+    // Prepare data for database
+    const profileData: any = {
+      firstName: validated.firstName,
+      lastName: validated.lastName,
+      phoneNumber: validated.phoneNumber || null,
+      phoneCountry: validated.phoneCountry || null,
+      country: validated.country || '',
+      city: validated.city || null,
+      address: validated.address || null,
+      postalCode: validated.postalCode || null,
+      placeOfBirth: validated.placeOfBirth || null,
+      nationality: validated.nationality || null,
+    };
+    
+    // Convert dateOfBirth string to Date if provided
+    if (validated.dateOfBirth) {
+      profileData.dateOfBirth = new Date(validated.dateOfBirth);
+    }
 
     // Update or create profile
     const profile = await prisma.profile.upsert({
       where: { userId: session.user.id },
       create: {
         userId: session.user.id,
-        ...validated
+        ...profileData
       },
-      update: validated
+      update: profileData
     });
 
     return NextResponse.json({

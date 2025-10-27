@@ -23,6 +23,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { CountryDropdown } from '@/components/ui/country-dropdown';
 import { DatePicker } from '@/components/ui/date-picker';
+import type { Value as PhoneValue } from 'react-phone-number-input';
 import {
   Select,
   SelectContent,
@@ -154,9 +155,9 @@ export default function KycPage(): React.ReactElement {
           city: formData.address_city,
           address: formData.address_street,
           postalCode: formData.address_postal,
-          dateOfBirth: formData.date_of_birth ? new Date(formData.date_of_birth) : null,
-          placeOfBirth: formData.place_of_birth,
-          nationality: formData.nationality,
+          dateOfBirth: formData.date_of_birth || null,
+          placeOfBirth: formData.place_of_birth || null,
+          nationality: formData.nationality || null,
         })
       });
 
@@ -228,10 +229,10 @@ export default function KycPage(): React.ReactElement {
       case 'phone':
         return (
           <PhoneInput
-            {...commonProps}
-            value={value}
+            value={(value || undefined) as PhoneValue}
             onChange={onChange}
-            defaultCountry={formData.phone_country || 'PL'}
+            defaultCountry="PL"
+            placeholder="Enter phone number"
           />
         );
 
@@ -258,7 +259,20 @@ export default function KycPage(): React.ReactElement {
         );
 
       case 'select':
-        const options = field.options || [];
+        // Parse options if it's a JSON string
+        let options = field.options || [];
+        if (typeof options === 'string') {
+          try {
+            options = JSON.parse(options);
+          } catch (e) {
+            console.error('Failed to parse options:', e);
+            options = [];
+          }
+        }
+        if (!Array.isArray(options)) {
+          options = [];
+        }
+        
         if (field.fieldName.includes('country') || field.fieldName === 'nationality') {
           return (
             <CountryDropdown

@@ -169,6 +169,7 @@ export async function checkKycStatus(userId: string) {
     if (session.status === 'APPROVED' || session.status === 'REJECTED' || session.status === 'EXPIRED') {
       return {
         status: session.status,
+        sessionId: session.id,
         completedAt: session.completedAt,
         rejectionReason: session.rejectionReason,
         message: getStatusMessage(session.status)
@@ -176,11 +177,24 @@ export async function checkKycStatus(userId: string) {
     }
 
     // Get provider and check status
-    const provider = integrationRegistry.getProvider(session.kycProviderId) as IKycProvider;
-    if (!provider || !session.kycaidVerificationId) {
+    if (!session.kycProviderId || !session.kycaidVerificationId) {
       return {
         status: session.status,
-        message: 'Unable to check status'
+        sessionId: session.id,
+        completedAt: session.completedAt,
+        rejectionReason: session.rejectionReason,
+        message: 'Unable to check status - provider not set'
+      };
+    }
+    
+    const provider = integrationRegistry.getProvider(session.kycProviderId) as IKycProvider;
+    if (!provider) {
+      return {
+        status: session.status,
+        sessionId: session.id,
+        completedAt: session.completedAt,
+        rejectionReason: session.rejectionReason,
+        message: 'Unable to check status - provider not found'
       };
     }
 
@@ -217,6 +231,7 @@ export async function checkKycStatus(userId: string) {
 
       return {
         status: updatedSession.status,
+        sessionId: updatedSession.id,
         completedAt: updatedSession.completedAt,
         rejectionReason: updatedSession.rejectionReason,
         message: getStatusMessage(updatedSession.status)
@@ -225,6 +240,7 @@ export async function checkKycStatus(userId: string) {
 
     return {
       status: session.status,
+      sessionId: session.id,
       message: getStatusMessage(session.status)
     };
   } catch (error: any) {
