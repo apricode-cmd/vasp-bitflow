@@ -1,29 +1,23 @@
-/**
- * Client KYC Form Fields API
- * GET /api/kyc/form-fields - Get enabled KYC form fields for client
- */
-
-import { NextResponse } from 'next/server';
-import { auth } from '@/auth';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { auth } from '@/lib/auth';
 
-export async function GET(): Promise<NextResponse> {
+/**
+ * GET /api/kyc/form-fields
+ * Get enabled KYC form fields (for client)
+ */
+export async function GET(request: NextRequest) {
   try {
-    console.log('[KYC FORM FIELDS] Fetching enabled fields...');
-    
-    // Check authentication
     const session = await auth();
-    if (!session?.user) {
-      console.log('[KYC FORM FIELDS] Unauthorized request');
+    
+    if (!session?.user?.id) {
       return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
+        { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    console.log('[KYC FORM FIELDS] User:', session.user.email);
-
-    // Get enabled KYC form fields grouped by category
+    // Get only enabled fields
     const fields = await prisma.kycFormField.findMany({
       where: {
         isEnabled: true
@@ -34,8 +28,6 @@ export async function GET(): Promise<NextResponse> {
       ]
     });
 
-    console.log('[KYC FORM FIELDS] Found', fields.length, 'enabled fields');
-
     // Group by category
     const grouped = fields.reduce((acc, field) => {
       if (!acc[field.category]) {
@@ -45,18 +37,16 @@ export async function GET(): Promise<NextResponse> {
       return acc;
     }, {} as Record<string, typeof fields>);
 
-    console.log('[KYC FORM FIELDS] Grouped into categories:', Object.keys(grouped));
-
     return NextResponse.json({
       success: true,
-      fields: grouped
+      fields,
+      grouped,
+      total: fields.length
     });
-  } catch (error) {
-    console.error('[KYC FORM FIELDS] Error details:', error);
-    console.error('[KYC FORM FIELDS] Error name:', (error as Error)?.name);
-    console.error('[KYC FORM FIELDS] Error message:', (error as Error)?.message);
+  } catch (error: any) {
+    console.error('Get KYC form fields error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch form fields' },
+      { success: false, error: 'Failed to fetch KYC form fields' },
       { status: 500 }
     );
   }
