@@ -452,10 +452,11 @@ export default function IntegrationsPage(): JSX.Element {
                 <Label htmlFor="modal-api-key">API Key *</Label>
                 <Input
                   id="modal-api-key"
-                  type="password"
+                  type="text"
                   value={selectedIntegration.apiKey || ''}
                   onChange={(e) => updateIntegration(selectedIntegration.service, { apiKey: e.target.value })}
                   placeholder="Enter API key"
+                  autoComplete="off"
                 />
                 <p className="text-xs text-muted-foreground">
                   Your API key will be encrypted before storage

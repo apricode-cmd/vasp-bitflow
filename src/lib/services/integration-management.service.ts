@@ -204,10 +204,25 @@ export async function updateIntegrationConfig(params: UpdateIntegrationParams) {
     };
 
     if (updates.apiKey !== undefined) {
-      updateData.apiKey = updates.apiKey ? encrypt(updates.apiKey) : null;
-      // If adding/updating API key and integration is enabled, set to active
-      if (updates.apiKey && integration.isEnabled) {
-        updateData.status = 'active';
+      // Don't save masked API keys (containing • or *)
+      const isMasked = updates.apiKey && (
+        updates.apiKey.includes('•') || 
+        updates.apiKey.includes('*') ||
+        /[^\x00-\x7F]/.test(updates.apiKey)
+      );
+      
+      if (!isMasked && updates.apiKey) {
+        updateData.apiKey = encrypt(updates.apiKey);
+        // If adding/updating API key and integration is enabled, set to active
+        if (integration.isEnabled) {
+          updateData.status = 'active';
+        }
+      } else if (isMasked) {
+        console.warn('⚠️ Skipping masked API key update');
+        // Keep existing key
+      } else {
+        // Explicitly clearing the key
+        updateData.apiKey = null;
       }
     }
 
@@ -331,6 +346,9 @@ export async function testIntegrationConnection(service: string, userId: string)
     console.log('🔑 API Key present:', !!integration.apiKey);
     console.log('🔑 API Key type:', typeof integration.apiKey);
     console.log('🔑 API Key length:', integration.apiKey?.length);
+    console.log('🔑 API Key preview (raw):', integration.apiKey?.substring(0, 20) + '...');
+    console.log('🔑 API Key char codes (first 20):', 
+      integration.apiKey?.substring(0, 20).split('').map(c => c.charCodeAt(0)).join(','));
     
     // Clean API key (remove any prefixes or extra characters)
     let cleanApiKey = integration.apiKey || '';
@@ -338,11 +356,14 @@ export async function testIntegrationConnection(service: string, userId: string)
     // If key looks like it has non-ASCII chars, it might be corrupted
     if (cleanApiKey && /[^\x00-\x7F]/.test(cleanApiKey)) {
       console.warn('⚠️ API key contains non-ASCII characters, might be corrupted');
+      console.warn('Non-ASCII chars at positions:', 
+        [...cleanApiKey].map((c, i) => /[^\x00-\x7F]/.test(c) ? i : null).filter(x => x !== null));
       // Try to extract just ASCII characters
       cleanApiKey = cleanApiKey.replace(/[^\x00-\x7F]/g, '');
     }
     
     console.log('🔑 Clean API Key length:', cleanApiKey.length);
+    console.log('🔑 Clean API Key preview:', cleanApiKey.substring(0, 20) + '...');
 
     // Get provider from registry
     const provider = integrationRegistry.getProvider(service);
