@@ -1,14 +1,14 @@
 /**
- * API: Start KYC Verification
- * POST /api/kyc/start
+ * API: Get KYC Form Configuration
+ * GET /api/kyc/config
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/auth';
-import { startKycVerification } from '@/lib/services/kyc.service';
+import { getKycFormConfig } from '@/lib/services/kyc.service';
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
@@ -20,22 +20,33 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Start KYC verification
-    const result = await startKycVerification(session.user.id);
+    // Get form configuration
+    const config = await getKycFormConfig();
+
+    if (!config) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'KYC provider not configured'
+        },
+        { status: 503 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
-      ...result
+      config
     });
   } catch (error: any) {
-    console.error('❌ KYC start failed:', error);
+    console.error('❌ Failed to get KYC config:', error);
     
     return NextResponse.json(
       { 
         success: false,
-        error: error.message || 'Failed to start KYC verification'
+        error: 'Failed to get KYC configuration'
       },
       { status: 500 }
     );
   }
 }
+

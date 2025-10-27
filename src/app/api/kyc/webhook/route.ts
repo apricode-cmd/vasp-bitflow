@@ -1,96 +1,49 @@
 /**
- * KYCAID Webhook API Route
+ * API: KYC Webhook Handler
+ * POST /api/kyc/webhook
  * 
- * POST /api/kyc/webhook - Handles KYCAID verification status updates
+ * Receives webhooks from KYC providers (KYCAID, SumSub, etc.)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { kycaidService } from '@/lib/services/kycaid';
-import { kycWebhookSchema } from '@/lib/validations/kyc';
-import { z } from 'zod';
+import { processKycWebhook } from '@/lib/services/kyc.service';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    // Get signature from headers
-    const signature = request.headers.get('x-signature');
-    if (!signature) {
-      return NextResponse.json(
-        { error: 'Missing signature' },
-        { status: 401 }
-      );
-    }
-
-    // Get raw body for signature verification
-    const body = await request.text();
-
-    // Verify webhook signature
-    const isValid = kycaidService.verifyWebhookSignature(body, signature);
-    if (!isValid) {
-      console.error('Invalid webhook signature');
-      return NextResponse.json(
-        { error: 'Invalid signature' },
-        { status: 401 }
-      );
-    }
-
-    // Parse and validate webhook payload
-    const payload = JSON.parse(body);
-    const validatedPayload = kycWebhookSchema.parse(payload);
-
-    // Map KYCAID status to our internal status
-    let status: 'PENDING' | 'APPROVED' | 'REJECTED' = 'PENDING';
+    // Get provider from query or header
+    const providerId = request.nextUrl.searchParams.get('provider') || 
+                      request.headers.get('x-provider-id');
     
-    if (validatedPayload.verification_status === 'completed') {
-      status = 'APPROVED';
-    } else if (
-      validatedPayload.verification_status === 'rejected' ||
-      validatedPayload.verification_status === 'declined'
-    ) {
-      status = 'REJECTED';
-    }
-
-    // Update KYC session in database
-    const kycSession = await prisma.kycSession.findFirst({
-      where: {
-        kycaidVerificationId: validatedPayload.verification_id
-      }
-    });
-
-    if (!kycSession) {
-      console.error('KYC session not found:', validatedPayload.verification_id);
+    if (!providerId) {
       return NextResponse.json(
-        { error: 'KYC session not found' },
-        { status: 404 }
-      );
-    }
-
-    await prisma.kycSession.update({
-      where: { id: kycSession.id },
-      data: {
-        status,
-        reviewedAt: new Date(),
-        rejectionReason: validatedPayload.rejection_reasons?.[0]?.reason
-      }
-    });
-
-    // TODO: Send email notification to user about KYC status change
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('KYC webhook error:', error);
-
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid payload', details: error.errors },
+        { error: 'Provider ID required' },
         { status: 400 }
       );
     }
 
+    // Get signature from header (provider-specific)
+    const signature = request.headers.get('x-signature') || 
+                     request.headers.get('x-kycaid-signature') ||
+                     request.headers.get('x-sumsub-signature');
+
+    // Get raw body for signature verification
+    const body = await request.json();
+
+    console.log(`📥 Received webhook from ${providerId}`);
+
+    // Process webhook
+    const result = await processKycWebhook(providerId, body, signature || undefined);
+
+    return NextResponse.json(result);
+  } catch (error: any) {
+    console.error('❌ Webhook processing failed:', error);
+    
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        success: false,
+        error: error.message || 'Failed to process webhook'
+      },
       { status: 500 }
     );
   }
 }
-

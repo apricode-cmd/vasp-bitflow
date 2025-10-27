@@ -23,10 +23,23 @@ export interface KycUserData {
   email: string;
   firstName: string;
   lastName: string;
-  dateOfBirth?: string;
-  country?: string;
+  dateOfBirth: string; // YYYY-MM-DD
+  nationality: string; // ISO2 code (e.g. "PL", "US")
+  residenceCountry: string; // ISO2 code
+  phone: string; // International format +48500111222
   address?: string;
-  phone?: string;
+  city?: string;
+  postalCode?: string;
+  externalId?: string; // Our internal user ID
+}
+
+/**
+ * Applicant creation result
+ */
+export interface KycApplicant {
+  applicantId: string;
+  status: string;
+  metadata?: Record<string, any>;
 }
 
 /**
@@ -34,9 +47,18 @@ export interface KycUserData {
  */
 export interface KycVerificationSession {
   verificationId: string;
-  formUrl?: string;
-  applicantId?: string;
+  applicantId: string;
+  status: string;
   metadata?: Record<string, any>;
+}
+
+/**
+ * Form URL result (one-time link)
+ */
+export interface KycFormUrl {
+  url: string;
+  expiresAt?: Date;
+  sessionId?: string;
 }
 
 /**
@@ -72,12 +94,19 @@ export interface IKycProvider extends IIntegrationProvider {
   readonly category: IntegrationCategory.KYC;
 
   /**
-   * Create a new verification session for a user
+   * Step 1: Create applicant in provider's system
    */
-  createVerification(
-    userId: string,
-    userData: KycUserData
-  ): Promise<KycVerificationSession>;
+  createApplicant(userData: KycUserData): Promise<KycApplicant>;
+
+  /**
+   * Step 2: Create verification for applicant
+   */
+  createVerification(applicantId: string, formId?: string): Promise<KycVerificationSession>;
+
+  /**
+   * Step 3: Get one-time form URL for liveness check
+   */
+  getFormUrl(applicantId: string, formId?: string): Promise<KycFormUrl>;
 
   /**
    * Get current verification status
@@ -85,14 +114,25 @@ export interface IKycProvider extends IIntegrationProvider {
   getVerificationStatus(verificationId: string): Promise<KycVerificationResult>;
 
   /**
-   * Generate form URL for user (if applicable)
+   * Get applicant details
    */
-  generateFormUrl(userId: string, verificationId?: string): string;
+  getApplicant(applicantId: string): Promise<KycApplicant>;
 
   /**
-   * Verify webhook signature (if applicable)
+   * Verify webhook signature (for automatic status updates)
    */
   verifyWebhookSignature?(payload: string, signature: string): boolean;
+
+  /**
+   * Process webhook payload (normalize data)
+   */
+  processWebhook?(payload: any): {
+    verificationId: string;
+    applicantId: string;
+    status: KycVerificationStatus;
+    reason?: string;
+    metadata?: Record<string, any>;
+  };
 
   /**
    * Verify document liveness/authenticity (AI check)

@@ -1,51 +1,41 @@
 /**
- * KYC Status API Route
- * 
- * GET /api/kyc/status - Returns current user's KYC verification status
+ * API: Check KYC Status
+ * GET /api/kyc/status
  */
 
-import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth-utils';
-import { prisma } from '@/lib/prisma';
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/auth';
+import { checkKycStatus } from '@/lib/services/kyc.service';
 
-export async function GET(): Promise<NextResponse> {
-  // Check authentication
-  const { error, session } = await requireAuth();
-  if (error) return error;
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
+export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
-    const userId = session.user.id;
-
-    // Get KYC session
-    const kycSession = await prisma.kycSession.findUnique({
-      where: { userId },
-      select: {
-        id: true,
-        status: true,
-        submittedAt: true,
-        reviewedAt: true,
-        rejectionReason: true,
-        kycaidVerificationId: true
-      }
-    });
-
-    if (!kycSession) {
-      return NextResponse.json({
-        status: 'NOT_STARTED',
-        message: 'KYC verification not started'
-      });
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
     }
 
-    return NextResponse.json(kycSession);
-  } catch (error) {
-    console.error('KYC status error:', error);
+    // Check KYC status
+    const result = await checkKycStatus(session.user.id);
+
+    return NextResponse.json({
+      success: true,
+      ...result
+    });
+  } catch (error: any) {
+    console.error('❌ KYC status check failed:', error);
+    
     return NextResponse.json(
-      { error: 'Failed to fetch KYC status' },
+      { 
+        success: false,
+        error: error.message || 'Failed to check KYC status'
+      },
       { status: 500 }
     );
   }
 }
-

@@ -71,8 +71,15 @@ export default function KycPage(): React.ReactElement {
       const response = await fetch('/api/kyc/status');
       if (response.ok) {
         const data = await response.json();
-        if (data.status !== 'NOT_STARTED') {
-          setKycSession(data);
+        if (data.success && data.status !== 'NOT_STARTED') {
+          setKycSession({
+            id: data.sessionId || '',
+            status: data.status,
+            submittedAt: null,
+            reviewedAt: data.completedAt || null,
+            rejectionReason: data.rejectionReason || null,
+            kycaidVerificationId: null
+          });
         }
       }
     } catch (error) {
@@ -87,8 +94,31 @@ export default function KycPage(): React.ReactElement {
   }, []);
 
   const handleStartKyc = async () => {
-    // Redirect to form page
-    window.location.href = '/kyc/form';
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/kyc/start', {
+        method: 'POST'
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.formUrl) {
+        toast.success('KYC session created!');
+        // Open form in new window
+        window.open(data.formUrl, '_blank', 'width=800,height=900');
+        // Reload to show status
+        setTimeout(() => {
+          fetchKycStatus();
+        }, 2000);
+      } else {
+        toast.error(data.error || 'Failed to start KYC verification');
+      }
+    } catch (error: any) {
+      console.error('Failed to start KYC:', error);
+      toast.error(error.message || 'Failed to start KYC verification');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (isLoading) {
