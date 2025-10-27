@@ -8,92 +8,51 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole } from '@/lib/auth-utils';
 import { prisma } from '@/lib/prisma';
+import { integrationRegistry } from '@/lib/integrations';
 
 export async function GET(): Promise<NextResponse> {
   try {
-    console.log('🔍 Fetching integrations from database...');
-    
     // Check admin authentication
-    try {
-      const authResult = await requireRole('ADMIN');
-      console.log('🔐 Auth result:', JSON.stringify(authResult, null, 2));
-      
-      if (authResult.error) {
-        console.log('❌ Unauthorized access to integrations');
-        return authResult.error;
-      }
-      const session = authResult.session;
-      console.log('✅ Session found:', session?.user?.email);
-    } catch (error) {
-      console.error('❌ Auth error:', error);
-      return NextResponse.json(
-        { error: 'Authentication failed', details: error.message },
-        { status: 401 }
-      );
+    const authResult = await requireRole('ADMIN');
+    if (authResult.error) {
+      return authResult.error;
     }
 
-    // Get all integrations from database
-    const integrations = await prisma.integration.findMany({
-      orderBy: { service: 'asc' }
-    });
-    
-    console.log('📊 Found integrations:', integrations.length);
+    // Get all registered providers from registry
+    const registeredProviders = integrationRegistry.getAllProviders();
 
-    // Convert to the expected format
-    const integrationsMap: Record<string, any> = {};
-    
-    integrations.forEach(integration => {
-      integrationsMap[integration.service] = {
-        service: integration.service,
-        isEnabled: integration.isEnabled,
-        status: integration.status,
-        apiKey: integration.apiKey,
-        apiEndpoint: integration.apiEndpoint,
-        lastTested: integration.lastTested,
-        config: integration.config,
-        rates: integration.rates
+    // Get configurations from database
+    const dbIntegrations = await prisma.integration.findMany({
+      orderBy: { updatedAt: 'desc' }
+    });
+
+    // Merge registry data with database data
+    const integrations = registeredProviders.map(provider => {
+      const dbConfig = dbIntegrations.find(db => db.service === provider.providerId);
+
+      return {
+        service: provider.providerId,
+        category: provider.category,
+        displayName: provider.displayName,
+        description: provider.description,
+        icon: provider.icon,
+        isEnabled: dbConfig?.isEnabled ?? false,
+        status: dbConfig?.status ?? 'inactive',
+        apiKey: dbConfig?.apiKey,
+        apiEndpoint: dbConfig?.apiEndpoint,
+        lastTested: dbConfig?.lastTested,
+        config: dbConfig?.config,
+        rates: dbConfig?.rates
       };
-    });
-
-    // Ensure default integrations exist
-    const defaultIntegrations = {
-      coingecko: {
-        service: 'coingecko',
-        isEnabled: false,
-        status: 'inactive',
-        apiEndpoint: 'https://api.coingecko.com/api/v3'
-      },
-      kycaid: {
-        service: 'kycaid',
-        isEnabled: false,
-        status: 'inactive',
-        apiEndpoint: 'https://api.kycaid.com'
-      },
-      resend: {
-        service: 'resend',
-        isEnabled: false,
-        status: 'inactive'
-      }
-    };
-
-    // Merge with defaults
-    Object.keys(defaultIntegrations).forEach(service => {
-      if (!integrationsMap[service]) {
-        integrationsMap[service] = defaultIntegrations[service as keyof typeof defaultIntegrations];
-      }
     });
 
     return NextResponse.json({
       success: true,
-      integrations: Object.values(integrationsMap)
+      integrations,
+      categories: integrationRegistry.getAllCategories()
     });
   } catch (error: any) {
     console.error('❌ Failed to fetch integrations:', error);
-    console.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      code: error.code
-    });
     return NextResponse.json(
       { 
         error: 'Failed to fetch integrations',
@@ -106,34 +65,16 @@ export async function GET(): Promise<NextResponse> {
 
 export async function PUT(request: NextRequest): Promise<NextResponse> {
   try {
-    console.log('💾 Updating integration...');
-    
     // Check admin authentication
-    try {
-      const authResult = await requireRole('ADMIN');
-      console.log('🔐 Auth result:', JSON.stringify(authResult, null, 2));
-      
-      if (authResult.error) {
-        console.log('❌ Unauthorized access to update integration');
-        return authResult.error;
-      }
-      const session = authResult.session;
-      console.log('✅ Session found:', session?.user?.email);
-    } catch (error) {
-      console.error('❌ Auth error:', error);
-      return NextResponse.json(
-        { error: 'Authentication failed', details: error.message },
-        { status: 401 }
-      );
+    const authResult = await requireRole('ADMIN');
+    if (authResult.error) {
+      return authResult.error;
     }
 
     const body = await request.json();
     const { service, updates } = body;
-    
-    console.log('📝 Service:', service, 'Updates:', updates);
 
     if (!service || !updates) {
-      console.log('❌ Missing service or updates');
       return NextResponse.json(
         { error: 'Service and updates are required' },
         { status: 400 }
@@ -180,11 +121,6 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     });
   } catch (error: any) {
     console.error('❌ Failed to update integration:', error);
-    console.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      code: error.code
-    });
     return NextResponse.json(
       { 
         error: 'Failed to update integration',
