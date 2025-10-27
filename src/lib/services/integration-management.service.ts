@@ -159,11 +159,15 @@ export async function updateIntegrationConfig(params: UpdateIntegrationParams) {
 
     // If integration doesn't exist, create it with minimal data
     if (!integration) {
+      const hasApiKey = !!updates.apiKey;
+      const isEnabled = updates.isEnabled ?? false;
+      
       const created = await prisma.integration.create({
         data: {
           service,
-          isEnabled: updates.isEnabled ?? false,
-          status: 'inactive',
+          isEnabled,
+          // Set status based on isEnabled and API key presence
+          status: (isEnabled && hasApiKey) ? 'active' : 'inactive',
           apiKey: updates.apiKey ? encrypt(updates.apiKey) : null,
           apiEndpoint: updates.apiEndpoint,
           config: updates.config || {}
@@ -201,6 +205,10 @@ export async function updateIntegrationConfig(params: UpdateIntegrationParams) {
 
     if (updates.apiKey !== undefined) {
       updateData.apiKey = updates.apiKey ? encrypt(updates.apiKey) : null;
+      // If adding/updating API key and integration is enabled, set to active
+      if (updates.apiKey && integration.isEnabled) {
+        updateData.status = 'active';
+      }
     }
 
     if (updates.apiEndpoint !== undefined) {
@@ -213,7 +221,16 @@ export async function updateIntegrationConfig(params: UpdateIntegrationParams) {
 
     if (updates.isEnabled !== undefined) {
       updateData.isEnabled = updates.isEnabled;
-      if (!updates.isEnabled) {
+      // Auto-update status based on isEnabled
+      if (updates.isEnabled) {
+        // When enabling, set to active if API key exists (including new one)
+        if (integration.apiKey || updates.apiKey) {
+          updateData.status = 'active';
+        } else {
+          updateData.status = 'inactive'; // No API key yet
+        }
+      } else {
+        // When disabling, always set to inactive
         updateData.status = 'inactive';
       }
     }

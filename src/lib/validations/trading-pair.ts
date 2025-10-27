@@ -42,3 +42,4 @@ export type CreateTradingPairInput = z.infer<typeof createTradingPairSchema>;
 export type UpdateTradingPairInput = z.infer<typeof updateTradingPairSchema>;
 
 
+
