@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
 import { KycStatusBadge } from '@/components/features/KycStatusBadge';
 import { OrderStatusBadge } from '@/components/features/OrderStatusBadge';
 import { KycAlert } from '@/components/features/KycAlert';
