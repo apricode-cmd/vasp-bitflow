@@ -343,27 +343,16 @@ export async function testIntegrationConnection(service: string, userId: string)
     }
 
     console.log('🧪 Testing integration:', service);
-    console.log('🔑 API Key present:', !!integration.apiKey);
-    console.log('🔑 API Key type:', typeof integration.apiKey);
-    console.log('🔑 API Key length:', integration.apiKey?.length);
-    console.log('🔑 API Key preview (raw):', integration.apiKey?.substring(0, 20) + '...');
-    console.log('🔑 API Key char codes (first 20):', 
-      integration.apiKey?.substring(0, 20).split('').map(c => c.charCodeAt(0)).join(','));
     
     // Clean API key (remove any prefixes or extra characters)
     let cleanApiKey = integration.apiKey || '';
     
     // If key looks like it has non-ASCII chars, it might be corrupted
     if (cleanApiKey && /[^\x00-\x7F]/.test(cleanApiKey)) {
-      console.warn('⚠️ API key contains non-ASCII characters, might be corrupted');
-      console.warn('Non-ASCII chars at positions:', 
-        [...cleanApiKey].map((c, i) => /[^\x00-\x7F]/.test(c) ? i : null).filter(x => x !== null));
+      console.warn('⚠️ API key contains non-ASCII characters, cleaning...');
       // Try to extract just ASCII characters
       cleanApiKey = cleanApiKey.replace(/[^\x00-\x7F]/g, '');
     }
-    
-    console.log('🔑 Clean API Key length:', cleanApiKey.length);
-    console.log('🔑 Clean API Key preview:', cleanApiKey.substring(0, 20) + '...');
 
     // Get provider from registry
     const provider = integrationRegistry.getProvider(service);

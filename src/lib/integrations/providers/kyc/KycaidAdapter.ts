@@ -90,12 +90,6 @@ export class KycaidAdapter implements IKycProvider {
    */
   async test(): Promise<IntegrationTestResult> {
     try {
-      console.log('🧪 Testing KYCAID connection...');
-      console.log('📍 Base URL:', this.baseUrl);
-      console.log('🔑 API Key present:', !!this.config.apiKey);
-      console.log('🔑 API Key length:', this.config.apiKey?.length || 0);
-      console.log('🔑 API Key preview:', this.config.apiKey?.substring(0, 10) + '...');
-      
       if (!this.config.apiKey) {
         return {
           success: false,
@@ -108,7 +102,6 @@ export class KycaidAdapter implements IKycProvider {
       // So we'll test by attempting to create a test applicant with minimal data
       // This will validate API key without actually creating anything
       const url = `${this.baseUrl}/applicants`;
-      console.log('📡 Request URL:', url);
       
       // Try to create applicant with invalid/minimal data to test auth
       const response = await fetch(url, {
@@ -121,9 +114,6 @@ export class KycaidAdapter implements IKycProvider {
           // Missing required fields - will fail but auth will work
         })
       });
-
-      console.log('📥 Response status:', response.status);
-      console.log('📥 Response statusText:', response.statusText);
 
       // If we get 200/201 or validation error (400/422), auth is working!
       if (response.ok || response.status === 400 || response.status === 422) {
@@ -151,7 +141,7 @@ export class KycaidAdapter implements IKycProvider {
 
       // Other errors
       const error = await response.text();
-      console.error('❌ KYCAID error response:', error);
+      console.error('❌ KYCAID error:', response.status, error);
       
       return {
         success: false,
