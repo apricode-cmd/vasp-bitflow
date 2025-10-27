@@ -211,12 +211,17 @@ export default function IntegrationsPage(): JSX.Element {
     const categoryConfig = CATEGORY_CONFIG[integration.category as keyof typeof CATEGORY_CONFIG];
     const CategoryIcon = categoryConfig?.icon || Plug;
     
+    // Provider-specific examples
+    const providerExamples: Record<string, string> = {
+      'kycaid': 'Identity verification, document validation, AML checks',
+      'coingecko': 'BTC, ETH, USDT, SOL live rates in EUR & PLN',
+      'resend': 'Order confirmations, KYC updates, system notifications'
+    };
+    
     return (
       <Card 
         key={integration.service} 
-        className={`group hover:shadow-lg transition-all duration-200 border-2 ${
-          integration.status === 'active' ? categoryConfig?.borderColor : 'border-gray-200'
-        }`}
+        className="group hover:shadow-xl transition-all duration-200 border-2 border-primary/20 hover:border-primary/40"
       >
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
@@ -232,6 +237,12 @@ export default function IntegrationsPage(): JSX.Element {
                 <CardDescription className="text-xs mt-1">
                   {integration.description}
                 </CardDescription>
+                {providerExamples[integration.service] && (
+                  <p className="text-xs text-muted-foreground mt-2 flex items-start gap-1">
+                    <span className="text-primary">•</span>
+                    <span className="italic">{providerExamples[integration.service]}</span>
+                  </p>
+                )}
               </div>
             </div>
           </div>
