@@ -449,7 +449,7 @@ export default function IntegrationsPage(): JSX.Element {
             <div className="space-y-4 py-4">
               {/* API Key */}
               <div className="space-y-2">
-                <Label htmlFor="modal-api-key">API Key</Label>
+                <Label htmlFor="modal-api-key">API Key *</Label>
                 <Input
                   id="modal-api-key"
                   type="password"
@@ -457,17 +457,60 @@ export default function IntegrationsPage(): JSX.Element {
                   onChange={(e) => updateIntegration(selectedIntegration.service, { apiKey: e.target.value })}
                   placeholder="Enter API key"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Your API key will be encrypted before storage
+                </p>
               </div>
+
+              {/* Form ID (for KYC providers) */}
+              {selectedIntegration.category === 'KYC' && (
+                <div className="space-y-2">
+                  <Label htmlFor="modal-form-id">Form ID *</Label>
+                  <Input
+                    id="modal-form-id"
+                    value={(selectedIntegration.config as any)?.formId || ''}
+                    onChange={(e) => updateIntegration(selectedIntegration.service, { 
+                      config: { ...selectedIntegration.config, formId: e.target.value }
+                    })}
+                    placeholder="form_basic_liveness"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    KYC form ID with liveness check enabled
+                  </p>
+                </div>
+              )}
+
+              {/* Webhook Secret (for KYC providers) */}
+              {selectedIntegration.category === 'KYC' && (
+                <div className="space-y-2">
+                  <Label htmlFor="modal-webhook-secret">Webhook Secret (optional)</Label>
+                  <Input
+                    id="modal-webhook-secret"
+                    type="password"
+                    value={(selectedIntegration.config as any)?.webhookSecret || ''}
+                    onChange={(e) => updateIntegration(selectedIntegration.service, { 
+                      config: { ...selectedIntegration.config, webhookSecret: e.target.value }
+                    })}
+                    placeholder="Enter webhook secret"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Used to verify webhook signatures from provider
+                  </p>
+                </div>
+              )}
 
               {/* API Endpoint */}
               <div className="space-y-2">
-                <Label htmlFor="modal-api-endpoint">API Endpoint</Label>
+                <Label htmlFor="modal-api-endpoint">API Endpoint (optional)</Label>
                 <Input
                   id="modal-api-endpoint"
                   value={selectedIntegration.apiEndpoint || ''}
                   onChange={(e) => updateIntegration(selectedIntegration.service, { apiEndpoint: e.target.value })}
                   placeholder="https://api.example.com"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Leave empty to use default endpoint
+                </p>
               </div>
 
               {/* Status Display */}
