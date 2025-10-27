@@ -200,12 +200,15 @@ export async function checkKycStatus(userId: string) {
     const providerId = (session.metadata as any)?.provider || 'kycaid'; // Get from metadata or default to kycaid
     
     if (!providerId || !session.kycaidVerificationId) {
+      // No verification ID yet - user hasn't completed the form
+      // Return PENDING with formUrl so they can complete it
       return {
         status: session.status,
         sessionId: session.id,
+        formUrl: (session.metadata as any)?.formUrl,
         completedAt: session.completedAt,
         rejectionReason: session.rejectionReason,
-        message: 'Unable to check status - provider not set'
+        message: 'Please complete the verification form'
       };
     }
     
