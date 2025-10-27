@@ -105,6 +105,8 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    console.log('📝 Updating integration:', service, 'Updates:', Object.keys(updates));
+
     // Use integration management service
     const result = await updateIntegrationConfig({
       service,
@@ -112,16 +114,22 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
       userId: session.user.id
     });
 
+    console.log('✅ Integration updated successfully:', service);
+
     return NextResponse.json({
       success: true,
       integration: result.integration
     });
   } catch (error: any) {
     console.error('❌ Failed to update integration:', error);
+    console.error('Error stack:', error.stack);
+    
     return NextResponse.json(
       { 
+        success: false,
         error: 'Failed to update integration',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        message: error.message,
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
       },
       { status: 500 }
     );

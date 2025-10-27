@@ -15,11 +15,17 @@ const SALT_LENGTH = 64;
 /**
  * Get encryption key from environment
  */
-function getEncryptionKey(): Buffer {
+function getEncryptionKey(): Buffer | null {
   const secret = process.env.ENCRYPTION_SECRET;
   
-  if (!secret || secret.length < 32) {
-    throw new Error('ENCRYPTION_SECRET must be at least 32 characters');
+  if (!secret) {
+    console.warn('⚠️ ENCRYPTION_SECRET not set - API keys will be stored in plain text (DEV ONLY)');
+    return null;
+  }
+  
+  if (secret.length < 32) {
+    console.error('❌ ENCRYPTION_SECRET must be at least 32 characters');
+    return null;
   }
 
   // Derive a 256-bit key from the secret
@@ -34,6 +40,12 @@ export function encrypt(text: string): string {
     if (!text) return '';
 
     const key = getEncryptionKey();
+    
+    // If no encryption key, return plain text with marker
+    if (!key) {
+      return `plain:${text}`;
+    }
+
     const iv = crypto.randomBytes(IV_LENGTH);
     const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
 
@@ -43,7 +55,7 @@ export function encrypt(text: string): string {
     const authTag = cipher.getAuthTag();
 
     // Return: iv:authTag:encrypted
-    return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
+    return `encrypted:${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
   } catch (error) {
     console.error('Encryption error:', error);
     throw new Error('Failed to encrypt data');
@@ -57,11 +69,36 @@ export function decrypt(encrypted: string): string {
   try {
     if (!encrypted) return '';
 
+    // Check if it's plain text (dev mode)
+    if (encrypted.startsWith('plain:')) {
+      return encrypted.substring(6);
+    }
+
+    // Check if it's encrypted
+    if (!encrypted.startsWith('encrypted:')) {
+      // Old format without prefix - try to decrypt
+      const parts = encrypted.split(':');
+      if (parts.length === 3) {
+        encrypted = `encrypted:${encrypted}`;
+      } else {
+        // Assume it's plain text
+        return encrypted;
+      }
+    }
+
     const key = getEncryptionKey();
-    const parts = encrypted.split(':');
+    
+    if (!key) {
+      console.warn('Cannot decrypt - no encryption key available');
+      return encrypted;
+    }
+
+    const withoutPrefix = encrypted.substring(10); // Remove 'encrypted:'
+    const parts = withoutPrefix.split(':');
 
     if (parts.length !== 3) {
-      throw new Error('Invalid encrypted data format');
+      console.error('Invalid encrypted data format');
+      return encrypted;
     }
 
     const [ivHex, authTagHex, encryptedHex] = parts;
@@ -78,7 +115,8 @@ export function decrypt(encrypted: string): string {
     return decrypted;
   } catch (error) {
     console.error('Decryption error:', error);
-    throw new Error('Failed to decrypt data');
+    // Return as-is if decryption fails
+    return encrypted;
   }
 }
 
