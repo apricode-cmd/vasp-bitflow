@@ -116,8 +116,43 @@ export default function IntegrationsPage(): JSX.Element {
   };
 
   const handleToggle = async (service: string, enabled: boolean) => {
+    // Temporarily update UI
     updateIntegration(service, { isEnabled: enabled });
-    await handleSave(service);
+    
+    // Save only the enabled status change
+    setSaving(true);
+    try {
+      const response = await fetch('/api/admin/integrations', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          service,
+          updates: {
+            isEnabled: enabled
+          }
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(enabled ? 'Integration enabled' : 'Integration disabled');
+        // Update with response data
+        if (data.integration) {
+          updateIntegration(service, data.integration);
+        }
+      } else {
+        // Revert on error
+        updateIntegration(service, { isEnabled: !enabled });
+        toast.error(data.error || 'Failed to update');
+      }
+    } catch (error: any) {
+      // Revert on error
+      updateIntegration(service, { isEnabled: !enabled });
+      toast.error(`Failed to update: ${error.message}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSave = async (service: string) => {

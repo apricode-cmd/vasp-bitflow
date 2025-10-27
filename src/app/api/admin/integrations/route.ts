@@ -9,6 +9,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireRole } from '@/lib/auth-utils';
 import { prisma } from '@/lib/prisma';
 import { integrationRegistry } from '@/lib/integrations';
+import { 
+  updateIntegrationConfig, 
+  getIntegrationForDisplay 
+} from '@/lib/services/integration-management.service';
+import { decrypt, maskApiKey } from '@/lib/services/encryption.service';
 
 export async function GET(): Promise<NextResponse> {
   try {
@@ -30,6 +35,17 @@ export async function GET(): Promise<NextResponse> {
     const integrations = registeredProviders.map(provider => {
       const dbConfig = dbIntegrations.find(db => db.service === provider.providerId);
 
+      // Mask API key for display
+      let maskedApiKey = null;
+      if (dbConfig?.apiKey) {
+        try {
+          const decrypted = decrypt(dbConfig.apiKey);
+          maskedApiKey = maskApiKey(decrypted);
+        } catch (error) {
+          console.error('Failed to decrypt API key:', error);
+        }
+      }
+
       return {
         service: provider.providerId,
         category: provider.category,
@@ -38,7 +54,7 @@ export async function GET(): Promise<NextResponse> {
         icon: provider.icon,
         isEnabled: dbConfig?.isEnabled ?? false,
         status: dbConfig?.status ?? 'inactive',
-        apiKey: dbConfig?.apiKey,
+        apiKey: maskedApiKey,
         apiEndpoint: dbConfig?.apiEndpoint,
         lastTested: dbConfig?.lastTested,
         config: dbConfig?.config,
@@ -71,6 +87,14 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
       return authResult.error;
     }
 
+    const session = authResult.session;
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'User ID not found in session' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { service, updates } = body;
 
@@ -81,43 +105,16 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Update or create integration
-    const integration = await prisma.integration.upsert({
-      where: { service },
-      update: {
-        isEnabled: updates.isEnabled,
-        status: updates.status,
-        apiKey: updates.apiKey,
-        apiEndpoint: updates.apiEndpoint,
-        lastTested: updates.lastTested ? new Date(updates.lastTested) : null,
-        config: updates.config,
-        rates: updates.rates,
-        updatedAt: new Date()
-      },
-      create: {
-        service,
-        isEnabled: updates.isEnabled || false,
-        status: updates.status || 'inactive',
-        apiKey: updates.apiKey,
-        apiEndpoint: updates.apiEndpoint,
-        lastTested: updates.lastTested ? new Date(updates.lastTested) : null,
-        config: updates.config,
-        rates: updates.rates
-      }
+    // Use integration management service
+    const result = await updateIntegrationConfig({
+      service,
+      updates,
+      userId: session.user.id
     });
 
     return NextResponse.json({
       success: true,
-      integration: {
-        service: integration.service,
-        isEnabled: integration.isEnabled,
-        status: integration.status,
-        apiKey: integration.apiKey,
-        apiEndpoint: integration.apiEndpoint,
-        lastTested: integration.lastTested,
-        config: integration.config,
-        rates: integration.rates
-      }
+      integration: result.integration
     });
   } catch (error: any) {
     console.error('❌ Failed to update integration:', error);
