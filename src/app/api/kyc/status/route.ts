@@ -4,14 +4,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/auth';
-import { kycService } from '@/lib/services/kyc.service';
+import { auth } from '@/auth';
+import { checkKycStatus } from '@/lib/services/kyc.service';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     // Check authentication
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     
     if (!session?.user?.id) {
       return NextResponse.json(
@@ -21,7 +20,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     // Check KYC status
-    const result = await kycService.getKycStatus(session.user.id);
+    const result = await checkKycStatus(session.user.id);
 
     return NextResponse.json({
       success: true,

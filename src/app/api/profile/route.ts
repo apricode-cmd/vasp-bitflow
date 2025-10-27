@@ -91,8 +91,12 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
 
     const body = await request.json();
     
+    console.log('📝 Profile update request:', body);
+    
     // Validate input
     const validated = updateProfileSchema.parse(body);
+    
+    console.log('✅ Validation passed:', validated);
     
     // Prepare data for database
     const profileData: any = {
@@ -129,6 +133,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
+      console.error('❌ Validation error:', error.errors);
       return NextResponse.json(
         { success: false, error: 'Validation failed', details: error.errors },
         { status: 400 }

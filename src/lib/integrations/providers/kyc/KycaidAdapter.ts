@@ -296,28 +296,39 @@ export class KycaidAdapter implements IKycProvider {
 
     try {
       const form = formId || this.config.formId;
-      const url = `${this.baseUrl}/forms/${form}/url?applicant_id=${applicantId}`;
+      
+      if (!form) {
+        throw new Error('Form ID not provided');
+      }
 
-      console.log('📝 Getting KYCAID form URL:', { applicantId, formId: form });
+      // KYCAID API: POST /forms/{form_id}/urls
+      const url = `${this.baseUrl}/forms/${form}/urls`;
+
+      console.log('📝 Getting KYCAID form URL:', { applicantId, formId: form, url });
 
       const response = await fetch(url, {
-        method: 'GET',
-        headers: this.getHeaders()
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          applicant_id: applicantId,
+          external_applicant_id: applicantId // Optional: link to your system
+        })
       });
 
       if (!response.ok) {
         const error = await response.text();
+        console.error('❌ KYCAID form URL error:', error);
         throw new Error(`Failed to get form URL: ${error}`);
       }
 
       const data = await response.json();
 
-      console.log('✅ KYCAID form URL generated');
+      console.log('✅ KYCAID form URL generated:', data.form_url);
 
       return {
-        url: data.url,
+        url: data.form_url || data.url, // Handle both response formats
         expiresAt: data.expires_at ? new Date(data.expires_at) : undefined,
-        sessionId: data.session_id
+        sessionId: data.verification_id || data.session_id
       };
     } catch (error: any) {
       console.error('❌ KYCAID form URL generation failed:', error);

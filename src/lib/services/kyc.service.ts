@@ -15,22 +15,24 @@ import { IKycProvider, KycUserData } from '@/lib/integrations/categories/IKycPro
  */
 async function getActiveKycProvider(): Promise<IKycProvider | null> {
   try {
-    // Find active KYC integration
+    console.log('🔍 Looking for active KYC provider...');
+    
+    // Find active KYC integration (KYCAID for now)
     const integration = await prisma.integration.findFirst({
       where: {
+        service: 'kycaid', // We only have KYCAID for now
         isEnabled: true,
-        status: 'active',
-        config: {
-          path: ['category'],
-          equals: 'KYC'
-        }
+        status: 'active'
       }
     });
 
     if (!integration) {
-      console.warn('⚠️ No active KYC provider found');
+      console.warn('⚠️ No active KYCAID integration found');
+      console.log('Check: /admin/integrations - KYCAID should be enabled with API key');
       return null;
     }
+
+    console.log('✅ Found KYCAID integration:', integration.service);
 
     // Get provider from registry
     const provider = integrationRegistry.getProvider(integration.service) as IKycProvider;
@@ -40,14 +42,20 @@ async function getActiveKycProvider(): Promise<IKycProvider | null> {
       return null;
     }
 
+    console.log('✅ Provider found in registry');
+
     // Initialize with secrets
     const secrets = await getIntegrationWithSecrets(integration.service);
     if (secrets?.apiKey) {
+      console.log('✅ Initializing provider with API key');
       await provider.initialize({
         apiKey: secrets.apiKey,
         apiEndpoint: secrets.apiEndpoint || undefined,
         ...secrets.config
       });
+    } else {
+      console.warn('⚠️ No API key found for KYCAID');
+      return null;
     }
 
     return provider;
@@ -88,6 +96,16 @@ export async function startKycVerification(userId: string) {
 
     console.log(`📝 Starting KYC verification for user ${userId} with provider ${provider.providerId}`);
 
+    // Get integration secrets to access formId from config
+    const secrets = await getIntegrationWithSecrets(provider.providerId);
+    const formId = secrets?.config?.formId;
+    
+    if (!formId) {
+      throw new Error('KYC Form ID not configured. Please set it in admin panel: /admin/integrations');
+    }
+
+    console.log(`📋 Using form ID: ${formId}`);
+
     // Prepare user data
     const userData: KycUserData = {
       email: user.email,
@@ -103,28 +121,30 @@ export async function startKycVerification(userId: string) {
       externalId: userId
     };
 
+    console.log('👤 Creating applicant...');
+    
     // Step 1: Create applicant
     const applicant = await provider.createApplicant(userData);
+    console.log(`✅ Applicant created: ${applicant.applicantId}`);
 
-    // Step 2: Create verification
-    const verification = await provider.createVerification(applicant.applicantId);
+    // Step 2: Get form URL (documents will be uploaded through the form)
+    console.log('📝 Getting form URL...');
+    const formUrlResult = await provider.getFormUrl(applicant.applicantId, formId);
+    console.log(`✅ Form URL generated: ${formUrlResult.url}`);
 
-    // Step 3: Get form URL
-    const formUrl = await provider.getFormUrl(applicant.applicantId);
-
-    // Step 4: Save session in database
+    // Step 3: Save session in database (verification will be created via webhook after form submission)
     const kycSession = await prisma.kycSession.create({
       data: {
         userId: userId,
-        kycProviderId: provider.providerId,
+        // Don't set kycProviderId - it has a foreign key constraint we don't use
         kycaidApplicantId: applicant.applicantId,
-        kycaidVerificationId: verification.verificationId,
+        kycaidFormId: formId,
+        // verificationId will be set later via webhook
         status: 'PENDING',
         metadata: {
           applicantStatus: applicant.status,
-          verificationStatus: verification.status,
-          formUrl: formUrl.url,
-          provider: provider.providerId
+          formUrl: formUrlResult.url,
+          provider: provider.providerId // Store provider in metadata instead
         },
         attempts: 1,
         lastAttemptAt: new Date()
@@ -136,9 +156,8 @@ export async function startKycVerification(userId: string) {
     return {
       success: true,
       sessionId: kycSession.id,
-      formUrl: formUrl.url,
+      formUrl: formUrlResult.url,
       applicantId: applicant.applicantId,
-      verificationId: verification.verificationId,
       provider: provider.displayName
     };
   } catch (error: any) {
@@ -172,12 +191,15 @@ export async function checkKycStatus(userId: string) {
         sessionId: session.id,
         completedAt: session.completedAt,
         rejectionReason: session.rejectionReason,
+        formUrl: (session.metadata as any)?.formUrl,
         message: getStatusMessage(session.status)
       };
     }
 
     // Get provider and check status
-    if (!session.kycProviderId || !session.kycaidVerificationId) {
+    const providerId = (session.metadata as any)?.provider || 'kycaid'; // Get from metadata or default to kycaid
+    
+    if (!providerId || !session.kycaidVerificationId) {
       return {
         status: session.status,
         sessionId: session.id,
@@ -187,7 +209,7 @@ export async function checkKycStatus(userId: string) {
       };
     }
     
-    const provider = integrationRegistry.getProvider(session.kycProviderId) as IKycProvider;
+    const provider = integrationRegistry.getProvider(providerId) as IKycProvider;
     if (!provider) {
       return {
         status: session.status,
@@ -199,7 +221,7 @@ export async function checkKycStatus(userId: string) {
     }
 
     // Initialize provider
-    const secrets = await getIntegrationWithSecrets(session.kycProviderId);
+    const secrets = await getIntegrationWithSecrets(providerId);
     if (secrets?.apiKey) {
       await provider.initialize({
         apiKey: secrets.apiKey,
@@ -234,6 +256,7 @@ export async function checkKycStatus(userId: string) {
         sessionId: updatedSession.id,
         completedAt: updatedSession.completedAt,
         rejectionReason: updatedSession.rejectionReason,
+        formUrl: (updatedSession.metadata as any)?.formUrl,
         message: getStatusMessage(updatedSession.status)
       };
     }
@@ -241,6 +264,7 @@ export async function checkKycStatus(userId: string) {
     return {
       status: session.status,
       sessionId: session.id,
+      formUrl: (session.metadata as any)?.formUrl,
       message: getStatusMessage(session.status)
     };
   } catch (error: any) {

@@ -60,6 +60,7 @@ interface KycSession {
   submittedAt: string | null;
   reviewedAt: string | null;
   rejectionReason: string | null;
+  formUrl?: string | null;
 }
 
 // Step configuration
@@ -92,6 +93,7 @@ export default function KycPage(): React.ReactElement {
       const response = await fetch('/api/kyc/status');
       if (response.ok) {
         const data = await response.json();
+        console.log('📊 KYC Status Response:', data); // Debug log
         if (data.success && data.status !== 'NOT_STARTED') {
           setKycSession({
             id: data.sessionId || '',
@@ -99,6 +101,7 @@ export default function KycPage(): React.ReactElement {
             submittedAt: null,
             reviewedAt: data.completedAt || null,
             rejectionReason: data.rejectionReason || null,
+            formUrl: data.formUrl || null,
           });
         }
       }
@@ -128,6 +131,27 @@ export default function KycPage(): React.ReactElement {
   };
 
   const handleNext = () => {
+    // Validate current step before moving forward
+    const currentStepConfig = STEPS.find(s => s.id === currentStep);
+    if (!currentStepConfig) return;
+
+    const stepFields = fields.filter(f => 
+      currentStepConfig.categories.includes(f.category) && f.isEnabled && f.isRequired
+    );
+
+    const missingFields: string[] = [];
+    stepFields.forEach(field => {
+      if (!formData[field.fieldName]) {
+        missingFields.push(field.label);
+      }
+    });
+
+    if (missingFields.length > 0) {
+      toast.error(`Please fill in required fields: ${missingFields.join(', ')}`);
+      return;
+    }
+
+    // Move to next step
     if (currentStep < STEPS.length) {
       setCurrentStep(currentStep + 1);
     }
@@ -142,27 +166,61 @@ export default function KycPage(): React.ReactElement {
   const handleSubmit = async () => {
     setIsSaving(true);
     try {
+      // Validate required fields
+      const requiredFields = {
+        first_name: 'First Name',
+        last_name: 'Last Name',
+        date_of_birth: 'Date of Birth',
+        nationality: 'Nationality',
+        phone: 'Phone Number',
+        address_street: 'Street Address',
+        address_city: 'City',
+        address_country: 'Country',
+        address_postal: 'Postal Code',
+      };
+
+      const missingFields: string[] = [];
+      Object.entries(requiredFields).forEach(([field, label]) => {
+        if (!formData[field]) {
+          missingFields.push(label);
+        }
+      });
+
+      if (missingFields.length > 0) {
+        toast.error(`Please fill in required fields: ${missingFields.join(', ')}`);
+        setIsSaving(false);
+        return;
+      }
+
+      // Prepare profile data
+      const profileData = {
+        firstName: formData.first_name,
+        lastName: formData.last_name,
+        phoneNumber: formData.phone,
+        phoneCountry: formData.phone_country,
+        country: formData.address_country,
+        city: formData.address_city,
+        address: formData.address_street,
+        postalCode: formData.address_postal,
+        dateOfBirth: formData.date_of_birth || null,
+        placeOfBirth: formData.place_of_birth || null,
+        nationality: formData.nationality || null,
+      };
+
+      console.log('Form data:', formData);
+      console.log('Submitting profile data:', profileData);
+
       // First, save profile data
       const profileResponse = await fetch('/api/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          firstName: formData.first_name,
-          lastName: formData.last_name,
-          phoneNumber: formData.phone,
-          phoneCountry: formData.phone_country,
-          country: formData.address_country,
-          city: formData.address_city,
-          address: formData.address_street,
-          postalCode: formData.address_postal,
-          dateOfBirth: formData.date_of_birth || null,
-          placeOfBirth: formData.place_of_birth || null,
-          nationality: formData.nationality || null,
-        })
+        body: JSON.stringify(profileData)
       });
 
       if (!profileResponse.ok) {
-        throw new Error('Failed to save profile data');
+        const errorData = await profileResponse.json();
+        console.error('Profile save error:', errorData);
+        throw new Error(errorData.error || 'Failed to save profile data');
       }
 
       toast.success('Profile data saved!');
@@ -421,7 +479,20 @@ export default function KycPage(): React.ReactElement {
                 <Clock className="h-4 w-4" />
                 <AlertTitle>Under Review</AlertTitle>
                 <AlertDescription>
-                  Your documents are being reviewed by our team. This usually takes 2-4 hours.
+                  {kycSession.formUrl ? (
+                    <>
+                      Please complete the verification form to upload your documents and take a selfie.
+                      <Button 
+                        className="mt-3 w-full"
+                        onClick={() => window.open(kycSession.formUrl!, '_blank', 'width=800,height=900')}
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Complete Verification Form
+                      </Button>
+                    </>
+                  ) : (
+                    'Your documents are being reviewed by our team. This usually takes 2-4 hours.'
+                  )}
                 </AlertDescription>
               </Alert>
             )}
