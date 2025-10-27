@@ -12,12 +12,12 @@ import {
   KycVerificationResult,
   KycDocumentVerification,
   KycVerificationStatus
-} from '../categories/IKycProvider';
+} from '../../categories/IKycProvider';
 import {
   BaseIntegrationConfig,
   IntegrationCategory,
   IntegrationTestResult
-} from '../types';
+} from '../../types';
 import { kycaidService } from '@/lib/services/kycaid';
 import crypto from 'crypto';
 

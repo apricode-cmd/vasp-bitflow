@@ -9,12 +9,12 @@ import {
   IEmailProvider,
   EmailParams,
   EmailSendResult
-} from '../categories/IEmailProvider';
+} from '../../categories/IEmailProvider';
 import {
   BaseIntegrationConfig,
   IntegrationCategory,
   IntegrationTestResult
-} from '../types';
+} from '../../types';
 import { Resend } from 'resend';
 
 /**

@@ -10,12 +10,12 @@ import {
   ExchangeRate,
   ExchangeRates,
   RateWithMetadata
-} from '../categories/IRatesProvider';
+} from '../../categories/IRatesProvider';
 import {
   BaseIntegrationConfig,
   IntegrationCategory,
   IntegrationTestResult
-} from '../types';
+} from '../../types';
 import { coinGeckoService } from '@/lib/services/coingecko';
 
 /**
