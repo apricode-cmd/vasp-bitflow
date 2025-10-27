@@ -1,57 +1,52 @@
 /**
  * Integrations Management Page
  * 
- * Modern card-based UI with modal configuration
+ * Enterprise-grade interface with search and filters
  */
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { 
   Shield, Mail, TrendingUp, CreditCard, Loader2, 
-  CheckCircle, XCircle, RefreshCw, ExternalLink, 
-  Key as KeyIcon, Settings, Plug, Check, X
+  CheckCircle, XCircle, RefreshCw, Settings, Plug, 
+  Check, Search, Filter
 } from 'lucide-react';
 
 // Integration categories with icons
 const CATEGORY_CONFIG = {
   KYC: {
-    label: 'KYC & Verification',
+    label: 'KYC',
     icon: Shield,
     color: 'text-blue-600',
-    bgColor: 'bg-blue-50 dark:bg-blue-950/20',
-    borderColor: 'border-blue-200 dark:border-blue-800'
+    bgColor: 'bg-blue-50 dark:bg-blue-950/20'
   },
   RATES: {
-    label: 'Exchange Rates',
+    label: 'Rates',
     icon: TrendingUp,
     color: 'text-green-600',
-    bgColor: 'bg-green-50 dark:bg-green-950/20',
-    borderColor: 'border-green-200 dark:border-green-800'
+    bgColor: 'bg-green-50 dark:bg-green-950/20'
   },
   EMAIL: {
-    label: 'Email & Notifications',
+    label: 'Email',
     icon: Mail,
     color: 'text-purple-600',
-    bgColor: 'bg-purple-50 dark:bg-purple-950/20',
-    borderColor: 'border-purple-200 dark:border-purple-800'
+    bgColor: 'bg-purple-50 dark:bg-purple-950/20'
   },
   PAYMENT: {
-    label: 'Payment Gateways',
+    label: 'Payment',
     icon: CreditCard,
     color: 'text-orange-600',
-    bgColor: 'bg-orange-50 dark:bg-orange-950/20',
-    borderColor: 'border-orange-200 dark:border-orange-800'
+    bgColor: 'bg-orange-50 dark:bg-orange-950/20'
   }
 };
 
@@ -74,9 +69,13 @@ export default function IntegrationsPage(): JSX.Element {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState('KYC');
   const [configModalOpen, setConfigModalOpen] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
+  
+  // Filters
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   useEffect(() => {
     fetchIntegrations();
@@ -111,7 +110,6 @@ export default function IntegrationsPage(): JSX.Element {
       [service]: { ...prev[service], ...updates }
     }));
     
-    // Update selected integration if it's open
     if (selectedIntegration?.service === service) {
       setSelectedIntegration(prev => prev ? { ...prev, ...updates } : null);
     }
@@ -137,13 +135,12 @@ export default function IntegrationsPage(): JSX.Element {
       const data = await response.json();
 
       if (data.success) {
-        toast.success(`${integrations[service].displayName} saved successfully`);
+        toast.success('Saved successfully');
         updateIntegration(service, data.integration);
       } else {
-        toast.error(data.error || 'Failed to save integration');
+        toast.error(data.error || 'Failed to save');
       }
     } catch (error: any) {
-      console.error('Save error:', error);
       toast.error(`Failed to save: ${error.message}`);
     } finally {
       setSaving(false);
@@ -161,19 +158,18 @@ export default function IntegrationsPage(): JSX.Element {
       const data = await response.json();
 
       if (data.success) {
-        toast.success(`${integrations[service].displayName} connection successful!`);
+        toast.success('Connection successful');
         updateIntegration(service, { 
           status: 'active', 
           lastTested: new Date()
         });
         await handleSave(service);
       } else {
-        toast.error(data.message || data.error || 'Connection failed');
+        toast.error(data.message || 'Connection failed');
         updateIntegration(service, { status: 'error' });
       }
     } catch (error: any) {
-      console.error(`${service} test error:`, error);
-      toast.error(`Test failed: ${error.message}`);
+      toast.error('Test failed');
       updateIntegration(service, { status: 'error' });
     } finally {
       setTesting(null);
@@ -190,6 +186,34 @@ export default function IntegrationsPage(): JSX.Element {
     setSelectedIntegration(null);
   };
 
+  // Filtered integrations
+  const filteredIntegrations = useMemo(() => {
+    return Object.values(integrations).filter(integration => {
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesSearch = 
+          integration.displayName.toLowerCase().includes(query) ||
+          integration.description.toLowerCase().includes(query) ||
+          integration.service.toLowerCase().includes(query);
+        
+        if (!matchesSearch) return false;
+      }
+
+      // Category filter
+      if (categoryFilter !== 'all' && integration.category !== categoryFilter) {
+        return false;
+      }
+
+      // Status filter
+      if (statusFilter === 'enabled' && !integration.isEnabled) return false;
+      if (statusFilter === 'disabled' && integration.isEnabled) return false;
+      if (statusFilter === 'active' && integration.status !== 'active') return false;
+
+      return true;
+    });
+  }, [integrations, searchQuery, categoryFilter, statusFilter]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -198,24 +222,14 @@ export default function IntegrationsPage(): JSX.Element {
     );
   }
 
-  // Group integrations by category
-  const integrationsByCategory = Object.values(integrations).reduce((acc, integration) => {
-    if (!acc[integration.category]) {
-      acc[integration.category] = [];
-    }
-    acc[integration.category].push(integration);
-    return acc;
-  }, {} as Record<string, Integration[]>);
-
   const renderIntegrationCard = (integration: Integration) => {
     const categoryConfig = CATEGORY_CONFIG[integration.category as keyof typeof CATEGORY_CONFIG];
     const CategoryIcon = categoryConfig?.icon || Plug;
     
-    // Provider-specific examples
     const providerExamples: Record<string, string> = {
-      'kycaid': 'Identity verification, document validation, AML checks',
-      'coingecko': 'BTC, ETH, USDT, SOL live rates in EUR & PLN',
-      'resend': 'Order confirmations, KYC updates, system notifications'
+      'kycaid': 'Identity verification, AML checks',
+      'coingecko': 'Live crypto rates',
+      'resend': 'Transactional emails'
     };
     
     return (
@@ -234,13 +248,9 @@ export default function IntegrationsPage(): JSX.Element {
                   <CardTitle className="text-lg">{integration.displayName}</CardTitle>
                   {integration.icon && <span className="text-xl">{integration.icon}</span>}
                 </div>
-                <CardDescription className="text-xs mt-1">
-                  {integration.description}
-                </CardDescription>
                 {providerExamples[integration.service] && (
-                  <p className="text-xs text-muted-foreground mt-2 flex items-start gap-1">
-                    <span className="text-primary">•</span>
-                    <span className="italic">{providerExamples[integration.service]}</span>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {providerExamples[integration.service]}
                   </p>
                 )}
               </div>
@@ -249,7 +259,7 @@ export default function IntegrationsPage(): JSX.Element {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Status Badge */}
+          {/* Status & Last Tested */}
           <div className="flex items-center justify-between">
             <Badge 
               variant={integration.status === 'active' ? 'default' : 'secondary'}
@@ -262,25 +272,21 @@ export default function IntegrationsPage(): JSX.Element {
               ) : (
                 <div className="h-3 w-3 rounded-full bg-gray-400" />
               )}
-              {integration.status === 'active' ? 'Active' : 
-               integration.status === 'error' ? 'Error' : 'Inactive'}
+              {integration.status}
             </Badge>
 
-            {/* Last Tested */}
             {integration.lastTested && (
               <span className="text-xs text-muted-foreground">
-                Tested {new Date(integration.lastTested).toLocaleDateString()}
+                {new Date(integration.lastTested).toLocaleDateString()}
               </span>
             )}
           </div>
 
-          {/* Toggle Switch */}
+          {/* Toggle */}
           <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">
-                {integration.isEnabled ? 'Enabled' : 'Disabled'}
-              </span>
-            </div>
+            <span className="text-sm font-medium">
+              {integration.isEnabled ? 'Enabled' : 'Disabled'}
+            </span>
             <Switch
               checked={integration.isEnabled}
               onCheckedChange={(val) => handleToggle(integration.service, val)}
@@ -305,74 +311,91 @@ export default function IntegrationsPage(): JSX.Element {
   return (
     <div className="space-y-6 animate-in">
       {/* Header */}
-      <div>
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary mb-4">
-          <Plug className="h-4 w-4" />
-          <span className="text-sm font-medium">Plugin System</span>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Integrations</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {filteredIntegrations.length} of {Object.keys(integrations).length} integrations
+          </p>
         </div>
-        <h1 className="text-3xl font-bold tracking-tight">Integrations</h1>
-        <p className="text-muted-foreground mt-1">
-          Manage external service integrations. Enable/disable providers like WordPress plugins.
-        </p>
+        <Badge variant="outline" className="px-3 py-1">
+          <Plug className="h-3 w-3 mr-1" />
+          Plugin System
+        </Badge>
       </div>
 
-      {/* Info Alert */}
-      <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200">
-        <KeyIcon className="h-5 w-5 text-blue-600" />
-        <AlertTitle className="text-blue-900 dark:text-blue-100">Modular Integration System</AlertTitle>
-        <AlertDescription className="text-blue-800 dark:text-blue-200">
-          Each integration is a plugin that can be enabled/disabled independently. 
-          Click <strong>Configure</strong> to manage API keys and settings.
-        </AlertDescription>
-      </Alert>
+      {/* Filters Bar */}
+      <div className="flex flex-col sm:flex-row gap-3 p-4 bg-muted/50 rounded-lg border">
+        {/* Search */}
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search integrations..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
 
-      {/* Category Tabs */}
-      <Tabs value={activeCategory} onValueChange={setActiveCategory} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          {Object.entries(CATEGORY_CONFIG).map(([key, config]) => {
-            const Icon = config.icon;
-            const count = integrationsByCategory[key]?.length || 0;
-            
-            return (
-              <TabsTrigger key={key} value={key} className="flex items-center gap-2">
-                <Icon className="h-4 w-4" />
-                <span className="hidden sm:inline">{config.label}</span>
-                <Badge variant="secondary" className="ml-1">{count}</Badge>
-              </TabsTrigger>
-            );
-          })}
-        </TabsList>
-
-        {Object.entries(CATEGORY_CONFIG).map(([key, config]) => (
-          <TabsContent key={key} value={key} className="space-y-4">
-            {/* Category Header */}
-            <div className={`p-4 rounded-lg ${config.bgColor} border ${config.borderColor}`}>
-              <h3 className={`text-lg font-semibold ${config.color} flex items-center gap-2`}>
-                <config.icon className="h-5 w-5" />
+        {/* Category Filter */}
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-full sm:w-[160px]">
+            <Filter className="h-4 w-4 mr-2" />
+            <SelectValue placeholder="Category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {Object.entries(CATEGORY_CONFIG).map(([key, config]) => (
+              <SelectItem key={key} value={key}>
                 {config.label}
-              </h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Configure providers for this category. Only one provider per category can be active.
-              </p>
-            </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-            {/* Integration Cards Grid */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {integrationsByCategory[key]?.length > 0 ? (
-                integrationsByCategory[key].map(renderIntegrationCard)
-              ) : (
-                <Card className="col-span-full">
-                  <CardContent className="py-12 text-center text-muted-foreground">
-                    <Plug className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                    <p>No integrations available for this category yet.</p>
-                    <p className="text-sm mt-2">Add new providers by registering them in the system.</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </TabsContent>
-        ))}
-      </Tabs>
+        {/* Status Filter */}
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-[160px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="enabled">Enabled</SelectItem>
+            <SelectItem value="disabled">Disabled</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Clear Filters */}
+        {(searchQuery || categoryFilter !== 'all' || statusFilter !== 'all') && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSearchQuery('');
+              setCategoryFilter('all');
+              setStatusFilter('all');
+            }}
+          >
+            Clear
+          </Button>
+        )}
+      </div>
+
+      {/* Integration Cards Grid */}
+      {filteredIntegrations.length > 0 ? (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredIntegrations.map(renderIntegrationCard)}
+        </div>
+      ) : (
+        <Card className="col-span-full">
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <Plug className="h-12 w-12 mx-auto mb-4 opacity-20" />
+            <p>No integrations found</p>
+            <p className="text-sm mt-2">Try adjusting your filters</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Configuration Modal */}
       {selectedIntegration && (
@@ -381,7 +404,7 @@ export default function IntegrationsPage(): JSX.Element {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Settings className="h-5 w-5" />
-                Configure {selectedIntegration.displayName}
+                {selectedIntegration.displayName}
               </DialogTitle>
               <DialogDescription>
                 {selectedIntegration.description}
@@ -420,7 +443,7 @@ export default function IntegrationsPage(): JSX.Element {
                   </Badge>
                   {selectedIntegration.lastTested && (
                     <span className="text-sm text-muted-foreground">
-                      Last tested: {new Date(selectedIntegration.lastTested).toLocaleString()}
+                      Tested {new Date(selectedIntegration.lastTested).toLocaleDateString()}
                     </span>
                   )}
                 </div>
@@ -433,12 +456,12 @@ export default function IntegrationsPage(): JSX.Element {
                   {testing === selectedIntegration.service ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Testing...
+                      Testing
                     </>
                   ) : (
                     <>
                       <RefreshCw className="h-4 w-4 mr-2" />
-                      Test Connection
+                      Test
                     </>
                   )}
                 </Button>
@@ -459,12 +482,12 @@ export default function IntegrationsPage(): JSX.Element {
                 {saving ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Saving...
+                    Saving
                   </>
                 ) : (
                   <>
                     <Check className="h-4 w-4 mr-2" />
-                    Save Changes
+                    Save
                   </>
                 )}
               </Button>
