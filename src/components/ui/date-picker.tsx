@@ -35,8 +35,10 @@ export function DatePicker({
   fromYear = 1900,
   toYear = new Date().getFullYear(),
 }: DatePickerProps) {
+  const [open, setOpen] = React.useState(false);
+
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -54,12 +56,15 @@ export function DatePicker({
         <Calendar
           mode="single"
           selected={date}
-          onSelect={onDateChange}
+          onSelect={(selectedDate) => {
+            onDateChange?.(selectedDate);
+            setOpen(false);
+          }}
           disabled={(date) =>
             date > new Date() || date < new Date(fromYear, 0, 1)
           }
           initialFocus
-          captionLayout="dropdown-buttons"
+          captionLayout="dropdown"
           fromYear={fromYear}
           toYear={toYear}
         />

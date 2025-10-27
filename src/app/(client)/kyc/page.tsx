@@ -237,13 +237,18 @@ export default function KycPage(): React.ReactElement {
         );
 
       case 'date':
+        // For date of birth, set max date to 18 years ago
+        const maxYear = field.fieldName === 'date_of_birth' 
+          ? new Date().getFullYear() - 18 
+          : new Date().getFullYear();
+        
         return (
           <DatePicker
             date={value ? new Date(value) : undefined}
             onDateChange={(date) => onChange(date?.toISOString())}
-            placeholder="Select date"
+            placeholder={field.fieldName === 'date_of_birth' ? 'Select date of birth' : 'Select date'}
             fromYear={1900}
-            toYear={new Date().getFullYear()}
+            toYear={maxYear}
           />
         );
 
