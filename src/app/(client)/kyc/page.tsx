@@ -23,6 +23,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { CountryDropdown } from '@/components/ui/country-dropdown';
 import { DatePicker } from '@/components/ui/date-picker';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import type { Value as PhoneValue } from 'react-phone-number-input';
 import {
   Select,
@@ -36,7 +42,7 @@ import { toast } from 'sonner';
 import { 
   Shield, CheckCircle, XCircle, Clock, Loader2, 
   FileText, Camera, User, AlertCircle, ArrowRight, ArrowLeft,
-  Check, Scale, FolderArchive, RefreshCw
+  Check, Scale, FolderArchive, RefreshCw, Info, Upload, HelpCircle
 } from 'lucide-react';
 import { KycStatus } from '@prisma/client';
 import { formatDateTime } from '@/lib/formatters';
@@ -85,6 +91,15 @@ export default function KycPage(): React.ReactElement {
     attestation: false,
   });
   const [showConsentsScreen, setShowConsentsScreen] = useState(true);
+  const [pepSubForm, setPepSubForm] = useState<any>({
+    pep_role_title: '',
+    pep_institution: '',
+    pep_country: '',
+    pep_since: '',
+    pep_until: '',
+    relationship_to_pep: '',
+    pep_additional_info: '',
+  });
 
   // Fetch KYC status and fields
   useEffect(() => {
@@ -169,6 +184,46 @@ export default function KycPage(): React.ReactElement {
         missingFields.push(field.label);
       }
     });
+
+    // Special validation for PEP fields (conditionally required)
+    const pepStatus = formData['pep_status'];
+    if (pepStatus && pepStatus !== 'NO') {
+      // Required fields for all PEP statuses
+      if (!formData['pep_role_title']) missingFields.push('PEP Role / Title');
+      if (!formData['pep_institution']) missingFields.push('Institution / Body');
+      if (!formData['pep_country']) missingFields.push('Country / Jurisdiction');
+      if (!formData['pep_since']) missingFields.push('Since (YYYY-MM)');
+
+      // Validate date format for pep_since
+      if (formData['pep_since'] && !/^\d{4}-\d{2}$/.test(formData['pep_since'])) {
+        toast.error('Start month must be in YYYY-MM format');
+        return;
+      }
+
+      // Required for FORMER statuses
+      if (pepStatus.includes('FORMER')) {
+        if (!formData['pep_until']) missingFields.push('Until (YYYY-MM)');
+        
+        // Validate date format for pep_until
+        if (formData['pep_until'] && !/^\d{4}-\d{2}$/.test(formData['pep_until'])) {
+          toast.error('End month must be in YYYY-MM format');
+          return;
+        }
+
+        // Validate that until >= since
+        if (formData['pep_since'] && formData['pep_until']) {
+          if (formData['pep_until'] < formData['pep_since']) {
+            toast.error('End month cannot be earlier than start month');
+            return;
+          }
+        }
+      }
+
+      // Required for FAMILY/ASSOCIATE statuses
+      if (pepStatus.includes('FAMILY') || pepStatus.includes('ASSOCIATE')) {
+        if (!formData['relationship_to_pep']) missingFields.push('Relationship to PEP');
+      }
+    }
 
     if (missingFields.length > 0) {
       toast.error(`Please fill in required fields: ${missingFields.join(', ')}`);
@@ -287,13 +342,19 @@ export default function KycPage(): React.ReactElement {
     switch (field.fieldType) {
       case 'text':
       case 'email':
+        // Special placeholder for PEP date fields
+        let placeholder = field.label;
+        if (field.fieldName === 'pep_since' || field.fieldName === 'pep_until') {
+          placeholder = 'YYYY-MM (e.g., 2020-05)';
+        }
+        
         return (
           <Input
             {...commonProps}
             type={field.fieldType}
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            placeholder={field.label}
+            placeholder={placeholder}
           />
         );
 
@@ -365,6 +426,98 @@ export default function KycPage(): React.ReactElement {
           options = [];
         }
         
+        // Special handling for pep_country
+        if (field.fieldName === 'pep_country') {
+          return (
+            <CountryDropdown
+              defaultValue={value}
+              onChange={(country) => onChange(country.alpha3)}
+              placeholder={`Select ${field.label}`}
+            />
+          );
+        }
+
+        // Special handling for pep_status with labels
+        if (field.fieldName === 'pep_status') {
+          const pepLabels: Record<string, string> = {
+            NO: 'No (Not a PEP)',
+            SELF_CURRENT: 'Yes — Self (Current)',
+            SELF_FORMER: 'Yes — Self (Former)',
+            FAMILY_CURRENT: 'Yes — Family Member (Current)',
+            FAMILY_FORMER: 'Yes — Family Member (Former)',
+            ASSOCIATE_CURRENT: 'Yes — Close Associate (Current)',
+            ASSOCIATE_FORMER: 'Yes — Close Associate (Former)',
+          };
+
+          return (
+            <Select value={value} onValueChange={(val) => {
+              onChange(val);
+              // Clear PEP subform if user selects NO
+              if (val === 'NO') {
+                setPepSubForm({
+                  pep_role_title: '',
+                  pep_institution: '',
+                  pep_country: '',
+                  pep_since: '',
+                  pep_until: '',
+                  relationship_to_pep: '',
+                  pep_additional_info: '',
+                });
+                // Also clear these from formData
+                setFormData({
+                  ...formData,
+                  pep_status: val,
+                  pep_role_title: '',
+                  pep_institution: '',
+                  pep_country: '',
+                  pep_since: '',
+                  pep_until: '',
+                  relationship_to_pep: '',
+                  pep_additional_info: '',
+                });
+              }
+            }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select PEP Status" />
+              </SelectTrigger>
+              <SelectContent>
+                {options.map((opt: string) => (
+                  <SelectItem key={opt} value={opt}>
+                    {pepLabels[opt] || opt}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          );
+        }
+
+        // Special handling for relationship_to_pep with labels
+        if (field.fieldName === 'relationship_to_pep') {
+          const relationLabels: Record<string, string> = {
+            spouse_partner: 'Spouse/Partner',
+            parent: 'Parent',
+            child: 'Child',
+            sibling: 'Sibling',
+            other: 'Other',
+          };
+
+          return (
+            <Select value={value} onValueChange={onChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select relationship" />
+              </SelectTrigger>
+              <SelectContent>
+                {options.map((opt: string) => (
+                  <SelectItem key={opt} value={opt}>
+                    {relationLabels[opt] || opt}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          );
+        }
+        
+        // Default country dropdown for other country fields
         if (field.fieldName.includes('country') || field.fieldName === 'nationality') {
           return (
             <CountryDropdown
@@ -374,6 +527,7 @@ export default function KycPage(): React.ReactElement {
             />
           );
         }
+
         return (
           <Select value={value} onValueChange={onChange}>
             <SelectTrigger>
@@ -452,20 +606,97 @@ export default function KycPage(): React.ReactElement {
 
           return (
             <div key={category} className="space-y-4">
-              <h3 className="text-lg font-semibold capitalize">
-                {category.replace(/_/g, ' ')}
-              </h3>
+              {/* Category Header */}
+              {category === 'pep_sanctions' ? (
+                <div className="space-y-2">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Shield className="h-5 w-5 text-primary" />
+                    PEP & Sanctions
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    PEP information is required for AML risk assessment. Sanctions screening is performed automatically.
+                  </p>
+                </div>
+              ) : (
+                <h3 className="text-lg font-semibold capitalize">
+                  {category.replace(/_/g, ' ')}
+                </h3>
+              )}
+
               <div className="grid gap-4">
-                {categoryFields.map(field => (
-                  <div key={field.id} className="space-y-2">
-                    <Label htmlFor={field.fieldName}>
-                      {field.label}
-                      {field.isRequired && <span className="text-destructive ml-1">*</span>}
-                    </Label>
-                    {renderField(field)}
-                  </div>
-                ))}
+                {categoryFields.map(field => {
+                  // Get tooltip for PEP fields
+                  const getPepTooltip = (fieldName: string): string | null => {
+                    const tooltips: Record<string, string> = {
+                      pep_status: 'PEP (Politically Exposed Person) — an individual who is or has been entrusted with a prominent public function (e.g., heads of state, ministers, MPs, judges, senior military, state-owned enterprise executives). Family members include spouse/partner, parents, children and their spouses/partners. Close associates are people known to have close business or personal ties with a PEP.',
+                      pep_role_title: 'The public function or position held by the PEP.',
+                      pep_institution: 'Name of the public institution, state body or state-owned enterprise.',
+                      pep_country: 'Country where the public function is/was held.',
+                      pep_since: 'Month and year when the PEP role started.',
+                      pep_until: 'Month and year when the PEP role ended.',
+                      relationship_to_pep: 'Your relationship to the PEP. Choose \'other\' if none of the above apply.',
+                      pep_additional_info: 'Provide clarifications that help our compliance team evaluate the exposure.',
+                      pep_evidence_file: 'Optional proof (e.g., public registry entry, official letter, news reference).'
+                    };
+                    return tooltips[fieldName] || null;
+                  };
+
+                  // Determine if PEP subfield should be shown
+                  const pepStatus = formData['pep_status'];
+                  const isPepSubField = ['pep_role_title', 'pep_institution', 'pep_country', 'pep_since', 'pep_until', 'relationship_to_pep', 'pep_additional_info', 'pep_evidence_file'].includes(field.fieldName);
+                  
+                  // Hide subfields if PEP status is NO or not selected
+                  if (isPepSubField && (!pepStatus || pepStatus === 'NO')) {
+                    return null;
+                  }
+
+                  // Hide 'Until' field for CURRENT status
+                  if (field.fieldName === 'pep_until' && pepStatus && pepStatus.includes('CURRENT')) {
+                    return null;
+                  }
+
+                  // Hide 'Relationship' field for SELF_* statuses
+                  if (field.fieldName === 'relationship_to_pep' && pepStatus && pepStatus.startsWith('SELF_')) {
+                    return null;
+                  }
+
+                  const tooltip = getPepTooltip(field.fieldName);
+                  const isConditionallyRequired = isPepSubField && pepStatus && pepStatus !== 'NO';
+
+                  return (
+                    <div key={field.id} className="space-y-2">
+                      <Label htmlFor={field.fieldName} className="flex items-center gap-2">
+                        {field.label}
+                        {(field.isRequired || isConditionallyRequired) && <span className="text-destructive ml-1">*</span>}
+                        {tooltip && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-sm">
+                                <p className="text-sm">{tooltip}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </Label>
+                      {renderField(field)}
+                    </div>
+                  );
+                })}
               </div>
+
+              {/* Sanctions Note for PEP category */}
+              {category === 'pep_sanctions' && (
+                <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+                  <Info className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="text-sm text-blue-800 dark:text-blue-200">
+                    Sanctions and adverse media screening is performed automatically. You do not need to provide this information manually.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {category !== step.categories[step.categories.length - 1] && (
                 <Separator className="my-4" />
               )}
