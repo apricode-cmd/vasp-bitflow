@@ -6,8 +6,10 @@
 
 'use client';
 
+import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
   Accordion,
   AccordionContent,
@@ -16,7 +18,7 @@ import {
 } from '@/components/ui/accordion';
 import {
   User, Phone, MapPin, FileText, Briefcase, Scale,
-  Target, TrendingUp, Activity, CheckCircle, XCircle
+  Target, TrendingUp, Activity, CheckCircle, XCircle, Search
 } from 'lucide-react';
 
 interface KycFormDataDisplayProps {
@@ -153,6 +155,8 @@ const formatFieldValue = (value: string): React.ReactNode => {
 };
 
 export function KycFormDataDisplay({ formData }: KycFormDataDisplayProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+
   if (!formData || formData.length === 0) {
     return (
       <Card className="p-6">
@@ -164,62 +168,109 @@ export function KycFormDataDisplay({ formData }: KycFormDataDisplayProps) {
   }
 
   const groupedData = groupFormDataByCategory(formData);
-  const categoryKeys = Object.keys(groupedData);
+  
+  // Filter categories and fields based on search
+  const filteredGroupedData: typeof groupedData = {};
+  Object.keys(groupedData).forEach(categoryKey => {
+    const fields = groupedData[categoryKey];
+    const filteredFields = fields.filter(field => 
+      field.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      field.fieldName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      field.fieldValue.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    
+    if (filteredFields.length > 0) {
+      filteredGroupedData[categoryKey] = filteredFields;
+    }
+  });
+
+  const categoryKeys = Object.keys(filteredGroupedData);
+  const totalFields = Object.values(filteredGroupedData).reduce((acc, fields) => acc + fields.length, 0);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {formData.length} fields in {categoryKeys.length} categories
-        </p>
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          type="text"
+          placeholder="Search fields by name or value..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
+        />
       </div>
 
-      <Accordion type="multiple" className="w-full space-y-2" defaultValue={categoryKeys.slice(0, 3)}>
-        {categoryKeys.map(categoryKey => {
-          const categoryInfo = getCategoryInfo(categoryKey);
-          const CategoryIcon = categoryInfo.icon;
-          const fields = groupedData[categoryKey];
+      {/* Stats */}
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>
+          {searchQuery ? `${totalFields} matching fields in ${categoryKeys.length} categories` : `${formData.length} fields in ${categoryKeys.length} categories`}
+        </span>
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="text-primary hover:underline text-xs"
+          >
+            Clear search
+          </button>
+        )}
+      </div>
 
-          return (
-            <AccordionItem 
-              key={categoryKey} 
-              value={categoryKey}
-              className="border rounded-lg px-4 bg-card"
-            >
-              <AccordionTrigger className="hover:no-underline py-4">
-                <div className="flex items-center gap-3 flex-1">
-                  <div className={`rounded-md bg-muted p-2 ${categoryInfo.color}`}>
-                    <CategoryIcon className="h-4 w-4" />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <div className="font-semibold">{categoryInfo.name}</div>
-                    <div className="text-xs text-muted-foreground font-normal">
-                      {categoryInfo.description} • {fields.length} fields
+      {categoryKeys.length === 0 ? (
+        <Card className="p-6">
+          <p className="text-sm text-muted-foreground text-center">
+            No fields match your search
+          </p>
+        </Card>
+      ) : (
+        <Accordion type="multiple" className="w-full space-y-2" defaultValue={categoryKeys.slice(0, 3)}>
+          {categoryKeys.map(categoryKey => {
+            const categoryInfo = getCategoryInfo(categoryKey);
+            const CategoryIcon = categoryInfo.icon;
+            const fields = filteredGroupedData[categoryKey];
+
+            return (
+              <AccordionItem 
+                key={categoryKey} 
+                value={categoryKey}
+                className="border rounded-lg px-4 bg-card"
+              >
+                <AccordionTrigger className="hover:no-underline py-4">
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className={`rounded-md bg-muted p-2 ${categoryInfo.color}`}>
+                      <CategoryIcon className="h-4 w-4" />
                     </div>
-                  </div>
-                  <Badge variant="secondary" className="ml-auto">
-                    {fields.length}
-                  </Badge>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="pt-2 pb-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {fields.map((field) => (
-                    <div key={field.fieldName} className="space-y-1">
-                      <p className="text-sm text-muted-foreground">
-                        {field.label}
-                      </p>
-                      <div className="text-sm">
-                        {formatFieldValue(field.fieldValue)}
+                    <div className="flex-1 text-left">
+                      <div className="font-semibold">{categoryInfo.name}</div>
+                      <div className="text-xs text-muted-foreground font-normal">
+                        {categoryInfo.description} • {fields.length} fields
+                        {searchQuery && ` (filtered)`}
                       </div>
                     </div>
-                  ))}
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          );
-        })}
-      </Accordion>
+                    <Badge variant="secondary" className="ml-auto">
+                      {fields.length}
+                    </Badge>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="pt-2 pb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {fields.map((field) => (
+                      <div key={field.fieldName} className="space-y-1">
+                        <p className="text-sm text-muted-foreground">
+                          {field.label}
+                        </p>
+                        <div className="text-sm">
+                          {formatFieldValue(field.fieldValue)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            );
+          })}
+        </Accordion>
+      )}
     </div>
   );
 }

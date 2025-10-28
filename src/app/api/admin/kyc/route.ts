@@ -40,8 +40,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         documents: {
           orderBy: { createdAt: 'desc' }
         },
-        profile: true,
-        provider: true // Include KYC provider info
+        profile: true
+        // Note: provider relation removed - we use metadata.provider instead
       },
       orderBy: status === 'PENDING' ? { submittedAt: 'desc' } : { createdAt: 'desc' }
     });

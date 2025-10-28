@@ -48,6 +48,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import { DataTable } from '@/components/admin/DataTable';
 import { KycFormDataDisplay } from '@/components/admin/KycFormDataDisplay';
 import { KycStatusBadge } from '@/components/features/KycStatusBadge';
 import { Combobox } from '@/components/shared/Combobox';
