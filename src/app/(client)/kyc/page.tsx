@@ -838,22 +838,17 @@ export default function KycPage(): React.ReactElement {
                           {(field.isRequired || isConditionallyRequired) && <span className="text-destructive ml-1">*</span>}
                         </Label>
                         {tooltip && (
-                          <Tooltip delayDuration={0}>
+                          <Tooltip>
                             <TooltipTrigger asChild>
                               <button 
                                 type="button" 
-                                className="inline-flex items-center justify-center shrink-0"
+                                className="inline-flex shrink-0"
                                 aria-label="Help"
                               >
-                                <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
+                                <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-primary" />
                               </button>
                             </TooltipTrigger>
-                            <TooltipContent 
-                              side="top"
-                              className="max-w-xs z-[9999]"
-                              sideOffset={8}
-                              collisionPadding={10}
-                            >
+                            <TooltipContent side="top" className="max-w-xs">
                               <p className="text-sm">{tooltip}</p>
                             </TooltipContent>
                           </Tooltip>
