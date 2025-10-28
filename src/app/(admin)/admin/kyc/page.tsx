@@ -48,7 +48,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { DataTable } from '@/components/admin/DataTable';
+import { KycFormDataDisplay } from '@/components/admin/KycFormDataDisplay';
 import { KycStatusBadge } from '@/components/features/KycStatusBadge';
 import { Combobox } from '@/components/shared/Combobox';
 import type { ComboboxOption } from '@/components/shared/Combobox';
@@ -736,6 +736,65 @@ export default function AdminKycPage(): JSX.Element {
                 </Card>
               </div>
 
+              {/* Provider Info */}
+              {selectedSession.provider && (
+                <div>
+                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    KYC Provider
+                  </h3>
+                  <Card>
+                    <div className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="rounded-lg bg-primary/10 p-3">
+                            <Shield className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold">{selectedSession.provider.name}</span>
+                              {selectedSession.provider.status === 'active' && (
+                                <Badge variant="default" className="text-xs">
+                                  Active
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-0.5">
+                              Service: {selectedSession.provider.service}
+                            </p>
+                          </div>
+                        </div>
+                        {selectedSession.kycaidVerificationId && selectedSession.provider.service === 'kycaid' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(`https://kycaid.com/verifications/${selectedSession.kycaidVerificationId}`, '_blank')}
+                          >
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            Open in KYCAID
+                          </Button>
+                        )}
+                      </div>
+                      {selectedSession.kycaidVerificationId && (
+                        <>
+                          <Separator className="my-4" />
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <p className="text-muted-foreground">Verification ID</p>
+                              <p className="font-mono text-sm">{selectedSession.kycaidVerificationId}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Applicant ID</p>
+                              <p className="font-mono text-sm">{selectedSession.kycaidApplicantId || 'N/A'}</p>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </Card>
+                </div>
+              )}
+
               {/* Extended KYC Profile Data */}
               {selectedSession.profile && (
                 <>
@@ -1044,24 +1103,9 @@ export default function AdminKycPage(): JSX.Element {
                 <div>
                   <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
                     <FileText className="h-4 w-4" />
-                    KYC Form Data ({selectedSession.formData.length} fields)
+                    KYC Form Data
                   </h3>
-                  <Card>
-                    <div className="p-4">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        {selectedSession.formData.map((field) => (
-                          <div key={field.id}>
-                            <p className="text-muted-foreground capitalize">
-                              {field.fieldName.replace(/_/g, ' ')}
-                            </p>
-                            <p className="font-medium break-words">
-                              {field.fieldValue || 'N/A'}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </Card>
+                  <KycFormDataDisplay formData={selectedSession.formData} />
                 </div>
               )}
 
