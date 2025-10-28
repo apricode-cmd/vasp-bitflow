@@ -423,7 +423,7 @@ export default function AdminKycPage(): JSX.Element {
       header: () => <div className="text-right">Actions</div>,
       cell: ({ row }) => {
         const session = row.original;
-        return (
+    return (
           <div className="text-right">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -484,8 +484,8 @@ export default function AdminKycPage(): JSX.Element {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
-        );
+      </div>
+    );
       },
     },
   ];
@@ -515,7 +515,7 @@ export default function AdminKycPage(): JSX.Element {
             disabled={refreshing}
           >
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-          </Button>
+        </Button>
         </div>
       </div>
 
@@ -541,7 +541,7 @@ export default function AdminKycPage(): JSX.Element {
               </TabsTrigger>
             </TabsList>
           </Tabs>
-        </div>
+          </div>
       </Card>
 
       {/* KYC Sessions Table */}
@@ -572,7 +572,7 @@ export default function AdminKycPage(): JSX.Element {
                   <Users className="h-4 w-4" />
                   User Information
                 </h3>
-                <Card>
+      <Card>
                   <div className="p-4">
                     <div className="flex items-center gap-4 mb-4">
                       <Avatar className="h-16 w-16">
@@ -995,7 +995,7 @@ export default function AdminKycPage(): JSX.Element {
                   <Card>
                     <div className="p-4">
                       <div className="flex items-center justify-between">
-                        <div>
+                      <div>
                           <p className="text-sm text-muted-foreground">Verification ID</p>
                           <p className="font-mono text-sm">{selectedSession.kycaidVerificationId}</p>
                         </div>
@@ -1022,8 +1022,8 @@ export default function AdminKycPage(): JSX.Element {
                       <p className="text-sm">{selectedSession.rejectionReason}</p>
                     </div>
                   </Card>
-                </div>
-              )}
+                      </div>
+                    )}
 
               {/* Actions */}
               {selectedSession.status === 'PENDING' && (
@@ -1046,9 +1046,9 @@ export default function AdminKycPage(): JSX.Element {
                       Reject KYC
                     </Button>
                   </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
           )}
         </SheetContent>
       </Sheet>

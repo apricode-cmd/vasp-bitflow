@@ -281,28 +281,72 @@ export default function KycPage(): React.ReactElement {
   const handleSubmit = async () => {
     setIsSaving(true);
     try {
-      // Validate required fields
-      const requiredFields = {
-        first_name: 'First Name',
-        last_name: 'Last Name',
-        date_of_birth: 'Date of Birth',
-        nationality: 'Nationality',
-        phone: 'Phone Number',
-        address_street: 'Street Address',
-        address_city: 'City',
-        address_country: 'Country',
-        address_postal: 'Postal Code',
-      };
-
+      // Validate ALL required fields from all steps
       const missingFields: string[] = [];
-      Object.entries(requiredFields).forEach(([field, label]) => {
-        if (!formData[field]) {
-          missingFields.push(label);
+      
+      // Get all enabled required fields
+      const requiredFieldsList = fields.filter(f => f.isEnabled && f.isRequired);
+      
+      requiredFieldsList.forEach(field => {
+        if (!formData[field.fieldName]) {
+          missingFields.push(field.label);
         }
       });
 
+      // Add conditional validations
+      // PEP validations
+      const pepStatus = formData['pep_status'];
+      if (pepStatus && pepStatus !== 'NO') {
+        if (!formData['pep_role_title']) missingFields.push('PEP Role / Title');
+        if (!formData['pep_institution']) missingFields.push('Institution / Body');
+        if (!formData['pep_country']) missingFields.push('Country / Jurisdiction');
+        if (!formData['pep_since']) missingFields.push('Since (YYYY-MM)');
+        
+        if (pepStatus.includes('FORMER') && !formData['pep_until']) {
+          missingFields.push('Until (YYYY-MM)');
+        }
+        
+        if ((pepStatus.includes('FAMILY') || pepStatus.includes('ASSOCIATE')) && !formData['relationship_to_pep']) {
+          missingFields.push('Relationship to PEP');
+        }
+      }
+
+      // Employment validations
+      const employmentStatus = formData['employment_status'];
+      if (employmentStatus) {
+        if (['EMPLOYED_FT', 'EMPLOYED_PT'].includes(employmentStatus)) {
+          if (!formData['employer_name']) missingFields.push('Employer Name');
+          if (!formData['job_title']) missingFields.push('Job Title / Role');
+          if (!formData['industry']) missingFields.push('Industry / Sector');
+          if (!formData['employment_country']) missingFields.push('Country of Employment');
+          if (!formData['employment_years']) missingFields.push('Length of Employment');
+          if (!formData['income_band_monthly']) missingFields.push('Monthly Net Income Band');
+        } else if (employmentStatus === 'SELF_EMPLOYED') {
+          if (!formData['biz_name']) missingFields.push('Business / Trade Name');
+          if (!formData['biz_activity']) missingFields.push('Business Activity / Industry');
+          if (!formData['biz_country']) missingFields.push('Business Country');
+          if (!formData['biz_years']) missingFields.push('Years in Business');
+          if (!formData['revenue_band_annual']) missingFields.push('Annual Revenue Band');
+        } else if (employmentStatus === 'STUDENT') {
+          if (!formData['institution_name']) missingFields.push('Institution Name');
+          if (!formData['student_funding_source']) missingFields.push('Funding Source');
+        } else if (employmentStatus === 'OTHER') {
+          if (!formData['other_employment_note'] || formData['other_employment_note'].length < 3) {
+            missingFields.push('Employment situation description (min 3 chars)');
+          }
+        }
+      }
+
+      // Purpose validations
+      const purpose = formData['purpose'];
+      if (purpose === 'other' || purpose === 'business_payments') {
+        if (!formData['purpose_note'] || formData['purpose_note'].length < 10) {
+          missingFields.push('Purpose additional details (min 10 chars)');
+        }
+      }
+
       if (missingFields.length > 0) {
-        toast.error(`Please fill in required fields: ${missingFields.join(', ')}`);
+        toast.error(`Missing required fields: ${missingFields.slice(0, 5).join(', ')}${missingFields.length > 5 ? ` and ${missingFields.length - 5} more` : ''}`);
         setIsSaving(false);
         return;
       }
