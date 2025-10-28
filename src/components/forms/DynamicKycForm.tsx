@@ -113,8 +113,8 @@ export function DynamicKycForm({ onSubmit, initialData = {} }: DynamicKycFormPro
       const response = await fetch('/api/kyc/form-fields');
       const data = await response.json();
 
-      if (data.success && data.fields) {
-        setFields(data.fields);
+      if (data.success && data.grouped) {
+        setFields(data.grouped);
       } else {
         toast.error('Failed to load form fields');
       }

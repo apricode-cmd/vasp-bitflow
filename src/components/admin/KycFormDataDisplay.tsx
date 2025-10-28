@@ -20,6 +20,7 @@ import {
   User, Phone, MapPin, FileText, Briefcase, Scale,
   Target, TrendingUp, Activity, CheckCircle, XCircle, Search
 } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface KycFormDataDisplayProps {
   formData: Array<{
@@ -48,9 +49,16 @@ const groupFormDataByCategory = (formData: Array<{ fieldName: string; fieldValue
   formData.forEach(item => {
     const fieldName = item.fieldName.toLowerCase();
     let category = 'other';
+    let priority = 999; // Default priority for sorting
 
     if (['first_name', 'last_name', 'date_of_birth', 'place_of_birth', 'nationality'].includes(fieldName)) {
       category = 'personal';
+      // Set priority for logical order: First Name, Last Name, Date of Birth, Place of Birth, Nationality
+      if (fieldName === 'first_name') priority = 1;
+      else if (fieldName === 'last_name') priority = 2;
+      else if (fieldName === 'date_of_birth') priority = 3;
+      else if (fieldName === 'place_of_birth') priority = 4;
+      else if (fieldName === 'nationality') priority = 5;
     } else if (['phone', 'phone_country', 'email'].includes(fieldName)) {
       category = 'contact';
     } else if (fieldName.startsWith('address_')) {
@@ -75,8 +83,14 @@ const groupFormDataByCategory = (formData: Array<{ fieldName: string; fieldValue
 
     categories[category].push({
       ...item,
-      label
+      label,
+      priority
     });
+  });
+
+  // Sort fields by priority within each category
+  Object.keys(categories).forEach(key => {
+    categories[key].sort((a, b) => a.priority - b.priority);
   });
 
   // Remove empty categories
@@ -109,9 +123,21 @@ const getCategoryInfo = (category: string) => {
 };
 
 // Format field value for display
-const formatFieldValue = (value: string): React.ReactNode => {
+const formatFieldValue = (fieldName: string, value: string): React.ReactNode => {
   if (!value || value === 'null' || value === 'undefined') {
     return <span className="text-muted-foreground italic">Not provided</span>;
+  }
+
+  // Check if it's a date field and format it (European format: DD.MM.YYYY)
+  if (fieldName.includes('date') || fieldName.includes('_dob') || fieldName.includes('birth')) {
+    try {
+      const date = new Date(value);
+      if (!isNaN(date.getTime())) {
+        return <span className="font-medium">{format(date, 'dd.MM.yyyy')}</span>;
+      }
+    } catch {
+      // Not a valid date, continue
+    }
   }
 
   // Check if it's a boolean
@@ -148,6 +174,11 @@ const formatFieldValue = (value: string): React.ReactNode => {
         {value}
       </div>
     );
+  }
+
+  // Format specific fields nicely
+  if (fieldName === 'phone' || fieldName === 'phone_number') {
+    return <span className="font-medium font-mono">{value}</span>;
   }
 
   // Regular text
@@ -260,7 +291,7 @@ export function KycFormDataDisplay({ formData }: KycFormDataDisplayProps) {
                           {field.label}
                         </p>
                         <div className="text-sm">
-                          {formatFieldValue(field.fieldValue)}
+                          {formatFieldValue(field.fieldName, field.fieldValue)}
                         </div>
                       </div>
                     ))}

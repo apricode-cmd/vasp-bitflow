@@ -384,17 +384,44 @@ export default function KycPage(): React.ReactElement {
         throw new Error(errorData.error || 'Failed to save profile data');
       }
 
-      toast.success('Profile data saved!');
+      console.log('✅ Profile data saved!');
 
-      // Then, start KYC session
+      // Then, start KYC session (if not exists)
+      console.log('🔐 Creating/getting KYC session...');
       const kycResponse = await fetch('/api/kyc/start', {
         method: 'POST'
       });
       
       const kycData = await kycResponse.json();
       
-      if (kycData.success && kycData.formUrl) {
-        toast.success('KYC session created! Opening verification form...');
+      if (!kycData.success) {
+        toast.error(kycData.error || 'Failed to start KYC verification');
+        throw new Error(kycData.error || 'Failed to start KYC verification');
+      }
+
+      console.log('✅ KYC session created!');
+
+      // Now save ALL form data to KycFormData
+      console.log('💾 Saving form data to database...');
+      const formDataResponse = await fetch('/api/kyc/submit-form', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ formData })
+      });
+
+      if (!formDataResponse.ok) {
+        const errorData = await formDataResponse.json();
+        console.error('Form data save error:', errorData);
+        throw new Error(errorData.error || 'Failed to save form data');
+      }
+
+      const formDataResult = await formDataResponse.json();
+      console.log('✅ Form data saved!', formDataResult.fieldsSaved, 'fields');
+      toast.success(`All data saved successfully! (${formDataResult.fieldsSaved} fields)`);
+
+      // Finally, open KYCAID form if available
+      if (kycData.formUrl) {
+        toast.success('Opening verification form...');
         // Open KYCAID form in new window
         window.open(kycData.formUrl, '_blank', 'width=800,height=900');
         // Reload to show status
@@ -402,7 +429,10 @@ export default function KycPage(): React.ReactElement {
           fetchKycStatus();
         }, 2000);
       } else {
-        toast.error(kycData.error || 'Failed to start KYC verification');
+        // Just reload status
+        setTimeout(() => {
+          fetchKycStatus();
+        }, 1000);
       }
     } catch (error: any) {
       console.error('Failed to submit KYC:', error);

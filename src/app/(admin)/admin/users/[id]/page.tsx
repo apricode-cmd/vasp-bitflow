@@ -28,6 +28,36 @@ interface UserDetails {
     phoneNumber: string | null;
     country: string;
     city: string | null;
+    // Extended KYC fields
+    dateOfBirth?: string | null;
+    placeOfBirth?: string | null;
+    nationality?: string | null;
+    phone?: string | null;
+    phoneCountry?: string | null;
+    addressStreet?: string | null;
+    addressCity?: string | null;
+    addressRegion?: string | null;
+    addressPostalCode?: string | null;
+    addressCountry?: string | null;
+    // Identity
+    idType?: string | null;
+    idNumber?: string | null;
+    idIssuingCountry?: string | null;
+    idIssueDate?: string | null;
+    idExpiryDate?: string | null;
+    // PEP
+    isPep?: boolean | null;
+    pepRole?: string | null;
+    // Employment
+    employmentStatus?: string | null;
+    occupation?: string | null;
+    employerName?: string | null;
+    // Funds
+    sourceOfFunds?: string | null;
+    sourceOfWealth?: string | null;
+    // Purpose
+    purposeOfAccount?: string | null;
+    intendedUse?: string | null;
   } | null;
   kycSession: {
     status: string;
@@ -403,64 +433,218 @@ export default function UserDetailPage({ params }: { params: { id: string } }): 
       )}
 
       {activeTab === 'kyc' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>KYC Information</CardTitle>
-            <CardDescription>KYC verification details</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {user.kycSession ? (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Status:</span>
-                  <Badge
-                    variant={
-                      user.kycSession.status === 'APPROVED'
-                        ? 'default'
-                        : user.kycSession.status === 'REJECTED'
-                        ? 'destructive'
-                        : 'secondary'
-                    }
-                  >
-                    {user.kycSession.status}
-                  </Badge>
-                </div>
-                {user.kycSession.submittedAt && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Submitted:</span>
-                    <span>{format(new Date(user.kycSession.submittedAt), 'PPP')}</span>
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>KYC Status</CardTitle>
+              <CardDescription>Verification status and timeline</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {user.kycSession ? (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Status:</span>
+                    <Badge
+                      variant={
+                        user.kycSession.status === 'APPROVED'
+                          ? 'default'
+                          : user.kycSession.status === 'REJECTED'
+                          ? 'destructive'
+                          : 'secondary'
+                      }
+                    >
+                      {user.kycSession.status}
+                    </Badge>
                   </div>
-                )}
-                {user.kycSession.reviewedAt && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Reviewed:</span>
-                    <span>{format(new Date(user.kycSession.reviewedAt), 'PPP')}</span>
-                  </div>
-                )}
-                {user.kycSession.documents.length > 0 && (
-                  <div>
-                    <h3 className="font-medium mb-2">Documents</h3>
-                    <div className="space-y-2">
-                      {user.kycSession.documents.map((doc, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 border rounded">
-                          <div>
-                            <div className="font-medium">{doc.documentType}</div>
-                            <div className="text-sm text-muted-foreground">{doc.fileName}</div>
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {format(new Date(doc.uploadedAt), 'PPP')}
-                          </div>
-                        </div>
-                      ))}
+                  {user.kycSession.submittedAt && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Submitted:</span>
+                      <span>{format(new Date(user.kycSession.submittedAt), 'PPP')}</span>
                     </div>
+                  )}
+                  {user.kycSession.reviewedAt && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Reviewed:</span>
+                      <span>{format(new Date(user.kycSession.reviewedAt), 'PPP')}</span>
+                    </div>
+                  )}
+                  <div className="mt-4">
+                    <Link href={`/admin/kyc?userId=${user.id}&autoOpen=true`}>
+                      <Button variant="outline" size="sm">
+                        View Full KYC Review
+                      </Button>
+                    </Link>
                   </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-muted-foreground">KYC not started</p>
-            )}
-          </CardContent>
-        </Card>
+                </div>
+              ) : (
+                <p className="text-muted-foreground">KYC not started</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Identity Document */}
+          {user.profile && user.profile.idType && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Identity Document</CardTitle>
+                <CardDescription>Official identification</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-sm text-muted-foreground">Document Type</span>
+                    <p className="font-medium">{user.profile.idType}</p>
+                  </div>
+                  {user.profile.idNumber && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">ID Number</span>
+                      <p className="font-medium">{user.profile.idNumber}</p>
+                    </div>
+                  )}
+                  {user.profile.idIssuingCountry && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">Issuing Country</span>
+                      <p className="font-medium">{user.profile.idIssuingCountry}</p>
+                    </div>
+                  )}
+                  {user.profile.idIssueDate && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">Issue Date</span>
+                      <p className="font-medium">{format(new Date(user.profile.idIssueDate), 'dd.MM.yyyy')}</p>
+                    </div>
+                  )}
+                  {user.profile.idExpiryDate && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">Expiry Date</span>
+                      <p className="font-medium">{format(new Date(user.profile.idExpiryDate), 'dd.MM.yyyy')}</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* PEP Status */}
+          {user.profile && user.profile.isPep !== null && user.profile.isPep !== undefined && (
+            <Card>
+              <CardHeader>
+                <CardTitle>PEP Status</CardTitle>
+                <CardDescription>Politically Exposed Person declaration</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Is PEP?</span>
+                    <Badge variant={user.profile.isPep ? 'destructive' : 'secondary'}>
+                      {user.profile.isPep ? 'Yes' : 'No'}
+                    </Badge>
+                  </div>
+                  {user.profile.isPep && user.profile.pepRole && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">PEP Role</span>
+                      <p className="font-medium">{user.profile.pepRole}</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Employment & Source of Funds */}
+          {user.profile && (user.profile.employmentStatus || user.profile.sourceOfFunds) && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Employment & Financial Information</CardTitle>
+                <CardDescription>Occupation and fund sources</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4">
+                  {user.profile.employmentStatus && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">Employment Status</span>
+                      <p className="font-medium">{user.profile.employmentStatus}</p>
+                    </div>
+                  )}
+                  {user.profile.occupation && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">Occupation</span>
+                      <p className="font-medium">{user.profile.occupation}</p>
+                    </div>
+                  )}
+                  {user.profile.employerName && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">Employer</span>
+                      <p className="font-medium">{user.profile.employerName}</p>
+                    </div>
+                  )}
+                  {user.profile.sourceOfFunds && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">Source of Funds</span>
+                      <p className="font-medium">{user.profile.sourceOfFunds}</p>
+                    </div>
+                  )}
+                  {user.profile.sourceOfWealth && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">Source of Wealth</span>
+                      <p className="font-medium">{user.profile.sourceOfWealth}</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Purpose of Account */}
+          {user.profile && (user.profile.purposeOfAccount || user.profile.intendedUse) && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Account Purpose</CardTitle>
+                <CardDescription>Intended use of the platform</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {user.profile.purposeOfAccount && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">Purpose</span>
+                      <p className="font-medium">{user.profile.purposeOfAccount}</p>
+                    </div>
+                  )}
+                  {user.profile.intendedUse && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">Intended Use</span>
+                      <p className="font-medium">{user.profile.intendedUse}</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Documents */}
+          {user.kycSession && user.kycSession.documents.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Uploaded Documents</CardTitle>
+                <CardDescription>KYC verification documents</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {user.kycSession.documents.map((doc, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <div className="font-medium">{doc.documentType}</div>
+                        <div className="text-sm text-muted-foreground">{doc.fileName}</div>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {format(new Date(doc.uploadedAt), 'PPP')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       )}
     </div>
   );

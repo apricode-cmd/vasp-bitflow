@@ -187,25 +187,37 @@ export async function startKycVerification(userId: string) {
     console.log(`✅ Form URL generated: ${formUrlResult.url}`);
 
     // Step 3: Save session in database (verification will be created via webhook after form submission)
-    const kycSession = await prisma.kycSession.create({
-      data: {
+    // Create or update KYC session in database
+    const kycSession = await prisma.kycSession.upsert({
+      where: { userId: userId },
+      create: {
         userId: userId,
-        // Don't set kycProviderId - it has a foreign key constraint we don't use
         kycaidApplicantId: applicant.applicantId,
         kycaidFormId: formId,
-        // verificationId will be set later via webhook
         status: 'PENDING',
         metadata: {
           applicantStatus: applicant.status,
           formUrl: formUrlResult.url,
-          provider: provider.providerId // Store provider in metadata instead
+          provider: provider.providerId
         },
         attempts: 1,
+        lastAttemptAt: new Date()
+      },
+      update: {
+        kycaidApplicantId: applicant.applicantId,
+        kycaidFormId: formId,
+        status: 'PENDING',
+        metadata: {
+          applicantStatus: applicant.status,
+          formUrl: formUrlResult.url,
+          provider: provider.providerId
+        },
+        attempts: { increment: 1 },
         lastAttemptAt: new Date()
       }
     });
 
-    console.log(`✅ KYC session created: ${kycSession.id}`);
+    console.log(`✅ KYC session ${kycSession.id} (attempts: ${kycSession.attempts})`);
 
     return {
       success: true,

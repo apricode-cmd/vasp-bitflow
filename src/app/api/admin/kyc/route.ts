@@ -38,7 +38,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           orderBy: { fieldName: 'asc' }
         },
         documents: {
-          orderBy: { createdAt: 'desc' }
+          orderBy: { uploadedAt: 'desc' }
         },
         profile: true
         // Note: provider relation removed - we use metadata.provider instead
@@ -58,14 +58,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             where: { service: providerId }
           });
 
-          if (integration) {
-            providerInfo = {
-              name: integration.name,
-              service: integration.service,
-              status: integration.status,
-              isEnabled: integration.isEnabled
-            };
-          }
+        if (integration) {
+          providerInfo = {
+            name: integration.service.toUpperCase(), // Use service as name
+            service: integration.service,
+            status: integration.status,
+            isEnabled: integration.isEnabled
+          };
+        }
         }
 
         return {

@@ -55,6 +55,7 @@ import { Combobox } from '@/components/shared/Combobox';
 import type { ComboboxOption } from '@/components/shared/Combobox';
 import { DynamicKycForm } from '@/components/forms/DynamicKycForm';
 import { formatDateTime } from '@/lib/formatters';
+import { format } from 'date-fns';
 import { toast } from 'sonner';
 import type { KycStatus } from '@prisma/client';
 import { 
@@ -190,6 +191,22 @@ export default function AdminKycPage(): JSX.Element {
     }
   }, [createDialogOpen]);
 
+  // Auto-open Sheet for specific user (from /admin/users/[id])
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const userId = params.get('userId');
+    const autoOpen = params.get('autoOpen');
+
+    if (userId && autoOpen === 'true' && kycSessions.length > 0) {
+      const userSession = kycSessions.find(s => s.userId === userId);
+      if (userSession) {
+        viewKycDetails(userSession);
+        // Clean URL
+        window.history.replaceState({}, '', '/admin/kyc');
+      }
+    }
+  }, [kycSessions]);
+
   const fetchKycSessions = async (): Promise<void> => {
     setRefreshing(true);
     try {
@@ -219,6 +236,10 @@ export default function AdminKycPage(): JSX.Element {
   };
 
   const viewKycDetails = (session: KycSession) => {
+    console.log('📊 Selected KYC Session:', session);
+    console.log('📝 Form Data:', session.formData);
+    console.log('📄 Documents:', session.documents);
+    console.log('🏢 Provider:', session.provider);
     setSelectedSession(session);
     setSheetOpen(true);
   };
@@ -270,9 +291,10 @@ export default function AdminKycPage(): JSX.Element {
 
       if (response.ok && data.success) {
         toast.success('KYC session deleted successfully');
-        await fetchKycSessions();
+        setSheetOpen(false); // Close the sheet
         setDeleteDialogOpen(false);
         setSelectedSession(null);
+        await fetchKycSessions();
       } else {
         toast.error(data.error || 'Failed to delete KYC session');
       }
@@ -811,7 +833,7 @@ export default function AdminKycPage(): JSX.Element {
                           <p className="text-muted-foreground">Date of Birth</p>
                           <p className="font-medium">
                             {selectedSession.profile.dateOfBirth 
-                              ? new Date(selectedSession.profile.dateOfBirth).toLocaleDateString()
+                              ? format(new Date(selectedSession.profile.dateOfBirth), 'dd.MM.yyyy')
                               : 'N/A'}
                           </p>
                         </div>
