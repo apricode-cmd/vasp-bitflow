@@ -832,20 +832,22 @@ export default function KycPage(): React.ReactElement {
 
                   return (
                     <div key={field.id} className="space-y-2">
-                      <Label htmlFor={field.fieldName} className="flex items-center gap-2">
-                        {field.label}
-                        {(field.isRequired || isConditionallyRequired) && <span className="text-destructive ml-1">*</span>}
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor={field.fieldName}>
+                          {field.label}
+                          {(field.isRequired || isConditionallyRequired) && <span className="text-destructive ml-1">*</span>}
+                        </Label>
                         {tooltip && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                          <Tooltip delayDuration={200}>
+                            <TooltipTrigger type="button" onClick={(e) => e.preventDefault()}>
+                              <HelpCircle className="h-4 w-4 text-muted-foreground" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-sm">
+                            <TooltipContent side="right" align="start" className="max-w-xs">
                               <p className="text-sm">{tooltip}</p>
                             </TooltipContent>
                           </Tooltip>
                         )}
-                      </Label>
+                      </div>
                       {renderField(field)}
                     </div>
                   );
