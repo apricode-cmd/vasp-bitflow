@@ -225,6 +225,33 @@ export default function KycPage(): React.ReactElement {
       }
     }
 
+    // Special validation for Employment fields (conditionally required)
+    const employmentStatus = formData['employment_status'];
+    if (employmentStatus) {
+      if (['EMPLOYED_FT', 'EMPLOYED_PT'].includes(employmentStatus)) {
+        if (!formData['employer_name']) missingFields.push('Employer Name');
+        if (!formData['job_title']) missingFields.push('Job Title / Role');
+        if (!formData['industry']) missingFields.push('Industry / Sector');
+        if (!formData['employment_country']) missingFields.push('Country of Employment');
+        if (!formData['employment_years']) missingFields.push('Length of Employment');
+        if (!formData['income_band_monthly']) missingFields.push('Monthly Net Income Band');
+      } else if (employmentStatus === 'SELF_EMPLOYED') {
+        if (!formData['biz_name']) missingFields.push('Business / Trade Name');
+        if (!formData['biz_activity']) missingFields.push('Business Activity / Industry');
+        if (!formData['biz_country']) missingFields.push('Business Country');
+        if (!formData['biz_years']) missingFields.push('Years in Business');
+        if (!formData['revenue_band_annual']) missingFields.push('Annual Revenue Band');
+      } else if (employmentStatus === 'STUDENT') {
+        if (!formData['institution_name']) missingFields.push('Institution Name');
+        if (!formData['student_funding_source']) missingFields.push('Funding Source');
+      } else if (employmentStatus === 'OTHER') {
+        if (!formData['other_employment_note'] || formData['other_employment_note'].length < 3) {
+          toast.error('Please describe your situation (min 3 characters)');
+          return;
+        }
+      }
+    }
+
     if (missingFields.length > 0) {
       toast.error(`Please fill in required fields: ${missingFields.join(', ')}`);
       return;
@@ -346,6 +373,8 @@ export default function KycPage(): React.ReactElement {
         let placeholder = field.label;
         if (field.fieldName === 'pep_since' || field.fieldName === 'pep_until') {
           placeholder = 'YYYY-MM (e.g., 2020-05)';
+        } else if (field.fieldName === 'employer_name') {
+          placeholder = 'e.g., ACME Sp. z o.o.';
         }
         
         return (
@@ -434,6 +463,102 @@ export default function KycPage(): React.ReactElement {
               onChange={(country) => onChange(country.alpha3)}
               placeholder={`Select ${field.label}`}
             />
+          );
+        }
+
+        // Special handling for employment_country and biz_country
+        if (field.fieldName === 'employment_country' || field.fieldName === 'biz_country') {
+          return (
+            <CountryDropdown
+              defaultValue={value}
+              onChange={(country) => onChange(country.alpha3)}
+              placeholder={`Select ${field.label}`}
+            />
+          );
+        }
+
+        // Special handling for employment_status with labels
+        if (field.fieldName === 'employment_status') {
+          const employmentLabels: Record<string, string> = {
+            EMPLOYED_FT: 'Employed (Full-time)',
+            EMPLOYED_PT: 'Employed (Part-time)',
+            SELF_EMPLOYED: 'Self-employed / Sole trader',
+            UNEMPLOYED: 'Unemployed',
+            STUDENT: 'Student',
+            RETIRED: 'Retired',
+            HOMEMAKER: 'Homemaker / Caregiver',
+            OTHER: 'Other',
+          };
+
+          return (
+            <Select value={value} onValueChange={onChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select Employment Status" />
+              </SelectTrigger>
+              <SelectContent>
+                {options.map((opt: string) => (
+                  <SelectItem key={opt} value={opt}>
+                    {employmentLabels[opt] || opt}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          );
+        }
+
+        // Special handling for student_funding_source with labels
+        if (field.fieldName === 'student_funding_source') {
+          const fundingLabels: Record<string, string> = {
+            family: 'Family support',
+            scholarship: 'Scholarship/Grant',
+            part_time: 'Part-time work',
+            savings: 'Savings',
+            other: 'Other',
+          };
+
+          return (
+            <Select value={value} onValueChange={onChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select funding source" />
+              </SelectTrigger>
+              <SelectContent>
+                {options.map((opt: string) => (
+                  <SelectItem key={opt} value={opt}>
+                    {fundingLabels[opt] || opt}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          );
+        }
+
+        // Special handling for primary_source_of_funds with labels
+        if (field.fieldName === 'primary_source_of_funds') {
+          const sofLabels: Record<string, string> = {
+            salary: 'Salary',
+            business: 'Business income',
+            investments: 'Investments',
+            savings: 'Savings',
+            pension: 'Pension',
+            gift_inheritance: 'Gift/Inheritance',
+            benefits: 'State benefits',
+            family_support: 'Family support',
+            other: 'Other',
+          };
+
+          return (
+            <Select value={value} onValueChange={onChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select primary source of funds" />
+              </SelectTrigger>
+              <SelectContent>
+                {options.map((opt: string) => (
+                  <SelectItem key={opt} value={opt}>
+                    {sofLabels[opt] || opt}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           );
         }
 
@@ -617,6 +742,16 @@ export default function KycPage(): React.ReactElement {
                     PEP information is required for AML risk assessment. Sanctions screening is performed automatically.
                   </p>
                 </div>
+              ) : category === 'employment' ? (
+                <div className="space-y-2">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <User className="h-5 w-5 text-primary" />
+                    Employment & Source of Funds
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Used for AML risk assessment. We only ask for ranges.
+                  </p>
+                </div>
               ) : (
                 <h3 className="text-lg font-semibold capitalize">
                   {category.replace(/_/g, ' ')}
@@ -625,9 +760,10 @@ export default function KycPage(): React.ReactElement {
 
               <div className="grid gap-4">
                 {categoryFields.map(field => {
-                  // Get tooltip for PEP fields
-                  const getPepTooltip = (fieldName: string): string | null => {
+                  // Get tooltip for all fields
+                  const getFieldTooltip = (fieldName: string): string | null => {
                     const tooltips: Record<string, string> = {
+                      // PEP tooltips
                       pep_status: 'PEP (Politically Exposed Person) — an individual who is or has been entrusted with a prominent public function (e.g., heads of state, ministers, MPs, judges, senior military, state-owned enterprise executives). Family members include spouse/partner, parents, children and their spouses/partners. Close associates are people known to have close business or personal ties with a PEP.',
                       pep_role_title: 'The public function or position held by the PEP.',
                       pep_institution: 'Name of the public institution, state body or state-owned enterprise.',
@@ -636,7 +772,13 @@ export default function KycPage(): React.ReactElement {
                       pep_until: 'Month and year when the PEP role ended.',
                       relationship_to_pep: 'Your relationship to the PEP. Choose \'other\' if none of the above apply.',
                       pep_additional_info: 'Provide clarifications that help our compliance team evaluate the exposure.',
-                      pep_evidence_file: 'Optional proof (e.g., public registry entry, official letter, news reference).'
+                      pep_evidence_file: 'Optional proof (e.g., public registry entry, official letter, news reference).',
+                      // Employment tooltips
+                      employment_status: 'Your current work situation. Choose \'Other\' if none apply.',
+                      income_band_monthly: 'Pick a range, not the exact amount.',
+                      revenue_band_annual: 'Pick a range, not the exact amount.',
+                      industry: 'Your employer\'s (or your) business sector.',
+                      primary_source_of_funds: 'Where the funds used with us mainly come from.',
                     };
                     return tooltips[fieldName] || null;
                   };
@@ -660,8 +802,33 @@ export default function KycPage(): React.ReactElement {
                     return null;
                   }
 
-                  const tooltip = getPepTooltip(field.fieldName);
-                  const isConditionallyRequired = isPepSubField && pepStatus && pepStatus !== 'NO';
+                  // Determine if Employment subfield should be shown
+                  const employmentStatus = formData['employment_status'];
+                  const isEmployedField = ['employer_name', 'job_title', 'industry', 'employment_country', 'employment_years', 'income_band_monthly'].includes(field.fieldName);
+                  const isSelfEmployedField = ['biz_name', 'biz_activity', 'biz_country', 'biz_years', 'revenue_band_annual', 'tax_or_reg_number'].includes(field.fieldName);
+                  const isStudentField = ['institution_name', 'student_funding_source'].includes(field.fieldName);
+                  const isOtherEmploymentField = field.fieldName === 'other_employment_note';
+
+                  // Hide employment subfields based on status
+                  if (isEmployedField && (!employmentStatus || !['EMPLOYED_FT', 'EMPLOYED_PT'].includes(employmentStatus))) {
+                    return null;
+                  }
+                  if (isSelfEmployedField && employmentStatus !== 'SELF_EMPLOYED') {
+                    return null;
+                  }
+                  if (isStudentField && employmentStatus !== 'STUDENT') {
+                    return null;
+                  }
+                  if (isOtherEmploymentField && employmentStatus !== 'OTHER') {
+                    return null;
+                  }
+
+                  const tooltip = getFieldTooltip(field.fieldName);
+                  const isConditionallyRequired = (isPepSubField && pepStatus && pepStatus !== 'NO') || 
+                                                   (isEmployedField && employmentStatus && ['EMPLOYED_FT', 'EMPLOYED_PT'].includes(employmentStatus)) ||
+                                                   (isSelfEmployedField && employmentStatus === 'SELF_EMPLOYED' && field.fieldName !== 'tax_or_reg_number') ||
+                                                   (isStudentField && employmentStatus === 'STUDENT') ||
+                                                   (isOtherEmploymentField && employmentStatus === 'OTHER');
 
                   return (
                     <div key={field.id} className="space-y-2">
@@ -669,16 +836,14 @@ export default function KycPage(): React.ReactElement {
                         {field.label}
                         {(field.isRequired || isConditionallyRequired) && <span className="text-destructive ml-1">*</span>}
                         {tooltip && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
-                              </TooltipTrigger>
-                              <TooltipContent className="max-w-sm">
-                                <p className="text-sm">{tooltip}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-sm">
+                              <p className="text-sm">{tooltip}</p>
+                            </TooltipContent>
+                          </Tooltip>
                         )}
                       </Label>
                       {renderField(field)}
@@ -952,7 +1117,8 @@ export default function KycPage(): React.ReactElement {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-in p-6">
+    <TooltipProvider>
+      <div className="max-w-4xl mx-auto space-y-6 animate-in p-6">
       {/* Header */}
       <div className="space-y-2">
         <h1 className="text-3xl font-bold flex items-center gap-2">
@@ -1058,5 +1224,6 @@ export default function KycPage(): React.ReactElement {
         </AlertDescription>
       </Alert>
     </div>
+    </TooltipProvider>
   );
 }
