@@ -33,12 +33,49 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           include: { 
             profile: true 
           }
-        }
+        },
+        formData: {
+          orderBy: { fieldName: 'asc' }
+        },
+        documents: {
+          orderBy: { createdAt: 'desc' }
+        },
+        profile: true,
+        provider: true // Include KYC provider info
       },
       orderBy: status === 'PENDING' ? { submittedAt: 'desc' } : { createdAt: 'desc' }
     });
 
-    return NextResponse.json({ kycSessions });
+    // Transform data to include provider metadata from Integration
+    const sessionsWithProvider = await Promise.all(
+      kycSessions.map(async (session) => {
+        let providerInfo = null;
+
+        // If session has metadata.provider, get integration info
+        const providerId = (session.metadata as any)?.provider;
+        if (providerId) {
+          const integration = await prisma.integration.findUnique({
+            where: { service: providerId }
+          });
+
+          if (integration) {
+            providerInfo = {
+              name: integration.name,
+              service: integration.service,
+              status: integration.status,
+              isEnabled: integration.isEnabled
+            };
+          }
+        }
+
+        return {
+          ...session,
+          provider: providerInfo
+        };
+      })
+    );
+
+    return NextResponse.json({ kycSessions: sessionsWithProvider });
   } catch (error) {
     console.error('Admin get KYC sessions error:', error);
     return NextResponse.json(

@@ -42,6 +42,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { DataTable } from '@/components/admin/DataTable';
 import { KycStatusBadge } from '@/components/features/KycStatusBadge';
 import { Combobox } from '@/components/shared/Combobox';
@@ -52,7 +58,9 @@ import { toast } from 'sonner';
 import type { KycStatus } from '@prisma/client';
 import { 
   Shield, Eye, CheckCircle, XCircle, RefreshCw, 
-  ExternalLink, FileText, Users, Image as ImageIcon
+  ExternalLink, FileText, Users, Image as ImageIcon,
+  MapPin, Briefcase, Scale, TrendingUp, Target, Activity,
+  Phone, Mail, User, Home, Building2, Wallet, CreditCard
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -357,6 +365,87 @@ export default function AdminKycPage(): JSX.Element {
     }
   };
 
+  // Helper: Group formData by category
+  const groupFormDataByCategory = (formData: Array<{ fieldName: string; fieldValue: string }>) => {
+    const categories: Record<string, Array<{ fieldName: string; fieldValue: string; label: string }>> = {
+      personal: [],
+      contact: [],
+      address: [],
+      documents: [],
+      employment: [],
+      pep_sanctions: [],
+      purpose: [],
+      funds: [],
+      activity: [],
+      consents: [],
+      other: []
+    };
+
+    formData.forEach(item => {
+      // Map field names to categories
+      const fieldName = item.fieldName.toLowerCase();
+      let category = 'other';
+
+      if (['first_name', 'last_name', 'date_of_birth', 'place_of_birth', 'nationality'].includes(fieldName)) {
+        category = 'personal';
+      } else if (['phone', 'phone_country', 'email'].includes(fieldName)) {
+        category = 'contact';
+      } else if (fieldName.startsWith('address_')) {
+        category = 'address';
+      } else if (fieldName.startsWith('id_') || fieldName.includes('document')) {
+        category = 'documents';
+      } else if (fieldName.startsWith('employment') || fieldName.includes('employer') || fieldName.includes('occupation') || fieldName.includes('income') || fieldName.includes('biz_') || fieldName.includes('student') || fieldName.includes('industry') || fieldName === 'job_title' || fieldName === 'tax_or_reg_number' || fieldName === 'institution_name' || fieldName === 'revenue_band_annual' || fieldName === 'other_employment_note') {
+        category = 'employment';
+      } else if (fieldName.startsWith('pep_') || fieldName.includes('sanction') || fieldName === 'relationship_to_pep') {
+        category = 'pep_sanctions';
+      } else if (fieldName.startsWith('purpose')) {
+        category = 'purpose';
+      } else if (fieldName.includes('source') || fieldName.includes('funds') || fieldName.includes('wealth') || fieldName === 'additional_sources') {
+        category = 'funds';
+      } else if (fieldName.startsWith('expected_') || fieldName.startsWith('dest_')) {
+        category = 'activity';
+      } else if (fieldName.startsWith('consent_')) {
+        category = 'consents';
+      }
+
+      // Create readable label
+      const label = item.fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+      categories[category].push({
+        ...item,
+        label
+      });
+    });
+
+    // Remove empty categories
+    Object.keys(categories).forEach(key => {
+      if (categories[key].length === 0) {
+        delete categories[key];
+      }
+    });
+
+    return categories;
+  };
+
+  // Helper: Get category icon and name
+  const getCategoryInfo = (category: string) => {
+    const categoryMap: Record<string, { icon: any; name: string; description: string }> = {
+      personal: { icon: User, name: 'Personal Information', description: 'Basic identity details' },
+      contact: { icon: Phone, name: 'Contact Information', description: 'Email and phone' },
+      address: { icon: MapPin, name: 'Residential Address', description: 'Physical address details' },
+      documents: { icon: FileText, name: 'Identity Documents', description: 'ID, passport, etc.' },
+      employment: { icon: Briefcase, name: 'Employment & Income', description: 'Work status and income' },
+      pep_sanctions: { icon: Scale, name: 'PEP & Sanctions', description: 'Political exposure and screening' },
+      purpose: { icon: Target, name: 'Purpose of Account', description: 'Intended use' },
+      funds: { icon: TrendingUp, name: 'Source of Funds', description: 'Origin of money' },
+      activity: { icon: Activity, name: 'Expected Activity', description: 'Transaction patterns' },
+      consents: { icon: CheckCircle, name: 'Consents & Compliance', description: 'User agreements' },
+      other: { icon: FileText, name: 'Other Information', description: 'Additional data' }
+    };
+
+    return categoryMap[category] || categoryMap.other;
+  };
+
   // Define table columns
   const columns: ColumnDef<KycSession>[] = [
     {
@@ -406,8 +495,32 @@ export default function AdminKycPage(): JSX.Element {
       ),
     },
     {
+      accessorKey: 'provider',
+      header: 'KYC Provider',
+      cell: ({ row }) => {
+        const provider = row.original.provider;
+        if (!provider) {
+          return <span className="text-sm text-muted-foreground">—</span>;
+        }
+        
+        return (
+          <div className="flex items-center gap-2">
+            <Badge 
+              variant={provider.isEnabled ? 'default' : 'secondary'}
+              className="font-mono text-xs"
+            >
+              {provider.name}
+            </Badge>
+            {provider.status === 'active' && (
+              <CheckCircle className="h-3 w-3 text-green-600" />
+            )}
+          </div>
+        );
+      },
+    },
+    {
       accessorKey: 'kycaidVerificationId',
-      header: 'KYCAID',
+      header: 'Verification ID',
       cell: ({ row }) => (
         row.original.kycaidVerificationId ? (
           <Badge variant="outline" className="font-mono text-xs">
