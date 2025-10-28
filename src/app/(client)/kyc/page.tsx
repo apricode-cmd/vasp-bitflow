@@ -73,7 +73,7 @@ interface KycSession {
 const STEPS = [
   { id: 1, title: 'Personal Info', categories: ['personal'] },
   { id: 2, title: 'Contact & Address', categories: ['contact', 'address'] },
-  { id: 3, title: 'Documents & Employment', categories: ['documents', 'employment', 'pep_sanctions'] },
+  { id: 3, title: 'Compliance Profile', categories: ['documents', 'employment', 'pep_sanctions'] },
   { id: 4, title: 'Additional Info', categories: ['purpose', 'activity', 'funds', 'consents'] },
 ];
 
@@ -838,11 +838,22 @@ export default function KycPage(): React.ReactElement {
                           {(field.isRequired || isConditionallyRequired) && <span className="text-destructive ml-1">*</span>}
                         </Label>
                         {tooltip && (
-                          <Tooltip delayDuration={200}>
-                            <TooltipTrigger type="button" onClick={(e) => e.preventDefault()}>
-                              <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                          <Tooltip delayDuration={0}>
+                            <TooltipTrigger asChild>
+                              <button 
+                                type="button" 
+                                className="inline-flex items-center justify-center shrink-0"
+                                aria-label="Help"
+                              >
+                                <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
+                              </button>
                             </TooltipTrigger>
-                            <TooltipContent side="right" align="start" className="max-w-xs">
+                            <TooltipContent 
+                              side="top"
+                              className="max-w-xs z-[9999]"
+                              sideOffset={8}
+                              collisionPadding={10}
+                            >
                               <p className="text-sm">{tooltip}</p>
                             </TooltipContent>
                           </Tooltip>
@@ -1173,7 +1184,10 @@ export default function KycPage(): React.ReactElement {
         <CardHeader>
           <CardTitle>{STEPS[currentStep - 1]?.title}</CardTitle>
           <CardDescription>
-            Please fill in all required fields marked with *
+            {currentStep === 3 
+              ? 'Employment, Source of Funds & PEP details — used for AML/CFT risk assessment'
+              : 'Please fill in all required fields marked with *'
+            }
           </CardDescription>
         </CardHeader>
         <CardContent>
