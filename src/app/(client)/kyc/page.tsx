@@ -252,6 +252,15 @@ export default function KycPage(): React.ReactElement {
       }
     }
 
+    // Special validation for Purpose note (conditionally required)
+    const purpose = formData['purpose'];
+    if (purpose === 'other' || purpose === 'business_payments') {
+      if (!formData['purpose_note'] || formData['purpose_note'].length < 10) {
+        toast.error('Please provide additional details (min 10 characters) for your purpose');
+        return;
+      }
+    }
+
     if (missingFields.length > 0) {
       toast.error(`Please fill in required fields: ${missingFields.join(', ')}`);
       return;
@@ -535,14 +544,13 @@ export default function KycPage(): React.ReactElement {
         // Special handling for primary_source_of_funds with labels
         if (field.fieldName === 'primary_source_of_funds') {
           const sofLabels: Record<string, string> = {
-            salary: 'Salary',
-            business: 'Business income',
-            investments: 'Investments',
+            salary: 'Salary/wages',
+            business: 'Business income (self-employed)',
+            investments: 'Investments (stocks/bonds/funds)',
             savings: 'Savings',
             pension: 'Pension',
             gift_inheritance: 'Gift/Inheritance',
             benefits: 'State benefits',
-            family_support: 'Family support',
             other: 'Other',
           };
 
@@ -555,6 +563,79 @@ export default function KycPage(): React.ReactElement {
                 {options.map((opt: string) => (
                   <SelectItem key={opt} value={opt}>
                     {sofLabels[opt] || opt}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          );
+        }
+
+        // Special handling for purpose with labels
+        if (field.fieldName === 'purpose') {
+          const purposeLabels: Record<string, string> = {
+            personal_buy: 'Buy crypto for personal use',
+            investment: 'Long-term investment',
+            remittance: 'Remittance to family/friends',
+            business_payments: 'Business payments (own company)',
+            trading: 'Trading/speculation',
+            other: 'Other',
+          };
+
+          return (
+            <Select value={value} onValueChange={onChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select purpose" />
+              </SelectTrigger>
+              <SelectContent>
+                {options.map((opt: string) => (
+                  <SelectItem key={opt} value={opt}>
+                    {purposeLabels[opt] || opt}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          );
+        }
+
+        // Special handling for dest_wallet_type with labels
+        if (field.fieldName === 'dest_wallet_type') {
+          const walletLabels: Record<string, string> = {
+            self_custody: 'Self-custody',
+            custodial: 'Custodial (exchange/wallet provider)',
+          };
+
+          return (
+            <Select value={value} onValueChange={onChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select wallet type" />
+              </SelectTrigger>
+              <SelectContent>
+                {options.map((opt: string) => (
+                  <SelectItem key={opt} value={opt}>
+                    {walletLabels[opt] || opt}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          );
+        }
+
+        // Special handling for expected_payment_methods with labels
+        if (field.fieldName === 'expected_payment_methods') {
+          const methodLabels: Record<string, string> = {
+            card: 'Card',
+            bank: 'Bank transfer',
+          };
+
+          return (
+            <Select value={value} onValueChange={onChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select payment methods" />
+              </SelectTrigger>
+              <SelectContent>
+                {options.map((opt: string) => (
+                  <SelectItem key={opt} value={opt}>
+                    {methodLabels[opt] || opt}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -682,6 +763,78 @@ export default function KycPage(): React.ReactElement {
             >
               {field.label}
             </label>
+          </div>
+        );
+
+      case 'multiselect':
+        // Parse options
+        let multiselectOptions = field.options || [];
+        if (typeof multiselectOptions === 'string') {
+          try {
+            multiselectOptions = JSON.parse(multiselectOptions);
+          } catch (e) {
+            multiselectOptions = [];
+          }
+        }
+
+        // Get labels for specific fields
+        const getMultiselectLabels = (fieldName: string): Record<string, string> => {
+          if (fieldName === 'additional_sources') {
+            return {
+              salary: 'Salary/wages',
+              business: 'Business income',
+              savings: 'Savings',
+              investments: 'Investments',
+              pension: 'Pension',
+              gift_inheritance: 'Gift/Inheritance',
+              benefits: 'State benefits',
+              other: 'Other',
+            };
+          }
+          if (fieldName === 'expected_assets') {
+            return {
+              BTC: 'BTC',
+              ETH: 'ETH',
+              USDT: 'USDT',
+              USDC: 'USDC',
+              SOL: 'SOL',
+              other: 'Other',
+            };
+          }
+          if (fieldName === 'expected_payment_methods') {
+            return {
+              card: 'Card',
+              bank: 'Bank transfer',
+            };
+          }
+          return {};
+        };
+
+        const multiselectLabels = getMultiselectLabels(field.fieldName);
+        const selectedValues = Array.isArray(value) ? value : (value ? [value] : []);
+
+        return (
+          <div className="space-y-2">
+            {multiselectOptions.map((option: string) => (
+              <div key={option} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`${field.fieldName}-${option}`}
+                  checked={selectedValues.includes(option)}
+                  onCheckedChange={(checked) => {
+                    const newValues = checked
+                      ? [...selectedValues, option]
+                      : selectedValues.filter((v) => v !== option);
+                    onChange(newValues);
+                  }}
+                />
+                <label
+                  htmlFor={`${field.fieldName}-${option}`}
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  {multiselectLabels[option] || option}
+                </label>
+              </div>
+            ))}
           </div>
         );
 
@@ -893,6 +1046,16 @@ export default function KycPage(): React.ReactElement {
                   <Info className="h-4 w-4 text-blue-600" />
                   <AlertDescription className="text-sm text-blue-800 dark:text-blue-200">
                     Sanctions and adverse media screening is performed automatically. You do not need to provide this information manually.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Self-custody wallet notice */}
+              {category === 'activity' && formData['dest_wallet_type'] === 'self_custody' && (
+                <Alert className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-sm text-amber-800 dark:text-amber-200">
+                    For transfers over €1,000 you may be asked to confirm ownership (e.g., message signature) in accordance with EU Travel Rule.
                   </AlertDescription>
                 </Alert>
               )}
