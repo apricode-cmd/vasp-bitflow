@@ -74,7 +74,7 @@ const STEPS = [
   { id: 1, title: 'Personal Info', categories: ['personal'] },
   { id: 2, title: 'Contact & Address', categories: ['contact', 'address'] },
   { id: 3, title: 'Compliance Profile', categories: ['documents', 'employment', 'pep_sanctions'] },
-  { id: 4, title: 'Additional Info', categories: ['purpose', 'activity', 'funds', 'consents'] },
+  { id: 4, title: 'Intended Use & Funds', categories: ['purpose', 'funds', 'activity'] },
 ];
 
 export default function KycPage(): React.ReactElement {
@@ -752,6 +752,17 @@ export default function KycPage(): React.ReactElement {
                     Used for AML risk assessment. We only ask for ranges.
                   </p>
                 </div>
+              ) : category === 'purpose' ? (
+                <h3 className="text-lg font-semibold">Purpose of Account</h3>
+              ) : category === 'funds' ? (
+                <h3 className="text-lg font-semibold">Source of Funds</h3>
+              ) : category === 'activity' ? (
+                <div className="space-y-2">
+                  <h3 className="text-lg font-semibold">Expected Activity</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Help us understand your planned usage patterns
+                  </p>
+                </div>
               ) : (
                 <h3 className="text-lg font-semibold capitalize">
                   {category.replace(/_/g, ' ')}
@@ -778,7 +789,16 @@ export default function KycPage(): React.ReactElement {
                       income_band_monthly: 'Pick a range, not the exact amount.',
                       revenue_band_annual: 'Pick a range, not the exact amount.',
                       industry: 'Your employer\'s (or your) business sector.',
-                      primary_source_of_funds: 'Where the funds used with us mainly come from.',
+                      // Step 4 tooltips
+                      purpose: 'Main intended use of the service.',
+                      primary_source_of_funds: 'Main origin of the money you will use with us.',
+                      additional_sources: 'Any additional funding sources (optional).',
+                      expected_avg_monthly: 'Pick a range, not the exact amount.',
+                      expected_max_ticket: 'Pick a range, not the exact amount.',
+                      expected_frequency_per_month: 'How often you plan to make transactions.',
+                      expected_payment_methods: 'Payment methods you intend to use.',
+                      expected_assets: 'Which cryptocurrencies you plan to buy.',
+                      dest_wallet_type: 'If you use a self-custody wallet, ownership checks may apply for transfers over €1,000 (EU Travel Rule).',
                     };
                     return tooltips[fieldName] || null;
                   };
@@ -808,6 +828,13 @@ export default function KycPage(): React.ReactElement {
                   const isSelfEmployedField = ['biz_name', 'biz_activity', 'biz_country', 'biz_years', 'revenue_band_annual', 'tax_or_reg_number'].includes(field.fieldName);
                   const isStudentField = ['institution_name', 'student_funding_source'].includes(field.fieldName);
                   const isOtherEmploymentField = field.fieldName === 'other_employment_note';
+
+                  // Determine if Purpose note should be shown
+                  const purpose = formData['purpose'];
+                  const isPurposeNote = field.fieldName === 'purpose_note';
+                  if (isPurposeNote && purpose !== 'other' && purpose !== 'business_payments') {
+                    return null;
+                  }
 
                   // Hide employment subfields based on status
                   if (isEmployedField && (!employmentStatus || !['EMPLOYED_FT', 'EMPLOYED_PT'].includes(employmentStatus))) {
@@ -1181,6 +1208,8 @@ export default function KycPage(): React.ReactElement {
           <CardDescription>
             {currentStep === 3 
               ? 'Employment, Source of Funds & PEP details — used for AML/CFT risk assessment'
+              : currentStep === 4
+              ? 'Used for AML risk assessment. We only ask for ranges.'
               : 'Please fill in all required fields marked with *'
             }
           </CardDescription>
