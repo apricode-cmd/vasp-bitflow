@@ -340,7 +340,7 @@ export default function KycPage(): React.ReactElement {
           return (
             <CountryDropdown
               defaultValue={value}
-              onChange={(country) => onChange(country.alpha2)}
+              onChange={(country) => onChange(country.alpha3)}
               placeholder={`Select ${field.label}`}
             />
           );

@@ -687,16 +687,16 @@ export function OrderKanban({
 
         {/* Kanban Board */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-          {KANBAN_COLUMNS.map((column) => {
-            const columnOrders = getOrdersByStatus(column.id);
+      {KANBAN_COLUMNS.map((column) => {
+        const columnOrders = getOrdersByStatus(column.id);
             const Icon = column.icon;
             const isDragOver = dragOverColumn === column.id;
             const isDropAllowed = draggedOrder && isTransitionAllowed(draggedOrder.status, column.id);
             const columnTotal = calculateColumnTotal(columnOrders);
 
-            return (
-              <div
-                key={column.id}
+        return (
+          <div
+            key={column.id}
                 className={`flex flex-col rounded-xl border-2 transition-all duration-300 ${
                   isDragOver && isDropAllowed
                     ? `${column.color} border-dashed shadow-lg scale-[1.02]` 
@@ -706,8 +706,8 @@ export function OrderKanban({
                 }`}
                 onDragOver={(e) => handleDragOver(e, column.id)}
                 onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, column.id)}
-              >
+            onDrop={(e) => handleDrop(e, column.id)}
+          >
                 {/* Column Header */}
                 <div className={`${column.bgColor} rounded-t-lg p-4 border-b`}>
                   <div className="flex items-center justify-between mb-3">
@@ -716,7 +716,7 @@ export function OrderKanban({
                         <TooltipTrigger asChild>
                           <div className={`h-10 w-10 rounded-lg bg-background/80 flex items-center justify-center shadow-sm cursor-help`}>
                             <Icon className={`h-5 w-5 ${column.iconColor}`} />
-                          </div>
+              </div>
                         </TooltipTrigger>
                         <TooltipContent side="right">
                           <p className="font-semibold">{column.label}</p>
@@ -726,14 +726,14 @@ export function OrderKanban({
                       <div>
                         <h3 className="font-bold text-sm">{column.label}</h3>
                         <p className="text-xs text-muted-foreground">{column.description}</p>
-                      </div>
+            </div>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
+                    </div>
+
+                    <div className="flex items-center justify-between">
                     <Badge variant="secondary" className="font-semibold">
                       {columnOrders.length} {columnOrders.length === 1 ? 'order' : 'orders'}
-                    </Badge>
+                      </Badge>
                     {columnTotal > 0 && (
                       <span className="text-xs font-bold">
                         {formatCurrency(columnTotal, 'EUR')}
@@ -861,10 +861,10 @@ export function OrderKanban({
                                     {/* Date */}
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                       <Calendar className="h-3 w-3" />
-                                      {formatDate(new Date(order.createdAt))}
-                                    </div>
-                                  </CardContent>
-                                </Card>
+                      {formatDate(new Date(order.createdAt))}
+                    </div>
+                  </CardContent>
+                </Card>
                               </HoverCardTrigger>
                               <HoverCardContent className="w-80" side="right">
                                 <div className="space-y-3">
@@ -992,7 +992,7 @@ export function OrderKanban({
                     })}
 
                     {/* Empty State */}
-                    {columnOrders.length === 0 && (
+              {columnOrders.length === 0 && (
                       <div className={`text-center py-16 border-2 border-dashed rounded-xl transition-all ${
                         isDragOver && isDropAllowed
                           ? `${column.color} bg-accent/50 scale-105` 
@@ -1031,14 +1031,14 @@ export function OrderKanban({
                             </p>
                           )}
                         </div>
-                      </div>
-                    )}
-                  </div>
+                </div>
+              )}
+            </div>
                 </ScrollArea>
-              </div>
-            );
-          })}
-        </div>
+          </div>
+        );
+      })}
+    </div>
 
         {/* Bulk Action Confirmation Dialog */}
         <AlertDialog open={bulkActionDialog.open} onOpenChange={(open) => setBulkActionDialog({ ...bulkActionDialog, open })}>
