@@ -29,6 +29,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { QRCode } from '@/components/ui/shadcn-io/qr-code';
 import type { Value as PhoneValue } from 'react-phone-number-input';
 import {
   Select,
@@ -42,7 +43,8 @@ import { toast } from 'sonner';
 import { 
   Shield, CheckCircle, XCircle, Clock, Loader2, 
   FileText, Camera, User, AlertCircle, ArrowRight, ArrowLeft,
-  Check, Scale, FolderArchive, RefreshCw, Info, Upload, HelpCircle
+  Check, Scale, FolderArchive, RefreshCw, Info, Upload, HelpCircle,
+  Smartphone, ExternalLink, QrCode
 } from 'lucide-react';
 import { KycStatus } from '@prisma/client';
 import { formatDateTime } from '@/lib/formatters';
@@ -1143,52 +1145,152 @@ export default function KycPage(): React.ReactElement {
           </CardHeader>
           <CardContent className="space-y-4">
             {kycSession.status === 'PENDING' && (
-              <Alert>
-                <Clock className="h-4 w-4" />
-                <AlertTitle>Under Review</AlertTitle>
-                <AlertDescription>
-                  {kycSession.formUrl ? (
-                    <>
-                      Please complete the verification form to upload your documents and take a selfie.
-                      <Button 
-                        className="mt-3 w-full"
-                        onClick={() => window.open(kycSession.formUrl!, '_blank', 'width=800,height=900')}
-                      >
-                        <FileText className="h-4 w-4 mr-2" />
-                        Complete Verification Form
-                      </Button>
-                    </>
-                  ) : (
-                    'Your documents are being reviewed by our team. This usually takes 2-4 hours.'
-                  )}
-                </AlertDescription>
-              </Alert>
+              <div className="space-y-6">
+                {/* Info Alert */}
+                <Alert className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-blue-200 dark:border-blue-800">
+                  <Camera className="h-5 w-5 text-blue-600" />
+                  <AlertTitle className="text-blue-900 dark:text-blue-100 font-semibold">
+                    Complete Your Verification
+                  </AlertTitle>
+                  <AlertDescription className="text-blue-800 dark:text-blue-200 mt-2">
+                    {kycSession.formUrl ? (
+                      <div className="space-y-4">
+                        <p>
+                          Please complete the verification form to upload your documents and take a selfie. 
+                          This process takes about 5-7 minutes.
+                        </p>
+                        
+                        {/* Desktop + Mobile Options */}
+                        <div className="grid md:grid-cols-2 gap-4 mt-4">
+                          {/* Desktop Button */}
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium text-blue-900 dark:text-blue-100 flex items-center gap-2">
+                              <ExternalLink className="h-4 w-4" />
+                              Continue on this device
+                            </p>
+                            <Button 
+                              className="w-full bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all"
+                              size="lg"
+                              onClick={() => window.open(kycSession.formUrl!, '_blank', 'width=800,height=900')}
+                            >
+                              <FileText className="h-5 w-5 mr-2" />
+                              Open Verification Form
+                            </Button>
+                          </div>
+
+                          {/* Mobile QR Code */}
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium text-blue-900 dark:text-blue-100 flex items-center gap-2">
+                              <Smartphone className="h-4 w-4" />
+                              Or scan with your phone
+                            </p>
+                            <div className="flex justify-center">
+                              <div className="relative group">
+                                <QRCode
+                                  className="size-32 rounded-lg border-2 border-primary/20 bg-white p-2 shadow-md hover:shadow-xl transition-all group-hover:scale-105"
+                                  data={kycSession.formUrl}
+                                />
+                                <div className="absolute inset-0 bg-primary/5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                              </div>
+                            </div>
+                            <p className="text-xs text-center text-muted-foreground mt-2">
+                              Scan to open on mobile device
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* What to prepare */}
+                        <div className="mt-4 p-3 rounded-lg bg-white/50 dark:bg-gray-900/50 border border-blue-200 dark:border-blue-800">
+                          <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
+                            📋 What you'll need:
+                          </p>
+                          <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 ml-4">
+                            <li>• Government-issued ID (passport or ID card)</li>
+                            <li>• Well-lit environment for selfie</li>
+                            <li>• 5-7 minutes of your time</li>
+                          </ul>
+                        </div>
+                      </div>
+                    ) : (
+                      'Your documents are being reviewed by our team. This usually takes 2-4 hours.'
+                    )}
+                  </AlertDescription>
+                </Alert>
+              </div>
             )}
 
             {kycSession.status === 'APPROVED' && (
-              <Alert className="border-green-500/50 bg-green-50 dark:bg-green-950/20">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <AlertTitle className="text-green-900 dark:text-green-100">Verified!</AlertTitle>
-                <AlertDescription className="text-green-800 dark:text-green-200">
-                  Your KYC verification is complete. You can now buy cryptocurrency.
-                </AlertDescription>
+              <Alert className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 border-green-200 dark:border-green-800">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-full bg-green-100 dark:bg-green-900 p-2">
+                    <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div className="flex-1">
+                    <AlertTitle className="text-green-900 dark:text-green-100 font-semibold text-lg">
+                      Verification Complete! 🎉
+                    </AlertTitle>
+                    <AlertDescription className="text-green-800 dark:text-green-200 mt-2">
+                      <p className="mb-3">
+                        Your identity has been successfully verified. You now have full access to all platform features.
+                      </p>
+                      <Button 
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                        onClick={() => window.location.href = '/buy'}
+                      >
+                        Start Trading
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    </AlertDescription>
+                  </div>
+                </div>
               </Alert>
             )}
 
             {kycSession.status === 'REJECTED' && (
-              <Alert variant="destructive">
-                <XCircle className="h-4 w-4" />
-                <AlertTitle>Verification Failed</AlertTitle>
-                <AlertDescription>
-                  {kycSession.rejectionReason || 'Please contact support for more information.'}
-                </AlertDescription>
+              <Alert className="bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/20 dark:to-rose-950/20 border-red-200 dark:border-red-800">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-full bg-red-100 dark:bg-red-900 p-2">
+                    <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div className="flex-1">
+                    <AlertTitle className="text-red-900 dark:text-red-100 font-semibold text-lg">
+                      Verification Not Approved
+                    </AlertTitle>
+                    <AlertDescription className="text-red-800 dark:text-red-200 mt-2">
+                      <p className="mb-2">
+                        {kycSession.rejectionReason || 'Unfortunately, we were unable to verify your identity with the provided documents.'}
+                      </p>
+                      <div className="mt-3 p-3 rounded-lg bg-white/50 dark:bg-gray-900/50 border border-red-200 dark:border-red-800">
+                        <p className="text-sm font-medium mb-2">What to do next:</p>
+                        <ul className="text-sm space-y-1 ml-4">
+                          <li>• Contact our support team for more details</li>
+                          <li>• Ensure your documents are clear and valid</li>
+                          <li>• You may reapply after addressing the issues</li>
+                        </ul>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        className="mt-3 border-red-300 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                        onClick={() => window.location.href = '/profile'}
+                      >
+                        Contact Support
+                      </Button>
+                    </AlertDescription>
+                  </div>
+                </div>
               </Alert>
             )}
 
-            <Button variant="outline" onClick={() => fetchKycStatus()} className="w-full">
-              <Clock className="h-4 w-4 mr-2" />
-              Refresh Status
-            </Button>
+            <div className="pt-4 border-t">
+              <Button 
+                variant="outline" 
+                onClick={() => fetchKycStatus()} 
+                className="w-full hover:bg-primary/5 hover:border-primary/30 transition-all"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh Status
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
