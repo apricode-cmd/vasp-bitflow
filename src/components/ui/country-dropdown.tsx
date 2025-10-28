@@ -143,8 +143,7 @@ const CountryDropdownComponent = (
       <PopoverContent
         collisionPadding={10}
         side="bottom"
-        className="min-w-[--radix-popper-anchor-width] p-0 !z-[99999]"
-        style={{ zIndex: 99999, position: 'relative' }}
+        className="min-w-[--radix-popper-anchor-width] p-0"
       >
         <Command className="w-full max-h-[200px] sm:max-h-[270px]">
           <CommandList>
@@ -157,10 +156,12 @@ const CountryDropdownComponent = (
                 .filter((x) => x.name)
                 .map((option, key: number) => (
                   <CommandItem
-                    className="flex items-center w-full gap-2"
+                    className="flex items-center w-full gap-2 !pointer-events-auto"
                     key={key}
                     value={option.name}
                     onSelect={() => handleSelect(option)}
+                    onMouseDown={() => handleSelect(option)}
+                    style={{ pointerEvents: 'auto' }}
                   >
                     <div className="flex flex-grow w-0 space-x-2 overflow-hidden">
                       <div className="inline-flex items-center justify-center w-5 h-5 shrink-0 overflow-hidden rounded-full">
