@@ -36,7 +36,7 @@ import { toast } from 'sonner';
 import { 
   Shield, CheckCircle, XCircle, Clock, Loader2, 
   FileText, Camera, User, AlertCircle, ArrowRight, ArrowLeft,
-  Check
+  Check, Scale, FolderArchive, RefreshCw
 } from 'lucide-react';
 import { KycStatus } from '@prisma/client';
 import { formatDateTime } from '@/lib/formatters';
@@ -677,19 +677,19 @@ export default function KycPage(): React.ReactElement {
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-blue-800 dark:text-blue-200">
             <div className="flex gap-3">
-              <div className="mt-0.5">⚖️</div>
+              <Scale className="h-5 w-5 mt-0.5 shrink-0" />
               <div>
                 <strong>AML Legal Basis:</strong> We process KYC data to comply with AML/CFT laws (Art. 6(1)(c) GDPR).
               </div>
             </div>
             <div className="flex gap-3">
-              <div className="mt-0.5">📁</div>
+              <FolderArchive className="h-5 w-5 mt-0.5 shrink-0" />
               <div>
                 <strong>Record Retention:</strong> KYC and transaction records are retained at least 5 years per AMLD.
               </div>
             </div>
             <div className="flex gap-3">
-              <div className="mt-0.5">🔄</div>
+              <RefreshCw className="h-5 w-5 mt-0.5 shrink-0" />
               <div>
                 <strong>Travel Rule (EU 2023/1113):</strong> For crypto transfers, sender/beneficiary data accompany the transfer; self-hosted addresses may require ownership checks over €1,000.
               </div>
