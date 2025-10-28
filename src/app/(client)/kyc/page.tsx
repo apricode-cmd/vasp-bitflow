@@ -1147,13 +1147,13 @@ export default function KycPage(): React.ReactElement {
             {kycSession.status === 'PENDING' && (
               <div className="space-y-6">
                 {/* Header with icon */}
-                <div className="flex items-center gap-3 pb-4 border-b">
+                <div className="flex items-center gap-4 pb-4 border-b">
                   <div className="rounded-lg bg-primary/10 p-3">
-                    <Camera className="h-6 w-6 text-primary" />
+                    <Camera className="h-7 w-7 text-primary" />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <h3 className="font-semibold text-lg">Complete Your Verification</h3>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground mt-0.5">
                       Upload documents and take a selfie • Takes 5-7 minutes
                     </p>
                   </div>
@@ -1162,11 +1162,11 @@ export default function KycPage(): React.ReactElement {
                 {kycSession.formUrl ? (
                   <>
                     {/* Main action area */}
-                    <div className="grid md:grid-cols-[1fr,auto] gap-6 items-start">
+                    <div className="grid md:grid-cols-[2fr,1fr] gap-8 items-center">
                       {/* Left: Desktop option */}
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-2 text-sm font-medium">
-                          <ExternalLink className="h-4 w-4 text-primary" />
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                          <ExternalLink className="h-4 w-4" />
                           Continue on this device
                         </div>
                         <Button 
@@ -1180,37 +1180,33 @@ export default function KycPage(): React.ReactElement {
                       </div>
 
                       {/* Right: Mobile QR */}
-                      <div className="flex flex-col items-center gap-3 md:border-l md:pl-6">
-                        <div className="flex items-center gap-2 text-sm font-medium">
-                          <Smartphone className="h-4 w-4 text-primary" />
-                          Scan with phone
+                      <div className="flex flex-col items-center justify-center gap-3 md:border-l md:pl-8 py-2">
+                        <div className="text-xs font-medium text-muted-foreground text-center">
+                          Or scan with phone
                         </div>
                         <QRCode
-                          className="size-36 rounded-xl border bg-background p-3 shadow-sm hover:shadow-md transition-shadow"
+                          className="size-32 rounded-lg border bg-background p-2.5 shadow-sm hover:shadow-md transition-all"
                           data={kycSession.formUrl}
                         />
-                        <p className="text-xs text-muted-foreground text-center max-w-[140px]">
-                          Scan to continue on mobile
-                        </p>
                       </div>
                     </div>
 
                     {/* What to prepare - compact */}
-                    <div className="rounded-lg border bg-muted/50 p-4">
+                    <div className="rounded-lg border bg-muted/30 p-4">
                       <div className="flex items-start gap-3">
-                        <div className="rounded-md bg-background p-2">
+                        <div className="rounded-md bg-background p-2 mt-0.5">
                           <Info className="h-4 w-4 text-muted-foreground" />
                         </div>
-                        <div className="flex-1 space-y-2">
+                        <div className="flex-1 space-y-1.5">
                           <p className="text-sm font-medium">What you'll need</p>
                           <ul className="text-sm text-muted-foreground space-y-1">
-                            <li className="flex items-center gap-2">
-                              <div className="h-1 w-1 rounded-full bg-muted-foreground/50" />
-                              Government-issued ID (passport or ID card)
+                            <li className="flex items-start gap-2">
+                              <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 mt-1.5 shrink-0" />
+                              <span>Government-issued ID (passport or ID card)</span>
                             </li>
-                            <li className="flex items-center gap-2">
-                              <div className="h-1 w-1 rounded-full bg-muted-foreground/50" />
-                              Well-lit environment for selfie
+                            <li className="flex items-start gap-2">
+                              <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 mt-1.5 shrink-0" />
+                              <span>Well-lit environment for selfie</span>
                             </li>
                           </ul>
                         </div>
@@ -1229,44 +1225,42 @@ export default function KycPage(): React.ReactElement {
             )}
 
             {kycSession.status === 'APPROVED' && (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {/* Success header */}
-                <div className="flex items-center gap-3 pb-4 border-b">
+                <div className="flex items-center gap-4 pb-4 border-b">
                   <div className="rounded-lg bg-green-500/10 p-3">
-                    <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-500" />
+                    <CheckCircle className="h-7 w-7 text-green-600 dark:text-green-500" />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <h3 className="font-semibold text-lg">Verification Complete!</h3>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground mt-0.5">
                       You now have full access to all features
                     </p>
                   </div>
                 </div>
 
                 {/* CTA */}
-                <div className="pt-2">
-                  <Button 
-                    className="w-full"
-                    size="lg"
-                    onClick={() => window.location.href = '/buy'}
-                  >
-                    Start Trading
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </Button>
-                </div>
+                <Button 
+                  className="w-full"
+                  size="lg"
+                  onClick={() => window.location.href = '/buy'}
+                >
+                  Start Trading
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
               </div>
             )}
 
             {kycSession.status === 'REJECTED' && (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {/* Error header */}
-                <div className="flex items-center gap-3 pb-4 border-b">
+                <div className="flex items-center gap-4 pb-4 border-b">
                   <div className="rounded-lg bg-destructive/10 p-3">
-                    <XCircle className="h-6 w-6 text-destructive" />
+                    <XCircle className="h-7 w-7 text-destructive" />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <h3 className="font-semibold text-lg">Verification Not Approved</h3>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground mt-0.5">
                       Please review the information below
                     </p>
                   </div>
@@ -1282,25 +1276,25 @@ export default function KycPage(): React.ReactElement {
                 )}
 
                 {/* Next steps - compact */}
-                <div className="rounded-lg border bg-muted/50 p-4">
+                <div className="rounded-lg border bg-muted/30 p-4">
                   <div className="flex items-start gap-3">
-                    <div className="rounded-md bg-background p-2">
+                    <div className="rounded-md bg-background p-2 mt-0.5">
                       <Info className="h-4 w-4 text-muted-foreground" />
                     </div>
-                    <div className="flex-1 space-y-2">
+                    <div className="flex-1 space-y-1.5">
                       <p className="text-sm font-medium">What to do next</p>
                       <ul className="text-sm text-muted-foreground space-y-1">
-                        <li className="flex items-center gap-2">
-                          <div className="h-1 w-1 rounded-full bg-muted-foreground/50" />
-                          Contact our support team for details
+                        <li className="flex items-start gap-2">
+                          <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 mt-1.5 shrink-0" />
+                          <span>Contact our support team for details</span>
                         </li>
-                        <li className="flex items-center gap-2">
-                          <div className="h-1 w-1 rounded-full bg-muted-foreground/50" />
-                          Ensure your documents are clear and valid
+                        <li className="flex items-start gap-2">
+                          <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 mt-1.5 shrink-0" />
+                          <span>Ensure your documents are clear and valid</span>
                         </li>
-                        <li className="flex items-center gap-2">
-                          <div className="h-1 w-1 rounded-full bg-muted-foreground/50" />
-                          You may reapply after addressing issues
+                        <li className="flex items-start gap-2">
+                          <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 mt-1.5 shrink-0" />
+                          <span>You may reapply after addressing issues</span>
                         </li>
                       </ul>
                     </div>
@@ -1308,15 +1302,14 @@ export default function KycPage(): React.ReactElement {
                 </div>
 
                 {/* CTA */}
-                <div className="pt-2">
-                  <Button 
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => window.location.href = '/profile'}
-                  >
-                    Contact Support
-                  </Button>
-                </div>
+                <Button 
+                  variant="outline"
+                  className="w-full"
+                  size="lg"
+                  onClick={() => window.location.href = '/profile'}
+                >
+                  Contact Support
+                </Button>
               </div>
             )}
 
