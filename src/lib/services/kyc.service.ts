@@ -358,8 +358,73 @@ export async function checkKycStatus(userId: string) {
 
       console.log(`ℹ️ KYC status unchanged: ${session.status}`);
     } else {
-      // No verificationId yet - check applicant status
-      console.log(`📊 Checking applicant status (no verificationId yet)`);
+      // No verificationId yet - try to create one or check applicant
+      console.log(`📊 No verificationId found - attempting to create verification`);
+      
+      try {
+        // Try to create verification for the applicant
+        const formId = session.kycaidFormId || secrets.config?.formId;
+        
+        if (formId) {
+          console.log(`🔧 Creating verification for applicant: ${session.kycaidApplicantId}`);
+          const verification = await provider.createVerification(session.kycaidApplicantId, formId);
+          
+          console.log(`✅ Verification created: ${verification.verificationId}`);
+          
+          // Update session with verificationId
+          await prisma.kycSession.update({
+            where: { id: session.id },
+            data: {
+              kycaidVerificationId: verification.verificationId,
+              metadata: {
+                ...session.metadata as any,
+                verificationCreatedOnRefresh: new Date().toISOString(),
+                verificationData: verification.metadata
+              }
+            }
+          });
+          
+          console.log(`✅ Session updated with verification ID`);
+          
+          // Now check the status of newly created verification
+          const result = await provider.getVerificationStatus(verification.verificationId);
+          
+          if (result.status !== session.status.toLowerCase()) {
+            const updatedSession = await prisma.kycSession.update({
+              where: { id: session.id },
+              data: {
+                status: result.status.toUpperCase() as any,
+                completedAt: result.completedAt || new Date(),
+                rejectionReason: result.rejectionReason || undefined,
+                metadata: {
+                  ...session.metadata as any,
+                  lastChecked: new Date(),
+                  providerResponse: result.metadata
+                }
+              }
+            });
+
+            console.log(`✅ KYC status updated from ${session.status} to ${result.status.toUpperCase()}`);
+
+            return {
+              status: updatedSession.status,
+              sessionId: updatedSession.id,
+              completedAt: updatedSession.completedAt,
+              rejectionReason: updatedSession.rejectionReason,
+              formUrl: (updatedSession.metadata as any)?.formUrl,
+              message: getStatusMessage(updatedSession.status)
+            };
+          }
+        } else {
+          console.warn('⚠️ No Form ID available to create verification');
+        }
+      } catch (createError: any) {
+        console.warn(`⚠️ Failed to create verification: ${createError.message}`);
+        console.log('📊 Falling back to applicant status check');
+      }
+      
+      // Fallback: check applicant status directly
+      console.log(`📊 Checking applicant status (fallback)`);
       const applicant = await provider.getApplicant(session.kycaidApplicantId);
       
       console.log(`📋 Applicant status: ${applicant.status}`);
