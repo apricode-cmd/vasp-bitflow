@@ -595,7 +595,7 @@ export default function AdminKycPage(): JSX.Element {
                     View User
                   </Link>
                 </DropdownMenuItem>
-                {(session.status === 'APPROVED' || session.status === 'REJECTED') && session.kycaidApplicantId && (
+                {(session.status === 'APPROVED' || session.status === 'REJECTED') && session.kycaidVerificationId && (
                   <DropdownMenuItem
                     onClick={async (e) => {
                       e.stopPropagation();
@@ -1191,7 +1191,7 @@ export default function AdminKycPage(): JSX.Element {
                     )}
 
               {/* Download Report - Available for APPROVED/REJECTED */}
-              {selectedSession.kycaidApplicantId && 
+              {selectedSession.kycaidVerificationId && 
                (selectedSession.status === 'APPROVED' || selectedSession.status === 'REJECTED') && (
                 <div>
                   <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">

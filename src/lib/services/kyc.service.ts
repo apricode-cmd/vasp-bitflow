@@ -51,7 +51,7 @@ async function getActiveKycProvider(): Promise<IKycProvider | null> {
       await provider.initialize({
         apiKey: secrets.apiKey,
         apiEndpoint: secrets.apiEndpoint || undefined,
-        ...secrets.config
+        ...(secrets.config as Record<string, any> || {})
       });
     } else {
       console.warn('⚠️ No API key found for KYCAID');
@@ -98,7 +98,7 @@ export async function startKycVerification(userId: string) {
 
     // Get integration secrets to access formId from config
     const secrets = await getIntegrationWithSecrets(provider.providerId);
-    const formId = secrets?.config?.formId;
+    const formId = (secrets?.config as any)?.formId;
     
     if (!formId) {
       throw new Error('KYC Form ID not configured. Please set it in admin panel: /admin/integrations');
@@ -238,7 +238,7 @@ export async function startKycVerification(userId: string) {
       sessionId: kycSession.id,
       formUrl: formUrlResult.url,
       applicantId: applicant.applicantId,
-      provider: provider.displayName
+      provider: provider.providerId
     };
   } catch (error: any) {
     console.error('❌ Failed to start KYC verification:', error);
@@ -317,7 +317,7 @@ export async function checkKycStatus(userId: string) {
     await provider.initialize({
       apiKey: secrets.apiKey,
       apiEndpoint: secrets.apiEndpoint || undefined,
-      ...secrets.config
+      ...(secrets.config as Record<string, any> || {})
     });
 
     console.log(`🔍 Polling KYC status for applicant: ${session.kycaidApplicantId}`);
@@ -363,7 +363,7 @@ export async function checkKycStatus(userId: string) {
       
       try {
         // Try to create verification for the applicant
-        const formId = session.kycaidFormId || secrets.config?.formId;
+        const formId = session.kycaidFormId || (secrets.config as any)?.formId;
         
         if (formId) {
           console.log(`🔧 Creating verification for applicant: ${session.kycaidApplicantId}`);
@@ -433,7 +433,7 @@ export async function checkKycStatus(userId: string) {
       if (applicant.metadata?.verificationStatus) {
         const verificationStatus = applicant.metadata.verificationStatus.toLowerCase();
         
-        if (verificationStatus === 'approved' && session.status !== 'APPROVED') {
+        if (verificationStatus === 'approved' && session.status === 'PENDING') {
           const updatedSession = await prisma.kycSession.update({
             where: { id: session.id },
             data: {
@@ -456,7 +456,7 @@ export async function checkKycStatus(userId: string) {
             formUrl: (updatedSession.metadata as any)?.formUrl,
             message: getStatusMessage(updatedSession.status)
           };
-        } else if (verificationStatus === 'declined' && session.status !== 'REJECTED') {
+        } else if (verificationStatus === 'declined' && session.status === 'PENDING') {
           const updatedSession = await prisma.kycSession.update({
             where: { id: session.id },
             data: {
@@ -520,7 +520,7 @@ export async function processKycWebhook(
       await provider.initialize({
         apiKey: secrets.apiKey,
         apiEndpoint: secrets.apiEndpoint || undefined,
-        ...secrets.config
+        ...(secrets.config as Record<string, any> || {})
       });
     }
 
@@ -628,6 +628,10 @@ export async function syncKycDocuments(sessionId: string): Promise<{ documentsCo
       throw new Error('No applicant ID - cannot sync documents');
     }
 
+    if (!session.kycaidVerificationId) {
+      throw new Error('No verification ID - cannot sync documents. Documents are only available for completed verifications.');
+    }
+
     if (session.status !== 'APPROVED' && session.status !== 'REJECTED') {
       throw new Error('Documents only available for completed verifications');
     }
@@ -654,10 +658,10 @@ export async function syncKycDocuments(sessionId: string): Promise<{ documentsCo
     await provider.initialize({
       apiKey: secrets.apiKey,
       apiEndpoint: secrets.apiEndpoint || undefined,
-      ...secrets.config
+      ...(secrets.config as Record<string, any> || {})
     });
 
-    // Get documents from KYCAID
+    // Get documents from KYCAID (or other provider)
     const kycaidProvider = provider as any;
     
     if (!kycaidProvider.getApplicantDocuments) {
@@ -665,7 +669,10 @@ export async function syncKycDocuments(sessionId: string): Promise<{ documentsCo
     }
 
     console.log('📥 Fetching documents from KYCAID...');
-    const documents = await kycaidProvider.getApplicantDocuments(session.kycaidApplicantId);
+    const documents = await kycaidProvider.getApplicantDocuments(
+      session.kycaidApplicantId,
+      session.kycaidVerificationId
+    );
 
     console.log(`✅ Found ${documents.length} documents`);
 
@@ -676,11 +683,14 @@ export async function syncKycDocuments(sessionId: string): Promise<{ documentsCo
       try {
         console.log(`📄 Processing document: ${doc.document_id} (${doc.type})`);
 
-        // Check if already exists
+        // Check if already exists by checking verification data
         const existingDoc = await prisma.kycDocument.findFirst({
           where: {
             kycSessionId: sessionId,
-            externalId: doc.document_id
+            verificationData: {
+              path: ['document_id'],
+              equals: doc.document_id
+            }
           }
         });
 
@@ -689,48 +699,57 @@ export async function syncKycDocuments(sessionId: string): Promise<{ documentsCo
           continue;
         }
 
-        // Save to database
+        // Save to database using existing fields
+        const fileName = `${doc.type}_${doc.document_id}`;
+        const fileUrl = doc.front_side || doc.back_side || '';
+
         await prisma.kycDocument.create({
           data: {
             kycSessionId: sessionId,
-            externalId: doc.document_id,
-            type: doc.type || 'OTHER',
-            documentNumber: doc.document_number || null,
-            issueDate: doc.issue_date ? new Date(doc.issue_date) : null,
-            expiryDate: doc.expiry_date ? new Date(doc.expiry_date) : null,
-            issuingCountry: doc.issuing_country || null,
-            fileUrl: doc.front_side || null, // URL to front side image
-            metadata: {
-              // Document IDs for images
-              frontSideId: doc.front_side_id,
-              frontSideUrl: doc.front_side,
-              backSideId: doc.back_side_id,
-              backSideUrl: doc.back_side,
-              otherSide1Id: doc.other_side_1_id,
-              otherSide1Url: doc.other_side_1,
-              otherSide2Id: doc.other_side_2_id,
-              otherSide2Url: doc.other_side_2,
-              otherSide3Id: doc.other_side_3_id,
-              otherSide3Url: doc.other_side_3,
-              // Document details
-              additionalNumber: doc.additional_number,
+            documentType: doc.type || 'OTHER',
+            fileUrl: fileUrl,
+            fileName: fileName,
+            fileSize: 0, // Unknown from KYCAID
+            mimeType: 'image/jpeg', // Default
+            verifiedByAI: doc.status === 'valid',
+            verificationData: {
+              // KYCAID document data
+              document_id: doc.document_id,
+              applicant_id: doc.applicant_id,
+              type: doc.type,
               provider: doc.provider,
               status: doc.status,
-              declineReasons: doc.decline_reasons,
-              // Financial info (if applicable)
-              incomeSources: doc.income_sources,
-              annualIncome: doc.annual_income,
-              transactionAmount: doc.transaction_amount,
-              transactionPurpose: doc.transaction_purpose,
-              transactionCurrency: doc.transaction_currency,
-              transactionDatetime: doc.transaction_datetime,
-              originFunds: doc.origin_funds,
-              // Card/Account info (if applicable)
-              cardNumber: doc.card_number,
-              accountNumber: doc.account_number,
+              document_number: doc.document_number,
+              additional_number: doc.additional_number,
+              issue_date: doc.issue_date,
+              expiry_date: doc.expiry_date,
+              // Image URLs
+              front_side_id: doc.front_side_id,
+              front_side: doc.front_side,
+              back_side_id: doc.back_side_id,
+              back_side: doc.back_side,
+              other_side_1_id: doc.other_side_1_id,
+              other_side_1: doc.other_side_1,
+              other_side_2_id: doc.other_side_2_id,
+              other_side_2: doc.other_side_2,
+              other_side_3_id: doc.other_side_3_id,
+              other_side_3: doc.other_side_3,
+              // Financial info
+              income_sources: doc.income_sources,
+              annual_income: doc.annual_income,
+              transaction_amount: doc.transaction_amount,
+              transaction_purpose: doc.transaction_purpose,
+              transaction_currency: doc.transaction_currency,
+              transaction_datetime: doc.transaction_datetime,
+              origin_funds: doc.origin_funds,
+              // Card/Account
+              card_number: doc.card_number,
+              account_number: doc.account_number,
+              // Decline reasons
+              decline_reasons: doc.decline_reasons,
               // System
-              createdAt: doc.created_at,
-              rawData: doc
+              created_at: doc.created_at,
+              synced_at: new Date().toISOString()
             }
           }
         });
@@ -748,7 +767,7 @@ export async function syncKycDocuments(sessionId: string): Promise<{ documentsCo
       where: { id: sessionId },
       data: {
         metadata: {
-          ...session.metadata as any,
+          ...(session.metadata as any || {}),
           documentsSynced: new Date().toISOString(),
           documentsCount: syncedCount
         }
@@ -779,7 +798,7 @@ export async function syncKycDocuments(sessionId: string): Promise<{ documentsCo
 }
 
 // Keep the old function name for backwards compatibility but make it call syncKycDocuments
-export async function downloadKycReport(sessionId: string): Promise<Buffer> {
+export async function downloadKycReport(_sessionId: string): Promise<Buffer> {
   // For now, throw error directing to use new sync function
   throw new Error('PDF reports are not available. Use document sync instead.');
 }
@@ -798,7 +817,7 @@ export async function getKycFormConfig() {
     const config = provider.getConfig();
     
     return {
-      provider: provider.displayName,
+      provider: provider.providerId,
       providerId: provider.providerId,
       formId: config.metadata?.formId,
       requiredFields: [

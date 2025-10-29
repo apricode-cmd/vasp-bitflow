@@ -424,14 +424,22 @@ export class KycaidAdapter implements IKycProvider {
 
   /**
    * Get applicant details
+   * If verificationId is provided, returns data for that specific verification
    */
-  async getApplicant(applicantId: string): Promise<KycApplicant> {
+  async getApplicant(applicantId: string, verificationId?: string): Promise<KycApplicant> {
     if (!this.isConfigured()) {
       throw new Error('KYCAID provider not configured');
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/applicants/${applicantId}`, {
+      // Add verification_id as query parameter if provided
+      const url = verificationId 
+        ? `${this.baseUrl}/applicants/${applicantId}?verification_id=${verificationId}`
+        : `${this.baseUrl}/applicants/${applicantId}`;
+
+      console.log('📥 Fetching applicant:', applicantId, verificationId ? `(verification: ${verificationId})` : '');
+
+      const response = await fetch(url, {
         method: 'GET',
         headers: this.getHeaders()
       });
@@ -456,7 +464,7 @@ export class KycaidAdapter implements IKycProvider {
           dateOfBirth: data.dob,
           nationality: data.nationality,
           residenceCountry: data.residence_country,
-          documents: data.documents || [], // Array of document IDs
+          documents: data.documents || [], // Array of document IDs (only with verification_id)
           addresses: data.addresses || [],
           declineReasons: data.decline_reasons || []
         }
@@ -503,21 +511,22 @@ export class KycaidAdapter implements IKycProvider {
   /**
    * Get all documents for applicant
    * Returns array of full document objects
+   * verificationId is REQUIRED to get documents
    */
-  async getApplicantDocuments(applicantId: string): Promise<any[]> {
+  async getApplicantDocuments(applicantId: string, verificationId: string): Promise<any[]> {
     if (!this.isConfigured()) {
       throw new Error('KYCAID provider not configured');
     }
 
     try {
-      console.log('📄 Getting documents for applicant:', applicantId);
+      console.log('📄 Getting documents for applicant:', applicantId, 'verification:', verificationId);
 
-      // First, get applicant to get document IDs
-      const applicant = await this.getApplicant(applicantId);
+      // Get applicant WITH verification_id to get document IDs
+      const applicant = await this.getApplicant(applicantId, verificationId);
       const documentIds = applicant.metadata?.documents || [];
 
       if (documentIds.length === 0) {
-        console.log('ℹ️ No documents found for applicant');
+        console.log('ℹ️ No documents found for this verification');
         return [];
       }
 
