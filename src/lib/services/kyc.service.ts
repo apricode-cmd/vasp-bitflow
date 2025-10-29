@@ -684,6 +684,33 @@ export async function syncKycDocuments(sessionId: string): Promise<{ documentsCo
 
     console.log(`✅ Found ${documents.length} documents`);
 
+    if (documents.length === 0) {
+      console.log('ℹ️ No documents found - this might be normal');
+      console.log('💡 Reasons:');
+      console.log('   - Documents are still being processed by KYCAID');
+      console.log('   - User did not upload documents in the form');
+      console.log('   - Documents will appear in KYCAID after some time');
+      console.log('');
+      console.log('📌 You can try syncing again in a few minutes');
+      
+      // Update metadata to track sync attempt
+      await prisma.kycSession.update({
+        where: { id: sessionId },
+        data: {
+          metadata: {
+            ...(session.metadata as any || {}),
+            lastDocumentSyncAttempt: new Date().toISOString(),
+            documentSyncAttempts: ((session.metadata as any)?.documentSyncAttempts || 0) + 1
+          }
+        }
+      });
+      
+      return {
+        documentsCount: 0,
+        message: 'No documents found yet. Documents may still be processing in KYCAID. Try again in a few minutes.'
+      };
+    }
+
     let syncedCount = 0;
 
     // Process each document
