@@ -595,34 +595,35 @@ export default function AdminKycPage(): JSX.Element {
                     View User
                   </Link>
                 </DropdownMenuItem>
-                {(session.status === 'APPROVED' || session.status === 'REJECTED') && session.kycaidVerificationId && (
+                {(session.status === 'APPROVED' || session.status === 'REJECTED') && session.kycaidApplicantId && (
                   <DropdownMenuItem
                     onClick={async (e) => {
                       e.stopPropagation();
                       try {
-                        const response = await fetch(`/api/admin/kyc/${session.id}/download-report`);
+                        toast.loading('Syncing documents...', { id: 'sync-docs' });
+                        
+                        const response = await fetch(`/api/admin/kyc/${session.id}/download-report`, {
+                          method: 'POST'
+                        });
+                        
                         if (!response.ok) {
                           const error = await response.json();
-                          toast.error(error.error || 'Failed to download report');
+                          toast.error(error.error || 'Failed to sync documents', { id: 'sync-docs' });
                           return;
                         }
-                        const blob = await response.blob();
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `kyc-report-${session.id}.pdf`;
-                        document.body.appendChild(a);
-                        a.click();
-                        window.URL.revokeObjectURL(url);
-                        document.body.removeChild(a);
-                        toast.success('Report downloaded');
+
+                        const result = await response.json();
+                        toast.success(result.message || `Synced ${result.documentsCount} documents`, { id: 'sync-docs' });
+                        
+                        // Refresh page to show new documents
+                        window.location.reload();
                       } catch (error) {
-                        toast.error('Failed to download report');
+                        toast.error('Failed to sync documents', { id: 'sync-docs' });
                       }
                     }}
                   >
                     <FileText className="h-4 w-4 mr-2" />
-                    Download Report
+                    Sync Documents
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
@@ -1143,7 +1144,7 @@ export default function AdminKycPage(): JSX.Element {
 
               {/* Documents */}
               {selectedSession.documents && selectedSession.documents.length > 0 && (
-                <div>
+                      <div>
                   <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
                     <FileText className="h-4 w-4" />
                     Uploaded Documents ({selectedSession.documents.length})
@@ -1160,15 +1161,15 @@ export default function AdminKycPage(): JSX.Element {
                           <div className="p-3">
                             <p className="text-sm font-medium truncate">{doc.fileName}</p>
                             <p className="text-xs text-muted-foreground capitalize">{doc.documentType}</p>
-                            <Button 
+                        <Button
                               variant="outline" 
-                              size="sm" 
+                          size="sm"
                               className="w-full mt-2"
                               onClick={() => window.open(doc.fileUrl, '_blank')}
-                            >
+                        >
                               <Eye className="h-3 w-3 mr-2" />
                               View
-                            </Button>
+                        </Button>
                           </div>
                         </Card>
                       ))}
@@ -1190,51 +1191,48 @@ export default function AdminKycPage(): JSX.Element {
                     )}
 
               {/* Download Report - Available for APPROVED/REJECTED */}
-              {selectedSession.kycaidVerificationId && 
+              {selectedSession.kycaidApplicantId && 
                (selectedSession.status === 'APPROVED' || selectedSession.status === 'REJECTED') && (
                 <div>
                   <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
                     <FileText className="h-4 w-4" />
-                    Verification Report
+                    Documents
                   </h3>
                   <Card>
                     <div className="p-4">
                       <p className="text-sm text-muted-foreground mb-4">
-                        Download the complete verification report from KYCAID in PDF format.
+                        Sync passport/ID photos and document data from KYCAID to database.
                       </p>
                       <Button 
                         variant="outline"
                         className="w-full"
                         onClick={async () => {
                           try {
-                            const response = await fetch(`/api/admin/kyc/${selectedSession.id}/download-report`);
+                            toast.loading('Syncing documents...', { id: 'sync-docs-detail' });
+                            
+                            const response = await fetch(`/api/admin/kyc/${selectedSession.id}/download-report`, {
+                              method: 'POST'
+                            });
                             
                             if (!response.ok) {
                               const error = await response.json();
-                              toast.error(error.error || 'Failed to download report');
+                              toast.error(error.error || 'Failed to sync documents', { id: 'sync-docs-detail' });
                               return;
                             }
                             
-                            // Download PDF
-                            const blob = await response.blob();
-                            const url = window.URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = `kyc-report-${selectedSession.id}.pdf`;
-                            document.body.appendChild(a);
-                            a.click();
-                            window.URL.revokeObjectURL(url);
-                            document.body.removeChild(a);
+                            const result = await response.json();
+                            toast.success(result.message || `Synced ${result.documentsCount} documents`, { id: 'sync-docs-detail' });
                             
-                            toast.success('Report downloaded successfully');
+                            // Refresh page to show new documents
+                            window.location.reload();
                           } catch (error) {
-                            console.error('Download error:', error);
-                            toast.error('Failed to download report');
+                            console.error('Sync error:', error);
+                            toast.error('Failed to sync documents', { id: 'sync-docs-detail' });
                           }
                         }}
                       >
                         <FileText className="h-4 w-4 mr-2" />
-                        Download PDF Report
+                        Sync Documents from KYCAID
                       </Button>
                     </div>
                   </Card>

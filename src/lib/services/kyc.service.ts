@@ -608,11 +608,12 @@ function getStatusMessage(status: string): string {
 }
 
 /**
- * Download KYC verification report PDF
+ * Sync KYC documents from KYCAID and save to database
+ * Downloads passport/ID photos and document data
  */
-export async function downloadKycReport(sessionId: string): Promise<Buffer> {
+export async function syncKycDocuments(sessionId: string): Promise<{ documentsCount: number; message: string }> {
   try {
-    console.log('📄 Downloading KYC report for session:', sessionId);
+    console.log('📄 Syncing KYC documents for session:', sessionId);
 
     // Get KYC session
     const session = await prisma.kycSession.findUnique({
@@ -623,12 +624,12 @@ export async function downloadKycReport(sessionId: string): Promise<Buffer> {
       throw new Error('KYC session not found');
     }
 
-    if (!session.kycaidVerificationId) {
-      throw new Error('No verification ID - report not available yet');
+    if (!session.kycaidApplicantId) {
+      throw new Error('No applicant ID - cannot sync documents');
     }
 
     if (session.status !== 'APPROVED' && session.status !== 'REJECTED') {
-      throw new Error('Report only available for completed verifications');
+      throw new Error('Documents only available for completed verifications');
     }
 
     // Get provider
@@ -656,34 +657,113 @@ export async function downloadKycReport(sessionId: string): Promise<Buffer> {
       ...secrets.config
     });
 
-    // Download report (assuming provider has downloadVerificationReport method)
-    const kycaidProvider = provider as any; // Cast to access custom method
+    // Get documents from KYCAID
+    const kycaidProvider = provider as any;
     
-    if (!kycaidProvider.downloadVerificationReport) {
-      throw new Error('Provider does not support report download');
+    if (!kycaidProvider.getApplicantDocuments) {
+      throw new Error('Provider does not support document retrieval');
     }
 
-    const reportBuffer = await kycaidProvider.downloadVerificationReport(
-      session.kycaidVerificationId
-    );
+    console.log('📥 Fetching documents from KYCAID...');
+    const documents = await kycaidProvider.getApplicantDocuments(session.kycaidApplicantId);
 
-    console.log(`✅ Report downloaded successfully: ${reportBuffer.length} bytes`);
+    console.log(`✅ Found ${documents.length} documents`);
 
-    // Update session metadata with report info
+    let syncedCount = 0;
+
+    // Process each document
+    for (const doc of documents) {
+      try {
+        console.log(`📄 Processing document: ${doc.document_id} (${doc.type})`);
+
+        // Check if already exists
+        const existingDoc = await prisma.kycDocument.findFirst({
+          where: {
+            kycSessionId: sessionId,
+            externalId: doc.document_id
+          }
+        });
+
+        if (existingDoc) {
+          console.log(`⏭️ Document already synced: ${doc.document_id}`);
+          continue;
+        }
+
+        // Save to database
+        await prisma.kycDocument.create({
+          data: {
+            kycSessionId: sessionId,
+            externalId: doc.document_id,
+            type: doc.type || 'OTHER',
+            documentNumber: doc.document_number || null,
+            issueDate: doc.issue_date ? new Date(doc.issue_date) : null,
+            expiryDate: doc.expiry_date ? new Date(doc.expiry_date) : null,
+            issuingCountry: doc.issuing_country || null,
+            fileUrl: doc.front_side || null, // URL to front side image
+            metadata: {
+              // Document IDs for images
+              frontSideId: doc.front_side_id,
+              frontSideUrl: doc.front_side,
+              backSideId: doc.back_side_id,
+              backSideUrl: doc.back_side,
+              otherSide1Id: doc.other_side_1_id,
+              otherSide1Url: doc.other_side_1,
+              otherSide2Id: doc.other_side_2_id,
+              otherSide2Url: doc.other_side_2,
+              otherSide3Id: doc.other_side_3_id,
+              otherSide3Url: doc.other_side_3,
+              // Document details
+              additionalNumber: doc.additional_number,
+              provider: doc.provider,
+              status: doc.status,
+              declineReasons: doc.decline_reasons,
+              // Financial info (if applicable)
+              incomeSources: doc.income_sources,
+              annualIncome: doc.annual_income,
+              transactionAmount: doc.transaction_amount,
+              transactionPurpose: doc.transaction_purpose,
+              transactionCurrency: doc.transaction_currency,
+              transactionDatetime: doc.transaction_datetime,
+              originFunds: doc.origin_funds,
+              // Card/Account info (if applicable)
+              cardNumber: doc.card_number,
+              accountNumber: doc.account_number,
+              // System
+              createdAt: doc.created_at,
+              rawData: doc
+            }
+          }
+        });
+
+        syncedCount++;
+        console.log(`✅ Document saved to database: ${doc.document_id}`);
+
+      } catch (docError: any) {
+        console.error(`❌ Failed to process document ${doc.document_id}:`, docError.message);
+      }
+    }
+
+    // Update session metadata
     await prisma.kycSession.update({
       where: { id: sessionId },
       data: {
         metadata: {
           ...session.metadata as any,
-          reportDownloaded: new Date().toISOString(),
-          reportSize: reportBuffer.length
+          documentsSynced: new Date().toISOString(),
+          documentsCount: syncedCount
         }
       }
     });
 
-    return reportBuffer;
+    console.log(`✅ Successfully synced ${syncedCount} documents`);
+
+    return {
+      documentsCount: syncedCount,
+      message: `Successfully synced ${syncedCount} document(s)`
+    };
+
   } catch (error: any) {
-    console.error('❌ Failed to download KYC report:', error);
+    console.error('❌ Failed to sync KYC documents:', error);
     
     // Provide user-friendly error messages
     if (error.message.includes('502')) {
@@ -694,8 +774,14 @@ export async function downloadKycReport(sessionId: string): Promise<Buffer> {
       throw new Error('Invalid KYCAID API credentials. Please check integration settings.');
     }
     
-    throw new Error(error.message || 'Failed to download KYC report');
+    throw new Error(error.message || 'Failed to sync KYC documents');
   }
+}
+
+// Keep the old function name for backwards compatibility but make it call syncKycDocuments
+export async function downloadKycReport(sessionId: string): Promise<Buffer> {
+  // For now, throw error directing to use new sync function
+  throw new Error('PDF reports are not available. Use document sync instead.');
 }
 
 /**

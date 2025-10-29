@@ -1,20 +1,20 @@
 /**
- * API: Download KYC Verification Report PDF
- * GET /api/admin/kyc/[id]/download-report
+ * API: Sync KYC Documents from KYCAID
+ * POST /api/admin/kyc/[id]/sync-documents
  * 
- * Admin only - download KYCAID verification report
+ * Admin only - fetch and save documents from KYCAID
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { downloadKycReport } from '@/lib/services/kyc.service';
+import { syncKycDocuments } from '@/lib/services/kyc.service';
 
-export async function GET(
+export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   try {
-    console.log('📄 Download report request for session:', params.id);
+    console.log('📄 Sync documents request for session:', params.id);
 
     // Check authentication and admin role
     const session = await auth();
@@ -37,31 +37,26 @@ export async function GET(
 
     const sessionId = params.id;
 
-    console.log(`📄 Admin ${session.user.email} downloading report for KYC session: ${sessionId}`);
+    console.log(`📄 Admin ${session.user.email} syncing documents for KYC session: ${sessionId}`);
 
-    // Download report
-    const reportBuffer = await downloadKycReport(sessionId);
+    // Sync documents
+    const result = await syncKycDocuments(sessionId);
 
-    console.log(`✅ Report downloaded successfully: ${reportBuffer.length} bytes`);
+    console.log(`✅ Documents synced successfully: ${result.documentsCount} documents`);
 
-    // Return PDF
-    return new NextResponse(reportBuffer, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="kyc-report-${sessionId}.pdf"`,
-        'Content-Length': reportBuffer.length.toString()
-      }
+    return NextResponse.json({
+      success: true,
+      ...result
     });
   } catch (error: any) {
-    console.error('❌ Download KYC report failed:', error);
+    console.error('❌ Sync KYC documents failed:', error);
     console.error('Error stack:', error.stack);
     
     // Return detailed error for debugging
     return NextResponse.json(
       { 
         success: false,
-        error: error.message || 'Failed to download KYC report',
+        error: error.message || 'Failed to sync KYC documents',
         details: process.env.NODE_ENV === 'development' ? error.stack : undefined
       },
       { status: 500 }

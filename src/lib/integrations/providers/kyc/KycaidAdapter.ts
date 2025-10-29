@@ -449,12 +449,97 @@ export class KycaidAdapter implements IKycProvider {
         metadata: {
           verificationStatus: data.verification_status,
           email: data.email,
-          createdAt: data.created_at
+          createdAt: data.created_at,
+          firstName: data.first_name,
+          lastName: data.last_name,
+          middleName: data.middle_name,
+          dateOfBirth: data.dob,
+          nationality: data.nationality,
+          residenceCountry: data.residence_country,
+          documents: data.documents || [], // Array of document IDs
+          addresses: data.addresses || [],
+          declineReasons: data.decline_reasons || []
         }
       };
     } catch (error: any) {
       console.error('❌ KYCAID get applicant failed:', error);
       throw new Error(`Failed to get KYCAID applicant: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get document details by ID
+   * GET /documents/{document_id}
+   */
+  async getDocument(documentId: string): Promise<any> {
+    if (!this.isConfigured()) {
+      throw new Error('KYCAID provider not configured');
+    }
+
+    try {
+      console.log('📄 Getting KYCAID document:', documentId);
+
+      const response = await fetch(`${this.baseUrl}/documents/${documentId}`, {
+        method: 'GET',
+        headers: this.getHeaders()
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Failed to get document: ${error}`);
+      }
+
+      const data = await response.json();
+
+      console.log(`✅ Retrieved document: ${data.type} - ${data.status}`);
+
+      return data;
+    } catch (error: any) {
+      console.error('❌ KYCAID get document failed:', error);
+      throw new Error(`Failed to get KYCAID document: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get all documents for applicant
+   * Returns array of full document objects
+   */
+  async getApplicantDocuments(applicantId: string): Promise<any[]> {
+    if (!this.isConfigured()) {
+      throw new Error('KYCAID provider not configured');
+    }
+
+    try {
+      console.log('📄 Getting documents for applicant:', applicantId);
+
+      // First, get applicant to get document IDs
+      const applicant = await this.getApplicant(applicantId);
+      const documentIds = applicant.metadata?.documents || [];
+
+      if (documentIds.length === 0) {
+        console.log('ℹ️ No documents found for applicant');
+        return [];
+      }
+
+      console.log(`📥 Fetching ${documentIds.length} document(s)...`);
+
+      // Fetch each document
+      const documents = [];
+      for (const docId of documentIds) {
+        try {
+          const doc = await this.getDocument(docId);
+          documents.push(doc);
+        } catch (error: any) {
+          console.warn(`⚠️ Failed to fetch document ${docId}:`, error.message);
+        }
+      }
+
+      console.log(`✅ Retrieved ${documents.length} document(s)`);
+
+      return documents;
+    } catch (error: any) {
+      console.error('❌ KYCAID get applicant documents failed:', error);
+      throw new Error(`Failed to get KYCAID applicant documents: ${error.message}`);
     }
   }
 
@@ -568,39 +653,111 @@ export class KycaidAdapter implements IKycProvider {
   }
 
   /**
-   * Download verification report as PDF
-   * GET /verifications/report?verification_id={verification_id}
+   * Get verification report data (not PDF, just data)
+   * This is used to generate reports on our side
    */
-  async downloadVerificationReport(verificationId: string): Promise<Buffer> {
+  async getVerificationReport(verificationId: string): Promise<any> {
     if (!this.isConfigured()) {
       throw new Error('KYCAID provider not configured');
     }
 
     try {
-      console.log('📄 Downloading KYCAID verification report:', verificationId);
+      console.log('📄 Getting KYCAID verification report data:', verificationId);
 
-      const url = `${this.baseUrl}/verifications/report?verification_id=${verificationId}`;
+      // Get full verification details
+      const verification = await this.getVerificationStatus(verificationId);
       
-      const response = await fetch(url, {
+      // Get applicant details
+      const applicant = await this.getApplicant(verification.metadata?.applicantId);
+
+      console.log('✅ Report data retrieved');
+
+      return {
+        verification,
+        applicant,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error: any) {
+      console.error('❌ KYCAID report data retrieval failed:', error);
+      throw new Error(`Failed to get KYCAID report data: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get applicant documents (passport/ID photos, etc.)
+   * GET /applicants/{applicant_id}/documents
+   */
+  async getApplicantDocuments(applicantId: string): Promise<any[]> {
+    if (!this.isConfigured()) {
+      throw new Error('KYCAID provider not configured');
+    }
+
+    try {
+      console.log('📄 Getting KYCAID documents for applicant:', applicantId);
+
+      const response = await fetch(`${this.baseUrl}/applicants/${applicantId}/documents`, {
         method: 'GET',
         headers: this.getHeaders()
       });
 
       if (!response.ok) {
         const error = await response.text();
-        throw new Error(`Failed to download report: ${error}`);
+        throw new Error(`Failed to get documents: ${error}`);
       }
 
-      // Get PDF as buffer
+      const data = await response.json();
+
+      console.log(`✅ Retrieved ${data.items?.length || 0} documents`);
+
+      return data.items || [];
+    } catch (error: any) {
+      console.error('❌ KYCAID get documents failed:', error);
+      throw new Error(`Failed to get KYCAID documents: ${error.message}`);
+    }
+  }
+
+  /**
+   * Download document file (image)
+   * GET /documents/{document_id}/download
+   */
+  async downloadDocument(documentId: string): Promise<{ buffer: Buffer; contentType: string; filename: string }> {
+    if (!this.isConfigured()) {
+      throw new Error('KYCAID provider not configured');
+    }
+
+    try {
+      console.log('📄 Downloading KYCAID document:', documentId);
+
+      const response = await fetch(`${this.baseUrl}/documents/${documentId}/download`, {
+        method: 'GET',
+        headers: this.getHeaders()
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Failed to download document: ${error}`);
+      }
+
+      // Get file data
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      console.log(`✅ Report downloaded: ${buffer.length} bytes`);
+      // Get content type and filename from headers
+      const contentType = response.headers.get('content-type') || 'image/jpeg';
+      const contentDisposition = response.headers.get('content-disposition') || '';
+      const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+      const filename = filenameMatch ? filenameMatch[1] : `document-${documentId}.jpg`;
 
-      return buffer;
+      console.log(`✅ Document downloaded: ${buffer.length} bytes, type: ${contentType}`);
+
+      return {
+        buffer,
+        contentType,
+        filename
+      };
     } catch (error: any) {
-      console.error('❌ KYCAID report download failed:', error);
-      throw new Error(`Failed to download KYCAID report: ${error.message}`);
+      console.error('❌ KYCAID document download failed:', error);
+      throw new Error(`Failed to download KYCAID document: ${error.message}`);
     }
   }
 }
