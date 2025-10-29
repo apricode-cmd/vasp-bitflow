@@ -79,7 +79,8 @@ export class KycaidAdapter implements IKycProvider {
     this.config = config as KycaidConfig;
     
     if (this.config.baseUrl) {
-      this.baseUrl = this.config.baseUrl;
+      // Remove trailing slash if present
+      this.baseUrl = this.config.baseUrl.replace(/\/$/, '');
     }
     
     this.initialized = true;
