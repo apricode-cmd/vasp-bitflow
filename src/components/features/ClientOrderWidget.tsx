@@ -92,6 +92,19 @@ interface BuyConfig {
   platformFee: number;
 }
 
+interface TradingPair {
+  id: string;
+  cryptoCode: string;
+  fiatCode: string;
+  isActive: boolean;
+  minCryptoAmount: number;
+  maxCryptoAmount: number;
+  minFiatAmount: number;
+  maxFiatAmount: number;
+  feePercent: number;
+  priority: number;
+}
+
 export function ClientOrderWidget() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -102,7 +115,7 @@ export function ClientOrderWidget() {
   const [config, setConfig] = useState<BuyConfig | null>(null);
   const [rates, setRates] = useState<ExchangeRates | null>(null);
   const [blockchainNetworks, setBlockchainNetworks] = useState<BlockchainNetwork[]>([]);
-  const [tradingPairFee, setTradingPairFee] = useState<number>(0.015); // Default 1.5%
+  const [tradingPair, setTradingPair] = useState<TradingPair | null>(null); // Current trading pair
   const [userWallets, setUserWallets] = useState<UserWallet[]>([]); // User's saved wallets
 
   // Form state
@@ -244,27 +257,37 @@ export function ClientOrderWidget() {
     return () => clearInterval(interval);
   }, [selectedCrypto, selectedFiat]);
 
-  // Fetch trading pair fee
+  // Fetch trading pair data (limits + fee)
   useEffect(() => {
-    const fetchTradingPairFee = async () => {
-      if (!selectedCrypto || !selectedFiat) return;
+    const fetchTradingPair = async () => {
+      if (!selectedCrypto || !selectedFiat) {
+        setTradingPair(null);
+        return;
+      }
 
       try {
         const response = await fetch(
-          `/api/admin/trading-pairs?cryptoCode=${selectedCrypto}&fiatCode=${selectedFiat}`
+          `/api/trading-pairs?cryptoCode=${selectedCrypto}&fiatCode=${selectedFiat}`
         );
+        
         if (response.ok) {
           const data = await response.json();
-          if (data.pairs && data.pairs.length > 0) {
-            setTradingPairFee(data.pairs[0].feePercent / 100);
+          if (data.success && data.pair) {
+            setTradingPair(data.pair);
+          } else {
+            setTradingPair(null);
+            console.warn('No trading pair found for', selectedCrypto, selectedFiat);
           }
+        } else {
+          setTradingPair(null);
         }
       } catch (error) {
-        // Silent fail for fee fetch
+        console.error('Failed to fetch trading pair:', error);
+        setTradingPair(null);
       }
     };
 
-    fetchTradingPairFee();
+    fetchTradingPair();
   }, [selectedCrypto, selectedFiat]);
 
   // Auto-select blockchain and wallet when crypto changes
@@ -328,50 +351,77 @@ export function ClientOrderWidget() {
   // Calculate crypto/fiat amounts based on input mode
   const cryptoAmount = useMemo(() => {
     const amount = parseFloat(inputAmount);
-    if (!amount || amount <= 0 || !currentRate) return '';
+    if (!amount || amount <= 0 || !currentRate || !tradingPair) return '';
+    
+    const feeDecimal = tradingPair.feePercent / 100;
     
     if (inputMode === 'crypto') {
       return inputAmount;
     } else {
       // Calculate crypto from fiat
-      const cryptoValue = amount / (currentRate * (1 + tradingPairFee));
+      const cryptoValue = amount / (currentRate * (1 + feeDecimal));
       return cryptoValue.toFixed(8);
     }
-  }, [inputAmount, inputMode, currentRate, tradingPairFee]);
+  }, [inputAmount, inputMode, currentRate, tradingPair]);
 
   const fiatAmount = useMemo(() => {
     const amount = parseFloat(inputAmount);
-    if (!amount || amount <= 0 || !currentRate) return '';
+    if (!amount || amount <= 0 || !currentRate || !tradingPair) return '';
+    
+    const feeDecimal = tradingPair.feePercent / 100;
     
     if (inputMode === 'fiat') {
       return inputAmount;
     } else {
       // Calculate fiat from crypto
-      const fiatValue = amount * currentRate * (1 + tradingPairFee);
+      const fiatValue = amount * currentRate * (1 + feeDecimal);
       return fiatValue.toFixed(2);
     }
-  }, [inputAmount, inputMode, currentRate, tradingPairFee]);
+  }, [inputAmount, inputMode, currentRate, tradingPair]);
 
   // Calculate order total
   const calculation = useMemo(() => {
     const crypto = parseFloat(cryptoAmount);
-    if (!rates || !crypto || crypto <= 0 || !currentRate) return null;
+    if (!rates || !crypto || crypto <= 0 || !currentRate || !tradingPair) return null;
 
-    return calculateOrderTotal(crypto, currentRate, tradingPairFee);
-  }, [cryptoAmount, currentRate, tradingPairFee, rates]);
+    // Use fee from TradingPair (convert from percent to decimal)
+    const feeDecimal = tradingPair.feePercent / 100;
+    return calculateOrderTotal(crypto, currentRate, feeDecimal);
+  }, [cryptoAmount, currentRate, tradingPair, rates]);
 
-  // Quick amount buttons - depends on input mode
+  // Quick amount buttons - dynamic based on trading pair limits
   const quickAmounts = useMemo(() => {
-    if (inputMode === 'crypto') {
-      // Crypto amounts
-      return selectedCrypto === 'BTC' 
+    if (!tradingPair) {
+      // Fallback if no trading pair
+      return inputMode === 'crypto' 
         ? [0.001, 0.01, 0.1, 0.5]
-        : [0.01, 0.1, 1, 10];
-    } else {
-      // Fiat amounts
-      return [100, 500, 1000, 5000];
+        : [100, 500, 1000, 5000];
     }
-  }, [inputMode, selectedCrypto]);
+
+    if (inputMode === 'crypto') {
+      // Crypto amounts based on min/max
+      const min = tradingPair.minCryptoAmount;
+      const max = tradingPair.maxCryptoAmount;
+      
+      return [
+        min,                    // Minimum
+        min * 10,               // 10x minimum
+        min * 100,              // 100x minimum
+        Math.min(min * 500, max) // 500x minimum or max
+      ].filter(amount => amount <= max);
+    } else {
+      // Fiat amounts based on min/max
+      const min = tradingPair.minFiatAmount;
+      const max = tradingPair.maxFiatAmount;
+      
+      return [
+        min,                           // Minimum
+        Math.min(min * 5, max),        // 5x minimum
+        Math.min(min * 10, max),       // 10x minimum
+        Math.min(min * 50, max)        // 50x minimum
+      ].filter(amount => amount <= max);
+    }
+  }, [inputMode, tradingPair]);
 
   // Get selected data
   const selectedCryptoData = config?.currencies.find(c => c.code === selectedCrypto);
@@ -441,6 +491,32 @@ export function ClientOrderWidget() {
     if (!calculation) {
       toast.error('Unable to calculate order total');
       return;
+    }
+
+    // Validate amounts against trading pair limits
+    if (tradingPair) {
+      const crypto = parseFloat(cryptoAmount);
+      const fiat = parseFloat(fiatAmount);
+
+      if (crypto < tradingPair.minCryptoAmount) {
+        toast.error(`Minimum order: ${tradingPair.minCryptoAmount} ${selectedCrypto}`);
+        return;
+      }
+
+      if (crypto > tradingPair.maxCryptoAmount) {
+        toast.error(`Maximum order: ${tradingPair.maxCryptoAmount} ${selectedCrypto}`);
+        return;
+      }
+
+      if (fiat < tradingPair.minFiatAmount) {
+        toast.error(`Minimum order: ${formatFiatCurrency(tradingPair.minFiatAmount, selectedFiat)}`);
+        return;
+      }
+
+      if (fiat > tradingPair.maxFiatAmount) {
+        toast.error(`Maximum order: ${formatFiatCurrency(tradingPair.maxFiatAmount, selectedFiat)}`);
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -556,10 +632,12 @@ export function ClientOrderWidget() {
               onValueChange={setSelectedCrypto}
               placeholder="Select cryptocurrency..."
             />
-            {selectedCryptoData && (
+            {tradingPair && (
               <p className="text-xs text-muted-foreground">
-                Min: {selectedCryptoData.minOrderAmount} {selectedCrypto}, 
-                Max: {selectedCryptoData.maxOrderAmount} {selectedCrypto}
+                Limits: {inputMode === 'crypto' 
+                  ? `${tradingPair.minCryptoAmount} - ${tradingPair.maxCryptoAmount} ${selectedCrypto}`
+                  : `${formatFiatCurrency(tradingPair.minFiatAmount, selectedFiat)} - ${formatFiatCurrency(tradingPair.maxFiatAmount, selectedFiat)}`
+                }
               </p>
             )}
           </div>
@@ -631,9 +709,12 @@ export function ClientOrderWidget() {
               </div>
             )}
 
-            {selectedCryptoData && (
+            {tradingPair && (
               <p className="text-xs text-muted-foreground">
-                Limits: {selectedCryptoData.minOrderAmount} - {selectedCryptoData.maxOrderAmount} {selectedCrypto}
+                Limits: {inputMode === 'crypto' 
+                  ? `${tradingPair.minCryptoAmount} - ${tradingPair.maxCryptoAmount} ${selectedCrypto}`
+                  : `${formatFiatCurrency(tradingPair.minFiatAmount, selectedFiat)} - ${formatFiatCurrency(tradingPair.maxFiatAmount, selectedFiat)}`
+                }
               </p>
             )}
           </div>
@@ -903,7 +984,7 @@ export function ClientOrderWidget() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">
-                        Platform Fee ({(tradingPairFee * 100).toFixed(1)}%):
+                        Platform Fee ({tradingPair?.feePercent.toFixed(1)}%):
                       </span>
                       <span className="font-medium">
                         {formatFiatCurrency(calculation.fee, selectedFiat)}
