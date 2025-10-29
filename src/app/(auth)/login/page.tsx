@@ -31,6 +31,7 @@ import { ApricodeLogo } from '@/components/icons/ApricodeLogo';
 
 export default function LoginPage(): React.ReactElement {
   const [isLoading, setIsLoading] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const form = useForm<LoginInput>({
@@ -42,6 +43,11 @@ export default function LoginPage(): React.ReactElement {
   });
 
   const onSubmit = async (data: LoginInput) => {
+    // Prevent multiple submissions
+    if (isLoading || isRedirecting) {
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -58,6 +64,9 @@ export default function LoginPage(): React.ReactElement {
         setIsLoading(false);
         return;
       }
+
+      // Mark as redirecting to prevent further submissions
+      setIsRedirecting(true);
 
       // Success - get session to determine redirect
       const sessionResponse = await fetch('/api/auth/session');
@@ -76,10 +85,10 @@ export default function LoginPage(): React.ReactElement {
       }
 
       // Show success message
-      toast.success('Login successful!');
+      toast.success('Login successful! Redirecting...');
       
-      // Small delay to ensure log is written
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait for session to be fully established
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Redirect based on role (ADMIN → /admin, CLIENT → /dashboard)
       if (session?.user?.role === 'ADMIN') {
@@ -91,6 +100,7 @@ export default function LoginPage(): React.ReactElement {
       console.error('Login error:', error);
       setError('An unexpected error occurred. Please try again.');
       setIsLoading(false);
+      setIsRedirecting(false);
     }
   };
 
@@ -183,9 +193,14 @@ export default function LoginPage(): React.ReactElement {
                 <Button 
                   type="submit" 
                   className="w-full h-11 font-semibold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all" 
-                  disabled={isLoading}
+                  disabled={isLoading || isRedirecting}
                 >
-                  {isLoading ? (
+                  {isRedirecting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Redirecting...
+                    </>
+                  ) : isLoading ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Signing in...

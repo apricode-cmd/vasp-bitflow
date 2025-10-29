@@ -36,8 +36,13 @@ async function checkMaintenanceMode(): Promise<boolean> {
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
-  // Always allow maintenance page
-  if (path === '/maintenance') {
+  // Always allow these critical routes (to prevent infinite loops)
+  if (
+    path === '/maintenance' ||
+    path.startsWith('/_next') ||
+    path.startsWith('/api/settings/public') || // Must be before maintenance check!
+    path.startsWith('/api/auth')
+  ) {
     return NextResponse.next();
   }
 
@@ -58,11 +63,8 @@ export async function middleware(request: NextRequest) {
     path === '/' ||
     path.startsWith('/login') ||
     path.startsWith('/register') ||
-    path.startsWith('/_next') ||
-    path.startsWith('/api/auth') ||
     path.startsWith('/api/rates') ||  // Public API for rates
     path.startsWith('/api/payment-methods') ||  // Public API for payment methods
-    path.startsWith('/api/settings/public') ||  // Public settings API
     path.startsWith('/api/v1/') ||  // Public API v1 (uses API keys)
     path.startsWith('/api/kyc/webhook') ||  // Webhook from KYCAID
     path.startsWith('/legal/')  // Legal pages
