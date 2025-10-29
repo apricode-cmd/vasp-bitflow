@@ -88,33 +88,33 @@ export default async function LegalPage({ params }: LegalPageProps) {
     <div className="min-h-screen flex flex-col bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background">
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between px-4 md:px-6">
-          <div className="flex items-center gap-4">
+        <div className="container max-w-4xl mx-auto flex h-14 items-center justify-between px-4 md:px-6">
+          <div className="flex items-center gap-3">
             <Link 
               href="/"
-              className="flex items-center gap-2 font-semibold text-lg hover:opacity-80 transition-opacity"
+              className="flex items-center gap-2 font-semibold hover:opacity-80 transition-opacity"
             >
-              <div className="rounded-lg bg-primary/10 p-2 ring-1 ring-primary/20">
-                <Shield className="h-5 w-5 text-primary" />
+              <div className="rounded-lg bg-primary/10 p-1.5 ring-1 ring-primary/20">
+                <Shield className="h-4 w-4 text-primary" />
               </div>
-              <span className="hidden sm:inline bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+              <span className="hidden sm:inline text-sm bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
                 Apricode Exchange
               </span>
             </Link>
             
-            <Separator orientation="vertical" className="h-6" />
+            <Separator orientation="vertical" className="h-5" />
             
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <div className="rounded-md bg-primary/5 p-1">
-                <FileText className="h-4 w-4 text-primary" />
+                <FileText className="h-3.5 w-3.5 text-primary" />
               </div>
               <span className="hidden md:inline">Legal Document</span>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Link href="/login">
-              <Button variant="ghost" size="sm" className="hidden sm:flex">
+              <Button variant="ghost" size="sm" className="hidden sm:flex h-8 text-xs">
                 Sign In
               </Button>
             </Link>
@@ -125,22 +125,22 @@ export default async function LegalPage({ params }: LegalPageProps) {
 
       {/* Hero Section */}
       <div className="border-b bg-muted/30">
-        <div className="container max-w-4xl mx-auto px-4 md:px-6 py-6">
+        <div className="container max-w-4xl mx-auto px-4 md:px-6 py-5">
           <div className="flex items-start justify-between gap-4">
             {/* Left: Title & Meta */}
             <div className="flex-1 min-w-0">
-              <h1 className="text-2xl md:text-3xl font-bold mb-3 bg-gradient-to-br from-primary to-foreground bg-clip-text text-transparent">
+              <h1 className="text-2xl md:text-3xl font-bold mb-2 bg-gradient-to-br from-primary to-foreground bg-clip-text text-transparent">
                 {document.title}
               </h1>
               
               {document.description && (
-                <p className="text-sm text-muted-foreground mb-3">
+                <p className="text-sm text-muted-foreground mb-2">
                   {document.description}
                 </p>
               )}
 
               {/* Metadata */}
-              <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2.5 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1.5">
                   <Calendar className="h-3 w-3" />
                   <span>{document.publishedAt ? format(new Date(document.publishedAt), 'MMM d, yyyy') : 'N/A'}</span>
