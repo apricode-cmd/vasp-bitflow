@@ -202,13 +202,18 @@ export function ClientOrderWidget() {
         const response = await fetch('/api/rates');
         
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+          const error = await response.json();
+          throw new Error(error.error || `HTTP ${response.status}`);
         }
         
         const data = await response.json();
         setRates(data);
-      } catch (error) {
-        toast.error('Failed to load exchange rates');
+      } catch (error: any) {
+        console.error('Failed to load rates:', error);
+        toast.error('Failed to load exchange rates', {
+          description: error.message || 'Please check CoinGecko integration'
+        });
+        setRates(null); // Clear rates on error
       } finally {
         setRatesLoading(false);
       }

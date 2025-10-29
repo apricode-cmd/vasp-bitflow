@@ -5,11 +5,11 @@
  */
 
 import prisma from '@/lib/prisma';
-import { coinGeckoService } from './coingecko';
+import { rateProviderService } from './rate-provider.service';
 
 class RateManagementService {
   /**
-   * Get current exchange rate (checks manual overrides first, then CoinGecko)
+   * Get current exchange rate (checks manual overrides first, then active rate provider)
    */
   async getCurrentRate(cryptoCode: string, fiatCode: string): Promise<number> {
     // First, check for active manual rate
@@ -19,8 +19,8 @@ class RateManagementService {
       return manualRate.rate;
     }
 
-    // Fall back to CoinGecko
-    return await coinGeckoService.getRate(cryptoCode, fiatCode);
+    // Fall back to active rate provider
+    return await rateProviderService.getRate(cryptoCode, fiatCode);
   }
 
   /**

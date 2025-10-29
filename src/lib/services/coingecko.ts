@@ -2,10 +2,12 @@
  * CoinGecko Service
  * 
  * Integration with CoinGecko API for real-time cryptocurrency prices.
+ * Only works if CoinGecko integration is active in system.
  */
 
 import axios, { AxiosInstance } from 'axios';
 import { config } from '@/lib/config';
+import { prisma } from '@/lib/prisma';
 
 // In-memory cache for rates (30 seconds TTL)
 const CACHE_DURATION_MS = 30 * 1000;
@@ -51,8 +53,26 @@ class CoinGeckoService {
   }
 
   /**
+   * Check if CoinGecko integration is active
+   */
+  private async isIntegrationActive(): Promise<boolean> {
+    try {
+      const integration = await prisma.integration.findUnique({
+        where: { service: 'coingecko' }
+      });
+      
+      return integration?.isEnabled && integration?.status === 'active';
+    } catch (error) {
+      console.error('❌ Failed to check CoinGecko integration status:', error);
+      return false;
+    }
+  }
+
+  /**
    * Gets current exchange rates for all supported cryptocurrencies
    * Implements 30-second caching to avoid rate limits
+   * 
+   * NOTE: This method does NOT check integration status - that's handled by rateProviderService
    */
   async getCurrentRates(forceRefresh = false): Promise<ExchangeRates> {
     // Check cache (skip if force refresh requested)
@@ -137,13 +157,13 @@ class CoinGeckoService {
       
       // Return cached data if available, even if expired
       if (ratesCache) {
-        console.warn('⚠️ Returning expired cached rates due to API error');
+        const cacheAge = Math.round((Date.now() - ratesCache.timestamp) / 1000);
+        console.warn(`⚠️ Returning stale cached rates (age: ${cacheAge}s) due to API error`);
         return ratesCache.data;
       }
 
-      // Return fallback rates if cache is empty
-      console.warn('🔄 Using fallback rates due to API unavailability');
-      return this.getFallbackRates();
+      // No cache available - throw error instead of using fallback
+      throw new Error(`Failed to fetch exchange rates from CoinGecko: ${error.message}. Please ensure the integration is properly configured with a valid API key in Settings → Integrations.`);
     }
   }
 
@@ -164,21 +184,6 @@ class CoinGeckoService {
   async getRate(crypto: 'BTC' | 'ETH' | 'USDT' | 'SOL', fiat: 'EUR' | 'PLN'): Promise<number> {
     const rates = await this.getCurrentRates();
     return rates[crypto][fiat];
-  }
-
-  /**
-   * Fallback rates in case API is unavailable
-   * These should be updated periodically or fetched from a backup source
-   */
-  private getFallbackRates(): ExchangeRates {
-    console.warn('Using fallback exchange rates');
-    return {
-      BTC: { EUR: 50000, PLN: 215000 },
-      ETH: { EUR: 3000, PLN: 12900 },
-      USDT: { EUR: 0.95, PLN: 4.08 },
-      SOL: { EUR: 150, PLN: 645 },
-      updatedAt: new Date().toISOString()
-    };
   }
 
   /**
