@@ -17,6 +17,14 @@ const defaultSettings = [
     isPublic: true
   },
   {
+    key: 'platformName',
+    value: 'Apricode Exchange',
+    type: 'STRING' as const,
+    category: 'brand',
+    description: 'Company name for copyright notice',
+    isPublic: true
+  },
+  {
     key: 'brandTagline',
     value: 'Buy Cryptocurrency Securely',
     type: 'STRING' as const,

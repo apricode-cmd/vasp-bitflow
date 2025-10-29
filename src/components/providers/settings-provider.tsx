@@ -14,6 +14,7 @@ import Color from 'color';
 
 interface PublicSettings {
   brandName?: string;
+  platformName?: string;
   brandTagline?: string;
   brandLogo?: string;
   primaryColor?: string;
@@ -27,6 +28,7 @@ interface PublicSettings {
   defaultFeePercent?: number;
   minOrderAmount?: number;
   maxOrderAmount?: number;
+  currentYear?: number;
 }
 
 interface SettingsContextType {

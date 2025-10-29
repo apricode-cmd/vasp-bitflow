@@ -46,6 +46,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       settingsObject[setting.key] = value;
     });
 
+    // Add server-computed values
+    settingsObject.currentYear = new Date().getFullYear();
+
     return NextResponse.json({
       success: true,
       settings: settingsObject

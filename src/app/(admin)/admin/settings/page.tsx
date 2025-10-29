@@ -34,6 +34,7 @@ import Color from 'color';
 interface SystemSettings {
   // Brand
   brandName: string;
+  platformName: string;
   brandTagline: string;
   brandLogo: string;
   primaryColor: string; // Brand primary color
@@ -278,17 +279,33 @@ export default function SettingsPage(): JSX.Element {
                     onChange={(e) => updateSetting('brandName', e.target.value)}
                     placeholder="Apricode Exchange"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Displayed in the header and meta tags
+                  </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="brandTagline">Tagline</Label>
+                  <Label htmlFor="platformName">Company Name (Copyright)</Label>
                   <Input
-                    id="brandTagline"
-                    value={settings.brandTagline || ''}
-                    onChange={(e) => updateSetting('brandTagline', e.target.value)}
-                    placeholder="Buy Cryptocurrency Securely"
+                    id="platformName"
+                    value={settings.platformName || ''}
+                    onChange={(e) => updateSetting('platformName', e.target.value)}
+                    placeholder="Apricode Exchange"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Used in the footer copyright notice
+                  </p>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="brandTagline">Tagline</Label>
+                <Input
+                  id="brandTagline"
+                  value={settings.brandTagline || ''}
+                  onChange={(e) => updateSetting('brandTagline', e.target.value)}
+                  placeholder="Buy Cryptocurrency Securely"
+                />
               </div>
 
               <div className="space-y-2">

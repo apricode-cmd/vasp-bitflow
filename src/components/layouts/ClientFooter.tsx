@@ -22,10 +22,13 @@ import { toast } from 'sonner';
 
 export function ClientFooter(): React.ReactElement {
   const { settings, loading } = useSettings();
-  const currentYear = new Date().getFullYear();
   const version = process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0';
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [copiedPhone, setCopiedPhone] = useState(false);
+
+  // Use server-provided year, fallback to client-side
+  const currentYear = settings.currentYear || new Date().getFullYear();
+  const companyName = settings.platformName || settings.brandName || 'Apricode Exchange';
 
   const handleCopyEmail = () => {
     if (settings.supportEmail) {
@@ -57,7 +60,7 @@ export function ClientFooter(): React.ReactElement {
               <>
                 <span>© {currentYear}</span>
                 <span className="font-medium text-foreground">
-                  {settings.brandName || 'Apricode Exchange'}
+                  {companyName}
                 </span>
                 <span className="hidden sm:inline">• All rights reserved</span>
               </>
