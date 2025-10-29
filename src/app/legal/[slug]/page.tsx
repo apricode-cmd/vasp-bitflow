@@ -85,140 +85,188 @@ export default async function LegalPage({ params }: LegalPageProps) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
-        <div className="container max-w-4xl mx-auto flex h-14 items-center justify-between px-4 md:px-6">
-          <div className="flex items-center gap-3">
+    <div className="min-h-screen flex flex-col bg-background">
+      {/* Modern Header */}
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container max-w-5xl mx-auto">
+          <div className="flex h-16 items-center justify-between px-4 md:px-6">
+            {/* Logo */}
             <Link 
               href="/"
-              className="flex items-center gap-2 font-semibold hover:opacity-80 transition-opacity"
+              className="flex items-center gap-2.5 group"
             >
-              <div className="rounded-lg bg-primary/10 p-1.5 ring-1 ring-primary/20">
-                <Shield className="h-4 w-4 text-primary" />
+              <div className="relative">
+                <div className="absolute inset-0 bg-primary/20 rounded-xl blur-sm group-hover:blur-md transition-all" />
+                <div className="relative rounded-xl bg-gradient-to-br from-primary to-primary/80 p-2 shadow-sm group-hover:shadow-md transition-all">
+                  <Shield className="h-4 w-4 text-primary-foreground" />
+                </div>
               </div>
-              <span className="hidden sm:inline text-sm bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                Apricode Exchange
-              </span>
+              <div className="flex flex-col -space-y-0.5">
+                <span className="text-sm font-semibold tracking-tight leading-none">
+                  Apricode Exchange
+                </span>
+                <span className="text-[10px] text-muted-foreground font-medium leading-none hidden sm:block">
+                  Legal & Compliance
+                </span>
+              </div>
             </Link>
             
-            <Separator orientation="vertical" className="h-5" />
-            
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <div className="rounded-md bg-primary/5 p-1">
-                <FileText className="h-3.5 w-3.5 text-primary" />
-              </div>
-              <span className="hidden md:inline">Legal Document</span>
+            {/* Actions */}
+            <div className="flex items-center gap-2">
+              <Link href="/login">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="hidden sm:flex h-9 px-4 rounded-lg hover:bg-primary/5"
+                >
+                  <span className="text-sm font-medium">Sign In</span>
+                </Button>
+              </Link>
+              
+              <div className="h-5 w-px bg-border hidden sm:block" />
+              
+              <ThemeToggle />
             </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Link href="/login">
-              <Button variant="ghost" size="sm" className="hidden sm:flex h-8 text-xs">
-                Sign In
-              </Button>
-            </Link>
-            <ThemeToggle />
           </div>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <div className="border-b bg-muted/30">
-        <div className="container max-w-4xl mx-auto px-4 md:px-6 py-5">
-          <div className="flex items-start justify-between gap-4">
-            {/* Left: Title & Meta */}
-            <div className="flex-1 min-w-0">
-              <h1 className="text-2xl md:text-3xl font-bold mb-2 bg-gradient-to-br from-primary to-foreground bg-clip-text text-transparent">
-                {document.title}
+      {/* Hero Section with Modern Design */}
+      <div className="border-b">
+        <div className="container max-w-5xl mx-auto px-4 md:px-6 py-8 md:py-10">
+          <div className="flex flex-col gap-6">
+            {/* Document Badge */}
+            <div className="flex items-center gap-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/5 border border-primary/10">
+                <FileText className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs font-medium text-foreground">
+                  Legal Document
+                </span>
+              </div>
+              
+              {document.isRequired && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20">
+                  <FileCheck className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                  <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                    Required
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Title & Description */}
+            <div className="space-y-3 max-w-3xl">
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight">
+                <span className="bg-gradient-to-br from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">
+                  {document.title}
+                </span>
               </h1>
               
               {document.description && (
-                <p className="text-sm text-muted-foreground mb-2">
+                <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
                   {document.description}
                 </p>
               )}
-
-              {/* Metadata */}
-              <div className="flex flex-wrap items-center gap-2.5 text-xs text-muted-foreground">
-                <div className="flex items-center gap-1.5">
-                  <Calendar className="h-3 w-3" />
-                  <span>{document.publishedAt ? format(new Date(document.publishedAt), 'MMM d, yyyy') : 'N/A'}</span>
-                </div>
-                
-                <Separator orientation="vertical" className="h-3" />
-                
-                <div className="flex items-center gap-1.5">
-                  <Clock className="h-3 w-3" />
-                  <span>{format(new Date(document.updatedAt), 'MMM d, yyyy')}</span>
-                </div>
-
-                {document.isRequired && (
-                  <>
-                    <Separator orientation="vertical" className="h-3" />
-                    <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                      <FileCheck className="h-3 w-3" />
-                      <span>Required</span>
-                    </div>
-                  </>
-                )}
-              </div>
             </div>
 
-            {/* Right: Quick Actions */}
-            <QuickActions />
+            {/* Metadata & Actions Row */}
+            <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+              {/* Metadata */}
+              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-muted/50">
+                    <Calendar className="h-4 w-4" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase tracking-wider font-medium opacity-60">
+                      Published
+                    </span>
+                    <span className="text-xs font-medium text-foreground">
+                      {document.publishedAt ? format(new Date(document.publishedAt), 'MMM d, yyyy') : 'N/A'}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="h-8 w-px bg-border" />
+                
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-muted/50">
+                    <Clock className="h-4 w-4" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase tracking-wider font-medium opacity-60">
+                      Updated
+                    </span>
+                    <span className="text-xs font-medium text-foreground">
+                      {format(new Date(document.updatedAt), 'MMM d, yyyy')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <QuickActions />
+            </div>
           </div>
         </div>
       </div>
 
       {/* Content */}
       <main className="flex-1">
-        <div className="container max-w-4xl mx-auto px-4 md:px-6 py-8 md:py-12">
+        <div className="container max-w-5xl mx-auto px-4 md:px-6 py-10 md:py-14">
           <LegalPageClient htmlContent={document.htmlContent} />
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="border-t bg-card/30 backdrop-blur-sm mt-auto">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
+      <footer className="border-t bg-muted/30 mt-auto">
+        <div className="container max-w-5xl mx-auto px-4 py-8">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6 text-sm">
             {/* Left: Copyright */}
-            <div className="flex items-center gap-1">
-              <span>© {new Date().getFullYear()}</span>
-              <span className="font-medium text-foreground">Apricode Exchange</span>
-              <span className="hidden sm:inline">• All rights reserved</span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
+                <div className="rounded-lg bg-primary/10 p-1.5">
+                  <Shield className="h-3.5 w-3.5 text-primary" />
+                </div>
+                <div className="flex flex-col -space-y-0.5">
+                  <span className="text-xs font-semibold">Apricode Exchange</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    © {new Date().getFullYear()} All rights reserved
+                  </span>
+                </div>
+              </div>
             </div>
 
             {/* Center: Links */}
             <div className="flex items-center gap-6">
               <Link 
                 href="/legal/terms-of-service" 
-                className="hover:text-foreground transition"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 Terms
               </Link>
               <Link 
                 href="/legal/privacy-policy" 
-                className="hover:text-foreground transition"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 Privacy
               </Link>
               <Link 
                 href="/contact" 
-                className="hover:text-foreground transition"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 Contact
               </Link>
             </div>
 
             {/* Right: Powered by */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs">Powered by</span>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Powered by</span>
               <a 
                 href="https://apricode.io" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 font-semibold text-primary hover:text-primary/80 transition-colors"
+                className="inline-flex items-center gap-1.5 font-semibold text-primary hover:text-primary/80 transition-colors"
               >
                 <Shield className="h-3.5 w-3.5" />
                 <span>Apricode</span>
