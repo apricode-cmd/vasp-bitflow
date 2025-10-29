@@ -54,6 +54,7 @@ interface SystemSettings {
   emailNotifications: boolean;
   
   // Platform
+  unverifiedUserLimit: number;
   defaultFeePercent: number;
   minOrderAmount: number;
   maxOrderAmount: number;
@@ -552,11 +553,12 @@ export default function SettingsPage(): JSX.Element {
             <CardContent className="space-y-6">
               {/* Status Toggles */}
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Maintenance Mode</Label>
+                <div className="flex items-center justify-between p-4 rounded-lg border border-destructive/20 bg-destructive/5">
+                  <div className="space-y-0.5 flex-1">
+                    <Label className="text-destructive font-semibold">Maintenance Mode</Label>
                     <p className="text-sm text-muted-foreground">
-                      Disable platform for maintenance
+                      ⚠️ When enabled, only admins can access the platform. 
+                      All users will be redirected to the maintenance page.
                     </p>
                   </div>
                   <Switch
@@ -567,11 +569,11 @@ export default function SettingsPage(): JSX.Element {
 
                 <Separator />
 
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
+                <div className="flex items-center justify-between p-4 rounded-lg border">
+                  <div className="space-y-0.5 flex-1">
                     <Label>User Registration</Label>
                     <p className="text-sm text-muted-foreground">
-                      Allow new users to register
+                      Allow new users to register. When disabled, registration form will show an error.
                     </p>
                   </div>
                   <Switch
@@ -582,11 +584,12 @@ export default function SettingsPage(): JSX.Element {
 
                 <Separator />
 
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
+                <div className="flex items-center justify-between p-4 rounded-lg border">
+                  <div className="space-y-0.5 flex-1">
                     <Label>Mandatory KYC</Label>
                     <p className="text-sm text-muted-foreground">
-                      Require KYC before trading
+                      Require KYC verification before trading. 
+                      If disabled, users can trade up to the unverified limit per 24 hours.
                     </p>
                   </div>
                   <Switch
@@ -601,7 +604,7 @@ export default function SettingsPage(): JSX.Element {
                   <div className="space-y-0.5">
                     <Label>Email Notifications</Label>
                     <p className="text-sm text-muted-foreground">
-                      Send emails to users about orders
+                      Send emails to users about orders and updates
                     </p>
                   </div>
                   <Switch
@@ -615,8 +618,24 @@ export default function SettingsPage(): JSX.Element {
 
               {/* Platform Limits */}
               <div>
-                <h4 className="font-semibold mb-4">Platform Limits</h4>
+                <h4 className="font-semibold mb-4">Trading Limits</h4>
                 <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="unverifiedUserLimit">
+                      Unverified User Limit (EUR/24h)
+                    </Label>
+                    <Input
+                      id="unverifiedUserLimit"
+                      type="number"
+                      step="100"
+                      value={settings.unverifiedUserLimit || 1000}
+                      onChange={(e) => updateSetting('unverifiedUserLimit', parseFloat(e.target.value))}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Maximum trading volume per 24 hours for users without KYC verification
+                    </p>
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="defaultFeePercent">Default Fee (%)</Label>
                     <Input
@@ -626,6 +645,9 @@ export default function SettingsPage(): JSX.Element {
                       value={settings.defaultFeePercent || 1.5}
                       onChange={(e) => updateSetting('defaultFeePercent', parseFloat(e.target.value))}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Default platform fee percentage (can be overridden per trading pair)
+                    </p>
                   </div>
 
                   <div className="space-y-2">
@@ -636,6 +658,9 @@ export default function SettingsPage(): JSX.Element {
                       value={settings.orderExpirationHours || 24}
                       onChange={(e) => updateSetting('orderExpirationHours', parseInt(e.target.value))}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      How long before pending orders expire
+                    </p>
                   </div>
 
                   <div className="space-y-2">

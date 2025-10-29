@@ -638,6 +638,37 @@ export function ClientOrderWidget() {
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {/* 24h Trading Limit Alert (for non-KYC users) */}
+        {limitInfo && !limitInfo.isKycApproved && !limitInfo.kycRequired && (
+          <Alert className="mb-6 border-primary/20 bg-primary/5">
+            <Info className="h-4 w-4 text-primary" />
+            <AlertDescription className="space-y-2">
+              <p className="font-medium text-foreground">
+                24-Hour Trading Limit (Without KYC)
+              </p>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Available:</span>
+                  <span className="font-semibold text-primary">
+                    {formatFiatCurrency(limitInfo.remaining, selectedFiat || 'EUR')}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">
+                    Used: {formatFiatCurrency(limitInfo.used, selectedFiat || 'EUR')}
+                  </span>
+                  <span className="text-muted-foreground">
+                    Limit: {formatFiatCurrency(limitInfo.limit, selectedFiat || 'EUR')}
+                  </span>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground pt-2 border-t">
+                Complete <a href="/kyc" className="text-primary hover:underline">KYC verification</a> to remove trading limits
+              </p>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Cryptocurrency Selection */}
           <div className="space-y-2">
