@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -14,7 +14,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { registerSchema, type RegisterInput } from '@/lib/validations/auth';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, Info, UserPlus } from 'lucide-react';
+import { Loader2, CheckCircle2, Info, UserPlus, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -38,6 +38,28 @@ export default function RegisterPage(): React.ReactElement {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [registrationDisabled, setRegistrationDisabled] = useState(false);
+  const [checkingSettings, setCheckingSettings] = useState(true);
+
+  // Check if registration is enabled
+  useEffect(() => {
+    const checkRegistrationStatus = async () => {
+      try {
+        const response = await fetch('/api/settings/public');
+        if (response.ok) {
+          const data = await response.json();
+          const isEnabled = data.settings?.registrationEnabled !== false; // Default true
+          setRegistrationDisabled(!isEnabled);
+        }
+      } catch (error) {
+        console.error('Failed to check registration status:', error);
+      } finally {
+        setCheckingSettings(false);
+      }
+    };
+
+    checkRegistrationStatus();
+  }, []);
 
   const form = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
@@ -125,6 +147,35 @@ export default function RegisterPage(): React.ReactElement {
           </div>
         </div>
 
+        {/* Check if registration is disabled */}
+        {checkingSettings ? (
+          <Card className="shadow-2xl border-primary/10 bg-card/95 backdrop-blur-sm">
+            <CardContent className="p-12 text-center">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-4" />
+              <p className="text-muted-foreground">Loading...</p>
+            </CardContent>
+          </Card>
+        ) : registrationDisabled ? (
+          <Card className="shadow-2xl border-destructive/20 bg-card/95 backdrop-blur-sm">
+            <CardContent className="p-12 text-center space-y-4">
+              <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 mb-2">
+                <AlertCircle className="h-8 w-8 text-destructive" />
+              </div>
+              <h2 className="text-2xl font-bold">Registration Temporarily Disabled</h2>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                New user registrations are currently disabled. Please contact support for assistance.
+              </p>
+              <div className="pt-4">
+                <Link href="/login">
+                  <Button variant="outline" size="lg">
+                    Go to Login
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
         {/* Registration Form Card */}
         <Card className="border-primary/10 shadow-xl shadow-primary/5">
           <CardHeader className="space-y-1">
@@ -381,6 +432,8 @@ export default function RegisterPage(): React.ReactElement {
             Back to home
           </Link>
         </div>
+        </>
+        )}
       </div>
     </div>
   );

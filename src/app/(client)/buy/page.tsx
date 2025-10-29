@@ -20,6 +20,7 @@ import Link from 'next/link';
 interface UserKycStatus {
   status: string;
   isApproved: boolean;
+  kycRequired: boolean; // From system settings
 }
 
 export default function BuyPage(): React.ReactElement {
@@ -32,14 +33,19 @@ export default function BuyPage(): React.ReactElement {
 
   const fetchKycStatus = async () => {
     try {
-      const response = await fetch('/api/kyc/status');
-      if (response.ok) {
-        const data = await response.json();
-        setKycStatus({
-          status: data.status || 'NOT_STARTED',
-          isApproved: data.status === 'APPROVED'
-        });
-      }
+      const [kycRes, settingsRes] = await Promise.all([
+        fetch('/api/kyc/status'),
+        fetch('/api/settings/public')
+      ]);
+      
+      const kycData = await kycRes.json();
+      const settingsData = await settingsRes.json();
+      
+      setKycStatus({
+        status: kycData.status || 'NOT_STARTED',
+        isApproved: kycData.status === 'APPROVED',
+        kycRequired: settingsData.settings?.kycRequired !== false // Default true if not set
+      });
     } catch (error) {
       console.error('Failed to fetch KYC status:', error);
     } finally {
@@ -91,7 +97,10 @@ export default function BuyPage(): React.ReactElement {
       <div className="grid lg:grid-cols-[1fr,380px] gap-5">
         {/* Order Widget */}
         <div>
-          {kycStatus?.isApproved ? (
+          {/* Show widget if:
+              1. KYC is NOT required (kycRequired: false) OR
+              2. KYC is approved */}
+          {!kycStatus?.kycRequired || kycStatus?.isApproved ? (
             <ClientOrderWidget />
           ) : (
             <Card className="bg-card/50 backdrop-blur-sm border-primary/10">

@@ -41,8 +41,12 @@ export class OrderLimitService {
         where: { id: userId },
         include: {
           kycSession: {
-            select: {
-              status: true
+            where: {
+              status: 'APPROVED'
+            },
+            take: 1,
+            orderBy: {
+              createdAt: 'desc'
             }
           }
         }
@@ -58,7 +62,7 @@ export class OrderLimitService {
         };
       }
 
-      const isKycApproved = user.kycSession?.status === 'APPROVED';
+      const isKycApproved = user.kycSession && user.kycSession.length > 0 && user.kycSession[0].status === 'APPROVED';
 
       // If KYC is mandatory and user is not approved
       if (kycRequired && !isKycApproved) {
@@ -149,14 +153,18 @@ export class OrderLimitService {
       where: { id: userId },
       include: {
         kycSession: {
-          select: {
-            status: true
+          where: {
+            status: 'APPROVED'
+          },
+          take: 1,
+          orderBy: {
+            createdAt: 'desc'
           }
         }
       }
     });
 
-    const isKycApproved = user?.kycSession?.status === 'APPROVED';
+    const isKycApproved = user?.kycSession && user.kycSession.length > 0 && user.kycSession[0].status === 'APPROVED';
 
     if (isKycApproved || kycRequired) {
       return {
