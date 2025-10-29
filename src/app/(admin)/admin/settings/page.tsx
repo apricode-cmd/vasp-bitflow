@@ -16,7 +16,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { LegalDocumentEditor } from '@/components/admin/LegalDocumentEditor';
 import { 
   ColorPicker,
   ColorPickerSelection,
@@ -26,9 +25,9 @@ import {
   ColorPickerEyeDropper
 } from '@/components/ui/shadcn-io/color-picker';
 import { toast } from 'sonner';
-import { 
-  Building2, Globe, FileText, Settings as SettingsIcon, 
-  Save, Loader2, AlertCircle, Sparkles, Mail, Shield, Palette
+import {
+  Building2, Globe, Settings as SettingsIcon,
+  Save, Loader2, AlertCircle, Sparkles, Mail, Palette
 } from 'lucide-react';
 import Color from 'color';
 
@@ -211,7 +210,7 @@ export default function SettingsPage(): JSX.Element {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="brand">
             <Building2 className="h-4 w-4 mr-2" />
             Brand
@@ -219,10 +218,6 @@ export default function SettingsPage(): JSX.Element {
           <TabsTrigger value="seo">
             <Globe className="h-4 w-4 mr-2" />
             SEO
-          </TabsTrigger>
-          <TabsTrigger value="legal">
-            <FileText className="h-4 w-4 mr-2" />
-            Legal
           </TabsTrigger>
           <TabsTrigger value="system">
             <SettingsIcon className="h-4 w-4 mr-2" />
@@ -471,62 +466,6 @@ export default function SettingsPage(): JSX.Element {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        {/* Legal Documents */}
-        <TabsContent value="legal" className="space-y-6 mt-6">
-          <Alert>
-            <Shield className="h-4 w-4" />
-            <AlertTitle>Legal Compliance</AlertTitle>
-            <AlertDescription>
-              These documents are legally binding. Please consult with legal counsel before publishing.
-            </AlertDescription>
-          </Alert>
-
-          <Tabs defaultValue="terms" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="terms">Terms of Service</TabsTrigger>
-              <TabsTrigger value="privacy">Privacy Policy</TabsTrigger>
-              <TabsTrigger value="aml">AML Policy</TabsTrigger>
-              <TabsTrigger value="cookies">Cookie Policy</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="terms" className="mt-6">
-              <LegalDocumentEditor
-                documentType="terms"
-                title="Terms of Service"
-                description="Define the terms and conditions for using your platform"
-                apiEndpoint="/api/admin/legal"
-              />
-            </TabsContent>
-
-            <TabsContent value="privacy" className="mt-6">
-              <LegalDocumentEditor
-                documentType="privacy"
-                title="Privacy Policy"
-                description="Explain how you collect, use, and protect user data"
-                apiEndpoint="/api/admin/legal"
-              />
-            </TabsContent>
-
-            <TabsContent value="aml" className="mt-6">
-              <LegalDocumentEditor
-                documentType="aml"
-                title="AML/KYC Policy"
-                description="Anti-Money Laundering and Know Your Customer procedures"
-                apiEndpoint="/api/admin/legal"
-              />
-            </TabsContent>
-
-            <TabsContent value="cookies" className="mt-6">
-              <LegalDocumentEditor
-                documentType="cookies"
-                title="Cookie Policy"
-                description="Disclosure of cookie usage on your platform"
-                apiEndpoint="/api/admin/legal"
-              />
-            </TabsContent>
-          </Tabs>
         </TabsContent>
 
         {/* System Settings */}
