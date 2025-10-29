@@ -359,33 +359,60 @@ export class KycaidAdapter implements IKycProvider {
 
       const data = await response.json();
 
-      console.log('✅ KYCAID verification status:', data.status);
+      console.log('✅ KYCAID verification response:', {
+        verification_id: data.verification_id,
+        status: data.status,
+        verified: data.verified
+      });
 
       // Map KYCAID status to our standard status
       let status: KycVerificationStatus;
-      switch (data.status) {
-        case 'APPROVED':
+      
+      // KYCAID statuses: unused, pending, completed
+      // verified: null (in progress), true (passed), false (failed)
+      
+      if (data.status === 'unused') {
+        status = 'pending'; // Form not filled yet
+      } else if (data.status === 'pending') {
+        status = 'pending'; // Under review
+      } else if (data.status === 'completed') {
+        // Completed - check verified flag
+        if (data.verified === true) {
           status = 'approved';
-          break;
-        case 'REJECTED':
-        case 'DECLINED':
+        } else if (data.verified === false) {
           status = 'rejected';
-          break;
-        case 'EXPIRED':
-          status = 'expired';
-          break;
-        default:
-          status = 'pending';
+        } else {
+          status = 'pending'; // Completed but not yet verified
+        }
+      } else {
+        status = 'pending';
+      }
+
+      // Collect rejection reasons from verifications
+      let rejectionReasons: string[] = [];
+      if (data.verifications) {
+        Object.entries(data.verifications).forEach(([type, result]: [string, any]) => {
+          if (result.verified === false && result.comment) {
+            rejectionReasons.push(`${type}: ${result.comment}`);
+          }
+        });
+      }
+
+      console.log('📊 Mapped status:', status);
+      if (rejectionReasons.length > 0) {
+        console.log('❌ Rejection reasons:', rejectionReasons);
       }
 
       return {
         status,
         verificationId,
-        rejectionReason: data.reasons ? data.reasons.join(', ') : undefined,
-        completedAt: data.timestamp ? new Date(data.timestamp) : undefined,
+        rejectionReason: rejectionReasons.length > 0 ? rejectionReasons.join('; ') : undefined,
+        completedAt: data.status === 'completed' ? new Date() : undefined,
         metadata: {
           applicantId: data.applicant_id,
-          types: data.types,
+          kycaidStatus: data.status,
+          verified: data.verified,
+          verifications: data.verifications,
           raw: data
         }
       };
@@ -466,31 +493,59 @@ export class KycaidAdapter implements IKycProvider {
     reason?: string;
     metadata?: Record<string, any>;
   } {
-    // KYCAID webhook structure
-    const { verification_id, applicant_id, status, reasons } = payload;
+    // KYCAID webhook structure matches GET /verifications/{id} response
+    const { verification_id, applicant_id, status, verified, verifications } = payload;
 
-    // Map status
+    console.log('📥 Processing KYCAID webhook:', {
+      verification_id,
+      applicant_id,
+      status,
+      verified
+    });
+
+    // Map KYCAID status to our standard status
     let normalizedStatus: KycVerificationStatus;
-    switch (status) {
-      case 'APPROVED':
+    
+    // KYCAID statuses: unused, pending, completed
+    // verified: null (in progress), true (passed), false (failed)
+    
+    if (status === 'unused') {
+      normalizedStatus = 'pending'; // Form not filled yet
+    } else if (status === 'pending') {
+      normalizedStatus = 'pending'; // Under review
+    } else if (status === 'completed') {
+      // Completed - check verified flag
+      if (verified === true) {
         normalizedStatus = 'approved';
-        break;
-      case 'REJECTED':
-      case 'DECLINED':
+      } else if (verified === false) {
         normalizedStatus = 'rejected';
-        break;
-      case 'EXPIRED':
-        normalizedStatus = 'expired';
-        break;
-      default:
-        normalizedStatus = 'pending';
+      } else {
+        normalizedStatus = 'pending'; // Completed but not yet verified
+      }
+    } else {
+      normalizedStatus = 'pending';
+    }
+
+    // Collect rejection reasons from verifications
+    let rejectionReasons: string[] = [];
+    if (verifications) {
+      Object.entries(verifications).forEach(([type, result]: [string, any]) => {
+        if (result.verified === false && result.comment) {
+          rejectionReasons.push(`${type}: ${result.comment}`);
+        }
+      });
+    }
+
+    console.log('📊 Webhook mapped status:', normalizedStatus);
+    if (rejectionReasons.length > 0) {
+      console.log('❌ Rejection reasons:', rejectionReasons);
     }
 
     return {
       verificationId: verification_id,
       applicantId: applicant_id,
       status: normalizedStatus,
-      reason: reasons ? (Array.isArray(reasons) ? reasons.join(', ') : reasons) : undefined,
+      reason: rejectionReasons.length > 0 ? rejectionReasons.join('; ') : undefined,
       metadata: payload
     };
   }

@@ -185,6 +185,11 @@ export async function startKycVerification(userId: string) {
     console.log('📝 Getting form URL...');
     const formUrlResult = await provider.getFormUrl(applicant.applicantId, formId);
     console.log(`✅ Form URL generated: ${formUrlResult.url}`);
+    
+    // Check if KYCAID returned verificationId in the form URL response
+    if (formUrlResult.sessionId) {
+      console.log(`✅ Verification ID received: ${formUrlResult.sessionId}`);
+    }
 
     // Step 3: Save session in database (verification will be created via webhook after form submission)
     // Create or update KYC session in database
@@ -193,24 +198,28 @@ export async function startKycVerification(userId: string) {
       create: {
         userId: userId,
         kycaidApplicantId: applicant.applicantId,
+        kycaidVerificationId: formUrlResult.sessionId || null, // Save if available
         kycaidFormId: formId,
         status: 'PENDING',
         metadata: {
           applicantStatus: applicant.status,
           formUrl: formUrlResult.url,
-          provider: provider.providerId
+          provider: provider.providerId,
+          verificationIdFromFormUrl: !!formUrlResult.sessionId // Track if we got it
         },
         attempts: 1,
         lastAttemptAt: new Date()
       },
       update: {
         kycaidApplicantId: applicant.applicantId,
+        kycaidVerificationId: formUrlResult.sessionId || null, // Save if available
         kycaidFormId: formId,
         status: 'PENDING',
         metadata: {
           applicantStatus: applicant.status,
           formUrl: formUrlResult.url,
-          provider: provider.providerId
+          provider: provider.providerId,
+          verificationIdFromFormUrl: !!formUrlResult.sessionId // Track if we got it
         },
         attempts: { increment: 1 },
         lastAttemptAt: new Date()
@@ -218,6 +227,11 @@ export async function startKycVerification(userId: string) {
     });
 
     console.log(`✅ KYC session ${kycSession.id} (attempts: ${kycSession.attempts})`);
+    if (kycSession.kycaidVerificationId) {
+      console.log(`✅ Verification ID saved: ${kycSession.kycaidVerificationId}`);
+    } else {
+      console.log(`ℹ️ No verification ID yet - will be created when user submits form`);
+    }
 
     return {
       success: true,
