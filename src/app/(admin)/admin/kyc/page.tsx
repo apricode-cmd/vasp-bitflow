@@ -7,6 +7,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { ColumnDef } from '@tanstack/react-table';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -164,6 +165,7 @@ interface KycSession {
 }
 
 export default function AdminKycPage(): JSX.Element {
+  const router = useRouter();
   const [kycSessions, setKycSessions] = useState<KycSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -615,8 +617,9 @@ export default function AdminKycPage(): JSX.Element {
                         const result = await response.json();
                         toast.success(result.message || `Synced ${result.documentsCount} documents`, { id: 'sync-docs' });
                         
-                        // Refresh page to show new documents
-                        window.location.reload();
+                        // Refresh data without full page reload
+                        await fetchKycSessions();
+                        router.refresh();
                       } catch (error) {
                         toast.error('Failed to sync documents', { id: 'sync-docs' });
                       }
@@ -1357,7 +1360,9 @@ export default function AdminKycPage(): JSX.Element {
                             const result = await response.json();
                             toast.success(result.message || `Synced ${result.documentsCount} documents`, { id: 'resync-docs' });
                             
-                            window.location.reload();
+                            // Refresh data without full page reload
+                            await fetchKycSessions();
+                            router.refresh();
                           } catch (error) {
                             toast.error('Failed to sync documents', { id: 'resync-docs' });
                           }
@@ -1397,7 +1402,9 @@ export default function AdminKycPage(): JSX.Element {
                               const result = await response.json();
                               toast.success(result.message || `Synced ${result.documentsCount} documents`, { id: 'sync-docs-initial' });
                               
-                              window.location.reload();
+                              // Refresh data without full page reload
+                              await fetchKycSessions();
+                              router.refresh();
                             } catch (error) {
                               console.error('Sync error:', error);
                               toast.error('Failed to sync documents', { id: 'sync-docs-initial' });
