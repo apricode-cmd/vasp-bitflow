@@ -11,6 +11,17 @@ import { getIntegrationWithSecrets } from './integration-management.service';
 import { IKycProvider, KycUserData } from '@/lib/integrations/categories/IKycProvider';
 
 /**
+ * Format date for KYC without timezone conversion
+ * Prevents the "day before" bug when converting to UTC
+ */
+function formatDateForKyc(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * Get active KYC provider
  */
 async function getActiveKycProvider(): Promise<IKycProvider | null> {
@@ -163,7 +174,7 @@ export async function startKycVerification(userId: string) {
       email: user.email,
       firstName: user.profile.firstName,
       lastName: user.profile.lastName,
-      dateOfBirth: user.profile.dateOfBirth.toISOString().split('T')[0], // YYYY-MM-DD
+      dateOfBirth: formatDateForKyc(user.profile.dateOfBirth), // Use local date, not UTC
       nationality: alpha3ToIso2(user.profile.nationality),
       residenceCountry: alpha3ToIso2(user.profile.country),
       phone: user.profile.phoneNumber,
@@ -174,6 +185,7 @@ export async function startKycVerification(userId: string) {
     };
 
     console.log('👤 Creating applicant with ISO2 country codes...');
+    console.log('  dateOfBirth:', user.profile.dateOfBirth, '→', userData.dateOfBirth);
     console.log('  nationality:', user.profile.nationality, '→', userData.nationality);
     console.log('  residenceCountry:', user.profile.country, '→', userData.residenceCountry);
     
