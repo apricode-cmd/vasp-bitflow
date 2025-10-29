@@ -1,24 +1,49 @@
 /**
  * Client Footer Component
  * 
- * Minimalistic footer for client dashboard
+ * Minimalistic footer for client dashboard with white-label support
  */
 
 'use client';
 
 import Link from 'next/link';
-import { useBranding } from '@/hooks/useBranding';
+import { useSettings } from '@/components/providers/settings-provider';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ApricodeLogo } from '@/components/icons/ApricodeLogo';
+import { Mail, Phone } from 'lucide-react';
 
 export function ClientFooter(): React.ReactElement {
-  const { branding, loading } = useBranding();
+  const { settings, loading } = useSettings();
   const currentYear = new Date().getFullYear();
   const version = process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0';
 
   return (
     <footer className="border-t bg-card/30 backdrop-blur-sm mt-auto">
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-8">
+        {/* Top Section: Contact Info */}
+        {(settings.supportEmail || settings.supportPhone) && (
+          <div className="flex flex-wrap items-center justify-center gap-6 pb-6 mb-6 border-b border-border/50">
+            {settings.supportEmail && (
+              <a 
+                href={`mailto:${settings.supportEmail}`}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+              >
+                <Mail className="h-4 w-4" />
+                <span>{settings.supportEmail}</span>
+              </a>
+            )}
+            {settings.supportPhone && (
+              <a 
+                href={`tel:${settings.supportPhone}`}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+              >
+                <Phone className="h-4 w-4" />
+                <span>{settings.supportPhone}</span>
+              </a>
+            )}
+          </div>
+        )}
+
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           {/* Left: Copyright */}
           <div className="flex items-center gap-1">
@@ -27,7 +52,9 @@ export function ClientFooter(): React.ReactElement {
             ) : (
               <>
                 <span>© {currentYear}</span>
-                <span className="font-medium text-foreground">{branding.companyName}</span>
+                <span className="font-medium text-foreground">
+                  {settings.brandName || 'Apricode Exchange'}
+                </span>
                 <span className="hidden sm:inline">• All rights reserved</span>
               </>
             )}
@@ -36,19 +63,19 @@ export function ClientFooter(): React.ReactElement {
           {/* Center: Links */}
           <div className="flex items-center gap-6">
             <Link 
-              href="/terms" 
+              href="/legal/terms" 
               className="hover:text-foreground transition"
             >
               Terms
             </Link>
             <Link 
-              href="/privacy" 
+              href="/legal/privacy" 
               className="hover:text-foreground transition"
             >
               Privacy
             </Link>
             <Link 
-              href="/support" 
+              href="/dashboard" 
               className="hover:text-foreground transition"
             >
               Support

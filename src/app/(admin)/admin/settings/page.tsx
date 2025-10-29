@@ -63,6 +63,7 @@ export default function SettingsPage(): JSX.Element {
   const [settings, setSettings] = useState<Partial<SystemSettings>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState('brand');
   const [previewColor, setPreviewColor] = useState<string>('#06b6d4'); // Default cyan - ensure always defined
   const [mounted, setMounted] = useState(false);
@@ -175,6 +176,36 @@ export default function SettingsPage(): JSX.Element {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
 
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('logo', file);
+
+      const response = await fetch('/api/admin/settings/upload-logo', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        updateSetting('brandLogo', data.logoUrl);
+        toast.success('Logo uploaded successfully');
+      } else {
+        toast.error(data.error || 'Failed to upload logo');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('An error occurred while uploading');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -261,15 +292,39 @@ export default function SettingsPage(): JSX.Element {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="brandLogo">Logo URL</Label>
-                <Input
-                  id="brandLogo"
-                  value={settings.brandLogo || ''}
-                  onChange={(e) => updateSetting('brandLogo', e.target.value)}
-                  placeholder="https://your-cdn.com/logo.png"
-                />
+                <Label htmlFor="brandLogo">Brand Logo</Label>
+                <div className="flex items-center gap-4">
+                  {/* Logo Preview */}
+                  {settings.brandLogo && (
+                    <div className="flex-shrink-0 w-32 h-16 border rounded-lg p-2 bg-muted/50 flex items-center justify-center">
+                      <img
+                        src={settings.brandLogo}
+                        alt="Brand logo"
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Upload Button */}
+                  <div className="flex-1">
+                    <Input
+                      id="brandLogo"
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp"
+                      onChange={handleLogoUpload}
+                      disabled={uploading}
+                      className="cursor-pointer"
+                    />
+                    {uploading && (
+                      <p className="text-xs text-primary mt-1 flex items-center gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Uploading...
+                      </p>
+                    )}
+                  </div>
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Recommended size: 200x50px, PNG format with transparency
+                  Recommended: 200x50px, PNG/SVG with transparency. Max 2MB.
                 </p>
               </div>
 

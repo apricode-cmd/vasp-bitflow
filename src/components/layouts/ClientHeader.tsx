@@ -49,7 +49,7 @@ import {
 } from '@/components/ui/sheet';
 import { useState, useEffect } from 'react';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
-import { useBranding } from '@/hooks/useBranding';
+import { useSettings } from '@/components/providers/settings-provider';
 import { toast } from 'sonner';
 
 interface Notification {
@@ -68,7 +68,7 @@ export function ClientHeader(): React.ReactElement {
   const { data: session } = useSession();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const { branding, loading: brandingLoading } = useBranding();
+  const { settings, loading: settingsLoading } = useSettings();
   
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(true);
@@ -202,11 +202,17 @@ export function ClientHeader(): React.ReactElement {
         <div className="flex items-center justify-between h-14">
           {/* Logo */}
           <Link href="/dashboard" className="flex items-center gap-2">
-            {brandingLoading ? (
-              <Skeleton className="h-5 w-40" />
+            {settingsLoading ? (
+              <Skeleton className="h-8 w-32" />
+            ) : settings.brandLogo ? (
+              <img
+                src={settings.brandLogo}
+                alt={settings.brandName || 'Logo'}
+                className="h-8 object-contain max-w-[150px]"
+              />
             ) : (
               <span className="text-lg font-bold text-primary">
-                {branding.companyName}
+                {settings.brandName || 'Apricode Exchange'}
               </span>
             )}
           </Link>

@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
+import { getPublicSettings } from '@/lib/settings';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ import Link from 'next/link';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { LegalPageClient } from '@/components/legal/LegalPageClient';
 import { QuickActions } from '@/components/legal/QuickActions';
+import Image from 'next/image';
 
 interface LegalPageProps {
   params: {
@@ -73,6 +75,7 @@ export async function generateMetadata({ params }: LegalPageProps): Promise<Meta
 
 export default async function LegalPage({ params }: LegalPageProps) {
   const document = await getDocument(params.slug);
+  const settings = await getPublicSettings();
 
   if (!document) {
     notFound();
@@ -95,10 +98,20 @@ export default async function LegalPage({ params }: LegalPageProps) {
               href="/"
               className="group flex items-center gap-2"
             >
-              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70">
-                <Shield className="h-3 w-3 text-primary-foreground" />
-              </div>
-              <span className="text-sm font-semibold">Apricode</span>
+              {settings.brandLogo ? (
+                <img
+                  src={settings.brandLogo}
+                  alt={settings.brandName || 'Logo'}
+                  className="h-6 object-contain max-w-[120px]"
+                />
+              ) : (
+                <>
+                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70">
+                    <Shield className="h-3 w-3 text-primary-foreground" />
+                  </div>
+                  <span className="text-sm font-semibold">{settings.brandName || 'Apricode'}</span>
+                </>
+              )}
             </Link>
             
             {/* Center: Document Badge */}

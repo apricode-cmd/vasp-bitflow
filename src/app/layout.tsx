@@ -9,17 +9,22 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { Toaster } from 'sonner';
 import { Providers } from '@/components/layouts/Providers';
+import { getPublicSettings } from '@/lib/settings';
 
 const inter = Inter({ subsets: ['latin'] });
 
-export const metadata: Metadata = {
-  title: 'Apricode Exchange - Buy Cryptocurrency Securely',
-  description: 'Buy Bitcoin, Ethereum, Tether, and Solana with EUR or PLN after KYC verification',
-  keywords: ['cryptocurrency', 'bitcoin', 'ethereum', 'buy crypto', 'KYC', 'exchange'],
-  authors: [{ name: 'Apricode Exchange' }],
-  viewport: 'width=device-width, initial-scale=1',
-  themeColor: '#3b82f6'
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getPublicSettings();
+
+  return {
+    title: settings.seoTitle || 'Apricode Exchange - Buy Cryptocurrency Securely',
+    description: settings.seoDescription || 'Buy Bitcoin, Ethereum, Tether, and Solana with EUR or PLN after KYC verification',
+    keywords: settings.seoKeywords ? settings.seoKeywords.split(',').map(k => k.trim()) : ['cryptocurrency', 'bitcoin', 'ethereum', 'buy crypto', 'KYC', 'exchange'],
+    authors: [{ name: settings.brandName || 'Apricode Exchange' }],
+    viewport: 'width=device-width, initial-scale=1',
+    themeColor: settings.primaryColor || '#3b82f6'
+  };
+}
 
 export default function RootLayout({
   children

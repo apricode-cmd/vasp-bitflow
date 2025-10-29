@@ -26,7 +26,7 @@ const defaultSettings = [
   },
   {
     key: 'brandLogo',
-    value: '/logo.png',
+    value: '/uploads/default_logo.svg',
     type: 'STRING' as const,
     category: 'brand',
     description: 'URL to platform logo',
