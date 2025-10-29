@@ -465,7 +465,7 @@ export class KycaidAdapter implements IKycProvider {
           dateOfBirth: data.dob,
           nationality: data.nationality,
           residenceCountry: data.residence_country,
-          documents: data.documents || [], // Array of document IDs (only with verification_id)
+          documents: data.documents || [], // Full document objects array
           addresses: data.addresses || [],
           declineReasons: data.decline_reasons || []
         }
@@ -507,75 +507,6 @@ export class KycaidAdapter implements IKycProvider {
       console.error('❌ KYCAID get document failed:', error);
       throw new Error(`Failed to get KYCAID document: ${error.message}`);
     }
-  }
-
-  /**
-   * Get all documents for applicant
-   * Returns array of full document objects
-   * verificationId is OPTIONAL - try without it first
-   */
-  async getApplicantDocuments(applicantId: string, verificationId?: string): Promise<any[]> {
-    if (!this.isConfigured()) {
-      throw new Error('KYCAID provider not configured');
-    }
-
-    try {
-      console.log('📄 Getting documents for applicant:', applicantId, verificationId ? `verification: ${verificationId}` : '(no verification_id)');
-
-      // First, try WITHOUT verification_id (get latest state)
-      const applicant = await this.getApplicant(applicantId);
-      const documentIds = applicant.metadata?.documents || [];
-
-      console.log(`📊 Found ${documentIds.length} document ID(s) in applicant data`);
-
-      if (documentIds.length === 0) {
-        // If no documents without verification_id, try WITH it
-        if (verificationId) {
-          console.log('📥 Trying with verification_id...');
-          const applicantWithVerification = await this.getApplicant(applicantId, verificationId);
-          const verificationDocIds = applicantWithVerification.metadata?.documents || [];
-          
-          console.log(`📊 Found ${verificationDocIds.length} document ID(s) with verification_id`);
-          
-          if (verificationDocIds.length === 0) {
-            console.log('ℹ️ No documents found for this verification');
-            return [];
-          }
-          
-          // Use verification docs
-          return await this.fetchDocuments(verificationDocIds);
-        }
-        
-        console.log('ℹ️ No documents found for applicant');
-        return [];
-      }
-
-      // Fetch documents
-      return await this.fetchDocuments(documentIds);
-    } catch (error: any) {
-      console.error('❌ KYCAID get applicant documents failed:', error);
-      throw new Error(`Failed to get KYCAID applicant documents: ${error.message}`);
-    }
-  }
-
-  /**
-   * Helper to fetch multiple documents by IDs
-   */
-  private async fetchDocuments(documentIds: string[]): Promise<any[]> {
-    console.log(`📥 Fetching ${documentIds.length} document(s)...`);
-
-    const documents = [];
-    for (const docId of documentIds) {
-      try {
-        const doc = await this.getDocument(docId);
-        documents.push(doc);
-      } catch (error: any) {
-        console.warn(`⚠️ Failed to fetch document ${docId}:`, error.message);
-      }
-    }
-
-    console.log(`✅ Retrieved ${documents.length} document(s)`);
-    return documents;
   }
 
   /**
@@ -719,8 +650,8 @@ export class KycaidAdapter implements IKycProvider {
   }
 
   /**
-   * Get applicant documents (passport/ID photos, etc.)
-   * GET /applicants/{applicant_id}/documents
+   * Get applicant documents (passport/ID photos, selfie, etc.)
+   * Documents are returned as full objects from GET /applicants/{applicant_id}
    */
   async getApplicantDocuments(applicantId: string): Promise<any[]> {
     if (!this.isConfigured()) {
@@ -730,21 +661,19 @@ export class KycaidAdapter implements IKycProvider {
     try {
       console.log('📄 Getting KYCAID documents for applicant:', applicantId);
 
-      const response = await fetch(`${this.baseUrl}/applicants/${applicantId}/documents`, {
-        method: 'GET',
-        headers: this.getHeaders()
-      });
+      // Get applicant with full document details
+      const applicant = await this.getApplicant(applicantId);
 
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Failed to get documents: ${error}`);
+      // KYCAID returns documents as array of objects
+      const documents = applicant.metadata?.documents || [];
+
+      console.log(`✅ Retrieved ${documents.length} documents`);
+      
+      if (documents.length > 0) {
+        console.log('📋 Document types:', documents.map((d: any) => d.type).join(', '));
       }
 
-      const data = await response.json();
-
-      console.log(`✅ Retrieved ${data.items?.length || 0} documents`);
-
-      return data.items || [];
+      return documents;
     } catch (error: any) {
       console.error('❌ KYCAID get documents failed:', error);
       throw new Error(`Failed to get KYCAID documents: ${error.message}`);

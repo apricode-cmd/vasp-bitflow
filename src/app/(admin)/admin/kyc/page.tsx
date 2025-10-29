@@ -1142,41 +1142,214 @@ export default function AdminKycPage(): JSX.Element {
                 </div>
               )}
 
-              {/* Documents */}
-              {selectedSession.documents && selectedSession.documents.length > 0 && (
-                      <div>
-                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Uploaded Documents ({selectedSession.documents.length})
-                  </h3>
-                  <ScrollArea className="h-[300px] w-full rounded-md border p-4">
+              {/* Documents Section - Combined View */}
+              <div>
+                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Identity Documents
+                </h3>
+
+                {/* Show synced documents if available */}
+                {selectedSession.documents && selectedSession.documents.length > 0 ? (
+                  <div className="space-y-4">
+                    {/* Document Count Badge */}
+                    <Card className="bg-primary/5 border-primary/20">
+                      <div className="p-3">
+                        <p className="text-sm text-center">
+                          <Badge variant="secondary" className="mr-2">
+                            {selectedSession.documents.length}
+                          </Badge>
+                          documents synced from KYCAID
+                        </p>
+                      </div>
+                    </Card>
+
+                    {/* Documents Grid */}
                     <div className="grid grid-cols-2 gap-4">
-                      {selectedSession.documents.map((doc) => (
-                        <Card key={doc.id} className="overflow-hidden">
-                          <AspectRatio ratio={16 / 9}>
-                            <div className="w-full h-full bg-muted flex items-center justify-center">
-                              <ImageIcon className="h-12 w-12 text-muted-foreground" />
+                      {selectedSession.documents.map((doc) => {
+                        // Parse verificationData to get image URLs
+                        const docData = doc.verificationData as any;
+                        const imageUrls = [
+                          docData?.front_side,
+                          docData?.back_side,
+                          docData?.other_side_1,
+                          docData?.other_side_2,
+                          docData?.other_side_3,
+                          docData?.portrait
+                        ].filter(Boolean);
+
+                        const firstImage = imageUrls[0];
+
+                        return (
+                          <Card key={doc.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                            {/* Document Image Preview */}
+                            <AspectRatio ratio={16 / 9}>
+                              {firstImage ? (
+                                <img
+                                  src={firstImage}
+                                  alt={docData?.type || 'Document'}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23f0f0f0" width="100" height="100"/%3E%3Ctext x="50" y="50" text-anchor="middle" dy=".3em" fill="%23999" font-size="14"%3ENo Image%3C/text%3E%3C/svg%3E';
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-muted flex items-center justify-center">
+                                  <ImageIcon className="h-12 w-12 text-muted-foreground" />
+                                </div>
+                              )}
+                            </AspectRatio>
+
+                            {/* Document Info */}
+                            <div className="p-3 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <Badge variant={docData?.status === 'valid' ? 'default' : 'secondary'}>
+                                  {docData?.type || 'Unknown'}
+                                </Badge>
+                                {docData?.status && (
+                                  <Badge variant={docData.status === 'valid' ? 'default' : 'destructive'} className="text-xs">
+                                    {docData.status}
+                                  </Badge>
+                                )}
+                              </div>
+                              
+                              {/* Document Details */}
+                              {docData?.document_number && (
+                                <p className="text-xs text-muted-foreground">
+                                  No: {docData.document_number}
+                                </p>
+                              )}
+                              
+                              {(docData?.issue_date || docData?.expiry_date) && (
+                                <p className="text-xs text-muted-foreground">
+                                  {docData.issue_date && `Issued: ${docData.issue_date}`}
+                                  {docData.expiry_date && ` • Expires: ${docData.expiry_date}`}
+                                </p>
+                              )}
+
+                              {/* View All Images Button */}
+                              {imageUrls.length > 1 && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full mt-2"
+                                  onClick={() => {
+                                    // Open dialog with all images
+                                    const newTab = window.open('', '_blank');
+                                    if (newTab) {
+                                      newTab.document.write(`
+                                        <html>
+                                          <head><title>Document Images - ${docData?.type}</title></head>
+                                          <body style="background: #000; margin: 0; padding: 20px; text-align: center;">
+                                            ${imageUrls.map(url => `
+                                              <img src="${url}" style="max-width: 100%; margin: 10px auto; display: block; box-shadow: 0 4px 6px rgba(0,0,0,0.3);" />
+                                            `).join('')}
+                                          </body>
+                                        </html>
+                                      `);
+                                      newTab.document.close();
+                                    }
+                                  }}
+                                >
+                                  <Eye className="h-3 w-3 mr-2" />
+                                  View {imageUrls.length} image{imageUrls.length > 1 ? 's' : ''}
+                                </Button>
+                              )}
                             </div>
-                          </AspectRatio>
-                          <div className="p-3">
-                            <p className="text-sm font-medium truncate">{doc.fileName}</p>
-                            <p className="text-xs text-muted-foreground capitalize">{doc.documentType}</p>
-                        <Button
-                              variant="outline" 
-                          size="sm"
-                              className="w-full mt-2"
-                              onClick={() => window.open(doc.fileUrl, '_blank')}
-                        >
-                              <Eye className="h-3 w-3 mr-2" />
-                              View
-                        </Button>
-                          </div>
-                        </Card>
-                      ))}
+                          </Card>
+                        );
+                      })}
                     </div>
-                  </ScrollArea>
-                </div>
-              )}
+
+                    {/* Re-sync Button */}
+                    {selectedSession.kycaidApplicantId && (
+                      <Button 
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={async () => {
+                          try {
+                            toast.loading('Re-syncing documents...', { id: 'resync-docs' });
+                            
+                            const response = await fetch(`/api/admin/kyc/${selectedSession.id}/download-report`, {
+                              method: 'POST'
+                            });
+                            
+                            if (!response.ok) {
+                              const error = await response.json();
+                              toast.error(error.error || 'Failed to sync documents', { id: 'resync-docs' });
+                              return;
+                            }
+                            
+                            const result = await response.json();
+                            toast.success(result.message || `Synced ${result.documentsCount} documents`, { id: 'resync-docs' });
+                            
+                            window.location.reload();
+                          } catch (error) {
+                            toast.error('Failed to sync documents', { id: 'resync-docs' });
+                          }
+                        }}
+                      >
+                        <RefreshCw className="h-3 w-3 mr-2" />
+                        Re-sync from KYCAID
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  /* No documents yet - show sync button */
+                  selectedSession.kycaidApplicantId && 
+                  (selectedSession.status === 'APPROVED' || selectedSession.status === 'REJECTED') ? (
+                    <Card>
+                      <div className="p-4">
+                        <p className="text-sm text-muted-foreground mb-4 text-center">
+                          No documents synced yet. Click below to fetch from KYCAID.
+                        </p>
+                        <Button 
+                          variant="outline"
+                          className="w-full"
+                          onClick={async () => {
+                            try {
+                              toast.loading('Syncing documents...', { id: 'sync-docs-initial' });
+                              
+                              const response = await fetch(`/api/admin/kyc/${selectedSession.id}/download-report`, {
+                                method: 'POST'
+                              });
+                              
+                              if (!response.ok) {
+                                const error = await response.json();
+                                toast.error(error.error || 'Failed to sync documents', { id: 'sync-docs-initial' });
+                                return;
+                              }
+                              
+                              const result = await response.json();
+                              toast.success(result.message || `Synced ${result.documentsCount} documents`, { id: 'sync-docs-initial' });
+                              
+                              window.location.reload();
+                            } catch (error) {
+                              console.error('Sync error:', error);
+                              toast.error('Failed to sync documents', { id: 'sync-docs-initial' });
+                            }
+                          }}
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          Sync Documents from KYCAID
+                        </Button>
+                      </div>
+                    </Card>
+                  ) : (
+                    <Card className="border-dashed">
+                      <div className="p-6 text-center">
+                        <ImageIcon className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground">
+                          {selectedSession.status === 'PENDING' 
+                            ? 'Documents will be available after verification is completed'
+                            : 'No documents available'}
+                        </p>
+                      </div>
+                    </Card>
+                  )
+                )}
+              </div>
 
               {/* Rejection Reason */}
               {selectedSession.rejectionReason && (
@@ -1185,55 +1358,6 @@ export default function AdminKycPage(): JSX.Element {
                   <Card className="border-destructive/50 bg-destructive/5">
                     <div className="p-4">
                       <p className="text-sm">{selectedSession.rejectionReason}</p>
-                    </div>
-                  </Card>
-                      </div>
-                    )}
-
-              {/* Download Report - Available for APPROVED/REJECTED */}
-              {selectedSession.kycaidApplicantId && 
-               (selectedSession.status === 'APPROVED' || selectedSession.status === 'REJECTED') && (
-                <div>
-                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Documents
-                  </h3>
-                  <Card>
-                    <div className="p-4">
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Sync passport/ID photos and document data from KYCAID to database.
-                      </p>
-                      <Button 
-                        variant="outline"
-                        className="w-full"
-                        onClick={async () => {
-                          try {
-                            toast.loading('Syncing documents...', { id: 'sync-docs-detail' });
-                            
-                            const response = await fetch(`/api/admin/kyc/${selectedSession.id}/download-report`, {
-                              method: 'POST'
-                            });
-                            
-                            if (!response.ok) {
-                              const error = await response.json();
-                              toast.error(error.error || 'Failed to sync documents', { id: 'sync-docs-detail' });
-                              return;
-                            }
-                            
-                            const result = await response.json();
-                            toast.success(result.message || `Synced ${result.documentsCount} documents`, { id: 'sync-docs-detail' });
-                            
-                            // Refresh page to show new documents
-                            window.location.reload();
-                          } catch (error) {
-                            console.error('Sync error:', error);
-                            toast.error('Failed to sync documents', { id: 'sync-docs-detail' });
-                          }
-                        }}
-                      >
-                        <FileText className="h-4 w-4 mr-2" />
-                        Sync Documents from KYCAID
-                      </Button>
                     </div>
                   </Card>
                 </div>
