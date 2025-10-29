@@ -146,29 +146,29 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Cryptocurrency:</span>
+              <span className="text-muted-foreground">Cryptocurrency:</span>
               <span className="font-medium">{order.currency.name} ({order.currencyCode})</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Amount:</span>
+              <span className="text-muted-foreground">Amount:</span>
               <span className="font-medium">{formatCryptoAmount(order.cryptoAmount, order.currency?.decimals || 8)} {order.currencyCode}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Exchange Rate:</span>
+              <span className="text-muted-foreground">Exchange Rate:</span>
               <span className="font-medium">1 {order.currencyCode} = {formatFiatCurrency(order.rate, order.fiatCurrencyCode)}</span>
             </div>
             <div className="border-t pt-3 space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Subtotal:</span>
+                <span className="text-muted-foreground">Subtotal:</span>
                 <span className="font-medium">{formatFiatCurrency(order.fiatAmount, order.fiatCurrencyCode)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Platform Fee:</span>
+                <span className="text-muted-foreground">Platform Fee:</span>
                 <span className="font-medium">{formatFiatCurrency(order.feeAmount, order.fiatCurrencyCode)}</span>
               </div>
               <div className="flex justify-between font-bold text-lg border-t pt-2">
                 <span>Total to Pay:</span>
-                <span className="text-blue-600">{formatFiatCurrency(order.totalFiat, order.fiatCurrencyCode)}</span>
+                <span className="text-primary">{formatFiatCurrency(order.totalFiat, order.fiatCurrencyCode)}</span>
               </div>
             </div>
           </CardContent>
@@ -181,9 +181,9 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <span className="text-sm text-gray-600">Wallet Address:</span>
+              <span className="text-sm text-muted-foreground">Wallet Address:</span>
               <div className="mt-1 flex items-center gap-2">
-                <code className="flex-1 text-sm bg-gray-100 px-3 py-2 rounded font-mono break-all">
+                <code className="flex-1 text-sm bg-muted px-3 py-2 rounded font-mono break-all">
                   {order.walletAddress}
                 </code>
                 <CopyButton text={order.walletAddress} />
@@ -192,9 +192,9 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
 
             {order.transactionHash && (
               <div>
-                <span className="text-sm text-gray-600">Transaction Hash:</span>
+                <span className="text-sm text-muted-foreground">Transaction Hash:</span>
                 <div className="mt-1 flex items-center gap-2">
-                  <code className="flex-1 text-sm bg-gray-100 px-3 py-2 rounded font-mono break-all">
+                  <code className="flex-1 text-sm bg-muted px-3 py-2 rounded font-mono break-all">
                     {order.transactionHash}
                   </code>
                   <CopyButton text={order.transactionHash} />
@@ -217,15 +217,15 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
           <CardContent className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div>
-                <span className="text-sm text-gray-600">Bank Name:</span>
+                <span className="text-sm text-muted-foreground">Bank Name:</span>
                 <p className="font-medium">{bankDetails.bankName}</p>
               </div>
               <div>
-                <span className="text-sm text-gray-600">Account Holder:</span>
+                <span className="text-sm text-muted-foreground">Account Holder:</span>
                 <p className="font-medium">{bankDetails.accountHolder}</p>
               </div>
               <div>
-                <span className="text-sm text-gray-600">IBAN:</span>
+                <span className="text-sm text-muted-foreground">IBAN:</span>
                 <div className="flex items-center gap-2">
                   <code className="font-mono text-sm">{bankDetails.iban}</code>
                   <CopyButton text={bankDetails.iban} variant="ghost" size="sm" />
@@ -233,7 +233,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
               </div>
               {bankDetails.swift && (
                 <div>
-                  <span className="text-sm text-gray-600">SWIFT/BIC:</span>
+                  <span className="text-sm text-muted-foreground">SWIFT/BIC:</span>
                   <div className="flex items-center gap-2">
                     <code className="font-mono text-sm">{bankDetails.swift}</code>
                     <CopyButton text={bankDetails.swift} variant="ghost" size="sm" />
