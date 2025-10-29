@@ -85,7 +85,7 @@ export default async function LegalPage({ params }: LegalPageProps) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-background to-background">
       {/* Dynamic Island Style Header */}
       <div className="fixed top-0 left-0 right-0 z-50 flex justify-center pt-4 px-4 pointer-events-none">
         <header className="pointer-events-auto w-full max-w-4xl rounded-2xl border border-border/50 bg-background/80 backdrop-blur-xl shadow-lg shadow-black/5 dark:shadow-black/20">
@@ -127,22 +127,18 @@ export default async function LegalPage({ params }: LegalPageProps) {
       {/* Spacer */}
       <div className="h-20" />
 
-      {/* Hero with Gradient */}
-      <div className="relative border-b overflow-hidden">
-        {/* Gradient Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent" />
-        
-        <div className="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-12 md:py-16">
+      {/* Hero - прозрачный с blur */}
+      <div className="border-b border-border/50">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-12 md:py-16">
           <div className="flex flex-col gap-6">
             {/* Badges Row */}
             <div className="flex items-center gap-2">
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 backdrop-blur-sm px-3 py-1.5">
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-background/15 backdrop-blur-md px-3 py-1.5">
                 <FileText className="h-3.5 w-3.5 text-primary" />
                 <span className="text-xs font-semibold text-primary">Legal Document</span>
               </div>
               {document.isRequired && (
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 backdrop-blur-sm px-3 py-1.5">
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 backdrop-blur-md px-3 py-1.5">
                   <div className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
                   <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">Required Reading</span>
                 </div>
@@ -165,7 +161,7 @@ export default async function LegalPage({ params }: LegalPageProps) {
             {/* Meta Row */}
             <div className="flex flex-wrap items-center gap-6 pt-2">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/50 backdrop-blur-sm">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-background/15 backdrop-blur-md">
                   <Calendar className="h-4 w-4" />
                 </div>
                 <div className="flex flex-col">
@@ -175,7 +171,7 @@ export default async function LegalPage({ params }: LegalPageProps) {
               </div>
               
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/50 backdrop-blur-sm">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-background/15 backdrop-blur-md">
                   <Clock className="h-4 w-4" />
                 </div>
                 <div className="flex flex-col">
@@ -192,7 +188,7 @@ export default async function LegalPage({ params }: LegalPageProps) {
         </div>
       </div>
 
-      {/* Content with Sidebar Navigation */}
+      {/* Content with Sidebar Navigation - прозрачный с blur */}
       <div className="flex-1">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-8 md:py-12">
           <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-8">
@@ -219,8 +215,8 @@ export default async function LegalPage({ params }: LegalPageProps) {
         </div>
       </div>
 
-      {/* Compact Footer */}
-      <footer className="border-t mt-auto">
+      {/* Compact Footer - прозрачный */}
+      <footer className="border-t border-border/50 mt-auto">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2">
