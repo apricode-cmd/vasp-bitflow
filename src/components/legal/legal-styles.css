@@ -1,0 +1,238 @@
+/* Legal Document Styles */
+
+.legal-document-wrapper {
+  @apply border-0 shadow-xl ring-1 ring-border/50 rounded-lg bg-card;
+  @apply p-6 md:p-10 lg:p-14;
+}
+
+.legal-content {
+  @apply max-w-none;
+  color: hsl(var(--foreground));
+}
+
+/* Headings */
+.legal-content h1,
+.legal-content h2,
+.legal-content h3,
+.legal-content h4,
+.legal-content h5,
+.legal-content h6 {
+  @apply font-bold tracking-tight scroll-mt-20;
+}
+
+.legal-content h1 {
+  @apply text-3xl md:text-4xl mb-8 mt-12 pb-4 border-b-2;
+  color: hsl(var(--primary));
+  border-color: hsl(var(--primary) / 0.3);
+}
+
+.legal-content h1:first-child {
+  @apply mt-0;
+}
+
+.legal-content h2 {
+  @apply text-2xl md:text-3xl mb-6 mt-12 pb-3 border-b;
+  color: hsl(var(--primary) / 0.9);
+  border-color: hsl(var(--border));
+}
+
+.legal-content h3 {
+  @apply text-xl md:text-2xl mb-5 mt-10;
+  color: hsl(var(--primary) / 0.8);
+}
+
+.legal-content h4 {
+  @apply text-lg md:text-xl mb-4 mt-8 font-semibold;
+  color: hsl(var(--foreground));
+}
+
+.legal-content h5 {
+  @apply text-base md:text-lg mb-3 mt-6 font-semibold;
+}
+
+.legal-content h6 {
+  @apply text-base mb-3 mt-4;
+}
+
+/* Paragraphs */
+.legal-content p {
+  @apply leading-[1.8] mb-6 text-[15px];
+  color: hsl(var(--foreground) / 0.9);
+}
+
+.legal-content p:empty {
+  @apply mb-0;
+  min-height: 0;
+}
+
+/* Links */
+.legal-content a {
+  @apply font-medium no-underline transition-all;
+  color: hsl(var(--primary));
+  text-decoration-color: hsl(var(--primary) / 0.3);
+  text-decoration-thickness: 2px;
+}
+
+.legal-content a:hover {
+  @apply underline;
+  text-decoration-color: hsl(var(--primary));
+}
+
+/* Strong & Em */
+.legal-content strong {
+  @apply font-semibold;
+  color: hsl(var(--foreground));
+}
+
+.legal-content em {
+  @apply italic;
+  color: hsl(var(--foreground) / 0.8);
+}
+
+/* Lists */
+.legal-content ul,
+.legal-content ol {
+  @apply my-8 space-y-3 pl-0;
+  list-style: none;
+}
+
+.legal-content ol {
+  counter-reset: item;
+}
+
+.legal-content li {
+  @apply relative pl-7 leading-relaxed;
+  color: hsl(var(--foreground) / 0.9);
+}
+
+/* Unordered list bullets */
+.legal-content ul > li::before {
+  content: '';
+  @apply absolute left-0 w-1.5 h-1.5 rounded-full;
+  top: 0.6em;
+  background-color: hsl(var(--primary));
+}
+
+/* Ordered list numbers */
+.legal-content ol > li {
+  counter-increment: item;
+}
+
+.legal-content ol > li::before {
+  content: counter(item) '.';
+  @apply absolute left-0 font-bold text-sm;
+  color: hsl(var(--primary));
+}
+
+/* Nested lists */
+.legal-content li > ul,
+.legal-content li > ol {
+  @apply mt-3 mb-0;
+}
+
+/* Blockquotes */
+.legal-content blockquote {
+  @apply not-italic border-l-4 pl-6 pr-4 py-4 my-8 rounded-r-lg shadow-sm;
+  border-color: hsl(var(--primary));
+  background-color: hsl(var(--muted) / 0.4);
+  color: hsl(var(--foreground) / 0.8);
+}
+
+.legal-content blockquote p {
+  @apply mb-0;
+}
+
+/* Inline Code */
+.legal-content code {
+  @apply px-2 py-1 rounded-md text-[0.9em] font-mono border;
+  background-color: hsl(var(--muted));
+  color: hsl(var(--primary));
+  border-color: hsl(var(--border) / 0.5);
+}
+
+.legal-content code::before,
+.legal-content code::after {
+  content: none;
+}
+
+/* Code Blocks */
+.legal-content pre {
+  @apply border rounded-lg p-4 my-8 overflow-x-auto shadow-sm;
+  background-color: hsl(var(--muted));
+  border-color: hsl(var(--border));
+}
+
+.legal-content pre code {
+  @apply p-0 border-0;
+  background: transparent;
+}
+
+/* Horizontal Rules */
+.legal-content hr {
+  @apply my-12 border-t-2;
+  border-color: hsl(var(--border));
+}
+
+/* Tables */
+.legal-content table {
+  @apply w-full my-8 border-collapse text-sm shadow-sm rounded-lg overflow-hidden;
+}
+
+.legal-content thead {
+  background-color: hsl(var(--muted) / 0.8);
+}
+
+.legal-content th {
+  @apply border px-4 py-3 text-left font-semibold;
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+}
+
+.legal-content th:first-child {
+  @apply rounded-tl-lg;
+}
+
+.legal-content th:last-child {
+  @apply rounded-tr-lg;
+}
+
+.legal-content td {
+  @apply border px-4 py-3;
+  color: hsl(var(--foreground) / 0.9);
+  border-color: hsl(var(--border));
+}
+
+.legal-content tbody tr {
+  @apply transition-colors;
+}
+
+.legal-content tbody tr:hover {
+  background-color: hsl(var(--muted) / 0.3);
+}
+
+/* Images */
+.legal-content img {
+  @apply rounded-lg shadow-md my-8;
+}
+
+.legal-content figcaption {
+  @apply text-center text-sm mt-2;
+  color: hsl(var(--muted-foreground));
+}
+
+/* Loading State */
+.legal-loading {
+  @apply text-center py-20;
+}
+
+.legal-loading-icon {
+  @apply rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4;
+  background-color: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+}
+
+.legal-loading-text {
+  @apply text-lg;
+  color: hsl(var(--muted-foreground));
+}
+

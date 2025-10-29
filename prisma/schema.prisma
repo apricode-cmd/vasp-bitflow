@@ -1600,3 +1600,88 @@ model KycProfile {
   @@index([nationality])
   @@index([pepStatus])
 }
+
+// ==========================================
+// LEGAL DOCUMENTS & COMPLIANCE
+// ==========================================
+
+enum DocumentCategory {
+  PUBLIC      // Public policies (Privacy, Terms, etc.)
+  INTERNAL    // Internal procedures (AML, KYC SOP, etc.)
+  LEGAL       // Legal agreements (Client Agreement, DPA, etc.)
+}
+
+enum DocumentStatus {
+  DRAFT       // Work in progress
+  REVIEW      // Ready for review
+  PUBLISHED   // Live and accessible
+  ARCHIVED    // No longer active
+}
+
+model LegalDocument {
+  id          String   @id @default(cuid())
+  
+  // Document metadata
+  key         String   @unique // Unique identifier (e.g., "terms_of_service")
+  title       String
+  description String?  @db.Text
+  slug        String?  @unique // URL slug for public documents (e.g., "/terms")
+  
+  // Categorization
+  category    DocumentCategory
+  isRequired  Boolean  @default(false) // Required for compliance
+  
+  // Content (rich text stored as JSON)
+  content     Json     // Lexical editor state
+  htmlContent String?  @db.Text // Rendered HTML for display
+  plainText   String?  @db.Text // Plain text for search
+  
+  // Publishing
+  status      DocumentStatus @default(DRAFT)
+  publishedAt DateTime?
+  publishedBy String? // User ID who published
+  
+  // Versioning
+  version     Int      @default(1)
+  previousVersionId String? // Reference to previous version
+  isLatest    Boolean  @default(true)
+  
+  // SEO & metadata
+  metaTitle       String?
+  metaDescription String?
+  ogImage         String? // URL to Open Graph image
+  
+  // Access control
+  isPublic    Boolean  @default(false) // Accessible without auth
+  allowedRoles String[] @default(["ADMIN"]) // Roles that can view
+  
+  // Audit trail
+  createdBy   String   // User ID
+  updatedBy   String?  // User ID
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Change tracking
+  changeLog   Json?    // Array of changes
+  
+  @@index([key])
+  @@index([slug])
+  @@index([category])
+  @@index([status])
+  @@index([isPublic])
+  @@index([publishedAt])
+}
+
+// Document templates for quick creation
+model DocumentTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  category    DocumentCategory
+  content     Json     // Default Lexical editor state
+  variables   Json?    // Placeholders to be replaced (e.g., {{COMPANY_NAME}})
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([category])
+}

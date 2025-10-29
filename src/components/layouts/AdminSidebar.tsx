@@ -12,9 +12,9 @@ import { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, ShoppingCart, Settings, CreditCard,
   TrendingUp, Shield, Database, Activity, Coins,
-  Wallet, Globe, Key, User, FileText,
+  Wallet, Globe, Key, User, FileText, Scale,
   ChevronDown, ChevronRight, Search,
-  ArrowDownCircle, ArrowUpCircle
+  ArrowDownCircle, ArrowUpCircle, BookOpen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -134,6 +134,19 @@ const navigation = [
     ],
     defaultOpen: false,
     priority: 'high'
+  },
+  {
+    section: 'Legal & Compliance',
+    items: [
+      { 
+        name: 'Legal Library', 
+        href: '/admin/documents', 
+        icon: BookOpen,
+        description: 'Policies, Terms, Agreements'
+      },
+    ],
+    defaultOpen: false,
+    priority: 'medium'
   },
   {
     section: 'System & Settings',
