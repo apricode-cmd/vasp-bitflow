@@ -50,12 +50,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       orderBy: { priority: 'asc' },
       include: includeBlockchains ? {
         blockchainNetworks: {
+          where: { isActive: true }, // Only include active blockchain relationships
           include: {
             blockchain: {
               select: {
                 code: true,
                 name: true,
-                symbol: true
+                symbol: true,
+                isActive: true // Include blockchain active status
               }
             }
           }

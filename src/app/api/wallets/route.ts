@@ -8,12 +8,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth-utils';
 import { prisma } from '@/lib/prisma';
+import { validateWalletAddress, normalizeWalletAddress } from '@/lib/validators/wallet-address';
 import { z } from 'zod';
 
 const createWalletSchema = z.object({
   currencyCode: z.string().min(1),
   blockchainCode: z.string().min(1),
-  address: z.string().min(26).max(62),
+  address: z.string().min(1).max(100), // Extended max length
   label: z.string().max(50).optional()
 });
 
@@ -28,7 +29,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const body = await request.json();
     const validatedData = createWalletSchema.parse(body);
 
-    // Check if currency exists
+    // 1. Validate address format
+    const validation = validateWalletAddress(validatedData.address, validatedData.blockchainCode);
+    if (!validation.isValid) {
+      return NextResponse.json(
+        { error: validation.error },
+        { status: 400 }
+      );
+    }
+
+    // 2. Normalize address
+    const normalizedAddress = normalizeWalletAddress(validatedData.address, validatedData.blockchainCode);
+
+    // 3. Check if currency exists
     const currency = await prisma.currency.findUnique({
       where: { code: validatedData.currencyCode }
     });
@@ -40,7 +53,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Check if blockchain exists
+    // 4. Check if blockchain exists
     const blockchain = await prisma.blockchainNetwork.findUnique({
       where: { code: validatedData.blockchainCode }
     });
@@ -52,30 +65,51 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Check if wallet already exists
+    // 5. Check if address is already registered with ANOTHER user
     const existingWallet = await prisma.userWallet.findFirst({
       where: {
-        userId: session.user.id,
+        address: normalizedAddress,
         currencyCode: validatedData.currencyCode,
         blockchainCode: validatedData.blockchainCode,
-        address: validatedData.address
+        userId: {
+          not: session.user.id
+        }
       }
     });
 
     if (existingWallet) {
       return NextResponse.json(
-        { error: 'This wallet address is already saved' },
+        { 
+          error: 'This wallet address is already registered with another user. Please use a different address or contact support if this is your wallet.'
+        },
         { status: 400 }
       );
     }
 
-    // Create wallet
+    // 6. Check if wallet already exists for current user
+    const ownExistingWallet = await prisma.userWallet.findFirst({
+      where: {
+        userId: session.user.id,
+        currencyCode: validatedData.currencyCode,
+        blockchainCode: validatedData.blockchainCode,
+        address: normalizedAddress
+      }
+    });
+
+    if (ownExistingWallet) {
+      return NextResponse.json(
+        { error: 'This wallet address is already saved in your account' },
+        { status: 400 }
+      );
+    }
+
+    // 7. Create wallet
     const wallet = await prisma.userWallet.create({
       data: {
         userId: session.user.id,
         currencyCode: validatedData.currencyCode,
         blockchainCode: validatedData.blockchainCode,
-        address: validatedData.address,
+        address: normalizedAddress, // Use normalized address
         label: validatedData.label
       },
       include: {
@@ -93,6 +127,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    console.error('Create wallet error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

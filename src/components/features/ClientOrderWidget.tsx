@@ -114,7 +114,6 @@ export function ClientOrderWidget() {
   const [inputMode, setInputMode] = useState<'crypto' | 'fiat'>('fiat'); // Toggle between crypto/fiat
   const [walletAddress, setWalletAddress] = useState<string>('');
   const [selectedWalletId, setSelectedWalletId] = useState<string>('new'); // 'new' or wallet ID
-  const [newWalletLabel, setNewWalletLabel] = useState<string>(''); // Label for new wallet
 
   // Fetch initial data
   useEffect(() => {
@@ -412,12 +411,13 @@ export function ClientOrderWidget() {
         return false;
       }
       
-      // Check if this network is supported by the selected currency
-      const isSupported = selectedCurrency.blockchainNetworks.some(
+      // Check if this network is supported by the selected currency AND is active
+      const supportedNetwork = selectedCurrency.blockchainNetworks.find(
         bn => bn.blockchain.code === network.code
       );
       
-      return isSupported;
+      // Must be supported AND active in CurrencyBlockchainNetwork
+      return supportedNetwork && supportedNetwork.blockchain.isActive;
     })
     .map(network => ({
       value: network.code,
@@ -446,29 +446,49 @@ export function ClientOrderWidget() {
     setSubmitting(true);
 
     try {
-      // If user entered a new wallet address and label, save it
-      if (selectedWalletId === 'new' && walletAddress && newWalletLabel) {
-        try {
-          const saveWalletRes = await fetch('/api/wallets', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              currencyCode: selectedCrypto,
-              blockchainCode: selectedNetwork,
-              address: walletAddress,
-              label: newWalletLabel
-            })
-          });
+      // Validate wallet address before creating order
+      if (selectedWalletId === 'new' && walletAddress) {
+        const validateRes = await fetch('/api/wallets/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            address: walletAddress,
+            blockchainCode: selectedNetwork,
+            currencyCode: selectedCrypto
+          })
+        });
 
-          if (saveWalletRes.ok) {
-            const savedWallet = await saveWalletRes.json();
-            // Update local state
-            setUserWallets(prev => [savedWallet, ...prev]);
-            toast.success('Wallet address saved for future use');
+        const validateData = await validateRes.json();
+
+        if (!validateData.isValid) {
+          toast.error(validateData.error || 'Invalid wallet address');
+          setSubmitting(false);
+          return;
+        }
+
+        // If wallet is not already saved and valid, save it
+        if (!validateData.alreadySaved) {
+          try {
+            const saveWalletRes = await fetch('/api/wallets', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                currencyCode: selectedCrypto,
+                blockchainCode: selectedNetwork,
+                address: walletAddress
+              })
+            });
+
+            if (saveWalletRes.ok) {
+              const savedWallet = await saveWalletRes.json();
+              // Update local state
+              setUserWallets(prev => [savedWallet, ...prev]);
+              toast.success('Wallet address saved for future use');
+            }
+          } catch (error) {
+            // Non-critical error, continue with order creation
+            console.error('Failed to save wallet:', error);
           }
-        } catch (error) {
-          // Non-critical error, continue with order creation
-          console.error('Failed to save wallet:', error);
         }
       }
 
@@ -830,39 +850,25 @@ export function ClientOrderWidget() {
 
                   {/* New Address Input (shown when "new" is selected) */}
                   {selectedWalletId === 'new' && (
-                    <div className="space-y-2 pl-7 animate-in slide-in-from-top-2">
+                    <div className="pl-7 animate-in slide-in-from-top-2">
                       <Input
                         placeholder={`Enter your ${selectedCrypto} wallet address`}
                         value={walletAddress}
                         onChange={(e) => setWalletAddress(e.target.value)}
-                      />
-                      <Input
-                        placeholder="Wallet label (optional, e.g., 'Hardware Wallet')"
-                        value={newWalletLabel}
-                        onChange={(e) => setNewWalletLabel(e.target.value)}
-                        className="text-sm"
                       />
                     </div>
                   )}
                 </div>
               ) : (
                 // No saved wallets - show input directly
-                <div className="space-y-2">
-                  <Input
-                    placeholder={`Enter your ${selectedCrypto} wallet address`}
-                    value={walletAddress}
-                    onChange={(e) => {
-                      setWalletAddress(e.target.value);
-                      setSelectedWalletId('new');
-                    }}
-                  />
-                  <Input
-                    placeholder="Wallet label (optional, e.g., 'Hardware Wallet')"
-                    value={newWalletLabel}
-                    onChange={(e) => setNewWalletLabel(e.target.value)}
-                    className="text-sm"
-                  />
-                </div>
+                <Input
+                  placeholder={`Enter your ${selectedCrypto} wallet address`}
+                  value={walletAddress}
+                  onChange={(e) => {
+                    setWalletAddress(e.target.value);
+                    setSelectedWalletId('new');
+                  }}
+                />
               );
             })()}
 
