@@ -608,6 +608,82 @@ function getStatusMessage(status: string): string {
 }
 
 /**
+ * Download KYC verification report PDF
+ */
+export async function downloadKycReport(sessionId: string): Promise<Buffer> {
+  try {
+    console.log('📄 Downloading KYC report for session:', sessionId);
+
+    // Get KYC session
+    const session = await prisma.kycSession.findUnique({
+      where: { id: sessionId }
+    });
+
+    if (!session) {
+      throw new Error('KYC session not found');
+    }
+
+    if (!session.kycaidVerificationId) {
+      throw new Error('No verification ID - cannot download report');
+    }
+
+    if (session.status !== 'APPROVED' && session.status !== 'REJECTED') {
+      throw new Error('Report only available for completed verifications');
+    }
+
+    // Get provider
+    const providerId = (session.metadata as any)?.provider || 'kycaid';
+    const provider = integrationRegistry.getProvider(providerId);
+    
+    if (!provider) {
+      throw new Error(`Provider "${providerId}" not found`);
+    }
+
+    // Initialize provider
+    const secrets = await getIntegrationWithSecrets(providerId);
+    if (!secrets?.apiKey) {
+      throw new Error('Provider not configured');
+    }
+
+    await provider.initialize({
+      apiKey: secrets.apiKey,
+      apiEndpoint: secrets.apiEndpoint || undefined,
+      ...secrets.config
+    });
+
+    // Download report (assuming provider has downloadVerificationReport method)
+    const kycaidProvider = provider as any; // Cast to access custom method
+    
+    if (!kycaidProvider.downloadVerificationReport) {
+      throw new Error('Provider does not support report download');
+    }
+
+    const reportBuffer = await kycaidProvider.downloadVerificationReport(
+      session.kycaidVerificationId
+    );
+
+    console.log(`✅ Report downloaded successfully: ${reportBuffer.length} bytes`);
+
+    // Update session metadata with report info
+    await prisma.kycSession.update({
+      where: { id: sessionId },
+      data: {
+        metadata: {
+          ...session.metadata as any,
+          reportDownloaded: new Date().toISOString(),
+          reportSize: reportBuffer.length
+        }
+      }
+    });
+
+    return reportBuffer;
+  } catch (error: any) {
+    console.error('❌ Failed to download KYC report:', error);
+    throw new Error(error.message || 'Failed to download KYC report');
+  }
+}
+
+/**
  * Get KYC form configuration from admin settings
  */
 export async function getKycFormConfig() {

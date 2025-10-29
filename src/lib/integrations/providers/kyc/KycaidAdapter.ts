@@ -566,6 +566,43 @@ export class KycaidAdapter implements IKycProvider {
       extractedData: {}
     };
   }
+
+  /**
+   * Download verification report as PDF
+   * GET /verifications/report?verification_id={verification_id}
+   */
+  async downloadVerificationReport(verificationId: string): Promise<Buffer> {
+    if (!this.isConfigured()) {
+      throw new Error('KYCAID provider not configured');
+    }
+
+    try {
+      console.log('📄 Downloading KYCAID verification report:', verificationId);
+
+      const url = `${this.baseUrl}/verifications/report?verification_id=${verificationId}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: this.getHeaders()
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Failed to download report: ${error}`);
+      }
+
+      // Get PDF as buffer
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      console.log(`✅ Report downloaded: ${buffer.length} bytes`);
+
+      return buffer;
+    } catch (error: any) {
+      console.error('❌ KYCAID report download failed:', error);
+      throw new Error(`Failed to download KYCAID report: ${error.message}`);
+    }
+  }
 }
 
 // Export singleton instance

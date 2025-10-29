@@ -1205,6 +1205,58 @@ export default function AdminKycPage(): JSX.Element {
                       </div>
                     )}
 
+              {/* Download Report - Available for APPROVED/REJECTED */}
+              {selectedSession.kycaidVerificationId && 
+               (selectedSession.status === 'APPROVED' || selectedSession.status === 'REJECTED') && (
+                <div>
+                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Verification Report
+                  </h3>
+                  <Card>
+                    <div className="p-4">
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Download the complete verification report from KYCAID in PDF format.
+                      </p>
+                      <Button 
+                        variant="outline"
+                        className="w-full"
+                        onClick={async () => {
+                          try {
+                            const response = await fetch(`/api/admin/kyc/${selectedSession.id}/download-report`);
+                            
+                            if (!response.ok) {
+                              const error = await response.json();
+                              toast.error(error.error || 'Failed to download report');
+                              return;
+                            }
+                            
+                            // Download PDF
+                            const blob = await response.blob();
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `kyc-report-${selectedSession.id}.pdf`;
+                            document.body.appendChild(a);
+                            a.click();
+                            window.URL.revokeObjectURL(url);
+                            document.body.removeChild(a);
+                            
+                            toast.success('Report downloaded successfully');
+                          } catch (error) {
+                            console.error('Download error:', error);
+                            toast.error('Failed to download report');
+                          }
+                        }}
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Download PDF Report
+                      </Button>
+                    </div>
+                  </Card>
+                </div>
+              )}
+
               {/* Actions */}
               {selectedSession.status === 'PENDING' && (
                 <div>
