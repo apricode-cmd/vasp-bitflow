@@ -462,7 +462,7 @@ export default function KycPage(): React.ReactElement {
           placeholder = 'e.g., ACME Sp. z o.o.';
         }
         
-        return (
+    return (
           <Input
             {...commonProps}
             type={field.fieldType}
@@ -839,8 +839,8 @@ export default function KycPage(): React.ReactElement {
             >
               {field.label}
             </label>
-          </div>
-        );
+      </div>
+    );
 
       case 'multiselect':
         // Parse options
@@ -889,7 +889,7 @@ export default function KycPage(): React.ReactElement {
         const multiselectLabels = getMultiselectLabels(field.fieldName);
         const selectedValues = Array.isArray(value) ? value : (value ? [value] : []);
 
-        return (
+    return (
           <div className="space-y-2">
             {multiselectOptions.map((option: string) => (
               <div key={option} className="flex items-center space-x-2">
@@ -928,8 +928,8 @@ export default function KycPage(): React.ReactElement {
             />
             <p className="text-xs text-muted-foreground">
               Max size: 10MB. Formats: JPG, PNG, PDF
-            </p>
-          </div>
+          </p>
+        </div>
         );
 
       default:
@@ -1230,16 +1230,16 @@ export default function KycPage(): React.ReactElement {
                         <div className="flex-1 space-y-1.5">
                           <p className="text-sm font-medium">What you'll need</p>
                           <ul className="text-sm text-muted-foreground space-y-1">
-                            <li className="flex items-start gap-2">
+                <li className="flex items-start gap-2">
                               <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 mt-1.5 shrink-0" />
                               <span>Government-issued ID (passport or ID card)</span>
-                            </li>
-                            <li className="flex items-start gap-2">
+                </li>
+                <li className="flex items-start gap-2">
                               <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 mt-1.5 shrink-0" />
                               <span>Well-lit environment for selfie</span>
-                            </li>
-                          </ul>
-                        </div>
+                </li>
+              </ul>
+            </div>
                       </div>
                     </div>
                   </>
@@ -1267,7 +1267,7 @@ export default function KycPage(): React.ReactElement {
                       You now have full access to all features
                     </p>
                   </div>
-                </div>
+            </div>
 
                 {/* CTA */}
                 <Button 
@@ -1339,7 +1339,7 @@ export default function KycPage(): React.ReactElement {
                   onClick={() => window.location.href = '/profile'}
                 >
                   Contact Support
-                </Button>
+            </Button>
               </div>
             )}
 
@@ -1364,7 +1364,7 @@ export default function KycPage(): React.ReactElement {
 
   // Show consents screen before form
   if (showConsentsScreen) {
-    return (
+  return (
       <div className="max-w-3xl mx-auto space-y-6 animate-in p-6">
         {/* Header */}
         <div className="text-center space-y-4">
@@ -1377,11 +1377,11 @@ export default function KycPage(): React.ReactElement {
           <p className="text-muted-foreground text-lg">
             Before we begin, please review and accept the following consents and legal information
           </p>
-        </div>
+      </div>
 
         {/* Consents Card */}
         <Card className="border-2">
-          <CardHeader>
+        <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
               Required Consents
@@ -1389,8 +1389,8 @@ export default function KycPage(): React.ReactElement {
             <CardDescription>
               All consents are required to proceed with KYC verification
             </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
+        </CardHeader>
+        <CardContent className="space-y-6">
             {/* Biometrics Consent */}
             <div className="flex items-start space-x-3 p-4 rounded-lg border-2 border-primary/20 bg-primary/5">
               <Checkbox
@@ -1412,8 +1412,8 @@ export default function KycPage(): React.ReactElement {
                 <Badge variant="outline" className="mt-2">
                   Art. 9(2)(a) GDPR
                 </Badge>
+                </div>
               </div>
-            </div>
 
             {/* Terms and Privacy */}
             <div className="flex items-start space-x-3 p-4 rounded-lg border bg-muted/30">
@@ -1440,7 +1440,7 @@ export default function KycPage(): React.ReactElement {
                     Privacy Policy
                   </a>.
                 </p>
-              </div>
+            </div>
             </div>
 
             {/* Attestation */}
@@ -1478,24 +1478,24 @@ export default function KycPage(): React.ReactElement {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-blue-800 dark:text-blue-200">
-            <div className="flex gap-3">
+              <div className="flex gap-3">
               <Scale className="h-5 w-5 mt-0.5 shrink-0" />
-              <div>
+                <div>
                 <strong>AML Legal Basis:</strong> We process KYC data to comply with AML/CFT laws (Art. 6(1)(c) GDPR).
+                </div>
               </div>
-            </div>
             <div className="flex gap-3">
               <FolderArchive className="h-5 w-5 mt-0.5 shrink-0" />
               <div>
                 <strong>Record Retention:</strong> KYC and transaction records are retained at least 5 years per AMLD.
-              </div>
             </div>
-            <div className="flex gap-3">
+            </div>
+              <div className="flex gap-3">
               <RefreshCw className="h-5 w-5 mt-0.5 shrink-0" />
-              <div>
+                <div>
                 <strong>Travel Rule (EU 2023/1113):</strong> For crypto transfers, sender/beneficiary data accompany the transfer; self-hosted addresses may require ownership checks over €1,000.
+                </div>
               </div>
-            </div>
           </CardContent>
         </Card>
 
@@ -1517,7 +1517,7 @@ export default function KycPage(): React.ReactElement {
             Accept & Continue
             <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
-        </div>
+            </div>
       </div>
     );
   }
@@ -1543,9 +1543,9 @@ export default function KycPage(): React.ReactElement {
             <div className="flex justify-between text-sm">
               <span className="font-medium">Step {currentStep} of {STEPS.length}</span>
               <span className="text-muted-foreground">{Math.round(progress)}% Complete</span>
-            </div>
+                </div>
             <Progress value={progress} className="h-2" />
-            <div className="flex justify-between">
+                <div className="flex justify-between">
               {STEPS.map((step) => (
                 <div
                   key={step.id}
@@ -1565,9 +1565,9 @@ export default function KycPage(): React.ReactElement {
                     </span>
                   )}
                   <span className="hidden md:inline text-xs">{step.title}</span>
-                </div>
-              ))}
             </div>
+              ))}
+          </div>
           </div>
         </CardContent>
       </Card>
@@ -1599,7 +1599,7 @@ export default function KycPage(): React.ReactElement {
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
-            </Button>
+              </Button>
 
             {currentStep < STEPS.length ? (
               <Button onClick={handleNext}>
