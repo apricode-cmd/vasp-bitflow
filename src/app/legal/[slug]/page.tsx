@@ -86,192 +86,155 @@ export default async function LegalPage({ params }: LegalPageProps) {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      {/* Modern Header */}
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container max-w-5xl mx-auto">
-          <div className="flex h-16 items-center justify-between px-4 md:px-6">
+      {/* Compact Glassmorphism Header */}
+      <header className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-background/60 backdrop-blur-xl supports-[backdrop-filter]:bg-background/40">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex h-14 items-center justify-between">
             {/* Logo */}
             <Link 
               href="/"
-              className="flex items-center gap-2.5 group"
+              className="group flex items-center gap-2"
             >
-              <div className="relative">
-                <div className="absolute inset-0 bg-primary/20 rounded-xl blur-sm group-hover:blur-md transition-all" />
-                <div className="relative rounded-xl bg-gradient-to-br from-primary to-primary/80 p-2 shadow-sm group-hover:shadow-md transition-all">
-                  <Shield className="h-4 w-4 text-primary-foreground" />
-                </div>
+              <div className="relative flex h-7 w-7 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-primary to-primary/70 shadow-sm transition-all duration-200 group-hover:shadow-md group-hover:shadow-primary/30">
+                <Shield className="h-3.5 w-3.5 text-primary-foreground" />
               </div>
-              <div className="flex flex-col -space-y-0.5">
-                <span className="text-sm font-semibold tracking-tight leading-none">
-                  Apricode Exchange
-                </span>
-                <span className="text-[10px] text-muted-foreground font-medium leading-none hidden sm:block">
-                  Legal & Compliance
-                </span>
-              </div>
+              <span className="text-sm font-semibold">Apricode</span>
             </Link>
             
-            {/* Actions */}
+            {/* Center: Document Badge */}
+            <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-md bg-muted/50 backdrop-blur-sm border border-border/50">
+              <FileText className="h-3 w-3 text-primary" />
+              <span className="text-xs font-medium">Legal Document</span>
+            </div>
+            
+            {/* Right Actions */}
             <div className="flex items-center gap-2">
+              <ThemeToggle />
+              
               <Link href="/login">
                 <Button 
                   variant="ghost" 
-                  size="sm" 
-                  className="hidden sm:flex h-9 px-4 rounded-lg hover:bg-primary/5"
+                  size="sm"
+                  className="h-8 px-3 text-xs font-medium"
                 >
-                  <span className="text-sm font-medium">Sign In</span>
+                  Login
                 </Button>
               </Link>
-              
-              <div className="h-5 w-px bg-border hidden sm:block" />
-              
-              <ThemeToggle />
             </div>
           </div>
         </div>
       </header>
 
-      {/* Hero Section with Modern Design */}
-      <div className="border-b">
-        <div className="container max-w-5xl mx-auto px-4 md:px-6 py-8 md:py-10">
-          <div className="flex flex-col gap-6">
-            {/* Document Badge */}
-            <div className="flex items-center gap-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/5 border border-primary/10">
-                <FileText className="h-3.5 w-3.5 text-primary" />
-                <span className="text-xs font-medium text-foreground">
-                  Legal Document
-                </span>
+      {/* Spacer */}
+      <div className="h-14" />
+
+      {/* Compact Hero */}
+      <div className="border-b bg-muted/20">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+          <div className="flex flex-col gap-4 max-w-3xl">
+            {/* Badges */}
+            <div className="flex items-center gap-2">
+              <div className="inline-flex items-center gap-1.5 rounded-full border bg-background/80 backdrop-blur-sm px-2.5 py-1 text-xs">
+                <FileText className="h-3 w-3 text-primary" />
+                <span className="font-medium">Legal</span>
               </div>
-              
               {document.isRequired && (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20">
-                  <FileCheck className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                  <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
-                    Required
-                  </span>
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs">
+                  <div className="h-1 w-1 rounded-full bg-amber-500 animate-pulse" />
+                  <span className="font-medium text-amber-700 dark:text-amber-400">Required</span>
                 </div>
               )}
             </div>
 
-            {/* Title & Description */}
-            <div className="space-y-3 max-w-3xl">
-              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight">
-                <span className="bg-gradient-to-br from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">
-                  {document.title}
-                </span>
-              </h1>
-              
-              {document.description && (
-                <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
-                  {document.description}
-                </p>
-              )}
-            </div>
+            {/* Title */}
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+              {document.title}
+            </h1>
+            
+            {document.description && (
+              <p className="text-base text-muted-foreground">
+                {document.description}
+              </p>
+            )}
 
-            {/* Metadata & Actions Row */}
-            <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-              {/* Metadata */}
-              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-muted/50">
-                    <Calendar className="h-4 w-4" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] uppercase tracking-wider font-medium opacity-60">
-                      Published
-                    </span>
-                    <span className="text-xs font-medium text-foreground">
-                      {document.publishedAt ? format(new Date(document.publishedAt), 'MMM d, yyyy') : 'N/A'}
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="h-8 w-px bg-border" />
-                
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-muted/50">
-                    <Clock className="h-4 w-4" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] uppercase tracking-wider font-medium opacity-60">
-                      Updated
-                    </span>
-                    <span className="text-xs font-medium text-foreground">
-                      {format(new Date(document.updatedAt), 'MMM d, yyyy')}
-                    </span>
-                  </div>
-                </div>
+            {/* Meta */}
+            <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2">
+              <div className="flex items-center gap-1.5">
+                <Calendar className="h-3 w-3" />
+                <span>{document.publishedAt ? format(new Date(document.publishedAt), 'MMM d, yyyy') : 'N/A'}</span>
               </div>
-
-              {/* Quick Actions */}
-              <QuickActions />
+              <div className="w-px h-3 bg-border" />
+              <div className="flex items-center gap-1.5">
+                <Clock className="h-3 w-3" />
+                <span>{format(new Date(document.updatedAt), 'MMM d, yyyy')}</span>
+              </div>
+              <div className="ml-auto">
+                <QuickActions />
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Content */}
-      <main className="flex-1">
-        <div className="container max-w-5xl mx-auto px-4 md:px-6 py-10 md:py-14">
-          <LegalPageClient htmlContent={document.htmlContent} />
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t bg-muted/30 mt-auto">
-        <div className="container max-w-5xl mx-auto px-4 py-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6 text-sm">
-            {/* Left: Copyright */}
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2">
-                <div className="rounded-lg bg-primary/10 p-1.5">
-                  <Shield className="h-3.5 w-3.5 text-primary" />
+      {/* Content with Sidebar Navigation */}
+      <div className="flex-1">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+          <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-8">
+            {/* Sticky TOC Navigation */}
+            <aside className="hidden lg:block">
+              <div className="sticky top-20 space-y-4">
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-3">
+                  On This Page
                 </div>
-                <div className="flex flex-col -space-y-0.5">
-                  <span className="text-xs font-semibold">Apricode Exchange</span>
-                  <span className="text-[10px] text-muted-foreground">
-                    © {new Date().getFullYear()} All rights reserved
-                  </span>
-                </div>
+                <nav className="space-y-1" id="toc-nav">
+                  {/* TOC will be populated by client component */}
+                  <div className="text-sm text-muted-foreground px-3 py-2">
+                    Loading sections...
+                  </div>
+                </nav>
               </div>
+            </aside>
+
+            {/* Document Content */}
+            <main className="min-w-0">
+              <LegalPageClient htmlContent={document.htmlContent} />
+            </main>
+          </div>
+        </div>
+      </div>
+
+      {/* Compact Footer */}
+      <footer className="border-t bg-muted/20 mt-auto">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10">
+                <Shield className="h-3 w-3 text-primary" />
+              </div>
+              <span className="text-xs font-medium">© {new Date().getFullYear()} Apricode Exchange</span>
             </div>
 
-            {/* Center: Links */}
-            <div className="flex items-center gap-6">
-              <Link 
-                href="/legal/terms-of-service" 
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
+            <div className="flex items-center gap-4">
+              <Link href="/legal/terms-of-service" className="text-xs text-muted-foreground hover:text-foreground transition">
                 Terms
               </Link>
-              <Link 
-                href="/legal/privacy-policy" 
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
+              <Link href="/legal/privacy-policy" className="text-xs text-muted-foreground hover:text-foreground transition">
                 Privacy
               </Link>
-              <Link 
-                href="/contact" 
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
+              <Link href="/contact" className="text-xs text-muted-foreground hover:text-foreground transition">
                 Contact
               </Link>
             </div>
 
-            {/* Right: Powered by */}
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <a 
+              href="https://apricode.io" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition"
+            >
               <span>Powered by</span>
-              <a 
-                href="https://apricode.io" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 font-semibold text-primary hover:text-primary/80 transition-colors"
-              >
-                <Shield className="h-3.5 w-3.5" />
-                <span>Apricode</span>
-              </a>
-            </div>
+              <span className="font-semibold">Apricode</span>
+            </a>
           </div>
         </div>
       </footer>

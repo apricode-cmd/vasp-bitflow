@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import './legal-styles.css'; // Import custom styles
 
 interface LegalPageClientProps {
@@ -7,6 +8,101 @@ interface LegalPageClientProps {
 }
 
 export function LegalPageClient({ htmlContent }: LegalPageClientProps) {
+  useEffect(() => {
+    if (!htmlContent) return;
+
+    // Generate Table of Contents from headings
+    const generateTOC = () => {
+      const contentElement = document.querySelector('.legal-content');
+      const tocNav = document.getElementById('toc-nav');
+      
+      if (!contentElement || !tocNav) return;
+
+      const headings = contentElement.querySelectorAll('h1, h2, h3');
+      
+      if (headings.length === 0) {
+        tocNav.innerHTML = '<div class="text-sm text-muted-foreground px-3 py-2">No sections found</div>';
+        return;
+      }
+
+      // Add IDs to headings for navigation
+      headings.forEach((heading, index) => {
+        if (!heading.id) {
+          heading.id = `section-${index}`;
+        }
+      });
+
+      // Create TOC links
+      const tocLinks = Array.from(headings).map((heading, index) => {
+        const level = parseInt(heading.tagName.substring(1));
+        const text = heading.textContent || '';
+        const id = heading.id;
+        
+        return `
+          <a 
+            href="#${id}" 
+            data-level="${level}"
+            class="toc-link block py-1.5 px-3 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-all ${level === 2 ? 'pl-6' : level === 3 ? 'pl-9' : ''}"
+          >
+            ${text}
+          </a>
+        `;
+      }).join('');
+
+      tocNav.innerHTML = tocLinks;
+
+      // Smooth scroll and active state handling
+      const links = tocNav.querySelectorAll('a');
+      links.forEach(link => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          const targetId = link.getAttribute('href')?.substring(1);
+          if (targetId) {
+            const targetElement = document.getElementById(targetId);
+            if (targetElement) {
+              const headerOffset = 80;
+              const elementPosition = targetElement.getBoundingClientRect().top;
+              const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+              window.scrollTo({
+                top: offsetPosition,
+                behavior: 'smooth'
+              });
+
+              // Update active state
+              links.forEach(l => l.classList.remove('font-semibold', 'text-primary', 'bg-primary/5'));
+              link.classList.add('font-semibold', 'text-primary', 'bg-primary/5');
+            }
+          }
+        });
+      });
+
+      // Highlight active section on scroll
+      const observerOptions = {
+        rootMargin: '-80px 0px -80% 0px',
+        threshold: 0
+      };
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const id = entry.target.id;
+            const activeLink = tocNav.querySelector(`a[href="#${id}"]`);
+            if (activeLink) {
+              links.forEach(l => l.classList.remove('font-semibold', 'text-primary', 'bg-primary/5'));
+              activeLink.classList.add('font-semibold', 'text-primary', 'bg-primary/5');
+            }
+          }
+        });
+      }, observerOptions);
+
+      headings.forEach(heading => observer.observe(heading));
+    };
+
+    // Generate TOC after content is rendered
+    setTimeout(generateTOC, 100);
+  }, [htmlContent]);
+
   return (
     <div className="legal-document-wrapper">
       {htmlContent ? (
