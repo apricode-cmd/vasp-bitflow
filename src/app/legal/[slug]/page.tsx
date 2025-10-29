@@ -130,59 +130,53 @@ export default async function LegalPage({ params }: LegalPageProps) {
       {/* Hero - прозрачный с blur */}
       <div className="border-b border-border/50">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-12 md:py-16">
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-8">
             {/* Badges Row */}
             <div className="flex items-center gap-2">
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-background/15 backdrop-blur-md px-3 py-1.5">
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-background/15 backdrop-blur-md px-3 py-1.5 shadow-sm">
                 <FileText className="h-3.5 w-3.5 text-primary" />
                 <span className="text-xs font-semibold text-primary">Legal Document</span>
               </div>
               {document.isRequired && (
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 backdrop-blur-md px-3 py-1.5">
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 backdrop-blur-md px-3 py-1.5 shadow-sm">
                   <div className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                  <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">Required Reading</span>
+                  <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">Required</span>
                 </div>
               )}
             </div>
 
             {/* Title Section */}
             <div className="space-y-4 max-w-3xl">
-              <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight bg-gradient-to-br from-foreground via-foreground to-foreground/60 bg-clip-text text-transparent leading-[1.1]">
                 {document.title}
               </h1>
               
               {document.description && (
-                <p className="text-lg text-muted-foreground leading-relaxed">
+                <p className="text-lg md:text-xl text-muted-foreground/80 leading-relaxed font-light">
                   {document.description}
                 </p>
               )}
             </div>
 
-            {/* Meta Row */}
-            <div className="flex flex-wrap items-center gap-6 pt-2">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-background/15 backdrop-blur-md">
-                  <Calendar className="h-4 w-4" />
+            {/* Meta Row with Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-4 pt-4">
+              {/* Left: Meta Info */}
+              <div className="flex flex-wrap items-center gap-3 text-sm">
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <Calendar className="h-3.5 w-3.5 opacity-50" />
+                  <span className="text-xs">{document.publishedAt ? format(new Date(document.publishedAt), 'MMM d, yyyy') : 'N/A'}</span>
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] uppercase tracking-wider font-medium opacity-60">Published</span>
-                  <span className="text-xs font-medium text-foreground">{document.publishedAt ? format(new Date(document.publishedAt), 'MMM d, yyyy') : 'N/A'}</span>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-background/15 backdrop-blur-md">
-                  <Clock className="h-4 w-4" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] uppercase tracking-wider font-medium opacity-60">Updated</span>
-                  <span className="text-xs font-medium text-foreground">{format(new Date(document.updatedAt), 'MMM d, yyyy')}</span>
+                
+                <div className="h-3 w-px bg-border/50" />
+                
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <Clock className="h-3.5 w-3.5 opacity-50" />
+                  <span className="text-xs">Updated {format(new Date(document.updatedAt), 'MMM d, yyyy')}</span>
                 </div>
               </div>
-              
-              <div className="ml-auto">
-                <QuickActions />
-              </div>
+
+              {/* Right: Quick Actions */}
+              <QuickActions />
             </div>
           </div>
         </div>
