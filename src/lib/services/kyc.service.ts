@@ -263,18 +263,17 @@ export async function checkKycStatus(userId: string) {
     }
 
     // Get provider and check status
-    const providerId = (session.metadata as any)?.provider || 'kycaid'; // Get from metadata or default to kycaid
+    const providerId = (session.metadata as any)?.provider || 'kycaid';
     
-    if (!providerId || !session.kycaidVerificationId) {
-      // No verification ID yet - user hasn't completed the form
-      // Return PENDING with formUrl so they can complete it
+    // Must have at least applicantId to check status
+    if (!providerId || !session.kycaidApplicantId) {
       return {
         status: session.status,
         sessionId: session.id,
         formUrl: (session.metadata as any)?.formUrl,
         completedAt: session.completedAt,
         rejectionReason: session.rejectionReason,
-        message: 'Please complete the verification form'
+        message: 'KYC session created, please complete the form'
       };
     }
     
@@ -291,43 +290,120 @@ export async function checkKycStatus(userId: string) {
 
     // Initialize provider
     const secrets = await getIntegrationWithSecrets(providerId);
-    if (secrets?.apiKey) {
-      await provider.initialize({
-        apiKey: secrets.apiKey,
-        apiEndpoint: secrets.apiEndpoint || undefined,
-        ...secrets.config
-      });
-    }
-
-    // Poll provider for status
-    const result = await provider.getVerificationStatus(session.kycaidVerificationId);
-
-    // Update session if status changed
-    if (result.status !== session.status.toLowerCase()) {
-      const updatedSession = await prisma.kycSession.update({
-        where: { id: session.id },
-        data: {
-          status: result.status.toUpperCase() as any,
-          completedAt: result.completedAt || undefined,
-          rejectionReason: result.rejectionReason || undefined,
-          metadata: {
-            ...session.metadata as any,
-            lastChecked: new Date(),
-            providerResponse: result.metadata
-          }
-        }
-      });
-
-      console.log(`✅ KYC status updated: ${result.status}`);
-
+    if (!secrets?.apiKey) {
+      console.warn('⚠️ No API key found for KYC provider');
       return {
-        status: updatedSession.status,
-        sessionId: updatedSession.id,
-        completedAt: updatedSession.completedAt,
-        rejectionReason: updatedSession.rejectionReason,
-        formUrl: (updatedSession.metadata as any)?.formUrl,
-        message: getStatusMessage(updatedSession.status)
+        status: session.status,
+        sessionId: session.id,
+        formUrl: (session.metadata as any)?.formUrl,
+        message: 'Unable to check status - provider not configured'
       };
+    }
+    
+    await provider.initialize({
+      apiKey: secrets.apiKey,
+      apiEndpoint: secrets.apiEndpoint || undefined,
+      ...secrets.config
+    });
+
+    console.log(`🔍 Polling KYC status for applicant: ${session.kycaidApplicantId}`);
+
+    // Check if we have verificationId (form was submitted)
+    if (session.kycaidVerificationId) {
+      // Poll provider for verification status
+      console.log(`📊 Checking verification: ${session.kycaidVerificationId}`);
+      const result = await provider.getVerificationStatus(session.kycaidVerificationId);
+
+      // Update session if status changed
+      if (result.status !== session.status.toLowerCase()) {
+        const updatedSession = await prisma.kycSession.update({
+          where: { id: session.id },
+          data: {
+            status: result.status.toUpperCase() as any,
+            completedAt: result.completedAt || new Date(),
+            rejectionReason: result.rejectionReason || undefined,
+            metadata: {
+              ...session.metadata as any,
+              lastChecked: new Date(),
+              providerResponse: result.metadata
+            }
+          }
+        });
+
+        console.log(`✅ KYC status updated from ${session.status} to ${result.status.toUpperCase()}`);
+
+        return {
+          status: updatedSession.status,
+          sessionId: updatedSession.id,
+          completedAt: updatedSession.completedAt,
+          rejectionReason: updatedSession.rejectionReason,
+          formUrl: (updatedSession.metadata as any)?.formUrl,
+          message: getStatusMessage(updatedSession.status)
+        };
+      }
+
+      console.log(`ℹ️ KYC status unchanged: ${session.status}`);
+    } else {
+      // No verificationId yet - check applicant status
+      console.log(`📊 Checking applicant status (no verificationId yet)`);
+      const applicant = await provider.getApplicant(session.kycaidApplicantId);
+      
+      console.log(`📋 Applicant status: ${applicant.status}`);
+      
+      // Check if applicant has been verified (status changed)
+      if (applicant.metadata?.verificationStatus) {
+        const verificationStatus = applicant.metadata.verificationStatus.toLowerCase();
+        
+        if (verificationStatus === 'approved' && session.status !== 'APPROVED') {
+          const updatedSession = await prisma.kycSession.update({
+            where: { id: session.id },
+            data: {
+              status: 'APPROVED',
+              completedAt: new Date(),
+              metadata: {
+                ...session.metadata as any,
+                lastChecked: new Date(),
+                applicantResponse: applicant.metadata
+              }
+            }
+          });
+
+          console.log(`✅ KYC status updated to APPROVED (from applicant status)`);
+
+          return {
+            status: updatedSession.status,
+            sessionId: updatedSession.id,
+            completedAt: updatedSession.completedAt,
+            formUrl: (updatedSession.metadata as any)?.formUrl,
+            message: getStatusMessage(updatedSession.status)
+          };
+        } else if (verificationStatus === 'declined' && session.status !== 'REJECTED') {
+          const updatedSession = await prisma.kycSession.update({
+            where: { id: session.id },
+            data: {
+              status: 'REJECTED',
+              completedAt: new Date(),
+              rejectionReason: 'Verification declined',
+              metadata: {
+                ...session.metadata as any,
+                lastChecked: new Date(),
+                applicantResponse: applicant.metadata
+              }
+            }
+          });
+
+          console.log(`✅ KYC status updated to REJECTED (from applicant status)`);
+
+          return {
+            status: updatedSession.status,
+            sessionId: updatedSession.id,
+            completedAt: updatedSession.completedAt,
+            rejectionReason: updatedSession.rejectionReason,
+            formUrl: (updatedSession.metadata as any)?.formUrl,
+            message: getStatusMessage(updatedSession.status)
+          };
+        }
+      }
     }
 
     return {

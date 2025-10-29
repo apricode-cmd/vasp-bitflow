@@ -85,6 +85,7 @@ export default function KycPage(): React.ReactElement {
   const [grouped, setGrouped] = useState<Record<string, KycField[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [consents, setConsents] = useState({
@@ -111,12 +112,18 @@ export default function KycPage(): React.ReactElement {
     ]);
   }, []);
 
-  const fetchKycStatus = async () => {
+  const fetchKycStatus = async (showToast = false) => {
     try {
+      if (showToast) {
+        setIsRefreshing(true);
+        toast.loading('Checking verification status...', { id: 'kyc-refresh' });
+      }
+      
       const response = await fetch('/api/kyc/status');
       if (response.ok) {
         const data = await response.json();
         console.log('📊 KYC Status Response:', data); // Debug log
+        
         if (data.success && data.status !== 'NOT_STARTED') {
           setKycSession({
             id: data.sessionId || '',
@@ -126,10 +133,29 @@ export default function KycPage(): React.ReactElement {
             rejectionReason: data.rejectionReason || null,
             formUrl: data.formUrl || null,
           });
+          
+          if (showToast) {
+            toast.success(`Status updated: ${data.status}`, { id: 'kyc-refresh' });
+          }
+        } else if (showToast) {
+          toast.info('No active verification found', { id: 'kyc-refresh' });
+        }
+      } else {
+        const errorData = await response.json();
+        console.error('❌ KYC status error:', errorData);
+        if (showToast) {
+          toast.error(errorData.error || 'Failed to check status', { id: 'kyc-refresh' });
         }
       }
     } catch (error) {
       console.error('Failed to fetch KYC status:', error);
+      if (showToast) {
+        toast.error('Network error - please try again', { id: 'kyc-refresh' });
+      }
+    } finally {
+      if (showToast) {
+        setIsRefreshing(false);
+      }
     }
   };
 
@@ -1346,11 +1372,21 @@ export default function KycPage(): React.ReactElement {
             <div className="pt-4 border-t">
               <Button 
                 variant="outline" 
-                onClick={() => fetchKycStatus()} 
+                onClick={() => fetchKycStatus(true)}
+                disabled={isRefreshing}
                 className="w-full hover:bg-primary/5 hover:border-primary/30 transition-all"
               >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh Status
+                {isRefreshing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Checking...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh Status
+                  </>
+                )}
               </Button>
             </div>
           </CardContent>
