@@ -42,7 +42,7 @@ export function LegalPageClient({ htmlContent }: LegalPageClientProps) {
           <a 
             href="#${id}" 
             data-level="${level}"
-            class="toc-link block py-1.5 px-3 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-all ${level === 2 ? 'pl-6' : level === 3 ? 'pl-9' : ''}"
+            class="toc-link block py-1 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-md transition-all ${level === 2 ? 'pl-4' : level === 3 ? 'pl-6' : ''}"
           >
             ${text}
           </a>
