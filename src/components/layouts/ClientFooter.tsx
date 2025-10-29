@@ -10,40 +10,44 @@ import Link from 'next/link';
 import { useSettings } from '@/components/providers/settings-provider';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ApricodeLogo } from '@/components/icons/ApricodeLogo';
-import { Mail, Phone } from 'lucide-react';
+import { Mail, Phone, MessageCircle, Copy, CheckCircle } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Button } from '@/components/ui/button';
+import { useState } from 'react';
+import { toast } from 'sonner';
 
 export function ClientFooter(): React.ReactElement {
   const { settings, loading } = useSettings();
   const currentYear = new Date().getFullYear();
   const version = process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0';
+  const [copiedEmail, setCopiedEmail] = useState(false);
+  const [copiedPhone, setCopiedPhone] = useState(false);
+
+  const handleCopyEmail = () => {
+    if (settings.supportEmail) {
+      navigator.clipboard.writeText(settings.supportEmail);
+      setCopiedEmail(true);
+      toast.success('Email copied to clipboard');
+      setTimeout(() => setCopiedEmail(false), 2000);
+    }
+  };
+
+  const handleCopyPhone = () => {
+    if (settings.supportPhone) {
+      navigator.clipboard.writeText(settings.supportPhone);
+      setCopiedPhone(true);
+      toast.success('Phone copied to clipboard');
+      setTimeout(() => setCopiedPhone(false), 2000);
+    }
+  };
 
   return (
     <footer className="border-t bg-card/30 backdrop-blur-sm mt-auto">
-      <div className="container mx-auto px-4 py-8">
-        {/* Top Section: Contact Info */}
-        {(settings.supportEmail || settings.supportPhone) && (
-          <div className="flex flex-wrap items-center justify-center gap-6 pb-6 mb-6 border-b border-border/50">
-            {settings.supportEmail && (
-              <a 
-                href={`mailto:${settings.supportEmail}`}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
-              >
-                <Mail className="h-4 w-4" />
-                <span>{settings.supportEmail}</span>
-              </a>
-            )}
-            {settings.supportPhone && (
-              <a 
-                href={`tel:${settings.supportPhone}`}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
-              >
-                <Phone className="h-4 w-4" />
-                <span>{settings.supportPhone}</span>
-              </a>
-            )}
-          </div>
-        )}
-
+      <div className="container mx-auto px-4 py-6">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           {/* Left: Copyright */}
           <div className="flex items-center gap-1">
@@ -74,12 +78,95 @@ export function ClientFooter(): React.ReactElement {
             >
               Privacy
             </Link>
-            <Link 
-              href="/dashboard" 
-              className="hover:text-foreground transition"
-            >
-              Support
-            </Link>
+            
+            {/* Support Popover */}
+            {(settings.supportEmail || settings.supportPhone) ? (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className="hover:text-foreground transition cursor-pointer flex items-center gap-1 group">
+                    <MessageCircle className="h-3.5 w-3.5 group-hover:text-primary transition" />
+                    <span>Support</span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent 
+                  side="top" 
+                  align="center"
+                  className="w-72 p-4 animate-in slide-in-from-bottom-2"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 pb-2 border-b">
+                      <MessageCircle className="h-4 w-4 text-primary" />
+                      <h4 className="font-semibold text-sm">Contact Support</h4>
+                    </div>
+                    
+                    {settings.supportEmail && (
+                      <div className="space-y-1.5">
+                        <p className="text-xs text-muted-foreground">Email</p>
+                        <div className="flex items-center gap-2">
+                          <a 
+                            href={`mailto:${settings.supportEmail}`}
+                            className="flex items-center gap-2 text-sm flex-1 group"
+                          >
+                            <Mail className="h-4 w-4 text-primary flex-shrink-0" />
+                            <span className="group-hover:text-primary transition truncate">
+                              {settings.supportEmail}
+                            </span>
+                          </a>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            onClick={handleCopyEmail}
+                          >
+                            {copiedEmail ? (
+                              <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {settings.supportPhone && (
+                      <div className="space-y-1.5">
+                        <p className="text-xs text-muted-foreground">Phone</p>
+                        <div className="flex items-center gap-2">
+                          <a 
+                            href={`tel:${settings.supportPhone}`}
+                            className="flex items-center gap-2 text-sm flex-1 group"
+                          >
+                            <Phone className="h-4 w-4 text-primary flex-shrink-0" />
+                            <span className="group-hover:text-primary transition">
+                              {settings.supportPhone}
+                            </span>
+                          </a>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            onClick={handleCopyPhone}
+                          >
+                            {copiedPhone ? (
+                              <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            ) : (
+              <Link 
+                href="/dashboard" 
+                className="hover:text-foreground transition"
+              >
+                Support
+              </Link>
+            )}
           </div>
 
           {/* Right: Developer & Version */}
