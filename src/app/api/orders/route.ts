@@ -11,6 +11,7 @@ import { prisma } from '@/lib/prisma';
 import { createOrderSchema } from '@/lib/validations/order';
 import { rateManagementService } from '@/lib/services/rate-management.service';
 import { calculateOrderTotal, validateOrderLimits } from '@/lib/utils/order-calculations';
+import { orderLimitService } from '@/lib/services/order-limit.service';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 import { z } from 'zod';
 
@@ -31,19 +32,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Validate input
     const validatedData = createOrderSchema.parse(body);
-
-    // Check KYC status - MUST be APPROVED
-    const kycSession = await prisma.kycSession.findUnique({
-      where: { userId },
-      select: { status: true }
-    });
-
-    if (!kycSession || kycSession.status !== 'APPROVED') {
-      return NextResponse.json(
-        { error: 'KYC verification must be approved before creating orders' },
-        { status: 403 }
-      );
-    }
 
     // Get trading pair with limits
     const tradingPair = await prisma.tradingPair.findUnique({
@@ -66,20 +54,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Validate amount limits
-    const limitsCheck = validateOrderLimits(
-      validatedData.cryptoAmount,
-      tradingPair.minCryptoAmount,
-      tradingPair.maxCryptoAmount
-    );
-
-    if (!limitsCheck.valid) {
-      return NextResponse.json(
-        { error: limitsCheck.error },
-        { status: 400 }
-      );
-    }
-
     // Get current exchange rate (includes manual overrides)
     const rate = await rateManagementService.getCurrentRate(
       validatedData.currencyCode,
@@ -92,6 +66,40 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       rate,
       tradingPair.feePercent / 100 // Convert percentage to decimal
     );
+
+    // Check order limits based on KYC status and 24h limit
+    const limitCheck = await orderLimitService.checkOrderLimit(
+      userId,
+      calculation.totalFiat
+    );
+
+    if (!limitCheck.allowed) {
+      return NextResponse.json(
+        { 
+          error: limitCheck.message,
+          details: {
+            used: limitCheck.used,
+            limit: limitCheck.limit,
+            remaining: limitCheck.remaining
+          }
+        },
+        { status: 403 }
+      );
+    }
+
+    // Validate crypto amount limits
+    const cryptoLimitsCheck = validateOrderLimits(
+      validatedData.cryptoAmount,
+      tradingPair.minCryptoAmount,
+      tradingPair.maxCryptoAmount
+    );
+
+    if (!cryptoLimitsCheck.valid) {
+      return NextResponse.json(
+        { error: cryptoLimitsCheck.error },
+        { status: 400 }
+      );
+    }
 
     // Generate unique payment reference
     const timestamp = Date.now().toString(36).toUpperCase();

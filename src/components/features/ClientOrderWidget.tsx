@@ -118,6 +118,15 @@ export function ClientOrderWidget() {
   const [tradingPair, setTradingPair] = useState<TradingPair | null>(null); // Current trading pair
   const [userWallets, setUserWallets] = useState<UserWallet[]>([]); // User's saved wallets
 
+  // Order limits (for non-KYC users)
+  const [limitInfo, setLimitInfo] = useState<{
+    used: number;
+    limit: number;
+    remaining: number;
+    isKycApproved: boolean;
+    kycRequired: boolean;
+  } | null>(null);
+
   // Form state
   const [selectedCrypto, setSelectedCrypto] = useState<string>('');
   const [selectedFiat, setSelectedFiat] = useState<string>('');
@@ -132,20 +141,22 @@ export function ClientOrderWidget() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [cryptoRes, fiatRes, blockchainRes, methodsRes, walletsRes] = await Promise.all([
+        const [cryptoRes, fiatRes, blockchainRes, methodsRes, walletsRes, limitRes] = await Promise.all([
           fetch('/api/admin/resources/currencies?active=true&includeBlockchains=true'),
           fetch('/api/admin/resources/fiat-currencies?active=true'),
           fetch('/api/blockchains?active=true'),
           fetch('/api/admin/payment-methods'),
-          fetch('/api/wallets')
+          fetch('/api/wallets'),
+          fetch('/api/orders/limit-check')
         ]);
 
-        const [cryptoData, fiatData, blockchainData, methodsData, walletsData] = await Promise.all([
+        const [cryptoData, fiatData, blockchainData, methodsData, walletsData, limitData] = await Promise.all([
           cryptoRes.json(),
           fiatRes.json(),
           blockchainRes.json(),
           methodsRes.json(),
-          walletsRes.json()
+          walletsRes.json(),
+          limitRes.json()
         ]);
 
         // Set cryptocurrencies
@@ -212,6 +223,11 @@ export function ClientOrderWidget() {
         // Set user wallets
         if (walletsData.wallets && Array.isArray(walletsData.wallets)) {
           setUserWallets(walletsData.wallets);
+        }
+
+        // Set limit info
+        if (limitData.success) {
+          setLimitInfo(limitData.data);
         }
 
       } catch (error) {

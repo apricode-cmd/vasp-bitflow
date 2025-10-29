@@ -2,6 +2,7 @@
  * User Registration API Route
  * 
  * Handles new user registration with profile creation.
+ * Checks if registration is enabled in system settings.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -13,6 +14,18 @@ import { z } from 'zod';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
+    // Check if registration is enabled
+    const registrationSetting = await prisma.systemSettings.findUnique({
+      where: { key: 'registrationEnabled' }
+    });
+
+    if (registrationSetting?.value === 'false') {
+      return NextResponse.json(
+        { error: 'Registration is currently disabled. Please contact support.' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
 
     // Validate input data

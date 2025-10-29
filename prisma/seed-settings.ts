@@ -125,6 +125,14 @@ const defaultSettings = [
     isPublic: true
   },
   {
+    key: 'unverifiedUserLimit',
+    value: '1000',
+    type: 'NUMBER' as const,
+    category: 'system',
+    description: 'Maximum EUR amount for unverified users per 24 hours (if kycRequired is false)',
+    isPublic: true
+  },
+  {
     key: 'emailNotifications',
     value: 'true',
     type: 'BOOLEAN' as const,
