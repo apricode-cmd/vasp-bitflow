@@ -624,7 +624,7 @@ export async function downloadKycReport(sessionId: string): Promise<Buffer> {
     }
 
     if (!session.kycaidVerificationId) {
-      throw new Error('No verification ID - cannot download report');
+      throw new Error('No verification ID - report not available yet');
     }
 
     if (session.status !== 'APPROVED' && session.status !== 'REJECTED') {
@@ -636,13 +636,18 @@ export async function downloadKycReport(sessionId: string): Promise<Buffer> {
     const provider = integrationRegistry.getProvider(providerId);
     
     if (!provider) {
-      throw new Error(`Provider "${providerId}" not found`);
+      throw new Error(`KYC provider "${providerId}" not found`);
     }
 
     // Initialize provider
     const secrets = await getIntegrationWithSecrets(providerId);
     if (!secrets?.apiKey) {
-      throw new Error('Provider not configured');
+      throw new Error('KYCAID is not configured. Please set API key in /admin/integrations');
+    }
+
+    // Check if API key is placeholder
+    if (secrets.apiKey.includes('your-kycaid-api-key') || secrets.apiKey.includes('placeholder')) {
+      throw new Error('KYCAID API key is not configured. Please set a valid API key in /admin/integrations');
     }
 
     await provider.initialize({
@@ -679,6 +684,16 @@ export async function downloadKycReport(sessionId: string): Promise<Buffer> {
     return reportBuffer;
   } catch (error: any) {
     console.error('❌ Failed to download KYC report:', error);
+    
+    // Provide user-friendly error messages
+    if (error.message.includes('502')) {
+      throw new Error('KYCAID service is temporarily unavailable. Please try again later.');
+    }
+    
+    if (error.message.includes('401') || error.message.includes('403')) {
+      throw new Error('Invalid KYCAID API credentials. Please check integration settings.');
+    }
+    
     throw new Error(error.message || 'Failed to download KYC report');
   }
 }

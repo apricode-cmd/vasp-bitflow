@@ -595,15 +595,34 @@ export default function AdminKycPage(): JSX.Element {
                     View User
                   </Link>
                 </DropdownMenuItem>
-                {session.kycaidVerificationId && (
+                {(session.status === 'APPROVED' || session.status === 'REJECTED') && session.kycaidVerificationId && (
                   <DropdownMenuItem
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation();
-                      window.open(`https://kycaid.com/verifications/${session.kycaidVerificationId}`, '_blank');
+                      try {
+                        const response = await fetch(`/api/admin/kyc/${session.id}/download-report`);
+                        if (!response.ok) {
+                          const error = await response.json();
+                          toast.error(error.error || 'Failed to download report');
+                          return;
+                        }
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `kyc-report-${session.id}.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                        toast.success('Report downloaded');
+                      } catch (error) {
+                        toast.error('Failed to download report');
+                      }
                     }}
                   >
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Open in KYCAID
+                    <FileText className="h-4 w-4 mr-2" />
+                    Download Report
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
@@ -787,16 +806,6 @@ export default function AdminKycPage(): JSX.Element {
                             </p>
                           </div>
                         </div>
-                        {selectedSession.kycaidVerificationId && selectedSession.provider.service === 'kycaid' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => window.open(`https://kycaid.com/verifications/${selectedSession.kycaidVerificationId}`, '_blank')}
-                          >
-                            <ExternalLink className="h-4 w-4 mr-2" />
-                            Open in KYCAID
-                          </Button>
-                        )}
                       </div>
                       {selectedSession.kycaidVerificationId && (
                         <>
@@ -1165,31 +1174,6 @@ export default function AdminKycPage(): JSX.Element {
                       ))}
                     </div>
                   </ScrollArea>
-                </div>
-              )}
-
-              {/* KYCAID Integration */}
-              {selectedSession.kycaidVerificationId && (
-                <div>
-                  <h3 className="text-sm font-semibold mb-3">KYCAID Integration</h3>
-                  <Card>
-                    <div className="p-4">
-                      <div className="flex items-center justify-between">
-                      <div>
-                          <p className="text-sm text-muted-foreground">Verification ID</p>
-                          <p className="font-mono text-sm">{selectedSession.kycaidVerificationId}</p>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.open(`https://kycaid.com/verifications/${selectedSession.kycaidVerificationId}`, '_blank')}
-                        >
-                          <ExternalLink className="h-4 w-4 mr-2" />
-                          Open in KYCAID
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
                 </div>
               )}
 

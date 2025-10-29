@@ -14,10 +14,13 @@ export async function GET(
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   try {
+    console.log('📄 Download report request for session:', params.id);
+
     // Check authentication and admin role
     const session = await auth();
     
     if (!session?.user) {
+      console.log('❌ Unauthorized - no session');
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -25,6 +28,7 @@ export async function GET(
     }
 
     if (session.user.role !== 'ADMIN') {
+      console.log('❌ Forbidden - user role:', session.user.role);
       return NextResponse.json(
         { error: 'Forbidden - Admin access required' },
         { status: 403 }
@@ -38,6 +42,8 @@ export async function GET(
     // Download report
     const reportBuffer = await downloadKycReport(sessionId);
 
+    console.log(`✅ Report downloaded successfully: ${reportBuffer.length} bytes`);
+
     // Return PDF
     return new NextResponse(reportBuffer, {
       status: 200,
@@ -49,11 +55,14 @@ export async function GET(
     });
   } catch (error: any) {
     console.error('❌ Download KYC report failed:', error);
+    console.error('Error stack:', error.stack);
     
+    // Return detailed error for debugging
     return NextResponse.json(
       { 
         success: false,
-        error: error.message || 'Failed to download KYC report'
+        error: error.message || 'Failed to download KYC report',
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
       },
       { status: 500 }
     );
