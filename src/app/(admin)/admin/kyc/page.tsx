@@ -1204,7 +1204,7 @@ export default function AdminKycPage(): JSX.Element {
                             <div className="p-3 space-y-2">
                               <div className="flex items-center justify-between">
                                 <Badge variant={docData?.status === 'valid' ? 'default' : 'secondary'}>
-                                  {docData?.type || 'Unknown'}
+                                  {docData?.type?.replace('_', ' ') || 'Unknown'}
                                 </Badge>
                                 {docData?.status && (
                                   <Badge variant={docData.status === 'valid' ? 'default' : 'destructive'} className="text-xs">
@@ -1214,21 +1214,62 @@ export default function AdminKycPage(): JSX.Element {
                               </div>
                               
                               {/* Document Details */}
-                              {docData?.document_number && (
-                                <p className="text-xs text-muted-foreground">
-                                  No: {docData.document_number}
-                                </p>
-                              )}
-                              
-                              {(docData?.issue_date || docData?.expiry_date) && (
-                                <p className="text-xs text-muted-foreground">
-                                  {docData.issue_date && `Issued: ${docData.issue_date}`}
-                                  {docData.expiry_date && ` • Expires: ${docData.expiry_date}`}
-                                </p>
-                              )}
+                              <div className="space-y-1 text-xs">
+                                {docData?.document_number && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Number:</span>
+                                    <span className="font-mono font-medium">{docData.document_number}</span>
+                                  </div>
+                                )}
+                                
+                                {docData?.issue_date && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Issued:</span>
+                                    <span className="font-medium">{docData.issue_date}</span>
+                                  </div>
+                                )}
+                                
+                                {docData?.expiry_date && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Expires:</span>
+                                    <span className="font-medium">{docData.expiry_date}</span>
+                                  </div>
+                                )}
+                                
+                                {docData?.issuing_authority && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Issuer:</span>
+                                    <span className="font-medium">{docData.issuing_authority}</span>
+                                  </div>
+                                )}
+                                
+                                {docData?.provider && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Provider:</span>
+                                    <span className="font-medium">{docData.provider}</span>
+                                  </div>
+                                )}
+                                
+                                {docData?.created_at && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Uploaded:</span>
+                                    <span className="font-medium">{new Date(docData.created_at).toLocaleDateString()}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              <Separator className="my-2" />
+
+                              {/* Image Count Info */}
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span>{imageUrls.length} image{imageUrls.length !== 1 ? 's' : ''} available</span>
+                                {docData?.front_side_size && (
+                                  <span>{Math.round(docData.front_side_size / 1024)} KB</span>
+                                )}
+                              </div>
 
                               {/* View All Images Button */}
-                              {imageUrls.length > 1 && (
+                              {imageUrls.length > 0 && (
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -1239,10 +1280,42 @@ export default function AdminKycPage(): JSX.Element {
                                     if (newTab) {
                                       newTab.document.write(`
                                         <html>
-                                          <head><title>Document Images - ${docData?.type}</title></head>
-                                          <body style="background: #000; margin: 0; padding: 20px; text-align: center;">
-                                            ${imageUrls.map(url => `
-                                              <img src="${url}" style="max-width: 100%; margin: 10px auto; display: block; box-shadow: 0 4px 6px rgba(0,0,0,0.3);" />
+                                          <head>
+                                            <title>Document Images - ${docData?.type}</title>
+                                            <style>
+                                              body {
+                                                background: #000;
+                                                margin: 0;
+                                                padding: 20px;
+                                                text-align: center;
+                                                font-family: system-ui;
+                                              }
+                                              h1 {
+                                                color: #fff;
+                                                margin-bottom: 20px;
+                                              }
+                                              img {
+                                                max-width: 100%;
+                                                margin: 10px auto;
+                                                display: block;
+                                                box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+                                                border-radius: 8px;
+                                              }
+                                              .info {
+                                                color: #999;
+                                                margin-bottom: 20px;
+                                                font-size: 14px;
+                                              }
+                                            </style>
+                                          </head>
+                                          <body>
+                                            <h1>${docData?.type?.replace('_', ' ')} - ${docData?.document_number || 'Document'}</h1>
+                                            <div class="info">
+                                              ${docData?.issue_date ? `Issued: ${docData.issue_date}` : ''}
+                                              ${docData?.expiry_date ? ` • Expires: ${docData.expiry_date}` : ''}
+                                            </div>
+                                            ${imageUrls.map((url, idx) => `
+                                              <img src="${url}" alt="Document image ${idx + 1}" />
                                             `).join('')}
                                           </body>
                                         </html>
