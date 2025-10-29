@@ -70,6 +70,16 @@ interface BlockchainNetwork {
   isActive: boolean;
 }
 
+interface UserWallet {
+  id: string;
+  currencyCode: string;
+  blockchainCode: string;
+  address: string;
+  label: string | null;
+  currency: { code: string; name: string; symbol: string };
+  blockchain: { code: string; name: string };
+}
+
 interface ExchangeRates {
   [key: string]: { [key: string]: number };
   updatedAt: string;
@@ -93,6 +103,7 @@ export function ClientOrderWidget() {
   const [rates, setRates] = useState<ExchangeRates | null>(null);
   const [blockchainNetworks, setBlockchainNetworks] = useState<BlockchainNetwork[]>([]);
   const [tradingPairFee, setTradingPairFee] = useState<number>(0.015); // Default 1.5%
+  const [userWallets, setUserWallets] = useState<UserWallet[]>([]); // User's saved wallets
 
   // Form state
   const [selectedCrypto, setSelectedCrypto] = useState<string>('');
@@ -102,23 +113,27 @@ export function ClientOrderWidget() {
   const [inputAmount, setInputAmount] = useState<string>(''); // Unified input
   const [inputMode, setInputMode] = useState<'crypto' | 'fiat'>('fiat'); // Toggle between crypto/fiat
   const [walletAddress, setWalletAddress] = useState<string>('');
+  const [selectedWalletId, setSelectedWalletId] = useState<string>('new'); // 'new' or wallet ID
+  const [newWalletLabel, setNewWalletLabel] = useState<string>(''); // Label for new wallet
 
   // Fetch initial data
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [cryptoRes, fiatRes, blockchainRes, methodsRes] = await Promise.all([
+        const [cryptoRes, fiatRes, blockchainRes, methodsRes, walletsRes] = await Promise.all([
           fetch('/api/admin/resources/currencies?active=true&includeBlockchains=true'),
           fetch('/api/admin/resources/fiat-currencies?active=true'),
           fetch('/api/blockchains?active=true'),
-          fetch('/api/admin/payment-methods')
+          fetch('/api/admin/payment-methods'),
+          fetch('/api/wallets')
         ]);
 
-        const [cryptoData, fiatData, blockchainData, methodsData] = await Promise.all([
+        const [cryptoData, fiatData, blockchainData, methodsData, walletsData] = await Promise.all([
           cryptoRes.json(),
           fiatRes.json(),
           blockchainRes.json(),
-          methodsRes.json()
+          methodsRes.json(),
+          walletsRes.json()
         ]);
 
         // Set cryptocurrencies
@@ -180,6 +195,11 @@ export function ClientOrderWidget() {
             setSelectedPaymentMethod(availableMethods[0].code);
             setSelectedFiat(availableMethods[0].currency);
           }
+        }
+
+        // Set user wallets
+        if (walletsData.wallets && Array.isArray(walletsData.wallets)) {
+          setUserWallets(walletsData.wallets);
         }
 
       } catch (error) {
@@ -247,6 +267,59 @@ export function ClientOrderWidget() {
 
     fetchTradingPairFee();
   }, [selectedCrypto, selectedFiat]);
+
+  // Auto-select blockchain and wallet when crypto changes
+  useEffect(() => {
+    if (!selectedCrypto || !config) return;
+
+    const selectedCurrency = config.currencies.find(c => c.code === selectedCrypto);
+    if (!selectedCurrency?.blockchainNetworks) return;
+
+    const availableBlockchains = selectedCurrency.blockchainNetworks
+      .filter(bn => bn.blockchain.isActive)
+      .map(bn => bn.blockchain.code);
+
+    // Auto-select first blockchain if only one available
+    if (availableBlockchains.length === 1) {
+      setSelectedNetwork(availableBlockchains[0]);
+    } else if (availableBlockchains.length > 1) {
+      // Select first blockchain by default
+      setSelectedNetwork(availableBlockchains[0]);
+    } else {
+      setSelectedNetwork('');
+    }
+
+    // Try to find a saved wallet for this crypto
+    const matchingWallets = userWallets.filter(w => 
+      w.currencyCode === selectedCrypto && 
+      availableBlockchains.includes(w.blockchainCode)
+    );
+
+    if (matchingWallets.length > 0) {
+      // Auto-select first matching wallet
+      setSelectedWalletId(matchingWallets[0].id);
+      setWalletAddress(matchingWallets[0].address);
+      setSelectedNetwork(matchingWallets[0].blockchainCode);
+    } else {
+      // Reset to "new" if no matching wallet
+      setSelectedWalletId('new');
+      setWalletAddress('');
+    }
+  }, [selectedCrypto, config, userWallets]);
+
+  // Update wallet address when selected wallet changes
+  useEffect(() => {
+    if (selectedWalletId === 'new') {
+      setWalletAddress('');
+      return;
+    }
+
+    const selectedWallet = userWallets.find(w => w.id === selectedWalletId);
+    if (selectedWallet) {
+      setWalletAddress(selectedWallet.address);
+      setSelectedNetwork(selectedWallet.blockchainCode);
+    }
+  }, [selectedWalletId, userWallets]);
 
   // Get current rate
   const currentRate = rates && selectedCrypto && selectedFiat
@@ -373,6 +446,32 @@ export function ClientOrderWidget() {
     setSubmitting(true);
 
     try {
+      // If user entered a new wallet address and label, save it
+      if (selectedWalletId === 'new' && walletAddress && newWalletLabel) {
+        try {
+          const saveWalletRes = await fetch('/api/wallets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              currencyCode: selectedCrypto,
+              blockchainCode: selectedNetwork,
+              address: walletAddress,
+              label: newWalletLabel
+            })
+          });
+
+          if (saveWalletRes.ok) {
+            const savedWallet = await saveWalletRes.json();
+            // Update local state
+            setUserWallets(prev => [savedWallet, ...prev]);
+            toast.success('Wallet address saved for future use');
+          }
+        } catch (error) {
+          // Non-critical error, continue with order creation
+          console.error('Failed to save wallet:', error);
+        }
+      }
+
       const response = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -650,16 +749,123 @@ export function ClientOrderWidget() {
           </div>
 
           {/* Wallet Address */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <Label className="flex items-center gap-2">
               <Wallet className="h-4 w-4" />
               Your Wallet Address *
             </Label>
-            <Input
-              placeholder={`Enter your ${selectedCrypto} wallet address`}
-              value={walletAddress}
-              onChange={(e) => setWalletAddress(e.target.value)}
-            />
+
+            {/* Filter wallets for selected crypto and blockchain */}
+            {(() => {
+              const matchingWallets = userWallets.filter(w => 
+                w.currencyCode === selectedCrypto && 
+                (w.blockchainCode === selectedNetwork || !selectedNetwork)
+              );
+
+              return matchingWallets.length > 0 ? (
+                <div className="space-y-3">
+                  {/* Saved Wallets */}
+                  <div className="space-y-2">
+                    {matchingWallets.map((wallet) => (
+                      <label
+                        key={wallet.id}
+                        className={`
+                          flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all
+                          ${selectedWalletId === wallet.id 
+                            ? 'border-primary bg-primary/5' 
+                            : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                          }
+                        `}
+                      >
+                        <input
+                          type="radio"
+                          name="wallet"
+                          value={wallet.id}
+                          checked={selectedWalletId === wallet.id}
+                          onChange={() => setSelectedWalletId(wallet.id)}
+                          className="mt-1 h-4 w-4 text-primary"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">
+                              {wallet.label || `${wallet.currency.symbol} Wallet`}
+                            </span>
+                            <Badge variant="secondary" className="text-xs">
+                              {wallet.blockchain.name}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground font-mono mt-1 break-all">
+                            {wallet.address}
+                          </p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+
+                  {/* Add New Wallet Option */}
+                  <label
+                    className={`
+                      flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all
+                      ${selectedWalletId === 'new' 
+                        ? 'border-primary bg-primary/5' 
+                        : 'border-dashed border-border hover:border-primary/50 hover:bg-muted/50'
+                      }
+                    `}
+                  >
+                    <input
+                      type="radio"
+                      name="wallet"
+                      value="new"
+                      checked={selectedWalletId === 'new'}
+                      onChange={() => setSelectedWalletId('new')}
+                      className="mt-1 h-4 w-4 text-primary"
+                    />
+                    <div className="flex-1">
+                      <span className="font-medium text-sm">Use a different address</span>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Enter a new wallet address manually
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* New Address Input (shown when "new" is selected) */}
+                  {selectedWalletId === 'new' && (
+                    <div className="space-y-2 pl-7 animate-in slide-in-from-top-2">
+                      <Input
+                        placeholder={`Enter your ${selectedCrypto} wallet address`}
+                        value={walletAddress}
+                        onChange={(e) => setWalletAddress(e.target.value)}
+                      />
+                      <Input
+                        placeholder="Wallet label (optional, e.g., 'Hardware Wallet')"
+                        value={newWalletLabel}
+                        onChange={(e) => setNewWalletLabel(e.target.value)}
+                        className="text-sm"
+                      />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // No saved wallets - show input directly
+                <div className="space-y-2">
+                  <Input
+                    placeholder={`Enter your ${selectedCrypto} wallet address`}
+                    value={walletAddress}
+                    onChange={(e) => {
+                      setWalletAddress(e.target.value);
+                      setSelectedWalletId('new');
+                    }}
+                  />
+                  <Input
+                    placeholder="Wallet label (optional, e.g., 'Hardware Wallet')"
+                    value={newWalletLabel}
+                    onChange={(e) => setNewWalletLabel(e.target.value)}
+                    className="text-sm"
+                  />
+                </div>
+              );
+            })()}
+
             <p className="text-xs text-muted-foreground">
               <AlertCircle className="inline h-3 w-3 mr-1" />
               Cryptocurrency will be sent to this address after payment confirmation

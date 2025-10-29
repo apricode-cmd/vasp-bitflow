@@ -1311,6 +1311,7 @@ model UserKycLevel {
 model Integration {
   id          String    @id @default(cuid())
   service     String    @unique // coingecko, kycaid, resend, etc.
+  category    String    @default("RATES") // KYC, RATES, EMAIL, PAYMENT, etc.
   isEnabled   Boolean   @default(false)
   status      String    @default("inactive") // active, inactive, error
   apiKey      String? // Encrypted API key
@@ -1322,6 +1323,7 @@ model Integration {
   updatedAt   DateTime  @updatedAt
 
   @@index([service])
+  @@index([category])
   @@index([isEnabled])
   @@index([status])
 }

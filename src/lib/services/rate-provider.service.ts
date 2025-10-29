@@ -7,6 +7,8 @@
 
 import { prisma } from '@/lib/prisma';
 import { coinGeckoService } from './coingecko';
+import { integrationRegistry } from '@/lib/integrations';
+import { IntegrationCategory } from '@/lib/integrations/types';
 
 export interface ExchangeRates {
   [crypto: string]: { [fiat: string]: number };
@@ -18,9 +20,21 @@ class RateProviderService {
    */
   async getActiveProvider(): Promise<{ service: string; apiKey: string | null } | null> {
     try {
+      // Get all RATES providers from registry
+      const ratesProviders = integrationRegistry.getProvidersByCategory(IntegrationCategory.RATES);
+      
+      if (ratesProviders.length === 0) {
+        console.warn('⚠️ No RATES providers registered in IntegrationRegistry');
+        return null;
+      }
+
+      // Get provider IDs from registry
+      const providerIds = ratesProviders.map(p => p.providerId);
+
+      // Find active provider in database
       const provider = await prisma.integration.findFirst({
         where: {
-          category: 'RATES',
+          service: { in: providerIds }, // Only check registered RATES providers
           isEnabled: true,
           status: 'active'
         },
@@ -30,8 +44,11 @@ class RateProviderService {
       });
 
       if (!provider) {
+        console.warn('⚠️ No active RATES provider found in database. Available providers:', providerIds);
         return null;
       }
+
+      console.log('✅ Active rate provider:', provider.service);
 
       return {
         service: provider.service,
