@@ -33,7 +33,7 @@ export class OrderLimitService {
         prisma.systemSettings.findUnique({ where: { key: 'unverifiedUserLimit' } })
       ]);
 
-      const kycRequired = kycRequiredSetting?.value === 'true';
+      const kycRequired = kycRequiredSetting?.value !== 'false'; // Default true if not set
       const unverifiedLimit = parseFloat(unverifiedLimitSetting?.value || '1000');
 
       // Get user with KYC status
@@ -41,12 +41,8 @@ export class OrderLimitService {
         where: { id: userId },
         include: {
           kycSession: {
-            where: {
-              status: 'APPROVED'
-            },
-            take: 1,
-            orderBy: {
-              createdAt: 'desc'
+            select: {
+              status: true
             }
           }
         }
@@ -62,7 +58,7 @@ export class OrderLimitService {
         };
       }
 
-      const isKycApproved = user.kycSession && user.kycSession.length > 0 && user.kycSession[0].status === 'APPROVED';
+      const isKycApproved = user.kycSession?.status === 'APPROVED';
 
       // If KYC is mandatory and user is not approved
       if (kycRequired && !isKycApproved) {
@@ -88,7 +84,7 @@ export class OrderLimitService {
               gte: twentyFourHoursAgo
             },
             status: {
-              notIn: ['CANCELLED', 'REJECTED']
+              notIn: ['CANCELLED' as const, 'REJECTED' as const]
             }
           },
           select: {
@@ -146,25 +142,21 @@ export class OrderLimitService {
       prisma.systemSettings.findUnique({ where: { key: 'unverifiedUserLimit' } })
     ]);
 
-    const kycRequired = kycRequiredSetting?.value === 'true';
+    const kycRequired = kycRequiredSetting?.value !== 'false'; // Default true if not set
     const unverifiedLimit = parseFloat(unverifiedLimitSetting?.value || '1000');
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
         kycSession: {
-          where: {
-            status: 'APPROVED'
-          },
-          take: 1,
-          orderBy: {
-            createdAt: 'desc'
+          select: {
+            status: true
           }
         }
       }
     });
 
-    const isKycApproved = user?.kycSession && user.kycSession.length > 0 && user.kycSession[0].status === 'APPROVED';
+    const isKycApproved = user?.kycSession?.status === 'APPROVED';
 
     if (isKycApproved || kycRequired) {
       return {
@@ -187,7 +179,7 @@ export class OrderLimitService {
           gte: twentyFourHoursAgo
         },
         status: {
-          notIn: ['CANCELLED', 'REJECTED']
+          notIn: ['CANCELLED' as const, 'REJECTED' as const]
         }
       },
       select: {
