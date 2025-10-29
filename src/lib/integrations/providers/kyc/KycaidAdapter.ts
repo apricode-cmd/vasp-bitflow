@@ -512,45 +512,70 @@ export class KycaidAdapter implements IKycProvider {
   /**
    * Get all documents for applicant
    * Returns array of full document objects
-   * verificationId is REQUIRED to get documents
+   * verificationId is OPTIONAL - try without it first
    */
-  async getApplicantDocuments(applicantId: string, verificationId: string): Promise<any[]> {
+  async getApplicantDocuments(applicantId: string, verificationId?: string): Promise<any[]> {
     if (!this.isConfigured()) {
       throw new Error('KYCAID provider not configured');
     }
 
     try {
-      console.log('📄 Getting documents for applicant:', applicantId, 'verification:', verificationId);
+      console.log('📄 Getting documents for applicant:', applicantId, verificationId ? `verification: ${verificationId}` : '(no verification_id)');
 
-      // Get applicant WITH verification_id to get document IDs
-      const applicant = await this.getApplicant(applicantId, verificationId);
+      // First, try WITHOUT verification_id (get latest state)
+      const applicant = await this.getApplicant(applicantId);
       const documentIds = applicant.metadata?.documents || [];
 
+      console.log(`📊 Found ${documentIds.length} document ID(s) in applicant data`);
+
       if (documentIds.length === 0) {
-        console.log('ℹ️ No documents found for this verification');
+        // If no documents without verification_id, try WITH it
+        if (verificationId) {
+          console.log('📥 Trying with verification_id...');
+          const applicantWithVerification = await this.getApplicant(applicantId, verificationId);
+          const verificationDocIds = applicantWithVerification.metadata?.documents || [];
+          
+          console.log(`📊 Found ${verificationDocIds.length} document ID(s) with verification_id`);
+          
+          if (verificationDocIds.length === 0) {
+            console.log('ℹ️ No documents found for this verification');
+            return [];
+          }
+          
+          // Use verification docs
+          return await this.fetchDocuments(verificationDocIds);
+        }
+        
+        console.log('ℹ️ No documents found for applicant');
         return [];
       }
 
-      console.log(`📥 Fetching ${documentIds.length} document(s)...`);
-
-      // Fetch each document
-      const documents = [];
-      for (const docId of documentIds) {
-        try {
-          const doc = await this.getDocument(docId);
-          documents.push(doc);
-        } catch (error: any) {
-          console.warn(`⚠️ Failed to fetch document ${docId}:`, error.message);
-        }
-      }
-
-      console.log(`✅ Retrieved ${documents.length} document(s)`);
-
-      return documents;
+      // Fetch documents
+      return await this.fetchDocuments(documentIds);
     } catch (error: any) {
       console.error('❌ KYCAID get applicant documents failed:', error);
       throw new Error(`Failed to get KYCAID applicant documents: ${error.message}`);
     }
+  }
+
+  /**
+   * Helper to fetch multiple documents by IDs
+   */
+  private async fetchDocuments(documentIds: string[]): Promise<any[]> {
+    console.log(`📥 Fetching ${documentIds.length} document(s)...`);
+
+    const documents = [];
+    for (const docId of documentIds) {
+      try {
+        const doc = await this.getDocument(docId);
+        documents.push(doc);
+      } catch (error: any) {
+        console.warn(`⚠️ Failed to fetch document ${docId}:`, error.message);
+      }
+    }
+
+    console.log(`✅ Retrieved ${documents.length} document(s)`);
+    return documents;
   }
 
   /**

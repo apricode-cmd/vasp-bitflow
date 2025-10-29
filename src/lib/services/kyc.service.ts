@@ -628,10 +628,6 @@ export async function syncKycDocuments(sessionId: string): Promise<{ documentsCo
       throw new Error('No applicant ID - cannot sync documents');
     }
 
-    if (!session.kycaidVerificationId) {
-      throw new Error('No verification ID - cannot sync documents. Documents are only available for completed verifications.');
-    }
-
     if (session.status !== 'APPROVED' && session.status !== 'REJECTED') {
       throw new Error('Documents only available for completed verifications');
     }
