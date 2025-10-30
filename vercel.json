@@ -8,9 +8,6 @@
   "env": {
     "NODE_ENV": "production"
   },
-  "build": {
-    "env": {}
-  },
   "headers": [
     {
       "source": "/api/(.*)",
