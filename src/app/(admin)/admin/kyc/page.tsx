@@ -78,11 +78,14 @@ import { MoreHorizontal } from 'lucide-react';
 
 interface KycSession {
   id: string;
+  userId: string; // Added missing field
   status: KycStatus;
   submittedAt: Date | null;
   reviewedAt: Date | null;
   rejectionReason: string | null;
   kycaidVerificationId: string | null;
+  kycaidApplicantId: string | null; // Added missing field
+  metadata?: any; // Added missing field
   user: {
     id: string;
     email: string;
