@@ -33,10 +33,6 @@ export async function getPublicSettings(): Promise<PublicSettings> {
         key: true,
         value: true,
         type: true
-      },
-      cacheStrategy: {
-        ttl: 60, // Cache for 60 seconds
-        swr: 120
       }
     });
 
