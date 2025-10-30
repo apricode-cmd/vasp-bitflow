@@ -540,8 +540,12 @@ export async function processKycWebhook(
     if (signature && provider.verifyWebhookSignature) {
       const isValid = provider.verifyWebhookSignature(JSON.stringify(payload), signature);
       if (!isValid) {
+        console.error('❌ Invalid webhook signature');
         throw new Error('Invalid webhook signature');
       }
+      console.log('✅ Webhook signature verified');
+    } else if (!signature) {
+      console.warn('⚠️ Webhook received without signature (consider enabling webhook secret in KYCAID dashboard)');
     }
 
     // Process webhook

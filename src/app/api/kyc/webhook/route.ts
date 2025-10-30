@@ -36,6 +36,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       timestamp: new Date().toISOString()
     });
 
+    // Log full webhook payload for debugging (only in development)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 Full webhook payload:', JSON.stringify(body, null, 2));
+    } else {
+      // In production, log only essential fields
+      console.log('🔍 Webhook data:', {
+        type: body.type,
+        verification_id: body.verification_id,
+        applicant_id: body.applicant_id,
+        status: body.status,
+        verified: body.verified,
+        form_id: body.form_id
+      });
+    }
+
     // Process webhook
     const result = await processKycWebhook(providerId, body, signature || undefined);
 
