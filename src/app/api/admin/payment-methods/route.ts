@@ -74,7 +74,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       adminId,
       AUDIT_ACTIONS.PAYMENT_METHOD_UPDATED,
       AUDIT_ENTITIES.PAYMENT_METHOD,
-      method.id,
+      method.code, // PaymentMethod uses 'code' as primary key, not 'id'
       {},
       {
         name: method.name,

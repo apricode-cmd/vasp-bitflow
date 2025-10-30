@@ -20,21 +20,21 @@ export const createPaymentMethodSchema = z.object({
   supportedNetworks: z.array(z.string()).optional().default([]),
   
   // Provider Connections
-  paymentAccountId: z.string().optional(),
-  pspConnector: z.string().optional(),
+  paymentAccountId: z.string().optional().nullable(),
+  pspConnector: z.string().optional().nullable(),
   
   // Limits & Fees
   isActive: z.boolean().optional().default(true),
   isAvailableForClients: z.boolean().optional().default(true),
-  processingTime: z.string().max(100).optional(),
+  processingTime: z.string().max(100).optional().nullable(),
   minAmount: z.number().positive().optional().nullable(),
   maxAmount: z.number().positive().optional().nullable(),
   feeFixed: z.number().min(0).optional().default(0),
   feePercent: z.number().min(0).max(100).optional().default(0),
   
   // Display
-  instructions: z.string().optional(),
-  iconUrl: z.string().optional(),
+  instructions: z.string().optional().nullable(),
+  iconUrl: z.string().optional().nullable(),
   config: z.record(z.any()).optional(),
   priority: z.number().int().min(0).optional().default(0)
 }).refine(
