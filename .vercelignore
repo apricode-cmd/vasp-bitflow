@@ -1,0 +1,11 @@
+# Ignore test files
+**/*.test.ts
+**/*.test.tsx
+**/test-*.ts
+**/check-*.ts
+**/debug-*.ts
+
+# Ignore seed files  
+prisma/seed*.ts
+seed-*.ts
+
