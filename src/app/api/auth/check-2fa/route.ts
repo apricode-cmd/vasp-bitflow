@@ -2,6 +2,7 @@
  * POST /api/auth/check-2fa
  * 
  * Check if user has 2FA enabled (for login flow)
+ * Returns: { requires2FA: boolean, validPassword: boolean }
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -24,6 +25,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       where: { email },
       select: {
         password: true,
+        isActive: true,
         twoFactorAuth: {
           select: {
             totpEnabled: true
@@ -33,23 +35,46 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
 
     if (!user) {
-      return NextResponse.json({ requires2FA: false });
+      return NextResponse.json({ 
+        requires2FA: false, 
+        validPassword: false 
+      });
+    }
+
+    // Check if user is active
+    if (!user.isActive) {
+      return NextResponse.json({ 
+        requires2FA: false, 
+        validPassword: false 
+      });
     }
 
     // Verify password
     const isValid = await bcrypt.compare(password, user.password);
 
     if (!isValid) {
-      return NextResponse.json({ requires2FA: false });
+      return NextResponse.json({ 
+        requires2FA: false, 
+        validPassword: false 
+      });
     }
 
     // Check if 2FA is enabled
     const requires2FA = user.twoFactorAuth?.totpEnabled === true;
 
-    return NextResponse.json({ requires2FA });
+    return NextResponse.json({ 
+      requires2FA,
+      validPassword: true 
+    });
   } catch (error) {
-    console.error('Check 2FA error:', error);
-    return NextResponse.json({ requires2FA: false });
+    console.error('❌ Check 2FA error:', error);
+    return NextResponse.json(
+      { 
+        requires2FA: false, 
+        validPassword: false 
+      },
+      { status: 500 }
+    );
   }
 }
 

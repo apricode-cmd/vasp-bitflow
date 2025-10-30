@@ -54,43 +54,43 @@ export default function LoginPage(): React.ReactElement {
     setError(null);
 
     try {
-      // First, check if user has 2FA enabled
-      // We need to verify password first, then check 2FA status
+      // Step 1: Check if user has 2FA enabled BEFORE attempting login
+      const checkResponse = await fetch('/api/auth/check-2fa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: data.email, password: data.password })
+      });
+      
+      const checkData = await checkResponse.json();
+      
+      console.log('🔐 2FA check result:', checkData);
+      
+      // Step 2: If 2FA is enabled, redirect to 2FA page
+      if (checkData.requires2FA) {
+        setIsRedirecting(true);
+        toast.success('Password verified. Redirecting to 2FA...');
+        
+        // Use window.location for hard redirect
+        await new Promise(resolve => setTimeout(resolve, 800));
+        window.location.href = `/2fa-verify?email=${encodeURIComponent(data.email)}`;
+        return;
+      }
+      
+      // Step 3: If password is wrong (check failed)
+      if (!checkResponse.ok || checkData.requires2FA === false && !checkData.validPassword) {
+        setError('Invalid email or password. Please try again.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Step 4: If no 2FA, proceed with normal login
       const result = await signIn('credentials', {
         email: data.email,
         password: data.password,
         redirect: false
       });
 
-      // If login failed, check if it might be due to 2FA
       if (result?.error) {
-        // Try to check 2FA status for this user
-        try {
-          const checkResponse = await fetch('/api/auth/check-2fa', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: data.email, password: data.password })
-          });
-          
-          const checkData = await checkResponse.json();
-          
-          console.log('2FA check result:', checkData);
-          
-          if (checkData.requires2FA) {
-            // User has 2FA enabled, redirect to 2FA page
-            setIsRedirecting(true);
-            toast.success('Password verified. Please enter your 2FA code.');
-            
-            // Use window.location for hard redirect
-            await new Promise(resolve => setTimeout(resolve, 500));
-            window.location.href = `/2fa-verify?email=${encodeURIComponent(data.email)}`;
-            return;
-          }
-        } catch (e) {
-          console.error('2FA check error:', e);
-          // Ignore check error, show original error
-        }
-        
         setError('Invalid email or password. Please try again.');
         setIsLoading(false);
         return;
@@ -109,9 +109,9 @@ export default function LoginPage(): React.ReactElement {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
         });
-        console.log('Login logged to SystemLog');
+        console.log('✅ Login logged to SystemLog');
       } catch (logError) {
-        console.error('Failed to log login:', logError);
+        console.error('❌ Failed to log login:', logError);
         // Don't block login if logging fails
       }
 
@@ -128,7 +128,7 @@ export default function LoginPage(): React.ReactElement {
         window.location.href = '/dashboard';
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('❌ Login error:', error);
       setError('An unexpected error occurred. Please try again.');
       setIsLoading(false);
       setIsRedirecting(false);
