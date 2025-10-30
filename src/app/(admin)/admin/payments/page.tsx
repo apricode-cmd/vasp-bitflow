@@ -174,16 +174,19 @@ export default function PaymentsPage(): JSX.Element {
 
       if (fiatRes.ok) {
         const data = await fiatRes.json();
+        console.log('💵 Fiat Currencies:', data.resources);
         setFiatCurrencies(data.resources || []);
       }
 
       if (cryptoRes.ok) {
         const data = await cryptoRes.json();
+        console.log('💰 Cryptocurrencies:', data.resources);
         setCryptocurrencies(data.resources || []);
       }
 
       if (blockchainsRes.ok) {
         const data = await blockchainsRes.json();
+        console.log('⛓️ Blockchains:', data.resources);
         setBlockchains(data.resources || []);
       }
     } catch (error) {

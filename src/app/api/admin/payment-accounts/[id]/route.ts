@@ -93,6 +93,7 @@ export async function PUT(
       fiatCurrencyCode, 
       cryptocurrencyCode, 
       blockchainCode,
+      memo, // Remove memo field - not in Prisma schema
       ...accountData 
     } = body;
 
