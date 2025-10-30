@@ -310,13 +310,11 @@ class TatumAdapter implements IBlockchainProvider {
       }
 
       // ==========================================
-      // 3. TRON TRC-20 TOKENS - v4 Portfolio API (special handling)
+      // 3. TRON TRC-20 TOKENS - v3 API
       // ==========================================
       if (blockchainUpper === 'TRON' && !isNative && contractAddress) {
-        console.log(`⚡ Using TRON v4 Portfolio API for TRC-20 token: ${contractAddress}`);
+        console.log(`⚡ Using TRON v3 API for TRC-20 token: ${contractAddress}`);
         
-        // TRON in v4 uses 'tron-mainnet' but it's NOT in the supported list for portfolio
-        // Try v3 account endpoint instead
         const response = await this.makeRequest(
           `/v3/tron/account/${address}`,
           'GET'
@@ -328,26 +326,38 @@ class TatumAdapter implements IBlockchainProvider {
         }
 
         const data = await response.json();
-        console.log('📦 TRON account data:', JSON.stringify(data, null, 2));
+        console.log('📦 TRON full response:', JSON.stringify(data, null, 2));
         
-        // Find TRC-20 token balance in trc20 array
+        // TRON v3 API returns trc20 array with token balances
+        // Example: { "trc20": [{ "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t": "1000000" }] }
         const trc20Tokens = data.trc20 || [];
-        const tokenData = trc20Tokens.find((t: any) => 
-          t[contractAddress] !== undefined
-        );
-
+        console.log('📦 TRC-20 tokens array:', trc20Tokens);
+        
+        // Find token by contract address
         let balanceRaw = '0';
-        if (tokenData && tokenData[contractAddress]) {
-          balanceRaw = tokenData[contractAddress];
+        
+        for (const tokenObj of trc20Tokens) {
+          console.log(`🔍 Checking token object:`, tokenObj);
+          if (tokenObj[contractAddress]) {
+            balanceRaw = tokenObj[contractAddress];
+            console.log(`✅ Found token balance: ${balanceRaw}`);
+            break;
+          }
+        }
+
+        if (balanceRaw === '0') {
+          console.warn(`⚠️ Token ${contractAddress} not found in wallet or balance is 0`);
         }
 
         const tokenDecimals = 6; // USDT TRC-20 has 6 decimals
         const balanceFormatted = parseFloat(balanceRaw) / Math.pow(10, tokenDecimals);
 
+        console.log(`💰 Final balance: ${balanceFormatted} USDT (raw: ${balanceRaw})`);
+
         return {
           address,
           blockchain,
-          currency: 'USDT', // or extract from contract
+          currency: 'USDT',
           balance: balanceRaw,
           balanceFormatted,
           decimals: tokenDecimals,
