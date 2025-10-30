@@ -26,6 +26,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const formData = await request.formData();
     const file = formData.get('logo') as File;
+    const logoType = formData.get('type') as string || 'light'; // 'light' or 'dark'
 
     if (!file) {
       return NextResponse.json(
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     let logoUrl: string;
     const timestamp = Date.now();
     const extension = file.name.split('.').pop();
-    const filename = `logo-${timestamp}.${extension}`;
+    const filename = `logo-${logoType}-${timestamp}.${extension}`; // Include type in filename
 
     // DEVELOPMENT: Save to /public/uploads/
     if (isDevelopment) {
@@ -90,20 +91,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Get admin ID
     const adminId = await getCurrentUserId();
 
+    // Determine settings key based on logo type
+    const settingsKey = logoType === 'dark' ? 'brandLogoDark' : 'brandLogo';
+
     // Get old logo for audit
     const oldSetting = await prisma.systemSettings.findUnique({
-      where: { key: 'brandLogo' }
+      where: { key: settingsKey }
     });
 
-    // Update brandLogo in SystemSettings
+    // Update brandLogo or brandLogoDark in SystemSettings
     await prisma.systemSettings.upsert({
-      where: { key: 'brandLogo' },
+      where: { key: settingsKey },
       create: {
-        key: 'brandLogo',
+        key: settingsKey,
         value: logoUrl,
         type: 'STRING',
         category: 'brand',
-        description: 'Brand logo URL',
+        description: logoType === 'dark' ? 'Brand logo for dark mode' : 'Brand logo for light mode',
         isPublic: true,
         updatedBy: adminId || undefined
       },
@@ -119,10 +123,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         adminId,
         AUDIT_ACTIONS.SETTINGS_UPDATED,
         AUDIT_ENTITIES.SYSTEM_SETTINGS,
-        'brandLogo',
+        settingsKey,
         { value: oldSetting?.value },
         { value: logoUrl },
-        { filename, size: file.size, type: file.type, storage: isDevelopment ? 'local' : 'vercel-blob' }
+        { filename, size: file.size, type: file.type, logoType, storage: isDevelopment ? 'local' : 'vercel-blob' }
       );
     }
 
@@ -130,6 +134,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       success: true,
       logoUrl,
       filename,
+      logoType,
       storage: isDevelopment ? 'local' : 'vercel-blob'
     });
   } catch (error: any) {

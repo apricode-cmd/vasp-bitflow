@@ -37,6 +37,7 @@ interface SystemSettings {
   platformName: string;
   brandTagline: string;
   brandLogo: string;
+  brandLogoDark: string; // Dark mode logo
   primaryColor: string; // Brand primary color
   supportEmail: string;
   supportPhone: string;
@@ -66,6 +67,7 @@ export default function SettingsPage(): JSX.Element {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingDark, setUploadingDark] = useState(false);
   const [activeTab, setActiveTab] = useState('brand');
   const [previewColor, setPreviewColor] = useState<string>('#06b6d4'); // Default cyan - ensure always defined
   const [mounted, setMounted] = useState(false);
@@ -186,6 +188,7 @@ export default function SettingsPage(): JSX.Element {
     try {
       const formData = new FormData();
       formData.append('logo', file);
+      formData.append('type', 'light'); // Light mode logo
 
       const response = await fetch('/api/admin/settings/upload-logo', {
         method: 'POST',
@@ -196,7 +199,7 @@ export default function SettingsPage(): JSX.Element {
 
       if (data.success) {
         updateSetting('brandLogo', data.logoUrl);
-        toast.success('Logo uploaded successfully');
+        toast.success('Light mode logo uploaded successfully');
       } else {
         toast.error(data.error || 'Failed to upload logo');
       }
@@ -205,6 +208,37 @@ export default function SettingsPage(): JSX.Element {
       toast.error('An error occurred while uploading');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleDarkLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploadingDark(true);
+    try {
+      const formData = new FormData();
+      formData.append('logo', file);
+      formData.append('type', 'dark'); // Dark mode logo
+
+      const response = await fetch('/api/admin/settings/upload-logo', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        updateSetting('brandLogoDark', data.logoUrl);
+        toast.success('Dark mode logo uploaded successfully');
+      } else {
+        toast.error(data.error || 'Failed to upload logo');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('An error occurred while uploading');
+    } finally {
+      setUploadingDark(false);
     }
   };
 
@@ -310,14 +344,14 @@ export default function SettingsPage(): JSX.Element {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="brandLogo">Brand Logo</Label>
+                <Label htmlFor="brandLogo">Brand Logo (Light Mode)</Label>
                 <div className="flex items-center gap-4">
                   {/* Logo Preview */}
                   {settings.brandLogo && (
-                    <div className="flex-shrink-0 w-32 h-16 border rounded-lg p-2 bg-muted/50 flex items-center justify-center">
+                    <div className="flex-shrink-0 w-32 h-16 border rounded-lg p-2 bg-white flex items-center justify-center">
                       <img
                         src={settings.brandLogo}
-                        alt="Brand logo"
+                        alt="Light mode logo"
                         className="max-w-full max-h-full object-contain"
                       />
                     </div>
@@ -342,7 +376,44 @@ export default function SettingsPage(): JSX.Element {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Recommended: 200x50px, PNG/SVG with transparency. Max 2MB.
+                  Logo for light theme. Recommended: Dark logo on transparent background, 200x50px. Max 2MB.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="brandLogoDark">Brand Logo (Dark Mode)</Label>
+                <div className="flex items-center gap-4">
+                  {/* Logo Preview */}
+                  {settings.brandLogoDark && (
+                    <div className="flex-shrink-0 w-32 h-16 border rounded-lg p-2 bg-slate-900 flex items-center justify-center">
+                      <img
+                        src={settings.brandLogoDark}
+                        alt="Dark mode logo"
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Upload Button */}
+                  <div className="flex-1">
+                    <Input
+                      id="brandLogoDark"
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp"
+                      onChange={handleDarkLogoUpload}
+                      disabled={uploadingDark}
+                      className="cursor-pointer"
+                    />
+                    {uploadingDark && (
+                      <p className="text-xs text-primary mt-1 flex items-center gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Uploading...
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Logo for dark theme. Recommended: Light logo on transparent background, 200x50px. Max 2MB.
                 </p>
               </div>
 

@@ -17,6 +17,7 @@ interface PublicSettings {
   platformName?: string;
   brandTagline?: string;
   brandLogo?: string;
+  brandLogoDark?: string; // Dark mode logo
   primaryColor?: string;
   supportEmail?: string;
   supportPhone?: string;

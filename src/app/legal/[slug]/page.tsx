@@ -12,6 +12,7 @@ import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { LegalPageClient } from '@/components/legal/LegalPageClient';
 import { QuickActions } from '@/components/legal/QuickActions';
 import { ClientFooter } from '@/components/layouts/ClientFooter';
+import { LegalPageLogo } from '@/components/legal/LegalPageLogo';
 
 interface LegalPageProps {
   params: {
@@ -96,20 +97,7 @@ export default async function LegalPage({ params }: LegalPageProps) {
               href="/"
               className="group flex items-center gap-2"
             >
-              {settings.brandLogo ? (
-                <img
-                  src={settings.brandLogo}
-                  alt={settings.brandName || 'Logo'}
-                  className="h-6 object-contain max-w-[120px]"
-                />
-              ) : (
-                <>
-                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70">
-                    <Shield className="h-3 w-3 text-primary-foreground" />
-                  </div>
-                  <span className="text-sm font-semibold">{settings.brandName || 'Apricode'}</span>
-                </>
-              )}
+              <LegalPageLogo settings={settings} />
             </Link>
             
             {/* Center: Document Badge */}

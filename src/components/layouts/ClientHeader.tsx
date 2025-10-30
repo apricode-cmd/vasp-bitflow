@@ -50,6 +50,7 @@ import {
 import { useState, useEffect } from 'react';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useSettings } from '@/components/providers/settings-provider';
+import { BrandLogo } from '@/components/features/BrandLogo';
 import { toast } from 'sonner';
 
 interface Notification {
@@ -204,16 +205,10 @@ export function ClientHeader(): React.ReactElement {
           <Link href="/dashboard" className="flex items-center gap-2">
             {settingsLoading ? (
               <Skeleton className="h-8 w-32" />
-            ) : settings.brandLogo ? (
-              <img
-                src={settings.brandLogo}
-                alt={settings.brandName || 'Logo'}
-                className="h-8 object-contain max-w-[150px]"
-              />
             ) : (
-              <span className="text-lg font-bold text-primary">
-                {settings.brandName || 'Apricode Exchange'}
-              </span>
+              <div className="h-8 w-auto max-w-[150px]">
+                <BrandLogo size={32} priority />
+              </div>
             )}
           </Link>
 
