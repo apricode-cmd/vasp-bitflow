@@ -13,11 +13,13 @@ import {
 import { IKycProvider } from './categories/IKycProvider';
 import { IRatesProvider } from './categories/IRatesProvider';
 import { IEmailProvider } from './categories/IEmailProvider';
+import { IBlockchainProvider } from './categories/IBlockchainProvider';
 
 // Import adapters
 import { kycaidAdapter } from './providers/kyc/KycaidAdapter';
 import { coinGeckoAdapter } from './providers/rates/CoinGeckoAdapter';
 import { resendAdapter } from './providers/email/ResendAdapter';
+import { tatumAdapter } from './providers/blockchain/TatumAdapter';
 
 /**
  * Provider registration info
@@ -80,6 +82,17 @@ class IntegrationRegistry {
       icon: '📧',
       documentationUrl: 'https://resend.com/docs',
       instance: resendAdapter
+    });
+
+    // Blockchain Providers
+    this.register({
+      providerId: 'tatum',
+      category: IntegrationCategory.BLOCKCHAIN,
+      displayName: 'Tatum',
+      description: 'Blockchain data and transaction infrastructure provider',
+      icon: '⛓️',
+      documentationUrl: 'https://docs.tatum.io/',
+      instance: tatumAdapter
     });
   }
 
@@ -172,6 +185,17 @@ class IntegrationRegistry {
     const provider = this.getProvider(providerId);
     if (provider && provider.category === IntegrationCategory.EMAIL) {
       return provider as IEmailProvider;
+    }
+    return null;
+  }
+
+  /**
+   * Get Blockchain provider (typed helper)
+   */
+  getBlockchainProvider(providerId: string): IBlockchainProvider | null {
+    const provider = this.getProvider(providerId);
+    if (provider && provider.category === IntegrationCategory.BLOCKCHAIN) {
+      return provider as IBlockchainProvider;
     }
     return null;
   }

@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 import { 
   Shield, Mail, TrendingUp, CreditCard, Loader2, 
   CheckCircle, XCircle, RefreshCw, Settings, Plug, 
-  Check, Search, Filter
+  Check, Search, Filter, Network
 } from 'lucide-react';
 
 // Integration categories with icons
@@ -47,6 +47,12 @@ const CATEGORY_CONFIG = {
     icon: CreditCard,
     color: 'text-orange-600',
     bgColor: 'bg-orange-50 dark:bg-orange-950/20'
+  },
+  BLOCKCHAIN: {
+    label: 'Blockchain',
+    icon: Network,
+    color: 'text-cyan-600',
+    bgColor: 'bg-cyan-50 dark:bg-cyan-950/20'
   }
 };
 

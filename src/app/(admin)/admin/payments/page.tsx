@@ -26,7 +26,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Edit,
-  Trash2
+  Trash2,
+  RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable } from '@/components/admin/DataTable';
@@ -103,6 +104,7 @@ export default function PaymentsPage(): JSX.Element {
   const [methodDialogOpen, setMethodDialogOpen] = useState(false);
   const [pspDialogOpen, setPspDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   
   const [selectedAccount, setSelectedAccount] = useState<PaymentAccount | undefined>();
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | undefined>();
@@ -153,42 +155,78 @@ export default function PaymentsPage(): JSX.Element {
       }
 
       // Fetch PSP connectors
-      const pspRes = await fetch('/api/admin/resources/psp-connectors');
+      const pspRes = await fetch('/api/admin/resources?type=psp_connector');
       if (pspRes.ok) {
         const data = await pspRes.json();
         console.log('🌐 PSP Connectors API response:', data);
-        console.log('🌐 PSP Connectors count:', data.data?.length || 0, data.data);
-        setPspConnectors(data.data || []);
+        console.log('🌐 PSP Connectors count:', data.resources?.length || 0, data.resources);
+        setPspConnectors(data.resources || []);
       } else {
         console.error('❌ PSP Connectors API failed:', pspRes.status);
       }
 
-      // Fetch reference data for dialogs
+      // Fetch reference data
       const [fiatRes, cryptoRes, blockchainsRes] = await Promise.all([
-        fetch('/api/admin/resources/fiat-currencies'),
-        fetch('/api/admin/resources/currencies?active=true'),
-        fetch('/api/admin/blockchains')
+        fetch('/api/admin/resources?type=fiat_currency'),
+        fetch('/api/admin/resources?type=cryptocurrency'),
+        fetch('/api/admin/resources?type=blockchain')
       ]);
 
       if (fiatRes.ok) {
         const data = await fiatRes.json();
-        setFiatCurrencies(data.data || []);
+        setFiatCurrencies(data.resources || []);
       }
+
       if (cryptoRes.ok) {
         const data = await cryptoRes.json();
-        setCryptocurrencies(data.data || []);
+        setCryptocurrencies(data.resources || []);
       }
+
       if (blockchainsRes.ok) {
         const data = await blockchainsRes.json();
-        setBlockchains(data.networks || []);
+        setBlockchains(data.resources || []);
       }
-      
-      console.log('✅ All payment data fetched successfully');
     } catch (error) {
-      console.error('❌ Failed to fetch payment data:', error);
+      console.error('Failed to fetch payment data:', error);
       toast.error('Failed to load payment data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Sync all wallet balances using Tatum
+  const handleSyncAllBalances = async () => {
+    setSyncing(true);
+    toast.loading('Syncing wallet balances...', { id: 'sync-balances' });
+    
+    try {
+      const response = await fetch('/api/admin/wallets/sync-all', {
+        method: 'POST'
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to sync balances');
+      }
+
+      const result = await response.json();
+      
+      toast.success(result.message, { id: 'sync-balances' });
+      
+      // Show details
+      if (result.failed > 0) {
+        toast.warning(`${result.failed} wallets failed to sync`, {
+          description: 'Check blockchain provider configuration'
+        });
+      }
+
+      // Refresh wallets data
+      await fetchData();
+    } catch (error: any) {
+      console.error('❌ Sync balances error:', error);
+      toast.error(error.message || 'Failed to sync balances', { id: 'sync-balances' });
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -784,13 +822,28 @@ export default function PaymentsPage(): JSX.Element {
                 Platform wallets for sending cryptocurrency payouts
               </p>
             </div>
-            <Button className="gap-2" onClick={() => {
-              setSelectedAccount(undefined);
-              setCryptoDialogOpen(true);
-            }}>
-              <Plus className="h-4 w-4" />
-              Add Crypto Wallet
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                className="gap-2" 
+                onClick={handleSyncAllBalances}
+                disabled={syncing || cryptoWallets.length === 0}
+              >
+                {syncing ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Sync All Balances
+              </Button>
+              <Button className="gap-2" onClick={() => {
+                setSelectedAccount(undefined);
+                setCryptoDialogOpen(true);
+              }}>
+                <Plus className="h-4 w-4" />
+                Add Crypto Wallet
+              </Button>
+            </div>
           </div>
           <DataTable
             columns={cryptoColumns}

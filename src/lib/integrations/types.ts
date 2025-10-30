@@ -16,7 +16,7 @@ export enum IntegrationCategory {
   RATES = 'RATES',               // Exchange rate providers
   EMAIL = 'EMAIL',               // Email/notification services
   PAYMENT = 'PAYMENT',           // Payment gateways (future)
-  BLOCKCHAIN = 'BLOCKCHAIN',     // Blockchain node providers (future)
+  BLOCKCHAIN = 'BLOCKCHAIN',     // Blockchain data & transaction providers
   ANALYTICS = 'ANALYTICS',       // Analytics services (future)
   STORAGE = 'STORAGE'            // File storage services (future)
 }
