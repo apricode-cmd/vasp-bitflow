@@ -112,11 +112,27 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
       nationality: validated.nationality || null,
     };
     
-    // Convert dateOfBirth string to Date if provided
-    // Parse as local date to avoid timezone issues (YYYY-MM-DD → local midnight)
+    // Convert dateOfBirth to Date if provided
+    // Handle both ISO string and YYYY-MM-DD format
     if (validated.dateOfBirth) {
-      const [year, month, day] = validated.dateOfBirth.split('-').map(Number);
-      profileData.dateOfBirth = new Date(year, month - 1, day); // month is 0-indexed
+      try {
+        // If it's an ISO string (e.g., "1989-09-26T23:00:00.000Z"), parse it
+        if (validated.dateOfBirth.includes('T')) {
+          const dateObj = new Date(validated.dateOfBirth);
+          // Extract year, month, day in local timezone
+          const year = dateObj.getFullYear();
+          const month = dateObj.getMonth();
+          const day = dateObj.getDate();
+          profileData.dateOfBirth = new Date(year, month, day);
+        } else {
+          // If it's YYYY-MM-DD format, parse as local date
+          const [year, month, day] = validated.dateOfBirth.split('-').map(Number);
+          profileData.dateOfBirth = new Date(year, month - 1, day); // month is 0-indexed
+        }
+      } catch (error) {
+        console.error('Failed to parse dateOfBirth:', validated.dateOfBirth, error);
+        // Skip setting dateOfBirth if parsing fails
+      }
     }
 
     // Update or create profile
