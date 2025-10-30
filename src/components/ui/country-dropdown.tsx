@@ -78,8 +78,9 @@ const CountryDropdownComponent = (
 
   useEffect(() => {
     if (defaultValue) {
+      // Try to find by alpha3 first, then by alpha2 (for compatibility)
       const initialCountry = options.find(
-        (country) => country.alpha3 === defaultValue
+        (country) => country.alpha3 === defaultValue || country.alpha2 === defaultValue
       );
       if (initialCountry) {
         setSelectedCountry(initialCountry);
