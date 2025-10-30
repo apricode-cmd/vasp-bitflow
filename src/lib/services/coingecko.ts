@@ -17,19 +17,18 @@ interface CachedRates {
   timestamp: number;
 }
 
+// Dynamic rates interface - supports any cryptocurrency code
 export interface CoinGeckoRates {
-  BTC: { EUR: number; PLN: number };
-  ETH: { EUR: number; PLN: number };
-  USDT: { EUR: number; PLN: number };
-  SOL: { EUR: number; PLN: number };
+  [key: string]: { EUR: number; PLN: number } | string; // string for updatedAt
   updatedAt: string;
 }
 
+// Dynamic CoinGecko API response - supports any coin ID
 interface CoinGeckoResponse {
-  bitcoin?: { eur?: number; pln?: number };
-  ethereum?: { eur?: number; pln?: number };
-  tether?: { eur?: number; pln?: number };
-  solana?: { eur?: number; pln?: number };
+  [coinId: string]: {
+    eur?: number;
+    pln?: number;
+  };
 }
 
 let ratesCache: CachedRates | null = null;
@@ -119,9 +118,31 @@ class CoinGeckoService {
     try {
       console.log('🔄 Fetching fresh rates from CoinGecko API' + (forceRefresh ? ' (forced refresh)' : '') + '...');
       
+      // ✅ Get active currencies from database dynamically
+      const currencies = await prisma.currency.findMany({
+        where: { 
+          isActive: true,
+          coingeckoId: { not: '' } // Only currencies with CoinGecko ID
+        },
+        select: {
+          code: true,
+          coingeckoId: true,
+          symbol: true
+        }
+      });
+
+      if (currencies.length === 0) {
+        throw new Error('No active currencies with CoinGecko ID found in database');
+      }
+
+      // Build comma-separated list of CoinGecko IDs
+      const coinIds = currencies.map(c => c.coingeckoId).join(',');
+      
+      console.log('💰 Fetching rates for currencies:', currencies.map(c => `${c.code} (${c.coingeckoId})`).join(', '));
+
       // Build request parameters
       const params: Record<string, string> = {
-        ids: 'bitcoin,ethereum,tether,solana',
+        ids: coinIds,
         vs_currencies: 'eur,pln',
         include_24hr_change: 'true',
         include_last_updated_at: 'true'
@@ -142,38 +163,31 @@ class CoinGeckoService {
         timestamp: new Date().toISOString()
       });
 
-      // Validate and extract rates
+      // ✅ Dynamically build rates object from database currencies
       const rates: CoinGeckoRates = {
-        BTC: {
-          EUR: this.validateRate(data.bitcoin?.eur, 'BTC/EUR'),
-          PLN: this.validateRate(data.bitcoin?.pln, 'BTC/PLN')
-        },
-        ETH: {
-          EUR: this.validateRate(data.ethereum?.eur, 'ETH/EUR'),
-          PLN: this.validateRate(data.ethereum?.pln, 'ETH/PLN')
-        },
-        USDT: {
-          EUR: this.validateRate(data.tether?.eur, 'USDT/EUR'),
-          PLN: this.validateRate(data.tether?.pln, 'USDT/PLN')
-        },
-        SOL: {
-          EUR: this.validateRate(data.solana?.eur, 'SOL/EUR'),
-          PLN: this.validateRate(data.solana?.pln, 'SOL/PLN')
-        },
         updatedAt: new Date().toISOString()
-      };
+      } as CoinGeckoRates;
+
+      const ratesLog: Record<string, any> = {};
+
+      for (const currency of currencies) {
+        const coinData = data[currency.coingeckoId as keyof CoinGeckoResponse];
+        
+        if (coinData) {
+          rates[currency.code as keyof Omit<CoinGeckoRates, 'updatedAt'>] = {
+            EUR: this.validateRate(coinData.eur, `${currency.code}/EUR`),
+            PLN: this.validateRate(coinData.pln, `${currency.code}/PLN`)
+          };
+          
+          ratesLog[`${currency.code}_EUR`] = rates[currency.code as keyof Omit<CoinGeckoRates, 'updatedAt'>].EUR;
+          ratesLog[`${currency.code}_PLN`] = rates[currency.code as keyof Omit<CoinGeckoRates, 'updatedAt'>].PLN;
+        } else {
+          console.warn(`⚠️ No data returned for ${currency.code} (${currency.coingeckoId})`);
+        }
+      }
 
       // Log successful rates
-      console.log('✅ Successfully fetched rates:', {
-        BTC_EUR: rates.BTC.EUR,
-        BTC_PLN: rates.BTC.PLN,
-        ETH_EUR: rates.ETH.EUR,
-        ETH_PLN: rates.ETH.PLN,
-        USDT_EUR: rates.USDT.EUR,
-        USDT_PLN: rates.USDT.PLN,
-        SOL_EUR: rates.SOL.EUR,
-        SOL_PLN: rates.SOL.PLN
-      });
+      console.log('✅ Successfully fetched rates:', ratesLog);
 
       // Update cache
       ratesCache = {
@@ -216,9 +230,15 @@ class CoinGeckoService {
   /**
    * Gets the exchange rate for a specific crypto/fiat pair
    */
-  async getRate(crypto: 'BTC' | 'ETH' | 'USDT' | 'SOL', fiat: 'EUR' | 'PLN'): Promise<number> {
+  async getRate(crypto: string, fiat: 'EUR' | 'PLN'): Promise<number> {
     const rates = await this.getCurrentRates();
-    return rates[crypto][fiat];
+    const cryptoRates = rates[crypto];
+    
+    if (!cryptoRates || typeof cryptoRates === 'string') {
+      throw new Error(`No exchange rate found for ${crypto}/${fiat}`);
+    }
+    
+    return cryptoRates[fiat];
   }
 
   /**
