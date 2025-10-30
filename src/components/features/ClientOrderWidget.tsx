@@ -241,10 +241,17 @@ export function ClientOrderWidget() {
   }, []);
 
   // Fetch rates
+  // Fetch rates with auto-refresh (every 30s, only when page is visible)
   useEffect(() => {
     if (!selectedCrypto || !selectedFiat) return;
 
     const fetchRates = async () => {
+      // Don't fetch if page is hidden
+      if (document.hidden) {
+        console.log('⏸️ Skipping rate fetch - page is hidden');
+        return;
+      }
+
       setRatesLoading(true);
       try {
         const response = await fetch('/api/rates');
@@ -267,10 +274,26 @@ export function ClientOrderWidget() {
       }
     };
 
+    // Initial fetch
     fetchRates();
-    const interval = setInterval(fetchRates, 30000); // Refresh every 30s
     
-    return () => clearInterval(interval);
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(fetchRates, 30000);
+    
+    // Fetch when page becomes visible again
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('👁️ Page visible again - fetching fresh rates');
+        fetchRates();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [selectedCrypto, selectedFiat]);
 
   // Fetch trading pair data (limits + fee)
