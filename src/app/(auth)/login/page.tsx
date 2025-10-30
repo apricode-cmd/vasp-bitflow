@@ -54,21 +54,35 @@ export default function LoginPage(): React.ReactElement {
     setError(null);
 
     try {
-      // Try to sign in
+      // First, check if user has 2FA enabled
+      // We need to verify password first, then check 2FA status
       const result = await signIn('credentials', {
         email: data.email,
         password: data.password,
         redirect: false
       });
 
-      // Check if 2FA is required
-      if (result?.error === '2FA_REQUIRED') {
-        // Redirect to 2FA verification page
-        router.push(`/2fa-verify?email=${encodeURIComponent(data.email)}`);
-        return;
-      }
-
+      // If login failed, check if it might be due to 2FA
       if (result?.error) {
+        // Try to check 2FA status for this user
+        try {
+          const checkResponse = await fetch('/api/auth/check-2fa', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: data.email, password: data.password })
+          });
+          
+          const checkData = await checkResponse.json();
+          
+          if (checkData.requires2FA) {
+            // User has 2FA enabled, redirect to 2FA page
+            router.push(`/2fa-verify?email=${encodeURIComponent(data.email)}`);
+            return;
+          }
+        } catch (e) {
+          // Ignore check error, show original error
+        }
+        
         setError('Invalid email or password. Please try again.');
         setIsLoading(false);
         return;

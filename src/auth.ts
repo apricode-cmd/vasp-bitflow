@@ -71,9 +71,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           if (has2FA) {
             const twoFactorCode = credentials.twoFactorCode as string | undefined;
 
-            // If no 2FA code provided, return special response to trigger 2FA page
+            // If no 2FA code provided, we can't proceed with standard NextAuth flow
+            // The login page should check 2FA status separately before calling signIn
             if (!twoFactorCode) {
-              throw new Error('2FA_REQUIRED');
+              // Return null to fail auth, login page will handle redirect to 2FA page
+              console.log('2FA required for user:', user.email);
+              return null;
             }
 
             // Verify 2FA code
@@ -84,7 +87,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             );
 
             if (!success) {
-              throw new Error('Invalid 2FA code');
+              console.log('Invalid 2FA code for user:', user.email);
+              return null; // Invalid 2FA code
             }
           }
 
@@ -96,12 +100,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           };
         } catch (error: any) {
           console.error('Auth error:', error);
-          
-          // Re-throw 2FA_REQUIRED to handle it in login page
-          if (error.message === '2FA_REQUIRED') {
-            throw error;
-          }
-          
           return null;
         }
       }
