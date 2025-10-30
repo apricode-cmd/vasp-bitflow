@@ -27,7 +27,7 @@ import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ApricodeLogo } from '@/components/icons/ApricodeLogo';
+import { BrandLogo } from '@/components/features/BrandLogo';
 
 export default function LoginPage(): React.ReactElement {
   const [isLoading, setIsLoading] = useState(false);
@@ -115,14 +115,14 @@ export default function LoginPage(): React.ReactElement {
         <div className="text-center space-y-4">
           <div className="flex justify-center">
             <div className="h-16 w-16 rounded-2xl bg-primary/10 backdrop-blur-sm flex items-center justify-center p-3 border border-primary/20 shadow-lg shadow-primary/10">
-              <ApricodeLogo className="text-primary w-full h-full" />
+              <BrandLogo size={64} priority />
             </div>
           </div>
           <div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-primary via-primary/80 to-primary bg-clip-text text-transparent">
-              CryptoExchange
+              Sign In to Your Account
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">Welcome back to your account</p>
+            <p className="text-sm text-muted-foreground mt-1">Welcome back! Enter your credentials to continue</p>
           </div>
         </div>
 
