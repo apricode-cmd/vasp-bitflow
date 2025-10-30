@@ -150,13 +150,13 @@ class TatumAdapter implements IBlockchainProvider {
     }
 
     try {
-      // Simple API key validation - just make any request to check auth
-      // Using a lightweight endpoint that doesn't require specific parameters
-      const response = await fetch('https://api.tatum.io/v4/data/chains', {
+      // Simple test - just verify API key by making a basic request
+      // Using /data/supported-blockchains which is lightweight and public
+      const response = await fetch('https://api.tatum.io/v4/data/supported-blockchains', {
         method: 'GET',
         headers: {
           'x-api-key': this.config!.apiKey,
-          'Content-Type': 'application/json'
+          'Accept': 'application/json'
         }
       });
 
@@ -167,16 +167,14 @@ class TatumAdapter implements IBlockchainProvider {
       });
 
       if (response.ok) {
-        const data = await response.json();
         console.log('✅ Tatum test successful');
         return {
           success: true,
-          message: 'Tatum v4 API key is valid',
+          message: 'Tatum v4 API key is valid and working',
           details: { 
             provider: 'Tatum', 
             version: 'v4',
-            endpoint: '/data/chains',
-            chainsAvailable: data.length || 'N/A'
+            endpoint: '/data/supported-blockchains'
           },
           timestamp: new Date()
         };
@@ -188,22 +186,23 @@ class TatumAdapter implements IBlockchainProvider {
         error: errorText
       });
 
-      // Specific error messages
+      // Specific error messages based on status
       let message = 'Tatum API test failed';
-      if (response.status === 401) {
-        message = 'Invalid API key';
-      } else if (response.status === 403) {
-        message = 'API key does not have required permissions';
+      if (response.status === 401 || response.status === 403) {
+        message = 'Invalid or unauthorized API key';
       } else if (response.status === 429) {
-        message = 'Rate limit exceeded';
+        message = 'Rate limit exceeded - API key is valid but quota reached';
+      } else if (response.status === 404) {
+        message = 'Tatum API endpoint not found - may need to update integration';
       }
       
       return {
         success: false,
-        message: `${message}: ${response.status} ${response.statusText}`,
+        message: `${message} (${response.status})`,
         details: { 
           error: errorText,
-          statusCode: response.status
+          statusCode: response.status,
+          hint: response.status === 401 ? 'Check your API key in Tatum Dashboard' : undefined
         },
         timestamp: new Date()
       };
@@ -211,7 +210,10 @@ class TatumAdapter implements IBlockchainProvider {
       console.error('❌ Tatum connection error:', error);
       return {
         success: false,
-        message: `Tatum connection error: ${error.message}`,
+        message: `Connection error: ${error.message}`,
+        details: {
+          hint: 'Check your internet connection or firewall settings'
+        },
         timestamp: new Date()
       };
     }
