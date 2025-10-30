@@ -168,7 +168,7 @@ export default function PaymentsPage(): JSX.Element {
       // Fetch reference data
       const [fiatRes, cryptoRes, blockchainsRes] = await Promise.all([
         fetch('/api/admin/resources/fiat-currencies'),
-        fetch('/api/admin/resources/currencies?active=true'), // Cryptocurrencies
+        fetch('/api/admin/resources/currencies?active=true&includeBlockchains=true'), // Cryptocurrencies with blockchains
         fetch('/api/admin/blockchains?active=true')
       ]);
 

@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Combobox } from '@/components/shared/Combobox';
 import { toast } from 'sonner';
-import { Wallet, Save } from 'lucide-react';
+import { Wallet, Save, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface CryptoWalletDialogProps {
   open: boolean;
@@ -50,6 +51,52 @@ export function CryptoWalletDialog({
     alertsEnabled: false,
   });
   const [saving, setSaving] = useState(false);
+
+  // Reset blockchain when cryptocurrency changes
+  useEffect(() => {
+    if (formData.cryptocurrencyCode) {
+      // Check if current blockchain is valid for selected cryptocurrency
+      const selectedCrypto = cryptocurrencies.find(c => c.code === formData.cryptocurrencyCode);
+      const validBlockchains = selectedCrypto?.blockchainNetworks?.map((bn: any) => bn.blockchainCode) || [];
+      
+      if (formData.blockchainCode && !validBlockchains.includes(formData.blockchainCode)) {
+        // Reset blockchain if it's not valid for the selected cryptocurrency
+        setFormData(prev => ({ ...prev, blockchainCode: '' }));
+      }
+    }
+  }, [formData.cryptocurrencyCode, cryptocurrencies]);
+
+  // Filter blockchains based on selected cryptocurrency
+  const availableBlockchains = useMemo(() => {
+    if (!formData.cryptocurrencyCode) {
+      return blockchains;
+    }
+
+    const selectedCrypto = cryptocurrencies.find(c => c.code === formData.cryptocurrencyCode);
+    
+    console.log('🔍 Selected crypto:', selectedCrypto);
+    console.log('📦 blockchainNetworks:', selectedCrypto?.blockchainNetworks);
+    
+    if (!selectedCrypto || !selectedCrypto.blockchainNetworks) {
+      return [];
+    }
+
+    // Get blockchain codes that are linked to this cryptocurrency
+    // blockchainNetworks structure: [{ blockchainCode: 'ETHEREUM', blockchain: { code: 'ETHEREUM', name: '...' }, ... }]
+    const linkedBlockchainCodes = selectedCrypto.blockchainNetworks
+      .filter((bn: any) => bn.isActive)
+      .map((bn: any) => bn.blockchain?.code || bn.blockchainCode); // Try both paths
+
+    console.log('🔗 Linked blockchain codes:', linkedBlockchainCodes);
+    console.log('📋 All blockchains:', blockchains.map(b => b.code));
+
+    // Filter blockchains to only show linked ones
+    const filtered = blockchains.filter(b => linkedBlockchainCodes.includes(b.code));
+    
+    console.log('✅ Filtered blockchains:', filtered.map(b => b.code));
+
+    return filtered;
+  }, [formData.cryptocurrencyCode, cryptocurrencies, blockchains]);
 
   useEffect(() => {
     if (wallet) {
@@ -137,7 +184,7 @@ export function CryptoWalletDialog({
     description: c.symbol
   }));
 
-  const blockchainOptions = blockchains.map(b => ({
+  const blockchainOptions = availableBlockchains.map(b => ({
     value: b.code,
     label: b.name,
     description: b.nativeToken
@@ -204,7 +251,7 @@ export function CryptoWalletDialog({
                 <Combobox
                   options={cryptoOptions}
                   value={formData.cryptocurrencyCode}
-                  onValueChange={(value) => setFormData({ ...formData, cryptocurrencyCode: value })}
+                  onValueChange={(value) => setFormData({ ...formData, cryptocurrencyCode: value, blockchainCode: '' })}
                   placeholder="Select cryptocurrency..."
                 />
               </div>
@@ -216,7 +263,16 @@ export function CryptoWalletDialog({
                   value={formData.blockchainCode}
                   onValueChange={(value) => setFormData({ ...formData, blockchainCode: value })}
                   placeholder="Select network..."
+                  disabled={!formData.cryptocurrencyCode || blockchainOptions.length === 0}
                 />
+                {formData.cryptocurrencyCode && blockchainOptions.length === 0 && (
+                  <Alert className="mt-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      No blockchains configured for this cryptocurrency. Please configure in <strong>/admin/currencies</strong>
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
             </div>
           </div>
