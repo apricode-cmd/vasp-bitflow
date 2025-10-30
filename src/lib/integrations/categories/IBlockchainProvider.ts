@@ -156,8 +156,20 @@ export interface IBlockchainProvider extends IIntegrationProvider {
   
   /**
    * Get wallet balance for a specific address
+   * @param blockchain - Blockchain code (ETHEREUM, BITCOIN, etc.)
+   * @param address - Wallet address
+   * @param options - Additional options
+   * @param options.contractAddress - For tokens (ERC-20, TRC-20, etc.)
+   * @param options.isNative - True if native coin (BTC, ETH), false if token (USDT, USDC)
    */
-  getBalance(blockchain: string, address: string): Promise<WalletBalance>;
+  getBalance(
+    blockchain: string, 
+    address: string,
+    options?: {
+      contractAddress?: string;
+      isNative?: boolean;
+    }
+  ): Promise<WalletBalance>;
   
   /**
    * Get wallet portfolio (native + tokens + NFTs) - Tatum v4

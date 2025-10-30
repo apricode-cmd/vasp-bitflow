@@ -76,9 +76,27 @@ export async function syncWalletBalance(walletId: string): Promise<{
       select: {
         id: true,
         code: true,
+        cryptocurrencyCode: true,
         blockchainCode: true,
         address: true,
-        isActive: true
+        isActive: true,
+        cryptocurrency: {
+          select: {
+            code: true,
+            symbol: true,
+            blockchainNetworks: {
+              where: {
+                blockchainCode: { not: null }
+              },
+              select: {
+                blockchainCode: true,
+                contractAddress: true,
+                isNative: true,
+                isActive: true
+              }
+            }
+          }
+        }
       }
     });
 
@@ -94,13 +112,33 @@ export async function syncWalletBalance(walletId: string): Promise<{
       return { success: false, error: 'Wallet missing blockchain or address' };
     }
 
+    if (!wallet.cryptocurrencyCode) {
+      return { success: false, error: 'Wallet missing cryptocurrency code' };
+    }
+
+    // Find the currency-blockchain relationship
+    const currencyBlockchain = wallet.cryptocurrency?.blockchainNetworks?.find(
+      bn => bn.blockchainCode === wallet.blockchainCode && bn.isActive
+    );
+
+    if (!currencyBlockchain) {
+      return { 
+        success: false, 
+        error: `No active relationship found for ${wallet.cryptocurrencyCode} on ${wallet.blockchainCode}` 
+      };
+    }
+
     // Get provider
     const provider = await getActiveBlockchainProvider();
 
     // Fetch balance
     const balanceData = await provider.getBalance(
       wallet.blockchainCode,
-      wallet.address
+      wallet.address,
+      {
+        contractAddress: currencyBlockchain.contractAddress || undefined,
+        isNative: currencyBlockchain.isNative
+      }
     );
 
     // Update wallet in database
@@ -108,6 +146,7 @@ export async function syncWalletBalance(walletId: string): Promise<{
       where: { id: walletId },
       data: {
         balance: balanceData.balanceFormatted,
+        lastChecked: new Date(),
         updatedAt: new Date()
       }
     });
@@ -125,9 +164,12 @@ export async function syncWalletBalance(walletId: string): Promise<{
           walletId,
           walletCode: wallet.code,
           blockchain: wallet.blockchainCode,
+          currency: wallet.cryptocurrencyCode,
           address: wallet.address,
+          contractAddress: currencyBlockchain.contractAddress,
+          isNative: currencyBlockchain.isNative,
           balance: balanceData.balanceFormatted,
-          currency: balanceData.currency
+          rawBalance: balanceData.balance
         }
       }
     });

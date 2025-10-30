@@ -1,7 +1,8 @@
 /**
- * Tatum Blockchain Provider Adapter
+ * Tatum Blockchain Provider Adapter (v3 + v4 Hybrid)
  * 
  * Provides blockchain data and transaction capabilities via Tatum API
+ * Base URL: https://api.tatum.io (both v3 and v4 endpoints)
  * Documentation: https://docs.tatum.io/
  */
 
@@ -28,16 +29,14 @@ import {
  */
 interface TatumConfig extends BaseIntegrationConfig {
   apiKey: string;
-  apiEndpoint?: string; // Default: https://api.tatum.io/v4
+  apiEndpoint?: string; // Default: https://api.tatum.io
   testnet?: boolean;
 }
 
 /**
- * Blockchain mapping (internal code -> Tatum v4 chain names)
- * v4 portfolio API supports specific chains
- * Documentation: https://docs.tatum.io/reference/getbalance
+ * Blockchain mapping (internal code -> Tatum v4 Portfolio API chain names)
  */
-const BLOCKCHAIN_MAP: Record<string, string> = {
+const BLOCKCHAIN_V4_MAP: Record<string, string> = {
   'ETHEREUM': 'ethereum-mainnet',
   'SOLANA': 'solana-mainnet',
   'BASE': 'base-mainnet',
@@ -45,44 +44,31 @@ const BLOCKCHAIN_MAP: Record<string, string> = {
   'BSC': 'bsc-mainnet',
   'POLYGON': 'polygon-mainnet',
   'OPTIMISM': 'optimism-mainnet',
+  'TRON': 'tron-mainnet',
   'BERACHAIN': 'berachain-mainnet',
   'UNICHAIN': 'unichain-mainnet',
   'MONAD': 'monad-testnet',
   'CELO': 'celo-mainnet',
   'CHILIZ': 'chiliz-mainnet',
-  'TEZOS': 'tezos-mainnet',
-  // Legacy/не поддерживается portfolio API (нужны другие endpoints)
-  'BITCOIN': 'bitcoin-mainnet', // Не поддерживается в portfolio
-  'TRON': 'tron-mainnet', // Не поддерживается в portfolio
-  'LITECOIN': 'litecoin-mainnet',
-  'DOGECOIN': 'dogecoin-mainnet',
-  'XRP': 'xrp-mainnet',
-  'STELLAR': 'stellar-mainnet'
+  'TEZOS': 'tezos-mainnet'
 };
 
 /**
- * Blockchain decimals
+ * Known stablecoin contracts (for reference only, actual contracts come from CurrencyBlockchainNetwork)
  */
-const DECIMALS_MAP: Record<string, number> = {
-  'BITCOIN': 8,
-  'ETHEREUM': 18,
-  'BSC': 18,
-  'POLYGON': 18,
-  'TRON': 6,
-  'SOLANA': 9,
-  'ARBITRUM': 18,
-  'OPTIMISM': 18,
-  'BASE': 18,
-  'AVALANCHE': 18,
-  'FANTOM': 18,
-  'CRONOS': 18,
-  'CARDANO': 6,
-  'POLKADOT': 10,
-  'KUSAMA': 12,
-  'LITECOIN': 8,
-  'DOGECOIN': 8,
-  'XRP': 6,
-  'STELLAR': 7
+const STABLECOIN_CONTRACTS: Record<string, Record<string, string>> = {
+  'USDT': {
+    'ETHEREUM': '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+    'TRON': 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+    'BSC': '0x55d398326f99059fF775485246999027B3197955'
+  },
+  'USDC': {
+    'ETHEREUM': '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+    'BASE': '0x833589fC1aF8d5d52835aF6adF4c7fA8f3cF8f4f',
+    'BSC': '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d',
+    'POLYGON': '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
+    'ARBITRUM': '0xaf88d065e77c8cC2239327C5EDb3A432268e5831'
+  }
 };
 
 /**
@@ -99,15 +85,7 @@ const CURRENCY_MAP: Record<string, string> = {
   'OPTIMISM': 'ETH',
   'BASE': 'ETH',
   'AVALANCHE': 'AVAX',
-  'FANTOM': 'FTM',
-  'CRONOS': 'CRO',
-  'CARDANO': 'ADA',
-  'POLKADOT': 'DOT',
-  'KUSAMA': 'KSM',
-  'LITECOIN': 'LTC',
-  'DOGECOIN': 'DOGE',
-  'XRP': 'XRP',
-  'STELLAR': 'XLM'
+  'FANTOM': 'FTM'
 };
 
 /**
@@ -118,7 +96,7 @@ class TatumAdapter implements IBlockchainProvider {
   readonly category = IntegrationCategory.BLOCKCHAIN;
   
   private config: TatumConfig | null = null;
-  private baseUrl: string = 'https://api.tatum.io/v4';
+  private baseUrl: string = 'https://api.tatum.io';
 
   /**
    * Initialize provider with config
@@ -134,7 +112,7 @@ class TatumAdapter implements IBlockchainProvider {
       this.baseUrl = config.apiEndpoint;
     }
 
-    console.log('✅ Tatum provider initialized');
+    console.log(`✅ Tatum provider initialized (${this.baseUrl})`);
   }
 
   /**
@@ -240,36 +218,84 @@ class TatumAdapter implements IBlockchainProvider {
 
   /**
    * Get wallet balance
+   * Supports native tokens (BTC, ETH, BNB, SOL) and ERC-20/TRC-20/BEP-20 tokens (USDT, USDC)
    */
-  async getBalance(blockchain: string, address: string): Promise<WalletBalance> {
+  async getBalance(
+    blockchain: string, 
+    address: string,
+    options?: {
+      contractAddress?: string;
+      isNative?: boolean;
+    }
+  ): Promise<WalletBalance> {
     this.ensureConfigured();
 
     const blockchainUpper = blockchain.toUpperCase();
     const decimals = this.getDecimals(blockchain);
     const currency = this.getNativeCurrency(blockchain);
+    
+    const isNative = options?.isNative ?? true;
+    const contractAddress = options?.contractAddress;
+
+    console.log(`🔍 Tatum getBalance: ${blockchain} | ${address.slice(0, 10)}... | Native: ${isNative} | Contract: ${contractAddress || 'N/A'}`);
 
     try {
-      // BITCOIN, LITECOIN, DOGECOIN use different API (UTXO-based)
-      if (['BITCOIN', 'LITECOIN', 'DOGECOIN'].includes(blockchainUpper)) {
-        console.log(`⚠️ ${blockchainUpper} не поддерживается в v4 Portfolio API. Используется v3 endpoint.`);
+      // ==========================================
+      // 1. BITCOIN (UTXO) - v3 API
+      // ==========================================
+      if (blockchainUpper === 'BITCOIN' && isNative) {
+        console.log('⚡ Using Bitcoin v3 API');
         
-        // Use v3 endpoint for UTXO chains
-        const tatumChainLower = blockchainUpper.toLowerCase();
         const response = await this.makeRequest(
-          `/v3/${tatumChainLower}/address/balance/${address}`,
+          `/v3/bitcoin/address/balance/${address}`,
           'GET'
         );
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`Failed to fetch balance: ${response.status} ${response.statusText} - ${errorText}`);
+          throw new Error(`Bitcoin API error: ${response.status} - ${errorText}`);
         }
 
         const data = await response.json();
-        
-        // v3 Bitcoin API returns { incoming, outgoing }
         const balanceRaw = data.incoming || '0';
         const balanceFormatted = parseFloat(balanceRaw);
+
+        return {
+          address,
+          blockchain,
+          currency: 'BTC',
+          balance: balanceRaw,
+          balanceFormatted,
+          decimals: 8,
+          timestamp: new Date()
+        };
+      }
+
+      // ==========================================
+      // 2. NATIVE TOKENS (ETH, BNB, SOL, TRX) - v4 Portfolio API
+      // ==========================================
+      if (isNative && BLOCKCHAIN_V4_MAP[blockchainUpper]) {
+        console.log(`⚡ Using v4 Portfolio API for native ${currency}`);
+        
+        const tatumChain = BLOCKCHAIN_V4_MAP[blockchainUpper];
+        const response = await this.makeRequest(
+          `/v4/data/wallet/portfolio?chain=${tatumChain}&addresses=${address}&tokenTypes=native`,
+          'GET'
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Portfolio API error: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        let balanceRaw = '0';
+        
+        if (data.native && Array.isArray(data.native) && data.native.length > 0) {
+          balanceRaw = data.native[0]?.balance || '0';
+        }
+
+        const balanceFormatted = parseFloat(balanceRaw) / Math.pow(10, decimals);
 
         return {
           address,
@@ -282,43 +308,65 @@ class TatumAdapter implements IBlockchainProvider {
         };
       }
 
-      // For EVM and other supported chains, use v4 Portfolio API
-      const tatumChain = this.mapBlockchain(blockchain);
-      
-      const response = await this.makeRequest(
-        `/data/wallet/portfolio?chain=${tatumChain}&addresses=${address}&tokenTypes=native`,
-        'GET'
+      // ==========================================
+      // 3. ERC-20/TRC-20/BEP-20 TOKENS - v4 Portfolio API
+      // ==========================================
+      if (!isNative && contractAddress && BLOCKCHAIN_V4_MAP[blockchainUpper]) {
+        console.log(`⚡ Using v4 Portfolio API for token: ${contractAddress}`);
+        
+        const tatumChain = BLOCKCHAIN_V4_MAP[blockchainUpper];
+        const response = await this.makeRequest(
+          `/v4/data/wallet/portfolio?chain=${tatumChain}&addresses=${address}&tokenTypes=fungible`,
+          'GET'
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Portfolio API error: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        
+        // Find the specific token by contract address
+        const token = (data.fungible || []).find((t: any) => 
+          t.tokenAddress?.toLowerCase() === contractAddress.toLowerCase()
+        );
+
+        if (!token) {
+          console.warn(`⚠️ Token ${contractAddress} not found in portfolio`);
+          return {
+            address,
+            blockchain,
+            currency: contractAddress.slice(0, 10) + '...',
+            balance: '0',
+            balanceFormatted: 0,
+            decimals: decimals,
+            timestamp: new Date()
+          };
+        }
+
+        const tokenDecimals = token.decimals || decimals;
+        const balanceRaw = token.balance || '0';
+        const balanceFormatted = parseFloat(balanceRaw) / Math.pow(10, tokenDecimals);
+
+        return {
+          address,
+          blockchain,
+          currency: token.tokenId || contractAddress.slice(0, 10) + '...',
+          balance: balanceRaw,
+          balanceFormatted,
+          decimals: tokenDecimals,
+          timestamp: new Date()
+        };
+      }
+
+      // ==========================================
+      // 4. FALLBACK - Unsupported
+      // ==========================================
+      throw new Error(
+        `Unsupported configuration: ${blockchain} | Native: ${isNative} | Contract: ${contractAddress || 'N/A'}`
       );
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to fetch balance: ${response.status} ${response.statusText} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      
-      // v4 returns portfolio with native balance
-      let balanceRaw = '0';
-      
-      if (data.native && Array.isArray(data.native) && data.native.length > 0) {
-        // v4 returns native as array
-        balanceRaw = data.native[0]?.balance || '0';
-      } else if (data.native?.balance) {
-        // Fallback if it's an object
-        balanceRaw = data.native.balance;
-      }
-
-      const balanceFormatted = parseFloat(balanceRaw) / Math.pow(10, decimals);
-
-      return {
-        address,
-        blockchain,
-        currency,
-        balance: balanceRaw,
-        balanceFormatted,
-        decimals,
-        timestamp: new Date()
-      };
     } catch (error: any) {
       console.error(`❌ Tatum getBalance error for ${blockchain}:${address}:`, error);
       throw new Error(`Failed to get balance for ${blockchain}: ${error.message}`);
@@ -733,10 +781,24 @@ class TatumAdapter implements IBlockchainProvider {
   }
 
   /**
-   * Get blockchain decimals
+   * Get blockchain decimals (fallback values)
    */
   getDecimals(blockchain: string): number {
-    return DECIMALS_MAP[blockchain.toUpperCase()] || 18;
+    const decimalsMap: Record<string, number> = {
+      'BITCOIN': 8,
+      'ETHEREUM': 18,
+      'BSC': 18,
+      'POLYGON': 18,
+      'TRON': 6,
+      'SOLANA': 9,
+      'ARBITRUM': 18,
+      'OPTIMISM': 18,
+      'BASE': 18,
+      'AVALANCHE': 18,
+      'FANTOM': 18
+    };
+    
+    return decimalsMap[blockchain.toUpperCase()] || 18;
   }
 
   /**
