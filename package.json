@@ -99,7 +99,6 @@
     "@types/ua-parser-js": "^0.7.39",
     "eslint": "^8.57.0",
     "eslint-config-next": "^14.2.0",
-    "tsx": "^4.19.0",
-    "typescript": "^5.5.0"
+    "tsx": "^4.19.0"
   }
 }
