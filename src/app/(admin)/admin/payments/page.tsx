@@ -456,6 +456,16 @@ export default function PaymentsPage(): JSX.Element {
         const isLow = balance && minBalance && balance < minBalance;
         const hasBalance = balance && balance > 0;
         
+        // Debug: log что показывается
+        if (typeof window !== 'undefined' && balance !== undefined) {
+          console.log('Balance cell data:', {
+            balance,
+            minBalance,
+            cryptocurrency: row.original.cryptocurrency,
+            hasMinBalance: minBalance !== undefined
+          });
+        }
+        
         if (balance === undefined || balance === null) {
           return (
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -499,7 +509,7 @@ export default function PaymentsPage(): JSX.Element {
                 {formatBalance(balance)}
               </span>
               {row.original.cryptocurrency && (
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs font-medium text-muted-foreground">
                   {row.original.cryptocurrency.code}
                 </span>
               )}
