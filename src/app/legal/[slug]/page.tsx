@@ -2,18 +2,16 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { getPublicSettings } from '@/lib/settings';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { 
-  FileText, Calendar, Shield, Clock, FileCheck
+  FileText, Calendar, Shield, Clock
 } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { LegalPageClient } from '@/components/legal/LegalPageClient';
 import { QuickActions } from '@/components/legal/QuickActions';
-import Image from 'next/image';
+import { ClientFooter } from '@/components/layouts/ClientFooter';
 
 interface LegalPageProps {
   params: {
@@ -222,41 +220,8 @@ export default async function LegalPage({ params }: LegalPageProps) {
         </div>
       </div>
 
-      {/* Compact Footer - прозрачный */}
-      <footer className="border-t border-border/50 mt-auto">
-        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2">
-              <div className="flex h-5 w-5 items-center justify-center rounded-md bg-primary/10">
-                <Shield className="h-2.5 w-2.5 text-primary" />
-              </div>
-              <span className="font-medium">© {new Date().getFullYear()} Apricode Exchange</span>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <Link href="/legal/terms-of-service" className="text-muted-foreground hover:text-foreground transition">
-                Terms
-              </Link>
-              <Link href="/legal/privacy-policy" className="text-muted-foreground hover:text-foreground transition">
-                Privacy
-              </Link>
-              <Link href="/contact" className="text-muted-foreground hover:text-foreground transition">
-                Contact
-              </Link>
-            </div>
-
-            <a 
-              href="https://apricode.io" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition"
-            >
-              <span>by</span>
-              <span className="font-semibold">Apricode</span>
-            </a>
-          </div>
-        </div>
-      </footer>
+      {/* Client Footer */}
+      <ClientFooter />
     </div>
   );
 }
