@@ -67,6 +67,7 @@ export async function middleware(request: NextRequest) {
   if (
     path.startsWith('/login') ||
     path.startsWith('/register') ||
+    path.startsWith('/2fa-verify') ||  // 2FA verification page
     path.startsWith('/api/rates') ||  // Public API for rates
     path.startsWith('/api/payment-methods') ||  // Public API for payment methods
     path.startsWith('/api/legal-documents/public') ||  // Public legal documents

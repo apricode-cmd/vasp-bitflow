@@ -44,24 +44,48 @@ export default function TwoFactorVerifyPage(): React.ReactElement {
     setError(null);
 
     try {
-      // Sign in with 2FA code
+      // Get password from sessionStorage (saved during login)
+      const password = sessionStorage.getItem('2fa_password');
+      
+      if (!password) {
+        setError('Session expired. Please login again.');
+        setTimeout(() => router.push('/login'), 2000);
+        return;
+      }
+
+      // Sign in with email, password, and 2FA code
       const result = await signIn('credentials', {
         email,
+        password,
         twoFactorCode: value,
         redirect: false
       });
 
       if (result?.error) {
-        setError(result.error);
+        setError('Invalid code. Please try again.');
         setCode('');
+        setIsVerifying(false);
       } else if (result?.ok) {
+        // Clear sessionStorage after successful login
+        sessionStorage.removeItem('2fa_email');
+        sessionStorage.removeItem('2fa_password');
+        
         toast.success('Login successful!');
-        router.push('/dashboard');
+        
+        // Get session to determine redirect
+        const sessionResponse = await fetch('/api/auth/session');
+        const session = await sessionResponse.json();
+        
+        // Redirect based on role
+        if (session?.user?.role === 'ADMIN') {
+          window.location.href = '/admin';
+        } else {
+          window.location.href = '/dashboard';
+        }
       }
     } catch (error) {
-      console.error('2FA verification error:', error);
+      console.error('❌ 2FA verification error:', error);
       setError('An error occurred. Please try again.');
-    } finally {
       setIsVerifying(false);
     }
   };

@@ -64,11 +64,17 @@ export default function LoginPage(): React.ReactElement {
       const checkData = await checkResponse.json();
       
       console.log('🔐 2FA check result:', checkData);
+      console.log('🔐 requires2FA:', checkData.requires2FA);
+      console.log('🔐 validPassword:', checkData.validPassword);
       
       // Step 2: If 2FA is enabled, redirect to 2FA page
-      if (checkData.requires2FA) {
+      if (checkData.requires2FA === true) {
         setIsRedirecting(true);
         toast.success('Password verified. Redirecting to 2FA...');
+        
+        // Save credentials temporarily in sessionStorage for 2FA verification
+        sessionStorage.setItem('2fa_email', data.email);
+        sessionStorage.setItem('2fa_password', data.password);
         
         // Use window.location for hard redirect
         await new Promise(resolve => setTimeout(resolve, 800));
