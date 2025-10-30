@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/middleware/api-auth';
+import { requireRole } from '@/lib/auth-utils';
 
 export async function POST(request: NextRequest) {
   const authResult = await requireRole('ADMIN');
