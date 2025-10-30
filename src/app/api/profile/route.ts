@@ -113,8 +113,10 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     };
     
     // Convert dateOfBirth string to Date if provided
+    // Parse as local date to avoid timezone issues (YYYY-MM-DD → local midnight)
     if (validated.dateOfBirth) {
-      profileData.dateOfBirth = new Date(validated.dateOfBirth);
+      const [year, month, day] = validated.dateOfBirth.split('-').map(Number);
+      profileData.dateOfBirth = new Date(year, month - 1, day); // month is 0-indexed
     }
 
     // Update or create profile
