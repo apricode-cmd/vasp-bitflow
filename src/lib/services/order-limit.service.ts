@@ -85,7 +85,7 @@ export class OrderLimitService {
               gte: twentyFourHoursAgo
             },
             status: {
-              notIn: [OrderStatus.CANCELLED, OrderStatus.REJECTED]
+              notIn: [OrderStatus.CANCELLED, OrderStatus.FAILED]
             }
           },
           select: {
@@ -180,7 +180,7 @@ export class OrderLimitService {
           gte: twentyFourHoursAgo
         },
         status: {
-          notIn: [OrderStatus.CANCELLED, OrderStatus.REJECTED]
+          notIn: [OrderStatus.CANCELLED, OrderStatus.FAILED]
         }
       },
       select: {
