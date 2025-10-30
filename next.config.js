@@ -44,6 +44,12 @@ const nextConfig = {
   
   // Fix WebSocket HMR issues
   webpack: (config, { dev, isServer }) => {
+    // Add explicit path alias for Vercel compatibility
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': require('path').resolve(__dirname, 'src'),
+    };
+    
     if (dev && !isServer) {
       config.watchOptions = {
         poll: 1000,
