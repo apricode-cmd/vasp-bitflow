@@ -26,23 +26,76 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children
 }: Readonly<{
   children: React.ReactNode;
-}>): React.ReactElement {
+}>): Promise<React.ReactElement> {
+  // Get primary color from DB for instant SSR
+  const settings = await getPublicSettings();
+  const primaryColorHex = settings.primaryColor || '#06b6d4'; // Cyan fallback
+
+  // Convert hex to HSL for CSS variable
+  function hexToHSL(hex: string): { h: number; s: number; l: number } {
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    let h = 0, s = 0;
+    const l = (max + min) / 2;
+    
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      
+      switch (max) {
+        case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+        case g: h = ((b - r) / d + 2) / 6; break;
+        case b: h = ((r - g) / d + 4) / 6; break;
+      }
+    }
+    
+    return {
+      h: Math.round(h * 360),
+      s: Math.round(s * 100),
+      l: Math.round(l * 100)
+    };
+  }
+
+  const primaryHSL = hexToHSL(primaryColorHex);
+  const primaryCSSValue = `${primaryHSL.h} ${primaryHSL.s}% ${primaryHSL.l}%`;
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Inline critical CSS variable BEFORE any CSS loads */}
+        <style dangerouslySetInnerHTML={{
+          __html: `
+            :root {
+              --primary: ${primaryCSSValue};
+            }
+            .dark {
+              --primary: ${primaryCSSValue};
+            }
+          `
+        }} />
+        
+        {/* Client-side script for localStorage sync (after CSS loads) */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
                 try {
-                  // Load saved brand color from localStorage before React hydrates
+                  // Save server-provided color to localStorage for future visits
+                  var serverColor = '${primaryColorHex}';
+                  localStorage.setItem('brand-primary-color', serverColor);
+                  
+                  // Also check if user changed color in settings (override)
                   var savedColor = localStorage.getItem('brand-primary-color');
-                  if (savedColor) {
-                    // Simple hex to HSL conversion
+                  if (savedColor && savedColor !== serverColor) {
+                    // User customized color - apply it
                     function hexToHSL(hex) {
                       var r = parseInt(hex.slice(1, 3), 16) / 255;
                       var g = parseInt(hex.slice(3, 5), 16) / 255;
