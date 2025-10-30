@@ -87,6 +87,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       const root = document.documentElement;
       root.style.setProperty('--primary', `${hue} ${saturation}% ${lightness}%`);
       
+      // Save to localStorage for instant load on next visit
+      localStorage.setItem('brand-primary-color', hexColor);
+      
       console.log('✅ Applied primary color from DB:', hexColor);
     } catch (error) {
       console.error('❌ Invalid primary color:', error);
