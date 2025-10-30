@@ -1,0 +1,48 @@
+name: CI on Vercel repository_dispatch
+
+on:
+  repository_dispatch:
+    types:
+      - vercel.deployment.ready
+      - vercel.deployment.success
+      - vercel.deployment.error
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repo-dispatch-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  handle-vercel-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # Правильний checkout саме того SHA, який задеплоїв Vercel
+      - uses: vercel/repository-dispatch/actions/checkout@v1
+
+      # Опційно: подивитися payload (допомагає при налагодженні)
+      - uses: vercel/repository-dispatch/actions/debug@v1
+
+      - name: Show deployed URL & env
+        run: |
+          echo "ENV: ${{ github.event.client_payload.environment }}"
+          echo "URL: ${{ github.event.client_payload.url }}"
+          echo "SHA: ${{ github.event.client_payload.git.sha }}"
+
+      # Приклад умови: запускати тести тільки на preview
+      - name: Install deps
+        if: ${{ github.event.client_payload.environment == 'preview' }}
+        run: |
+          npm ci
+
+      - name: Run e2e (stub)
+        if: ${{ github.event.client_payload.environment == 'preview' }}
+        env:
+          BASE_URL: ${{ github.event.client_payload.url }}
+        run: |
+          echo "Run Playwright/Cypress here vs $BASE_URL"
+          # npx playwright install --with-deps
+          # npx playwright test
+

@@ -261,6 +261,46 @@ Limits are configured in the database \`currencies\` table:
 
 Bank details are managed through the admin settings panel and stored in the \`bank_details\` table.
 
+## ⚙️ Operations
+
+### 1. Commit Author (для правильного деплою в Vercel)
+
+Налаштуй один раз:
+
+\`\`\`bash
+git config --global user.name  "Bohdan Kononenko"
+git config --global user.email "bogdan.apricode@gmail.com"
+\`\`\`
+
+Тригер деплою:
+
+\`\`\`bash
+git commit --allow-empty -m "chore: trigger Vercel build"
+git push origin main
+\`\`\`
+
+Або використовуй скрипт для автоматичної перевірки:
+
+\`\`\`bash
+npm run prepush
+\`\`\`
+
+### 2. Database Management
+
+\`\`\`bash
+# View database with Prisma Studio
+npx prisma studio
+
+# Create new migration
+npx prisma migrate dev --name migration_name
+
+# Backup before changes
+npm run db:backup
+
+# Reset database (WARNING: deletes all data)
+npx prisma migrate reset
+\`\`\`
+
 ## 🐛 Troubleshooting
 
 ### Database Connection Issues
@@ -281,6 +321,20 @@ npx prisma migrate reset
 
 # Generate Prisma client
 npx prisma generate
+\`\`\`
+
+### Vercel "Commit Author Required" Error
+
+Якщо бачиш помилку "A commit author is required" при деплої:
+
+\`\`\`bash
+# Налаштуй Git автора
+git config --global user.name  "Bohdan Kononenko"
+git config --global user.email "bogdan.apricode@gmail.com"
+
+# Створи порожній коміт для тригеру деплою
+git commit --allow-empty -m "chore: trigger Vercel build"
+git push origin main
 \`\`\`
 
 ## 📄 License
