@@ -244,19 +244,55 @@ class TatumAdapter implements IBlockchainProvider {
   async getBalance(blockchain: string, address: string): Promise<WalletBalance> {
     this.ensureConfigured();
 
-    const tatumChain = this.mapBlockchain(blockchain);
+    const blockchainUpper = blockchain.toUpperCase();
     const decimals = this.getDecimals(blockchain);
     const currency = this.getNativeCurrency(blockchain);
 
     try {
-      // Use v4 portfolio endpoint with tokenTypes=native
+      // BITCOIN, LITECOIN, DOGECOIN use different API (UTXO-based)
+      if (['BITCOIN', 'LITECOIN', 'DOGECOIN'].includes(blockchainUpper)) {
+        console.log(`⚠️ ${blockchainUpper} не поддерживается в v4 Portfolio API. Используется v3 endpoint.`);
+        
+        // Use v3 endpoint for UTXO chains
+        const tatumChainLower = blockchainUpper.toLowerCase();
+        const response = await this.makeRequest(
+          `/v3/${tatumChainLower}/address/balance/${address}`,
+          'GET'
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to fetch balance: ${response.status} ${response.statusText} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        
+        // v3 Bitcoin API returns { incoming, outgoing }
+        const balanceRaw = data.incoming || '0';
+        const balanceFormatted = parseFloat(balanceRaw);
+
+        return {
+          address,
+          blockchain,
+          currency,
+          balance: balanceRaw,
+          balanceFormatted,
+          decimals,
+          timestamp: new Date()
+        };
+      }
+
+      // For EVM and other supported chains, use v4 Portfolio API
+      const tatumChain = this.mapBlockchain(blockchain);
+      
       const response = await this.makeRequest(
         `/data/wallet/portfolio?chain=${tatumChain}&addresses=${address}&tokenTypes=native`,
         'GET'
       );
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch balance: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch balance: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       const data = await response.json();
@@ -285,7 +321,7 @@ class TatumAdapter implements IBlockchainProvider {
       };
     } catch (error: any) {
       console.error(`❌ Tatum getBalance error for ${blockchain}:${address}:`, error);
-      throw new Error(`Failed to get balance: ${error.message}`);
+      throw new Error(`Failed to get balance for ${blockchain}: ${error.message}`);
     }
   }
 
