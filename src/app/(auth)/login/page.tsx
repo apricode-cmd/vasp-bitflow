@@ -74,12 +74,17 @@ export default function LoginPage(): React.ReactElement {
           
           const checkData = await checkResponse.json();
           
+          console.log('2FA check result:', checkData);
+          
           if (checkData.requires2FA) {
             // User has 2FA enabled, redirect to 2FA page
+            setIsRedirecting(true);
+            toast.success('Password verified. Please enter your 2FA code.');
             router.push(`/2fa-verify?email=${encodeURIComponent(data.email)}`);
             return;
           }
         } catch (e) {
+          console.error('2FA check error:', e);
           // Ignore check error, show original error
         }
         
