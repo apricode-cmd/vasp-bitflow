@@ -10,25 +10,54 @@ import Link from 'next/link';
 import { useSettings } from '@/components/providers/settings-provider';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ApricodeLogo } from '@/components/icons/ApricodeLogo';
-import { Mail, Phone, MessageCircle, Copy, CheckCircle } from 'lucide-react';
+import { Mail, Phone, MessageCircle, Copy, CheckCircle, Scale, ExternalLink } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+
+interface LegalDocument {
+  id: string;
+  title: string;
+  slug: string;
+  description: string | null;
+}
 
 export function ClientFooter(): React.ReactElement {
   const { settings, loading } = useSettings();
   const version = process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0';
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [copiedPhone, setCopiedPhone] = useState(false);
+  const [legalDocuments, setLegalDocuments] = useState<LegalDocument[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(true);
 
   // Use server-provided year, fallback to client-side
   const currentYear = settings.currentYear || new Date().getFullYear();
   const companyName = settings.platformName || settings.brandName || 'Apricode Exchange';
+
+  // Fetch legal documents for footer menu
+  useEffect(() => {
+    const fetchLegalDocuments = async () => {
+      try {
+        const response = await fetch('/api/legal-documents/public');
+        const data = await response.json();
+        
+        if (data.success) {
+          setLegalDocuments(data.documents || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch legal documents:', error);
+      } finally {
+        setLoadingDocs(false);
+      }
+    };
+
+    fetchLegalDocuments();
+  }, []);
 
   const handleCopyEmail = () => {
     if (settings.supportEmail) {
@@ -69,18 +98,50 @@ export function ClientFooter(): React.ReactElement {
 
           {/* Center: Links */}
           <div className="flex items-center gap-6">
-            <Link 
-              href="/legal/terms" 
-              className="hover:text-foreground transition"
-            >
-              Terms
-            </Link>
-            <Link 
-              href="/legal/privacy" 
-              className="hover:text-foreground transition"
-            >
-              Privacy
-            </Link>
+            {/* Legal Documents Popover */}
+            {!loadingDocs && legalDocuments.length > 0 ? (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className="hover:text-foreground transition cursor-pointer flex items-center gap-1 group">
+                    <Scale className="h-3.5 w-3.5 group-hover:text-primary transition" />
+                    <span>Legal</span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent 
+                  side="top" 
+                  align="center"
+                  className="w-72 p-4 animate-in slide-in-from-bottom-2"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 pb-2 border-b">
+                      <Scale className="h-4 w-4 text-primary" />
+                      <h4 className="font-semibold text-sm">Legal Documents</h4>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      {legalDocuments.map((doc) => (
+                        <Link
+                          key={doc.id}
+                          href={`/legal/${doc.slug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 p-2 rounded-md hover:bg-accent transition-colors group"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition flex-shrink-0" />
+                          <p className="text-sm font-medium group-hover:text-primary transition">
+                            {doc.title}
+                          </p>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            ) : loadingDocs ? (
+              <Skeleton className="h-4 w-12" />
+            ) : (
+              <span className="text-muted-foreground cursor-not-allowed">Legal</span>
+            )}
             
             {/* Support Popover */}
             {(settings.supportEmail || settings.supportPhone) ? (

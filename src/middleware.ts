@@ -69,6 +69,7 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/register') ||
     path.startsWith('/api/rates') ||  // Public API for rates
     path.startsWith('/api/payment-methods') ||  // Public API for payment methods
+    path.startsWith('/api/legal-documents/public') ||  // Public legal documents
     path.startsWith('/api/v1/') ||  // Public API v1 (uses API keys)
     path.startsWith('/api/kyc/webhook') ||  // Webhook from KYCAID
     path.startsWith('/legal/')  // Legal pages
