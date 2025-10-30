@@ -71,15 +71,15 @@ export const updatePaymentMethodSchema = z.object({
   // Limits & Fees
   isActive: z.boolean().optional(),
   isAvailableForClients: z.boolean().optional(),
-  processingTime: z.string().max(100).optional(),
+  processingTime: z.string().max(100).optional().nullable(),
   minAmount: z.number().positive().optional().nullable(),
   maxAmount: z.number().positive().optional().nullable(),
   feeFixed: z.number().min(0).optional(),
   feePercent: z.number().min(0).max(100).optional(),
   
   // Display
-  instructions: z.string().optional(),
-  iconUrl: z.string().optional(),
+  instructions: z.string().optional().nullable(),
+  iconUrl: z.string().optional().nullable(),
   config: z.record(z.any()).optional(),
   priority: z.number().int().min(0).optional()
 });

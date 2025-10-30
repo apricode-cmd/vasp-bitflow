@@ -52,11 +52,11 @@ class PaymentMethodService {
   }
 
   /**
-   * Get payment method by ID
+   * Get payment method by code (primary key)
    */
-  async getMethodById(id: string): Promise<any | null> {
+  async getMethodById(code: string): Promise<any | null> {
     return prisma.paymentMethod.findUnique({
-      where: { id },
+      where: { code },
       include: {
         paymentAccount: {
           include: {
@@ -90,9 +90,9 @@ class PaymentMethodService {
   /**
    * Update payment method
    */
-  async updateMethod(id: string, data: any): Promise<any> {
+  async updateMethod(code: string, data: any): Promise<any> {
     return prisma.paymentMethod.update({
-      where: { id },
+      where: { code },
       data,
       include: {
         paymentAccount: {
@@ -109,9 +109,9 @@ class PaymentMethodService {
   /**
    * Delete (deactivate) payment method
    */
-  async deleteMethod(id: string): Promise<any> {
+  async deleteMethod(code: string): Promise<any> {
     return prisma.paymentMethod.update({
-      where: { id },
+      where: { code },
       data: { isActive: false }
     });
   }
