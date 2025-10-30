@@ -34,24 +34,26 @@ interface TatumConfig extends BaseIntegrationConfig {
 
 /**
  * Blockchain mapping (internal code -> Tatum v4 chain names)
- * v4 uses format: blockchain-network (e.g., bitcoin-mainnet, ethereum-mainnet)
+ * v4 portfolio API supports specific chains
+ * Documentation: https://docs.tatum.io/reference/getbalance
  */
 const BLOCKCHAIN_MAP: Record<string, string> = {
-  'BITCOIN': 'bitcoin-mainnet',
   'ETHEREUM': 'ethereum-mainnet',
+  'SOLANA': 'solana-mainnet',
+  'BASE': 'base-mainnet',
+  'ARBITRUM': 'arb-one-mainnet',
   'BSC': 'bsc-mainnet',
   'POLYGON': 'polygon-mainnet',
-  'SOLANA': 'solana-mainnet',
-  'TRON': 'tron-mainnet',
-  'ARBITRUM': 'arbitrum-one-mainnet',
   'OPTIMISM': 'optimism-mainnet',
-  'BASE': 'base-mainnet',
-  'AVALANCHE': 'avalanche-mainnet',
-  'FANTOM': 'fantom-mainnet',
-  'CRONOS': 'cronos-mainnet',
-  'CARDANO': 'cardano-mainnet',
-  'POLKADOT': 'polkadot-mainnet',
-  'KUSAMA': 'kusama-mainnet',
+  'BERACHAIN': 'berachain-mainnet',
+  'UNICHAIN': 'unichain-mainnet',
+  'MONAD': 'monad-testnet',
+  'CELO': 'celo-mainnet',
+  'CHILIZ': 'chiliz-mainnet',
+  'TEZOS': 'tezos-mainnet',
+  // Legacy/не поддерживается portfolio API (нужны другие endpoints)
+  'BITCOIN': 'bitcoin-mainnet', // Не поддерживается в portfolio
+  'TRON': 'tron-mainnet', // Не поддерживается в portfolio
   'LITECOIN': 'litecoin-mainnet',
   'DOGECOIN': 'dogecoin-mainnet',
   'XRP': 'xrp-mainnet',
@@ -148,11 +150,11 @@ class TatumAdapter implements IBlockchainProvider {
     }
 
     try {
-      // Test with Ethereum address (better support in v4)
+      // Test with Ethereum address using portfolio endpoint
       const testAddress = '0x80d8bac9a6901698b3749fe336bbd1385c1f98f2';
       
       const response = await this.makeRequest(
-        `/v4/data/wallet/balance/time?chain=ethereum-mainnet&addresses=${testAddress}`,
+        `/v4/data/wallet/portfolio?chain=ethereum-mainnet&address=${testAddress}&tokenTypes=native`,
         'GET'
       );
 
@@ -165,7 +167,8 @@ class TatumAdapter implements IBlockchainProvider {
             provider: 'Tatum', 
             version: 'v4',
             testAddress,
-            response: data.result?.[0] || data
+            chain: 'ethereum-mainnet',
+            response: data
           },
           timestamp: new Date()
         };
@@ -217,9 +220,9 @@ class TatumAdapter implements IBlockchainProvider {
     const currency = this.getNativeCurrency(blockchain);
 
     try {
-      // Use v4 endpoint for current wallet portfolio
+      // Use v4 portfolio endpoint with tokenTypes=native
       const response = await this.makeRequest(
-        `/v4/data/wallet/portfolio?chain=${tatumChain}&address=${address}`,
+        `/v4/data/wallet/portfolio?chain=${tatumChain}&address=${address}&tokenTypes=native`,
         'GET'
       );
 
@@ -232,9 +235,12 @@ class TatumAdapter implements IBlockchainProvider {
       // v4 returns portfolio with native balance
       let balanceRaw = '0';
       
-      if (data.native) {
-        // Native balance from v4 portfolio endpoint
-        balanceRaw = data.native.balance || '0';
+      if (data.native && Array.isArray(data.native) && data.native.length > 0) {
+        // v4 returns native as array
+        balanceRaw = data.native[0]?.balance || '0';
+      } else if (data.native?.balance) {
+        // Fallback if it's an object
+        balanceRaw = data.native.balance;
       }
 
       const balanceFormatted = parseFloat(balanceRaw) / Math.pow(10, decimals);
@@ -265,8 +271,9 @@ class TatumAdapter implements IBlockchainProvider {
     const currency = this.getNativeCurrency(blockchain);
 
     try {
+      // Get all token types: native, fungible (ERC-20), nft, multitoken
       const response = await this.makeRequest(
-        `/v4/data/wallet/portfolio?chain=${tatumChain}&address=${address}`,
+        `/v4/data/wallet/portfolio?chain=${tatumChain}&address=${address}&tokenTypes=native,fungible,nft,multitoken`,
         'GET'
       );
 
@@ -276,26 +283,45 @@ class TatumAdapter implements IBlockchainProvider {
 
       const data = await response.json();
 
-      // Parse native balance
-      const nativeBalanceRaw = data.native?.balance || '0';
+      // Parse native balance (array format in v4)
+      let nativeBalanceRaw = '0';
+      let nativeValueUsd = 0;
+      
+      if (data.native && Array.isArray(data.native) && data.native.length > 0) {
+        nativeBalanceRaw = data.native[0]?.balance || '0';
+        nativeValueUsd = data.native[0]?.valueUsd || 0;
+      }
+      
       const nativeBalanceFormatted = parseFloat(nativeBalanceRaw) / Math.pow(10, decimals);
 
-      // Parse tokens
-      const tokens = data.tokens?.map((token: any) => ({
-        contractAddress: token.contractAddress,
-        symbol: token.symbol,
+      // Parse fungible tokens (ERC-20)
+      const tokens = (data.fungible || []).map((token: any) => ({
+        contractAddress: token.tokenAddress,
+        symbol: token.tokenId, // tokenId contains symbol in v4
         balance: token.balance,
         balanceFormatted: parseFloat(token.balance) / Math.pow(10, token.decimals || 18),
         decimals: token.decimals || 18,
         valueUsd: token.valueUsd
-      })) || [];
+      }));
 
-      // Parse NFTs
-      const nfts = data.nfts?.map((nft: any) => ({
-        contractAddress: nft.contractAddress,
+      // Parse NFTs (ERC-721)
+      const nfts = (data.nft || []).map((nft: any) => ({
+        contractAddress: nft.tokenAddress,
         tokenId: nft.tokenId,
         metadata: nft.metadata
-      })) || [];
+      }));
+
+      // Parse MultiTokens (ERC-1155)
+      const multiTokens = (data.multitoken || []).map((mt: any) => ({
+        contractAddress: mt.tokenAddress,
+        tokenId: mt.tokenId,
+        balance: mt.balance,
+        metadata: mt.metadata
+      }));
+
+      // Calculate total USD value
+      const totalValueUsd = nativeValueUsd + 
+        tokens.reduce((sum: number, t: any) => sum + (t.valueUsd || 0), 0);
 
       return {
         address,
@@ -304,11 +330,11 @@ class TatumAdapter implements IBlockchainProvider {
           currency,
           balance: nativeBalanceRaw,
           balanceFormatted: nativeBalanceFormatted,
-          valueUsd: data.native?.valueUsd
+          valueUsd: nativeValueUsd
         },
         tokens,
-        nfts,
-        totalValueUsd: data.totalValueUsd,
+        nfts: [...nfts, ...multiTokens],
+        totalValueUsd,
         timestamp: new Date()
       };
     } catch (error: any) {
