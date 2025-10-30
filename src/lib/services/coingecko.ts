@@ -35,21 +35,49 @@ interface CoinGeckoResponse {
 let ratesCache: CachedRates | null = null;
 
 class CoinGeckoService {
-  private client: AxiosInstance;
+  private client: AxiosInstance | null = null;
   private apiKey: string | null = null;
+  private baseURL: string = 'https://api.coingecko.com/api/v3'; // Default fallback
 
   constructor() {
+    // Set API key if available
+    this.apiKey = process.env.COINGECKO_API_KEY || null;
+  }
+
+  /**
+   * Initialize axios client with URL from database
+   */
+  private async initializeClient(): Promise<void> {
+    if (this.client) return; // Already initialized
+
+    try {
+      // Try to get URL from database integration
+      const integration = await prisma.integration.findFirst({
+        where: { service: 'coingecko' }
+      });
+
+      if (integration?.apiEndpoint) {
+        this.baseURL = integration.apiEndpoint;
+        console.log('✅ Using CoinGecko URL from database:', this.baseURL);
+      } else {
+        // Fallback to env variable
+        this.baseURL = config.coingecko.apiUrl || this.baseURL;
+        console.log('⚠️ Using CoinGecko URL from env/fallback:', this.baseURL);
+      }
+    } catch (error) {
+      console.error('❌ Failed to load CoinGecko config from DB, using fallback:', error);
+      this.baseURL = config.coingecko.apiUrl || this.baseURL;
+    }
+
+    // Create axios client
     this.client = axios.create({
-      baseURL: config.coingecko.apiUrl,
+      baseURL: this.baseURL,
       headers: {
         'Accept': 'application/json',
         'User-Agent': 'Apricode-Exchange/1.0'
       },
       timeout: 10000 // 10 second timeout
     });
-
-    // Set API key if available
-    this.apiKey = process.env.COINGECKO_API_KEY || null;
   }
 
   /**
@@ -75,6 +103,13 @@ class CoinGeckoService {
    * NOTE: This method does NOT check integration status - that's handled by rateProviderService
    */
   async getCurrentRates(forceRefresh = false): Promise<CoinGeckoRates> {
+    // Initialize client if needed
+    await this.initializeClient();
+
+    if (!this.client) {
+      throw new Error('Failed to initialize CoinGecko client');
+    }
+
     // Check cache (skip if force refresh requested)
     if (!forceRefresh && ratesCache && Date.now() - ratesCache.timestamp < CACHE_DURATION_MS) {
       console.log('📦 Returning cached rates (age: ' + Math.round((Date.now() - ratesCache.timestamp) / 1000) + 's)');
@@ -200,6 +235,16 @@ class CoinGeckoService {
     responseTime?: number;
   }> {
     try {
+      // Initialize client if needed
+      await this.initializeClient();
+
+      if (!this.client) {
+        return {
+          success: false,
+          message: 'Failed to initialize CoinGecko client'
+        };
+      }
+
       const startTime = Date.now();
       
       const response = await this.client.get('/ping');
@@ -237,6 +282,16 @@ class CoinGeckoService {
     } | null;
   }> {
     try {
+      // Initialize client if needed
+      await this.initializeClient();
+
+      if (!this.client) {
+        return {
+          hasApiKey: !!this.apiKey,
+          rateLimit: null
+        };
+      }
+
       const response = await this.client.get('/ping');
       
       return {
@@ -268,6 +323,14 @@ class CoinGeckoService {
     lastUpdated: string;
   } | null> {
     try {
+      // Initialize client if needed
+      await this.initializeClient();
+
+      if (!this.client) {
+        console.error('Failed to initialize CoinGecko client');
+        return null;
+      }
+
       const response = await this.client.get(`/coins/${coinId}`, {
         params: {
           localization: false,
