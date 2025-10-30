@@ -35,6 +35,7 @@ interface TatumConfig extends BaseIntegrationConfig {
 
 /**
  * Blockchain mapping (internal code -> Tatum v4 Portfolio API chain names)
+ * Note: TRON is NOT supported in Portfolio API v4, use dedicated endpoints
  */
 const BLOCKCHAIN_V4_MAP: Record<string, string> = {
   'ETHEREUM': 'ethereum-mainnet',
@@ -44,13 +45,13 @@ const BLOCKCHAIN_V4_MAP: Record<string, string> = {
   'BSC': 'bsc-mainnet',
   'POLYGON': 'polygon-mainnet',
   'OPTIMISM': 'optimism-mainnet',
-  'TRON': 'tron-mainnet',
   'BERACHAIN': 'berachain-mainnet',
   'UNICHAIN': 'unichain-mainnet',
   'MONAD': 'monad-testnet',
   'CELO': 'celo-mainnet',
   'CHILIZ': 'chiliz-mainnet',
   'TEZOS': 'tezos-mainnet'
+  // TRON - NOT in this map, handled separately
 };
 
 /**
@@ -309,7 +310,84 @@ class TatumAdapter implements IBlockchainProvider {
       }
 
       // ==========================================
-      // 3. ERC-20/TRC-20/BEP-20 TOKENS - v4 Portfolio API
+      // 3. TRON TRC-20 TOKENS - v4 Portfolio API (special handling)
+      // ==========================================
+      if (blockchainUpper === 'TRON' && !isNative && contractAddress) {
+        console.log(`⚡ Using TRON v4 Portfolio API for TRC-20 token: ${contractAddress}`);
+        
+        // TRON in v4 uses 'tron-mainnet' but it's NOT in the supported list for portfolio
+        // Try v3 account endpoint instead
+        const response = await this.makeRequest(
+          `/v3/tron/account/${address}`,
+          'GET'
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`TRON API error: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        console.log('📦 TRON account data:', JSON.stringify(data, null, 2));
+        
+        // Find TRC-20 token balance in trc20 array
+        const trc20Tokens = data.trc20 || [];
+        const tokenData = trc20Tokens.find((t: any) => 
+          t[contractAddress] !== undefined
+        );
+
+        let balanceRaw = '0';
+        if (tokenData && tokenData[contractAddress]) {
+          balanceRaw = tokenData[contractAddress];
+        }
+
+        const tokenDecimals = 6; // USDT TRC-20 has 6 decimals
+        const balanceFormatted = parseFloat(balanceRaw) / Math.pow(10, tokenDecimals);
+
+        return {
+          address,
+          blockchain,
+          currency: 'USDT', // or extract from contract
+          balance: balanceRaw,
+          balanceFormatted,
+          decimals: tokenDecimals,
+          timestamp: new Date()
+        };
+      }
+
+      // ==========================================
+      // 4. TRON NATIVE (TRX) - v3 API
+      // ==========================================
+      if (blockchainUpper === 'TRON' && isNative) {
+        console.log('⚡ Using TRON v3 API for native TRX');
+        
+        const response = await this.makeRequest(
+          `/v3/tron/account/${address}`,
+          'GET'
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`TRON API error: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        const balanceRaw = data.balance || '0';
+        const balanceFormatted = parseFloat(balanceRaw) / Math.pow(10, 6); // TRX has 6 decimals
+
+        return {
+          address,
+          blockchain,
+          currency: 'TRX',
+          balance: balanceRaw,
+          balanceFormatted,
+          decimals: 6,
+          timestamp: new Date()
+        };
+      }
+
+      // ==========================================
+      // 5. ERC-20/BEP-20 TOKENS (not TRON) - v4 Portfolio API
       // ==========================================
       if (!isNative && contractAddress && BLOCKCHAIN_V4_MAP[blockchainUpper]) {
         console.log(`⚡ Using v4 Portfolio API for token: ${contractAddress}`);
