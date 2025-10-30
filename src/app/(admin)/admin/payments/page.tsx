@@ -27,7 +27,10 @@ import {
   AlertCircle,
   Edit,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  Bitcoin,
+  DollarSign,
+  Coins
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable } from '@/components/admin/DataTable';
@@ -56,6 +59,7 @@ interface PaymentAccount {
   address?: string;
   balance?: number;
   minBalance?: number;
+  lastChecked?: string;
   // Common
   isActive: boolean;
   isDefault: boolean;
@@ -379,11 +383,35 @@ export default function PaymentsPage(): JSX.Element {
     {
       accessorKey: 'cryptocurrency',
       header: 'Asset',
-      cell: ({ row }) => row.original.cryptocurrency ? (
-        <Badge variant="outline">
-          {row.original.cryptocurrency.symbol} {row.original.cryptocurrency.code}
-        </Badge>
-      ) : 'N/A',
+      cell: ({ row }) => {
+        if (!row.original.cryptocurrency) return 'N/A';
+        
+        const { code, symbol } = row.original.cryptocurrency;
+        
+        // Get icon for crypto
+        const getCryptoIcon = (cryptoCode: string) => {
+          const iconMap: Record<string, JSX.Element> = {
+            'BTC': <Bitcoin className="h-4 w-4 text-orange-500" />,
+            'ETH': <Coins className="h-4 w-4 text-blue-500" />,
+            'USDT': <DollarSign className="h-4 w-4 text-green-600" />,
+            'USDC': <DollarSign className="h-4 w-4 text-blue-600" />,
+            'SOL': <Coins className="h-4 w-4 text-purple-500" />,
+            'TRX': <Coins className="h-4 w-4 text-red-500" />,
+          };
+          return iconMap[cryptoCode] || <Wallet className="h-4 w-4 text-muted-foreground" />;
+        };
+
+        return (
+          <div className="flex items-center gap-2">
+            <div className="flex-shrink-0">
+              {getCryptoIcon(code)}
+            </div>
+            <div className="flex flex-col">
+              <span className="font-medium text-sm">{symbol} {code}</span>
+            </div>
+          </div>
+        );
+      },
     },
     {
       accessorKey: 'blockchain',
@@ -424,18 +452,68 @@ export default function PaymentsPage(): JSX.Element {
       cell: ({ row }) => {
         const balance = row.original.balance;
         const minBalance = row.original.minBalance;
+        const lastChecked = row.original.updatedAt;
         const isLow = balance && minBalance && balance < minBalance;
+        const hasBalance = balance && balance > 0;
+        
+        if (balance === undefined || balance === null) {
+          return (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <span className="text-sm">—</span>
+            </div>
+          );
+        }
 
-        return balance !== undefined ? (
-          <div className="flex items-center gap-2">
-            <span className={isLow ? 'text-yellow-600' : ''}>
-              {balance.toFixed(8)}
-            </span>
-            {isLow && (
-              <AlertCircle className="h-4 w-4 text-yellow-600" />
+        // Format balance with appropriate decimals
+        const formatBalance = (val: number) => {
+          if (val === 0) return '0';
+          if (val >= 1) {
+            return val.toLocaleString('en-US', { 
+              minimumFractionDigits: 2, 
+              maximumFractionDigits: 8 
+            });
+          }
+          return val.toLocaleString('en-US', { 
+            minimumFractionDigits: 8, 
+            maximumFractionDigits: 8 
+          });
+        };
+
+        // Calculate time since last update
+        const getTimeSince = (date: string) => {
+          const seconds = Math.floor((new Date().getTime() - new Date(date).getTime()) / 1000);
+          if (seconds < 60) return 'just now';
+          if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+          if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+          return `${Math.floor(seconds / 86400)}d ago`;
+        };
+
+        return (
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <span className={`font-mono text-sm font-medium ${
+                hasBalance 
+                  ? 'text-green-600 dark:text-green-400' 
+                  : 'text-muted-foreground'
+              }`}>
+                {formatBalance(balance)}
+              </span>
+              {row.original.cryptocurrency && (
+                <span className="text-xs text-muted-foreground">
+                  {row.original.cryptocurrency.code}
+                </span>
+              )}
+              {isLow && (
+                <AlertCircle className="h-3.5 w-3.5 text-yellow-600" />
+              )}
+            </div>
+            {lastChecked && (
+              <span className="text-[10px] text-muted-foreground">
+                Updated {getTimeSince(lastChecked)}
+              </span>
             )}
           </div>
-        ) : 'N/A';
+        );
       },
     },
     {
