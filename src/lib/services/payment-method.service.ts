@@ -34,7 +34,13 @@ class PaymentMethodService {
   async getAllMethods(): Promise<any[]> {
     return prisma.paymentMethod.findMany({
       include: {
-        fiatCurrency: true,
+        paymentAccount: {
+          include: {
+            fiatCurrency: true,
+            cryptocurrency: true,
+            blockchain: true
+          }
+        },
         _count: {
           select: {
             orders: true
@@ -52,7 +58,13 @@ class PaymentMethodService {
     return prisma.paymentMethod.findUnique({
       where: { id },
       include: {
-        fiatCurrency: true
+        paymentAccount: {
+          include: {
+            fiatCurrency: true,
+            cryptocurrency: true,
+            blockchain: true
+          }
+        }
       }
     });
   }
@@ -64,7 +76,13 @@ class PaymentMethodService {
     return prisma.paymentMethod.create({
       data,
       include: {
-        fiatCurrency: true
+        paymentAccount: {
+          include: {
+            fiatCurrency: true,
+            cryptocurrency: true,
+            blockchain: true
+          }
+        }
       }
     });
   }
@@ -77,7 +95,13 @@ class PaymentMethodService {
       where: { id },
       data,
       include: {
-        fiatCurrency: true
+        paymentAccount: {
+          include: {
+            fiatCurrency: true,
+            cryptocurrency: true,
+            blockchain: true
+          }
+        }
       }
     });
   }

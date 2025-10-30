@@ -157,6 +157,12 @@ export function PaymentMethodDialog({
         ...formData,
         minAmount: formData.minAmount ? parseFloat(formData.minAmount) : null,
         maxAmount: formData.maxAmount ? parseFloat(formData.maxAmount) : null,
+        // Convert empty strings to null for optional FK fields
+        pspConnector: formData.pspConnector || null,
+        paymentAccountId: formData.paymentAccountId || null,
+        processingTime: formData.processingTime || null,
+        instructions: formData.instructions || null,
+        iconUrl: formData.iconUrl || null,
       };
 
       const response = await fetch(endpoint, {
