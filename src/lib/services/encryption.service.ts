@@ -151,3 +151,43 @@ export function maskApiKey(apiKey: string): string {
   
   return `${first}${masked}${last}`;
 }
+
+/**
+ * Encrypt an object (converts to JSON, then encrypts)
+ */
+export function encryptObject(obj: Record<string, any>): string {
+  try {
+    const jsonStr = JSON.stringify(obj);
+    return encrypt(jsonStr);
+  } catch (error) {
+    console.error('Object encryption error:', error);
+    throw new Error('Failed to encrypt object');
+  }
+}
+
+/**
+ * Decrypt an object (decrypts, then parses JSON)
+ */
+export function decryptObject(encrypted: string): Record<string, any> {
+  try {
+    const decryptedStr = decrypt(encrypted);
+    return JSON.parse(decryptedStr);
+  } catch (error) {
+    console.error('Object decryption error:', error);
+    throw new Error('Failed to decrypt object');
+  }
+}
+
+/**
+ * Export as service object for backward compatibility
+ */
+export const encryptionService = {
+  encrypt,
+  decrypt,
+  encryptObject,
+  decryptObject,
+  hashApiKey,
+  maskApiKey,
+  generateEncryptionSecret
+};
+
