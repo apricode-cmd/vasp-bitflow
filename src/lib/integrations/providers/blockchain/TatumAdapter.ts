@@ -148,26 +148,34 @@ class TatumAdapter implements IBlockchainProvider {
     }
 
     try {
-      // Test with a simple balance check on Bitcoin (genesis address)
-      const testAddress = 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh';
+      // Test with Ethereum address (better support in v4)
+      const testAddress = '0x80d8bac9a6901698b3749fe336bbd1385c1f98f2';
       
       const response = await this.makeRequest(
-        `/v4/data/wallet/portfolio?chain=bitcoin-mainnet&address=${testAddress}`,
+        `/v4/data/wallet/balance/time?chain=ethereum-mainnet&addresses=${testAddress}`,
         'GET'
       );
 
       if (response.ok) {
+        const data = await response.json();
         return {
           success: true,
-          message: 'Tatum connection successful',
-          details: { provider: 'Tatum', version: 'v4' },
+          message: 'Tatum v4 connection successful',
+          details: { 
+            provider: 'Tatum', 
+            version: 'v4',
+            testAddress,
+            response: data.result?.[0] || data
+          },
           timestamp: new Date()
         };
       }
 
+      const errorText = await response.text();
       return {
         success: false,
         message: `Tatum test failed: ${response.status} ${response.statusText}`,
+        details: { error: errorText },
         timestamp: new Date()
       };
     } catch (error: any) {
