@@ -167,27 +167,27 @@ export default function PaymentsPage(): JSX.Element {
 
       // Fetch reference data
       const [fiatRes, cryptoRes, blockchainsRes] = await Promise.all([
-        fetch('/api/admin/resources?type=fiat_currency'),
-        fetch('/api/admin/resources?type=cryptocurrency'),
-        fetch('/api/admin/resources?type=blockchain')
+        fetch('/api/admin/resources/fiat-currencies'),
+        fetch('/api/admin/resources/currencies?active=true'), // Cryptocurrencies
+        fetch('/api/admin/blockchains?active=true')
       ]);
 
       if (fiatRes.ok) {
         const data = await fiatRes.json();
-        console.log('💵 Fiat Currencies:', data.resources);
-        setFiatCurrencies(data.resources || []);
+        console.log('💵 Fiat Currencies:', data);
+        setFiatCurrencies(data.data || []);
       }
 
       if (cryptoRes.ok) {
         const data = await cryptoRes.json();
-        console.log('💰 Cryptocurrencies:', data.resources);
-        setCryptocurrencies(data.resources || []);
+        console.log('💰 Cryptocurrencies:', data);
+        setCryptocurrencies(data.data || []);
       }
 
       if (blockchainsRes.ok) {
         const data = await blockchainsRes.json();
-        console.log('⛓️ Blockchains:', data.resources);
-        setBlockchains(data.resources || []);
+        console.log('⛓️ Blockchains:', data);
+        setBlockchains(data.data || []);
       }
     } catch (error) {
       console.error('Failed to fetch payment data:', error);
