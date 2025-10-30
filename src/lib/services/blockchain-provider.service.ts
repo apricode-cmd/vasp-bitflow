@@ -85,9 +85,6 @@ export async function syncWalletBalance(walletId: string): Promise<{
             code: true,
             symbol: true,
             blockchainNetworks: {
-              where: {
-                blockchainCode: { not: null }
-              },
               select: {
                 blockchainCode: true,
                 contractAddress: true,
