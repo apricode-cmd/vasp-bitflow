@@ -122,6 +122,8 @@ export async function POST(request: NextRequest) {
       fiatCurrencyCode, 
       cryptocurrencyCode, 
       blockchainCode,
+      memo, // Remove - not in Prisma schema
+      tag,  // Remove - not in Prisma schema
       ...accountData 
     } = validated;
 
