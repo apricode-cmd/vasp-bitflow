@@ -150,19 +150,17 @@ class TatumAdapter implements IBlockchainProvider {
     }
 
     try {
-      // Test with Ethereum address using portfolio endpoint
-      const testAddress = '0x80d8bac9a6901698b3749fe336bbd1385c1f98f2';
-      const testUrl = `/data/wallet/portfolio?chain=ethereum-mainnet&address=${testAddress}&tokenTypes=native`;
-      
-      console.log('🧪 Testing Tatum API:', {
-        baseUrl: this.baseUrl,
-        endpoint: testUrl,
-        fullUrl: `${this.baseUrl}${testUrl}`
+      // Simple API key validation - just make any request to check auth
+      // Using a lightweight endpoint that doesn't require specific parameters
+      const response = await fetch('https://api.tatum.io/v4/data/chains', {
+        method: 'GET',
+        headers: {
+          'x-api-key': this.config!.apiKey,
+          'Content-Type': 'application/json'
+        }
       });
-      
-      const response = await this.makeRequest(testUrl, 'GET');
 
-      console.log('📡 Tatum API response:', {
+      console.log('📡 Tatum API test response:', {
         status: response.status,
         statusText: response.statusText,
         ok: response.ok
@@ -170,16 +168,15 @@ class TatumAdapter implements IBlockchainProvider {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Tatum test successful:', data);
+        console.log('✅ Tatum test successful');
         return {
           success: true,
-          message: 'Tatum v4 connection successful',
+          message: 'Tatum v4 API key is valid',
           details: { 
             provider: 'Tatum', 
             version: 'v4',
-            testAddress,
-            chain: 'ethereum-mainnet',
-            response: data
+            endpoint: '/data/chains',
+            chainsAvailable: data.length || 'N/A'
           },
           timestamp: new Date()
         };
@@ -188,17 +185,24 @@ class TatumAdapter implements IBlockchainProvider {
       const errorText = await response.text();
       console.error('❌ Tatum test failed:', {
         status: response.status,
-        statusText: response.statusText,
-        error: errorText,
-        url: `${this.baseUrl}${testUrl}`
+        error: errorText
       });
+
+      // Specific error messages
+      let message = 'Tatum API test failed';
+      if (response.status === 401) {
+        message = 'Invalid API key';
+      } else if (response.status === 403) {
+        message = 'API key does not have required permissions';
+      } else if (response.status === 429) {
+        message = 'Rate limit exceeded';
+      }
       
       return {
         success: false,
-        message: `Tatum test failed: ${response.status} ${response.statusText}`,
+        message: `${message}: ${response.status} ${response.statusText}`,
         details: { 
           error: errorText,
-          url: `${this.baseUrl}${testUrl}`,
           statusCode: response.status
         },
         timestamp: new Date()
@@ -245,7 +249,7 @@ class TatumAdapter implements IBlockchainProvider {
     try {
       // Use v4 portfolio endpoint with tokenTypes=native
       const response = await this.makeRequest(
-        `/data/wallet/portfolio?chain=${tatumChain}&address=${address}&tokenTypes=native`,
+        `/data/wallet/portfolio?chain=${tatumChain}&addresses=${address}&tokenTypes=native`,
         'GET'
       );
 
@@ -296,7 +300,7 @@ class TatumAdapter implements IBlockchainProvider {
     try {
       // Get all token types: native, fungible (ERC-20), nft, multitoken
       const response = await this.makeRequest(
-        `/data/wallet/portfolio?chain=${tatumChain}&address=${address}&tokenTypes=native,fungible,nft,multitoken`,
+        `/data/wallet/portfolio?chain=${tatumChain}&addresses=${address}&tokenTypes=native,fungible,nft,multitoken`,
         'GET'
       );
 
