@@ -11,10 +11,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Shield, KeyRound, AlertCircle } from 'lucide-react';
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSeparator,
+  InputOTPSlot,
+} from '@/components/ui/input-otp';
 import { toast } from 'sonner';
 import Link from 'next/link';
 
@@ -33,13 +37,8 @@ export default function TwoFactorVerifyPage(): React.ReactElement {
     return <div>Redirecting...</div>;
   }
 
-  const handleVerify = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!code.trim()) {
-      setError('Please enter the code');
-      return;
-    }
+  const handleVerify = async (value: string) => {
+    if (value.length !== 6 && value.length !== 9) return;
 
     setIsVerifying(true);
     setError(null);
@@ -48,7 +47,7 @@ export default function TwoFactorVerifyPage(): React.ReactElement {
       // Sign in with 2FA code
       const result = await signIn('credentials', {
         email,
-        twoFactorCode: code,
+        twoFactorCode: value,
         redirect: false
       });
 
@@ -77,76 +76,120 @@ export default function TwoFactorVerifyPage(): React.ReactElement {
           <div>
             <CardTitle>Two-Factor Authentication</CardTitle>
             <CardDescription>
-              Enter the 6-digit code from your authenticator app
+              {isBackupCode 
+                ? 'Enter your 8-character backup code'
+                : 'Enter the 6-digit code from your authenticator app'
+              }
             </CardDescription>
           </div>
         </CardHeader>
 
-        <CardContent>
-          <form onSubmit={handleVerify} className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+        <CardContent className="space-y-6">
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
 
-            <div className="space-y-2">
-              <Label htmlFor="code">
-                {isBackupCode ? 'Backup Code' : 'Authentication Code'}
-              </Label>
-              <Input
-                id="code"
-                type="text"
-                inputMode={isBackupCode ? 'text' : 'numeric'}
-                maxLength={isBackupCode ? 9 : 6}
+          {!isBackupCode ? (
+            // TOTP Code Input (6 digits)
+            <div className="flex flex-col items-center space-y-4">
+              <InputOTP
+                maxLength={6}
                 value={code}
-                onChange={(e) => setCode(e.target.value.replace(/[^0-9A-Z-]/gi, '').toUpperCase())}
-                placeholder={isBackupCode ? 'XXXX-XXXX' : '000000'}
-                className="text-center text-2xl tracking-widest font-mono"
-                autoFocus
+                onChange={(value) => {
+                  setCode(value);
+                  if (value.length === 6) {
+                    handleVerify(value);
+                  }
+                }}
                 disabled={isVerifying}
-              />
-            </div>
+              >
+                <InputOTPGroup>
+                  <InputOTPSlot index={0} />
+                  <InputOTPSlot index={1} />
+                  <InputOTPSlot index={2} />
+                </InputOTPGroup>
+                <InputOTPSeparator />
+                <InputOTPGroup>
+                  <InputOTPSlot index={3} />
+                  <InputOTPSlot index={4} />
+                  <InputOTPSlot index={5} />
+                </InputOTPGroup>
+              </InputOTP>
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isVerifying || !code.trim()}
-            >
-              {isVerifying ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              {isVerifying && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Verifying...
-                </>
-              ) : (
-                <>
-                  <Shield className="mr-2 h-4 w-4" />
-                  Verify & Continue
-                </>
+                </div>
               )}
-            </Button>
+            </div>
+          ) : (
+            // Backup Code Input (8 characters with dash)
+            <div className="flex flex-col items-center space-y-4">
+              <InputOTP
+                maxLength={9}
+                value={code}
+                onChange={(value) => {
+                  setCode(value);
+                  if (value.length === 9) {
+                    handleVerify(value);
+                  }
+                }}
+                disabled={isVerifying}
+                pattern="[A-Z0-9-]+"
+              >
+                <InputOTPGroup>
+                  <InputOTPSlot index={0} />
+                  <InputOTPSlot index={1} />
+                  <InputOTPSlot index={2} />
+                  <InputOTPSlot index={3} />
+                </InputOTPGroup>
+                <InputOTPSeparator />
+                <InputOTPGroup>
+                  <InputOTPSlot index={4} />
+                  <InputOTPSlot index={5} />
+                  <InputOTPSlot index={6} />
+                  <InputOTPSlot index={7} />
+                  <InputOTPSlot index={8} />
+                </InputOTPGroup>
+              </InputOTP>
 
-            <div className="text-center space-y-2">
-              <button
-                type="button"
-                onClick={() => setIsBackupCode(!isBackupCode)}
+              {isVerifying && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Verifying...
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="text-center space-y-3">
+            <button
+              type="button"
+              onClick={() => {
+                setIsBackupCode(!isBackupCode);
+                setCode('');
+                setError(null);
+              }}
+              className="text-sm text-muted-foreground hover:text-primary transition flex items-center gap-2 mx-auto"
+              disabled={isVerifying}
+            >
+              <KeyRound className="h-3 w-3" />
+              {isBackupCode ? 'Use authenticator code' : 'Use backup code instead'}
+            </button>
+
+            <div className="pt-2 border-t">
+              <Link
+                href="/login"
                 className="text-sm text-muted-foreground hover:text-primary transition"
               >
-                <KeyRound className="inline h-3 w-3 mr-1" />
-                {isBackupCode ? 'Use authenticator code' : 'Use backup code instead'}
-              </button>
-
-              <div className="pt-2 border-t">
-                <Link
-                  href="/login"
-                  className="text-sm text-muted-foreground hover:text-primary transition"
-                >
-                  ← Back to login
-                </Link>
-              </div>
+                ← Back to login
+              </Link>
             </div>
-          </form>
+          </div>
         </CardContent>
       </Card>
     </div>
