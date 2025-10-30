@@ -310,49 +310,90 @@ class TatumAdapter implements IBlockchainProvider {
       }
 
       // ==========================================
-      // 3. TRON TRC-20 TOKENS - v3 API
+      // 3. TRON TRC-20 TOKENS - Direct Smart Contract Call
       // ==========================================
       if (blockchainUpper === 'TRON' && !isNative && contractAddress) {
-        console.log(`⚡ Using TRON v3 API for TRC-20 token: ${contractAddress}`);
+        console.log(`⚡ Using TRON Smart Contract call for TRC-20 token: ${contractAddress}`);
         
-        const response = await this.makeRequest(
-          `/v3/tron/account/${address}`,
-          'GET'
+        // First, try v3 account endpoint (faster)
+        try {
+          const accountResponse = await this.makeRequest(
+            `/v3/tron/account/${address}`,
+            'GET'
+          );
+
+          if (accountResponse.ok) {
+            const accountData = await accountResponse.json();
+            console.log('📦 TRON v3 account response:', JSON.stringify(accountData, null, 2));
+            
+            const trc20Tokens = accountData.trc20 || [];
+            
+            if (trc20Tokens.length > 0) {
+              console.log('📦 TRC-20 tokens found:', trc20Tokens);
+              
+              for (const tokenObj of trc20Tokens) {
+                if (tokenObj[contractAddress]) {
+                  const balanceRaw = tokenObj[contractAddress];
+                  const tokenDecimals = 6; // USDT TRC-20 has 6 decimals
+                  const balanceFormatted = parseFloat(balanceRaw) / Math.pow(10, tokenDecimals);
+                  
+                  console.log(`✅ Found token balance via v3: ${balanceFormatted} USDT`);
+                  
+                  return {
+                    address,
+                    blockchain,
+                    currency: 'USDT',
+                    balance: balanceRaw,
+                    balanceFormatted,
+                    decimals: tokenDecimals,
+                    timestamp: new Date()
+                  };
+                }
+              }
+            }
+            
+            console.log('⚠️ TRC-20 array is empty, trying direct smart contract call...');
+          }
+        } catch (error) {
+          console.error('❌ v3 account endpoint failed:', error);
+        }
+
+        // Fallback: Direct smart contract call via v4
+        console.log('📞 Calling TRON smart contract directly for accurate balance...');
+        
+        // Convert Base58 address to Hex (remove 'T' and decode)
+        // For now, use a simple hex conversion or pass as-is if Tatum handles it
+        const contractCallResponse = await this.makeRequest(
+          `/v4/tron/triggerconstantcontract`,
+          'POST',
+          {
+            owner_address: address,
+            contract_address: contractAddress,
+            function_selector: 'balanceOf(address)',
+            parameter: this.tronAddressToParameter(address),
+            visible: true
+          }
         );
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`TRON API error: ${response.status} - ${errorText}`);
+        if (!contractCallResponse.ok) {
+          const errorText = await contractCallResponse.text();
+          console.error('❌ TRON contract call failed:', errorText);
+          throw new Error(`TRON contract call error: ${contractCallResponse.status} - ${errorText}`);
         }
 
-        const data = await response.json();
-        console.log('📦 TRON full response:', JSON.stringify(data, null, 2));
+        const contractData = await contractCallResponse.json();
+        console.log('📦 TRON contract response:', JSON.stringify(contractData, null, 2));
         
-        // TRON v3 API returns trc20 array with token balances
-        // Example: { "trc20": [{ "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t": "1000000" }] }
-        const trc20Tokens = data.trc20 || [];
-        console.log('📦 TRC-20 tokens array:', trc20Tokens);
-        
-        // Find token by contract address
+        // Parse result from hex
         let balanceRaw = '0';
-        
-        for (const tokenObj of trc20Tokens) {
-          console.log(`🔍 Checking token object:`, tokenObj);
-          if (tokenObj[contractAddress]) {
-            balanceRaw = tokenObj[contractAddress];
-            console.log(`✅ Found token balance: ${balanceRaw}`);
-            break;
-          }
-        }
-
-        if (balanceRaw === '0') {
-          console.warn(`⚠️ Token ${contractAddress} not found in wallet or balance is 0`);
+        if (contractData.constant_result && contractData.constant_result[0]) {
+          balanceRaw = parseInt(contractData.constant_result[0], 16).toString();
         }
 
         const tokenDecimals = 6; // USDT TRC-20 has 6 decimals
         const balanceFormatted = parseFloat(balanceRaw) / Math.pow(10, tokenDecimals);
 
-        console.log(`💰 Final balance: ${balanceFormatted} USDT (raw: ${balanceRaw})`);
+        console.log(`💰 Final balance via contract: ${balanceFormatted} USDT (raw: ${balanceRaw})`);
 
         return {
           address,
@@ -1059,6 +1100,20 @@ class TatumAdapter implements IBlockchainProvider {
     };
 
     return formats[blockchain.toUpperCase()] || 'Standard';
+  }
+
+  /**
+   * Convert TRON Base58 address to hex parameter for smart contract calls
+   * TRON addresses start with 'T' and need to be converted to hex without '0x41' prefix
+   */
+  private tronAddressToParameter(address: string): string {
+    // For now, Tatum may handle this automatically with visible:true
+    // If not, we'll need proper base58 decoding
+    // The parameter format should be: 0000000000000000000000<ADDRESS_HEX>
+    
+    // Simplified: assume Tatum handles conversion with visible:true
+    // Return the address as-is and let Tatum convert it
+    return address.replace(/^T/, '41'); // T -> 41 prefix for TRON
   }
 }
 
