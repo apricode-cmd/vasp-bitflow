@@ -9,12 +9,7 @@
     "NODE_ENV": "production"
   },
   "build": {
-    "env": {
-      "NEXTAUTH_URL": "@nextauth-url",
-      "DATABASE_URL": "@database-url",
-      "NEXTAUTH_SECRET": "@nextauth-secret",
-      "ENCRYPTION_SECRET": "@encryption-secret"
-    }
+    "env": {}
   },
   "headers": [
     {
