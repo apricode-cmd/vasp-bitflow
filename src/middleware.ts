@@ -58,9 +58,13 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // Temporarily redirect landing page to login
+  if (path === '/') {
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
+
   // Public routes - allow without auth (only if NOT in maintenance mode)
   if (
-    path === '/' ||
     path.startsWith('/login') ||
     path.startsWith('/register') ||
     path.startsWith('/api/rates') ||  // Public API for rates
