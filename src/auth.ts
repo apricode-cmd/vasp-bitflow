@@ -9,6 +9,7 @@ import Credentials from 'next-auth/providers/credentials';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { loginSchema } from '@/lib/validations/auth';
+import { verifyUserTotp } from '@/lib/services/totp.service';
 import UAParser from 'ua-parser-js';
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -16,7 +17,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     Credentials({
       credentials: {
         email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' }
+        password: { label: 'Password', type: 'password' },
+        twoFactorCode: { label: '2FA Code', type: 'text' } // Optional 2FA code
       },
       async authorize(credentials) {
         try {
@@ -26,7 +28,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           }
 
           // Validate with Zod schema
-          const validatedData = loginSchema.parse(credentials);
+          const validatedData = loginSchema.parse({
+            email: credentials.email,
+            password: credentials.password
+          });
 
           // Find user in database
           const user = await prisma.user.findUnique({
@@ -36,7 +41,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               email: true,
               password: true,
               role: true,
-              isActive: true
+              isActive: true,
+              twoFactorAuth: {
+                select: {
+                  totpEnabled: true
+                }
+              }
             }
           });
 
@@ -54,14 +64,44 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             return null;
           }
 
+          // Check if 2FA is enabled
+          const has2FA = user.twoFactorAuth?.totpEnabled === true;
+
+          // If 2FA is enabled
+          if (has2FA) {
+            const twoFactorCode = credentials.twoFactorCode as string | undefined;
+
+            // If no 2FA code provided, return special response to trigger 2FA page
+            if (!twoFactorCode) {
+              throw new Error('2FA_REQUIRED');
+            }
+
+            // Verify 2FA code
+            const { success } = await verifyUserTotp(
+              user.id,
+              user.email,
+              twoFactorCode
+            );
+
+            if (!success) {
+              throw new Error('Invalid 2FA code');
+            }
+          }
+
           // Return user data (without password)
           return {
             id: user.id,
             email: user.email,
             role: user.role
           };
-        } catch (error) {
+        } catch (error: any) {
           console.error('Auth error:', error);
+          
+          // Re-throw 2FA_REQUIRED to handle it in login page
+          if (error.message === '2FA_REQUIRED') {
+            throw error;
+          }
+          
           return null;
         }
       }

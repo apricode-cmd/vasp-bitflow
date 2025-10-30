@@ -9,6 +9,7 @@
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema, type LoginInput } from '@/lib/validations/auth';
@@ -30,6 +31,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { BrandLogo } from '@/components/features/BrandLogo';
 
 export default function LoginPage(): React.ReactElement {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +60,13 @@ export default function LoginPage(): React.ReactElement {
         password: data.password,
         redirect: false
       });
+
+      // Check if 2FA is required
+      if (result?.error === '2FA_REQUIRED') {
+        // Redirect to 2FA verification page
+        router.push(`/2fa-verify?email=${encodeURIComponent(data.email)}`);
+        return;
+      }
 
       if (result?.error) {
         setError('Invalid email or password. Please try again.');

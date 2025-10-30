@@ -5,7 +5,7 @@
   "description": "Apricode Exchange - Cryptocurrency purchase platform with KYC verification",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && prisma db push && next build",
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "next lint",
@@ -68,6 +68,7 @@
     "next": "^14.2.0",
     "next-auth": "^5.0.0-beta.20",
     "next-themes": "^0.4.6",
+    "otpauth": "^9.4.1",
     "postcss": "^8.4.47",
     "prisma": "^5.20.0",
     "qrcode": "^1.5.4",

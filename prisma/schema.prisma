@@ -1067,17 +1067,29 @@ model IpRule {
   @@index([type])
 }
 
-// Two-Factor Authentication для админов
+// Two-Factor Authentication (TOTP + Passkeys support)
 model TwoFactorAuth {
   id          String   @id @default(cuid())
   userId      String   @unique
-  secret      String // Encrypted TOTP secret
-  isEnabled   Boolean  @default(false)
-  backupCodes String[] // Encrypted
+  
+  // TOTP (Google Authenticator)
+  totpEnabled Boolean  @default(false)
+  totpSecret  String?  // Encrypted TOTP secret
+  totpVerifiedAt DateTime?
+  
+  // Backup Codes (одноразовые)
+  backupCodes Json?    // Encrypted array of {code: string, used: boolean}
+  
+  // Passkeys/WebAuthn (Future)
+  passkeysEnabled Boolean @default(false)
+  passkeys        Json?   // Array of {id, publicKey, counter, transports}
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
 }
 
 // ==========================================
