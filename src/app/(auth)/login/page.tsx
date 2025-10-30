@@ -80,7 +80,10 @@ export default function LoginPage(): React.ReactElement {
             // User has 2FA enabled, redirect to 2FA page
             setIsRedirecting(true);
             toast.success('Password verified. Please enter your 2FA code.');
-            router.push(`/2fa-verify?email=${encodeURIComponent(data.email)}`);
+            
+            // Use window.location for hard redirect
+            await new Promise(resolve => setTimeout(resolve, 500));
+            window.location.href = `/2fa-verify?email=${encodeURIComponent(data.email)}`;
             return;
           }
         } catch (e) {
