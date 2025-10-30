@@ -211,7 +211,7 @@ model FiatCurrency {
   tradingPairs   TradingPair[]    @relation("FiatCurrency")
   bankDetails    BankDetails[]    // DEPRECATED
   rateHistory    RateHistory[]    @relation("FiatCurrency")
-  paymentMethods PaymentMethod[]
+  // NOTE: PaymentMethod.currency can be fiat or crypto, no FK relation
   feeProfiles    FeeProfile[]
   limitsMatrix   LimitsMatrix[]
   payIns         PayIn[] // Входящие платежи в этой валюте
@@ -903,7 +903,7 @@ model PaymentMethod {
   automationLevel AutomationLevel @default(MANUAL)
   
   // Payment Details
-  currency       String // EUR, PLN (для фиата)
+  currency       String // EUR, PLN (для фиата) | BTC, ETH, USDT (для криптовалют)
   supportedNetworks String[] @default([]) // Для крипты: ["ETHEREUM", "BSC", "POLYGON"]
   
   // Provider Connection (NEW: unified approach)
@@ -936,7 +936,8 @@ model PaymentMethod {
   createdBy      String? // Admin user ID
   
   // Relations
-  fiatCurrency   FiatCurrency?   @relation(fields: [currency], references: [code])
+  // NOTE: currency is a string that can be either FiatCurrency or Cryptocurrency code
+  // We don't enforce FK constraint to allow flexibility
   psp            PspConnector?   @relation(fields: [pspConnector], references: [code])
   paymentAccount PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
   
