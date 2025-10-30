@@ -62,6 +62,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { PasswordGenerator } from '@/components/ui/password-generator';
+import { TwoFactorAuth } from '@/components/features/TwoFactorAuth';
+
 
 // Profile update schema
 const profileSchema = z.object({
@@ -89,7 +91,6 @@ const passwordSchema = z.object({
 // Security settings schema
 const securitySchema = z.object({
   sessionTimeout: z.enum(['15', '30', '60', '120', '480', '1440']),
-  twoFactorEnabled: z.boolean(),
   loginNotifications: z.boolean(),
 });
 
@@ -130,7 +131,6 @@ export default function AdminProfilePage(): React.ReactElement {
     resolver: zodResolver(securitySchema),
     defaultValues: {
       sessionTimeout: '30',
-      twoFactorEnabled: false,
       loginNotifications: true,
     },
   });
@@ -152,7 +152,6 @@ export default function AdminProfilePage(): React.ReactElement {
           if (data.settings) {
             securityForm.reset({
               sessionTimeout: data.settings.sessionTimeout || '30',
-              twoFactorEnabled: data.settings.twoFactorEnabled || false,
               loginNotifications: data.settings.loginNotifications || true,
             });
           }
@@ -430,6 +429,10 @@ export default function AdminProfilePage(): React.ReactElement {
 
         {/* Security Tab */}
         <TabsContent value="security" className="space-y-6">
+          {/* Two-Factor Authentication */}
+          <TwoFactorAuth />
+
+          {/* Other Security Settings */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -437,7 +440,7 @@ export default function AdminProfilePage(): React.ReactElement {
                 Security Settings
               </CardTitle>
               <CardDescription>
-                Configure security preferences and session management
+                Configure session management and notifications
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -476,31 +479,6 @@ export default function AdminProfilePage(): React.ReactElement {
                   />
 
                   <Separator />
-
-                  <FormField
-                    control={securityForm.control}
-                    name="twoFactorEnabled"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-base flex items-center gap-2">
-                            <Lock className="w-4 h-4" />
-                            Two-Factor Authentication
-                          </FormLabel>
-                          <FormDescription>
-                            Add an extra layer of security to your account (Coming Soon)
-                          </FormDescription>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            disabled
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
 
                   <FormField
                     control={securityForm.control}
