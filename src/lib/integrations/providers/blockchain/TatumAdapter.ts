@@ -8,6 +8,8 @@
 import {
   IBlockchainProvider,
   WalletBalance,
+  WalletPortfolio,
+  HistoricalBalance,
   SendTransactionParams,
   TransactionResponse,
   TransactionDetails,
@@ -26,33 +28,34 @@ import {
  */
 interface TatumConfig extends BaseIntegrationConfig {
   apiKey: string;
-  apiEndpoint?: string; // Default: https://api.tatum.io/v3
+  apiEndpoint?: string; // Default: https://api.tatum.io/v4
   testnet?: boolean;
 }
 
 /**
- * Blockchain mapping (internal code -> Tatum API name)
+ * Blockchain mapping (internal code -> Tatum v4 chain names)
+ * v4 uses format: blockchain-network (e.g., bitcoin-mainnet, ethereum-mainnet)
  */
 const BLOCKCHAIN_MAP: Record<string, string> = {
-  'BITCOIN': 'bitcoin',
-  'ETHEREUM': 'ethereum',
-  'BSC': 'bsc',
-  'POLYGON': 'polygon',
-  'SOLANA': 'solana',
-  'TRON': 'tron',
-  'ARBITRUM': 'arbitrum',
-  'OPTIMISM': 'optimism',
-  'BASE': 'base',
-  'AVALANCHE': 'avax',
-  'FANTOM': 'fantom',
-  'CRONOS': 'cronos',
-  'CARDANO': 'ada',
-  'POLKADOT': 'dot',
-  'KUSAMA': 'ksm',
-  'LITECOIN': 'litecoin',
-  'DOGECOIN': 'doge',
-  'XRP': 'xrp',
-  'STELLAR': 'xlm'
+  'BITCOIN': 'bitcoin-mainnet',
+  'ETHEREUM': 'ethereum-mainnet',
+  'BSC': 'bsc-mainnet',
+  'POLYGON': 'polygon-mainnet',
+  'SOLANA': 'solana-mainnet',
+  'TRON': 'tron-mainnet',
+  'ARBITRUM': 'arbitrum-one-mainnet',
+  'OPTIMISM': 'optimism-mainnet',
+  'BASE': 'base-mainnet',
+  'AVALANCHE': 'avalanche-mainnet',
+  'FANTOM': 'fantom-mainnet',
+  'CRONOS': 'cronos-mainnet',
+  'CARDANO': 'cardano-mainnet',
+  'POLKADOT': 'polkadot-mainnet',
+  'KUSAMA': 'kusama-mainnet',
+  'LITECOIN': 'litecoin-mainnet',
+  'DOGECOIN': 'dogecoin-mainnet',
+  'XRP': 'xrp-mainnet',
+  'STELLAR': 'stellar-mainnet'
 };
 
 /**
@@ -113,7 +116,7 @@ class TatumAdapter implements IBlockchainProvider {
   readonly category = IntegrationCategory.BLOCKCHAIN;
   
   private config: TatumConfig | null = null;
-  private baseUrl: string = 'https://api.tatum.io/v3';
+  private baseUrl: string = 'https://api.tatum.io/v4';
 
   /**
    * Initialize provider with config
@@ -149,7 +152,7 @@ class TatumAdapter implements IBlockchainProvider {
       const testAddress = 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh';
       
       const response = await this.makeRequest(
-        `/v3/bitcoin/address/balance/${testAddress}`,
+        `/v4/data/wallet/portfolio?chain=bitcoin-mainnet&address=${testAddress}`,
         'GET'
       );
 
@@ -157,7 +160,7 @@ class TatumAdapter implements IBlockchainProvider {
         return {
           success: true,
           message: 'Tatum connection successful',
-          details: { provider: 'Tatum', version: 'v3' },
+          details: { provider: 'Tatum', version: 'v4' },
           timestamp: new Date()
         };
       }
@@ -201,13 +204,14 @@ class TatumAdapter implements IBlockchainProvider {
   async getBalance(blockchain: string, address: string): Promise<WalletBalance> {
     this.ensureConfigured();
 
-    const tatumBlockchain = this.mapBlockchain(blockchain);
+    const tatumChain = this.mapBlockchain(blockchain);
     const decimals = this.getDecimals(blockchain);
     const currency = this.getNativeCurrency(blockchain);
 
     try {
+      // Use v4 endpoint for current wallet portfolio
       const response = await this.makeRequest(
-        `/v3/${tatumBlockchain}/address/balance/${address}`,
+        `/v4/data/wallet/portfolio?chain=${tatumChain}&address=${address}`,
         'GET'
       );
 
@@ -217,15 +221,12 @@ class TatumAdapter implements IBlockchainProvider {
 
       const data = await response.json();
       
-      // Tatum returns different formats for different chains
+      // v4 returns portfolio with native balance
       let balanceRaw = '0';
       
-      if (data.incoming) {
-        // Bitcoin-like chains
-        balanceRaw = data.incoming;
-      } else if (data.balance) {
-        // Ethereum-like chains
-        balanceRaw = data.balance;
+      if (data.native) {
+        // Native balance from v4 portfolio endpoint
+        balanceRaw = data.native.balance || '0';
       }
 
       const balanceFormatted = parseFloat(balanceRaw) / Math.pow(10, decimals);
@@ -242,6 +243,131 @@ class TatumAdapter implements IBlockchainProvider {
     } catch (error: any) {
       console.error(`❌ Tatum getBalance error for ${blockchain}:${address}:`, error);
       throw new Error(`Failed to get balance: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get wallet portfolio (native + tokens + NFTs) - Tatum v4
+   */
+  async getPortfolio(blockchain: string, address: string): Promise<WalletPortfolio> {
+    this.ensureConfigured();
+
+    const tatumChain = this.mapBlockchain(blockchain);
+    const decimals = this.getDecimals(blockchain);
+    const currency = this.getNativeCurrency(blockchain);
+
+    try {
+      const response = await this.makeRequest(
+        `/v4/data/wallet/portfolio?chain=${tatumChain}&address=${address}`,
+        'GET'
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch portfolio: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      // Parse native balance
+      const nativeBalanceRaw = data.native?.balance || '0';
+      const nativeBalanceFormatted = parseFloat(nativeBalanceRaw) / Math.pow(10, decimals);
+
+      // Parse tokens
+      const tokens = data.tokens?.map((token: any) => ({
+        contractAddress: token.contractAddress,
+        symbol: token.symbol,
+        balance: token.balance,
+        balanceFormatted: parseFloat(token.balance) / Math.pow(10, token.decimals || 18),
+        decimals: token.decimals || 18,
+        valueUsd: token.valueUsd
+      })) || [];
+
+      // Parse NFTs
+      const nfts = data.nfts?.map((nft: any) => ({
+        contractAddress: nft.contractAddress,
+        tokenId: nft.tokenId,
+        metadata: nft.metadata
+      })) || [];
+
+      return {
+        address,
+        blockchain,
+        native: {
+          currency,
+          balance: nativeBalanceRaw,
+          balanceFormatted: nativeBalanceFormatted,
+          valueUsd: data.native?.valueUsd
+        },
+        tokens,
+        nfts,
+        totalValueUsd: data.totalValueUsd,
+        timestamp: new Date()
+      };
+    } catch (error: any) {
+      console.error(`❌ Tatum getPortfolio error for ${blockchain}:${address}:`, error);
+      throw new Error(`Failed to get portfolio: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get historical balance at specific time or block - Tatum v4
+   */
+  async getHistoricalBalance(
+    blockchain: string,
+    address: string,
+    options: { time?: Date; block?: number }
+  ): Promise<HistoricalBalance> {
+    this.ensureConfigured();
+
+    const tatumChain = this.mapBlockchain(blockchain);
+    const decimals = this.getDecimals(blockchain);
+    const currency = this.getNativeCurrency(blockchain);
+
+    try {
+      // Build query params
+      const params = new URLSearchParams({
+        chain: tatumChain,
+        addresses: address
+      });
+
+      if (options.time) {
+        // Unix timestamp in seconds
+        params.append('time', Math.floor(options.time.getTime() / 1000).toString());
+      } else if (options.block) {
+        params.append('block', options.block.toString());
+      } else {
+        throw new Error('Either time or block must be provided');
+      }
+
+      const response = await this.makeRequest(
+        `/v4/data/wallet/balance/time?${params.toString()}`,
+        'GET'
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch historical balance: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      // v4 returns array of balances for multiple addresses
+      const balanceData = data[0] || { balance: '0' };
+      const balanceRaw = balanceData.balance || '0';
+      const balanceFormatted = parseFloat(balanceRaw) / Math.pow(10, decimals);
+
+      return {
+        address,
+        blockchain,
+        currency,
+        balance: balanceRaw,
+        balanceFormatted,
+        decimals,
+        timestamp: options.time || new Date(),
+        blockNumber: options.block || balanceData.blockNumber
+      };
+    } catch (error: any) {
+      console.error(`❌ Tatum getHistoricalBalance error:`, error);
+      throw new Error(`Failed to get historical balance: ${error.message}`);
     }
   }
 

@@ -21,6 +21,49 @@ export interface WalletBalance {
 }
 
 /**
+ * Historical balance response
+ */
+export interface HistoricalBalance {
+  address: string;
+  blockchain: string;
+  currency: string;
+  balance: string;
+  balanceFormatted: number;
+  decimals: number;
+  timestamp: Date;
+  blockNumber?: number;
+}
+
+/**
+ * Wallet portfolio (native + tokens + NFTs)
+ */
+export interface WalletPortfolio {
+  address: string;
+  blockchain: string;
+  native: {
+    currency: string;
+    balance: string;
+    balanceFormatted: number;
+    valueUsd?: number;
+  };
+  tokens?: Array<{
+    contractAddress: string;
+    symbol: string;
+    balance: string;
+    balanceFormatted: number;
+    decimals: number;
+    valueUsd?: number;
+  }>;
+  nfts?: Array<{
+    contractAddress: string;
+    tokenId: string;
+    metadata?: any;
+  }>;
+  totalValueUsd?: number;
+  timestamp: Date;
+}
+
+/**
  * Transaction send parameters
  */
 export interface SendTransactionParams {
@@ -115,6 +158,23 @@ export interface IBlockchainProvider extends IIntegrationProvider {
    * Get wallet balance for a specific address
    */
   getBalance(blockchain: string, address: string): Promise<WalletBalance>;
+  
+  /**
+   * Get wallet portfolio (native + tokens + NFTs) - Tatum v4
+   */
+  getPortfolio?(blockchain: string, address: string): Promise<WalletPortfolio>;
+  
+  /**
+   * Get historical balance at specific time or block - Tatum v4
+   */
+  getHistoricalBalance?(
+    blockchain: string,
+    address: string,
+    options: {
+      time?: Date;
+      block?: number;
+    }
+  ): Promise<HistoricalBalance>;
   
   /**
    * Send cryptocurrency transaction
