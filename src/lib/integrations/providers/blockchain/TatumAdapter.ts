@@ -152,14 +152,25 @@ class TatumAdapter implements IBlockchainProvider {
     try {
       // Test with Ethereum address using portfolio endpoint
       const testAddress = '0x80d8bac9a6901698b3749fe336bbd1385c1f98f2';
+      const testUrl = `/v4/data/wallet/portfolio?chain=ethereum-mainnet&address=${testAddress}&tokenTypes=native`;
       
-      const response = await this.makeRequest(
-        `/v4/data/wallet/portfolio?chain=ethereum-mainnet&address=${testAddress}&tokenTypes=native`,
-        'GET'
-      );
+      console.log('🧪 Testing Tatum API:', {
+        baseUrl: this.baseUrl,
+        endpoint: testUrl,
+        fullUrl: `${this.baseUrl}${testUrl}`
+      });
+      
+      const response = await this.makeRequest(testUrl, 'GET');
+
+      console.log('📡 Tatum API response:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
 
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ Tatum test successful:', data);
         return {
           success: true,
           message: 'Tatum v4 connection successful',
@@ -175,13 +186,25 @@ class TatumAdapter implements IBlockchainProvider {
       }
 
       const errorText = await response.text();
+      console.error('❌ Tatum test failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+        url: `${this.baseUrl}${testUrl}`
+      });
+      
       return {
         success: false,
         message: `Tatum test failed: ${response.status} ${response.statusText}`,
-        details: { error: errorText },
+        details: { 
+          error: errorText,
+          url: `${this.baseUrl}${testUrl}`,
+          statusCode: response.status
+        },
         timestamp: new Date()
       };
     } catch (error: any) {
+      console.error('❌ Tatum connection error:', error);
       return {
         success: false,
         message: `Tatum connection error: ${error.message}`,
