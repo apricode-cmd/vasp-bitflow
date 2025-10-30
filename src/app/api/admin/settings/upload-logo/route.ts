@@ -2,16 +2,19 @@
  * Upload Logo API
  * 
  * POST /api/admin/settings/upload-logo
- * Uploads logo to /public/uploads/ and saves path to SystemSettings
+ * Uploads logo to Vercel Blob Storage (production) or /public/uploads/ (development)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { put } from '@vercel/blob';
 import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { requireRole, getCurrentUserId } from '@/lib/auth-utils';
 import { prisma } from '@/lib/prisma';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
+
+const isDevelopment = process.env.NODE_ENV === 'development';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
@@ -49,25 +52,40 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true });
-    }
-
-    // Generate unique filename
+    let logoUrl: string;
     const timestamp = Date.now();
     const extension = file.name.split('.').pop();
     const filename = `logo-${timestamp}.${extension}`;
-    const filepath = path.join(uploadsDir, filename);
 
-    // Convert file to buffer and save
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    await writeFile(filepath, buffer);
+    // DEVELOPMENT: Save to /public/uploads/
+    if (isDevelopment) {
+      const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+      if (!existsSync(uploadsDir)) {
+        await mkdir(uploadsDir, { recursive: true });
+      }
 
-    // Public URL path
-    const publicPath = `/uploads/${filename}`;
+      const filepath = path.join(uploadsDir, filename);
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      await writeFile(filepath, buffer);
+
+      logoUrl = `/uploads/${filename}`;
+      console.log('✅ [DEV] Logo saved locally:', logoUrl);
+    } 
+    // PRODUCTION: Upload to Vercel Blob
+    else {
+      if (!process.env.BLOB_READ_WRITE_TOKEN) {
+        throw new Error('BLOB_READ_WRITE_TOKEN is not configured');
+      }
+
+      const blob = await put(filename, file, {
+        access: 'public',
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+      });
+
+      logoUrl = blob.url;
+      console.log('✅ [PROD] Logo uploaded to Vercel Blob:', logoUrl);
+    }
 
     // Get admin ID
     const adminId = await getCurrentUserId();
@@ -82,7 +100,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       where: { key: 'brandLogo' },
       create: {
         key: 'brandLogo',
-        value: publicPath,
+        value: logoUrl,
         type: 'STRING',
         category: 'brand',
         description: 'Brand logo URL',
@@ -90,7 +108,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         updatedBy: adminId || undefined
       },
       update: {
-        value: publicPath,
+        value: logoUrl,
         updatedBy: adminId || undefined
       }
     });
@@ -103,17 +121,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         AUDIT_ENTITIES.SYSTEM_SETTINGS,
         'brandLogo',
         { value: oldSetting?.value },
-        { value: publicPath },
-        { filename, size: file.size, type: file.type }
+        { value: logoUrl },
+        { filename, size: file.size, type: file.type, storage: isDevelopment ? 'local' : 'vercel-blob' }
       );
     }
 
-    console.log('✅ Logo uploaded:', publicPath);
-
     return NextResponse.json({
       success: true,
-      logoUrl: publicPath,
-      filename
+      logoUrl,
+      filename,
+      storage: isDevelopment ? 'local' : 'vercel-blob'
     });
   } catch (error: any) {
     console.error('❌ Upload logo error:', error);
