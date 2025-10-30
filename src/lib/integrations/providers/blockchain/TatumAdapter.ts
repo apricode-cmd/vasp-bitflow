@@ -152,7 +152,7 @@ class TatumAdapter implements IBlockchainProvider {
     try {
       // Test with Ethereum address using portfolio endpoint
       const testAddress = '0x80d8bac9a6901698b3749fe336bbd1385c1f98f2';
-      const testUrl = `/v4/data/wallet/portfolio?chain=ethereum-mainnet&address=${testAddress}&tokenTypes=native`;
+      const testUrl = `/data/wallet/portfolio?chain=ethereum-mainnet&address=${testAddress}&tokenTypes=native`;
       
       console.log('🧪 Testing Tatum API:', {
         baseUrl: this.baseUrl,
@@ -245,7 +245,7 @@ class TatumAdapter implements IBlockchainProvider {
     try {
       // Use v4 portfolio endpoint with tokenTypes=native
       const response = await this.makeRequest(
-        `/v4/data/wallet/portfolio?chain=${tatumChain}&address=${address}&tokenTypes=native`,
+        `/data/wallet/portfolio?chain=${tatumChain}&address=${address}&tokenTypes=native`,
         'GET'
       );
 
@@ -296,7 +296,7 @@ class TatumAdapter implements IBlockchainProvider {
     try {
       // Get all token types: native, fungible (ERC-20), nft, multitoken
       const response = await this.makeRequest(
-        `/v4/data/wallet/portfolio?chain=${tatumChain}&address=${address}&tokenTypes=native,fungible,nft,multitoken`,
+        `/data/wallet/portfolio?chain=${tatumChain}&address=${address}&tokenTypes=native,fungible,nft,multitoken`,
         'GET'
       );
 
@@ -397,7 +397,7 @@ class TatumAdapter implements IBlockchainProvider {
       }
 
       const response = await this.makeRequest(
-        `/v4/data/wallet/balance/time?${params.toString()}`,
+        `/data/wallet/balance/time?${params.toString()}`,
         'GET'
       );
 
