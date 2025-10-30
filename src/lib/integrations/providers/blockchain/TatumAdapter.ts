@@ -438,50 +438,108 @@ class TatumAdapter implements IBlockchainProvider {
       }
 
       // ==========================================
-      // 5. ERC-20/BEP-20 TOKENS (not TRON) - v4 Portfolio API
+      // 5. ERC-20/BEP-20 TOKENS (not TRON) - v4 Portfolio API with RPC fallback
       // ==========================================
       if (!isNative && contractAddress && BLOCKCHAIN_V4_MAP[blockchainUpper]) {
         console.log(`⚡ Using v4 Portfolio API for token: ${contractAddress}`);
         
         const tatumChain = BLOCKCHAIN_V4_MAP[blockchainUpper];
-        const response = await this.makeRequest(
-          `/v4/data/wallet/portfolio?chain=${tatumChain}&addresses=${address}&tokenTypes=fungible`,
-          'GET'
-        );
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Portfolio API error: ${response.status} - ${errorText}`);
-        }
-
-        const data = await response.json();
         
-        // Find the specific token by contract address
-        const token = (data.fungible || []).find((t: any) => 
-          t.tokenAddress?.toLowerCase() === contractAddress.toLowerCase()
-        );
+        // Try Portfolio API first (faster if indexed)
+        try {
+          const response = await this.makeRequest(
+            `/v4/data/wallet/portfolio?chain=${tatumChain}&addresses=${address}&tokenTypes=fungible`,
+            'GET'
+          );
 
-        if (!token) {
-          console.warn(`⚠️ Token ${contractAddress} not found in portfolio`);
-          return {
-            address,
-            blockchain,
-            currency: contractAddress.slice(0, 10) + '...',
-            balance: '0',
-            balanceFormatted: 0,
-            decimals: decimals,
-            timestamp: new Date()
-          };
+          if (response.ok) {
+            const data = await response.json();
+            
+            // Find the specific token by contract address
+            const token = (data.fungible || []).find((t: any) => 
+              t.tokenAddress?.toLowerCase() === contractAddress.toLowerCase()
+            );
+
+            if (token) {
+              const tokenDecimals = token.decimals || decimals;
+              const balanceRaw = token.balance || '0';
+              const balanceFormatted = parseFloat(balanceRaw) / Math.pow(10, tokenDecimals);
+              
+              console.log(`✅ Found token via Portfolio API: ${balanceFormatted}`);
+
+              return {
+                address,
+                blockchain,
+                currency: token.tokenId || contractAddress.slice(0, 10) + '...',
+                balance: balanceRaw,
+                balanceFormatted,
+                decimals: tokenDecimals,
+                timestamp: new Date()
+              };
+            }
+            
+            console.log('⚠️ Token not found in Portfolio API, trying RPC fallback...');
+          }
+        } catch (error) {
+          console.error('❌ Portfolio API failed, trying RPC fallback:', error);
         }
 
-        const tokenDecimals = token.decimals || decimals;
-        const balanceRaw = token.balance || '0';
+        // Fallback: Direct RPC call via eth_call
+        console.log('📞 Using RPC eth_call for ERC-20 balance...');
+        
+        // Prepare eth_call parameters
+        // balanceOf(address) = 0x70a08231 + padded address (32 bytes)
+        const addressParam = address.toLowerCase().replace('0x', '').padStart(64, '0');
+        const data = '0x70a08231' + addressParam;
+        
+        const rpcUrl = this.getRpcUrl(blockchainUpper);
+        const rpcResponse = await fetch(rpcUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': this.config!.apiKey
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'eth_call',
+            params: [
+              {
+                to: contractAddress,
+                data: data
+              },
+              'latest'
+            ]
+          })
+        });
+
+        if (!rpcResponse.ok) {
+          const errorText = await rpcResponse.text();
+          throw new Error(`RPC call failed: ${rpcResponse.status} - ${errorText}`);
+        }
+
+        const rpcData = await rpcResponse.json();
+        console.log('📦 RPC response:', rpcData);
+        
+        if (rpcData.error) {
+          throw new Error(`RPC error: ${rpcData.error.message}`);
+        }
+
+        // Parse hex result
+        let balanceRaw = '0';
+        if (rpcData.result && rpcData.result !== '0x') {
+          balanceRaw = parseInt(rpcData.result, 16).toString();
+        }
+
+        const tokenDecimals = 6; // USDT/USDC typically have 6 decimals
         const balanceFormatted = parseFloat(balanceRaw) / Math.pow(10, tokenDecimals);
+
+        console.log(`💰 Final balance via RPC: ${balanceFormatted} (raw: ${balanceRaw})`);
 
         return {
           address,
           blockchain,
-          currency: token.tokenId || contractAddress.slice(0, 10) + '...',
+          currency: contractAddress.slice(0, 10) + '...',
           balance: balanceRaw,
           balanceFormatted,
           decimals: tokenDecimals,
@@ -1114,6 +1172,29 @@ class TatumAdapter implements IBlockchainProvider {
     // Simplified: assume Tatum handles conversion with visible:true
     // Return the address as-is and let Tatum convert it
     return address.replace(/^T/, '41'); // T -> 41 prefix for TRON
+  }
+
+  /**
+   * Get RPC URL for Tatum Gateway
+   */
+  private getRpcUrl(blockchain: string): string {
+    const chainMap: Record<string, string> = {
+      'ETHEREUM': 'ethereum-mainnet',
+      'BSC': 'bsc-mainnet',
+      'POLYGON': 'polygon-mainnet',
+      'ARBITRUM': 'arb-one-mainnet',
+      'OPTIMISM': 'optimism-mainnet',
+      'BASE': 'base-mainnet',
+      'AVALANCHE': 'avalanche-mainnet'
+    };
+
+    const chain = chainMap[blockchain.toUpperCase()];
+    if (!chain) {
+      throw new Error(`No RPC URL configured for ${blockchain}`);
+    }
+
+    // Tatum Gateway RPC format: https://x-api-key:YOUR_API_KEY@CHAIN.gateway.tatum.io
+    return `https://x-api-key:${this.config!.apiKey}@${chain}.gateway.tatum.io`;
   }
 }
 
