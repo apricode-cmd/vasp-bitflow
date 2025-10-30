@@ -22,6 +22,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { CountryDropdown } from '@/components/ui/country-dropdown';
+import { TwoFactorAuth } from '@/components/features/TwoFactorAuth';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,7 +39,7 @@ import { formatDate } from '@/lib/formatters';
 import { toast } from 'sonner';
 import { 
   User, Mail, Phone, MapPin, Calendar, Shield, Lock, 
-  Save, Loader2, AlertCircle
+  Save, Loader2, AlertCircle, Smartphone, Key, QrCode, Copy, RefreshCw, Eye, EyeOff
 } from 'lucide-react';
 
 // Profile update schema
@@ -374,6 +375,12 @@ export default function ProfilePage(): React.ReactElement {
 
         {/* Security Tab */}
         <TabsContent value="security" className="space-y-6 mt-6">
+          {/* Two-Factor Authentication */}
+          <TwoFactorAuth />
+
+          <Separator />
+
+          {/* Change Password */}
           <Card className="bg-card/50 backdrop-blur-sm">
             <CardHeader>
               <CardTitle>Change Password</CardTitle>
@@ -470,18 +477,6 @@ export default function ProfilePage(): React.ReactElement {
                     <label className="text-sm font-medium">Email Notifications</label>
                     <p className="text-sm text-muted-foreground">
                       Receive notifications about your orders
-                    </p>
-                  </div>
-                  <Badge variant="secondary">Coming Soon</Badge>
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <label className="text-sm font-medium">Two-Factor Authentication</label>
-                    <p className="text-sm text-muted-foreground">
-                      Add an extra layer of security
                     </p>
                   </div>
                   <Badge variant="secondary">Coming Soon</Badge>
