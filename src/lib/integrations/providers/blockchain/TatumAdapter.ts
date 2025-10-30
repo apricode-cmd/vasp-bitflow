@@ -484,15 +484,17 @@ class TatumAdapter implements IBlockchainProvider {
           console.error('❌ Portfolio API failed, trying RPC fallback:', error);
         }
 
-        // Fallback: Direct RPC call via eth_call
+        // Fallback: Direct RPC call via eth_call through Tatum Gateway
         console.log('📞 Using RPC eth_call for ERC-20 balance...');
         
         // Prepare eth_call parameters
         // balanceOf(address) = 0x70a08231 + padded address (32 bytes)
         const addressParam = address.toLowerCase().replace('0x', '').padStart(64, '0');
-        const data = '0x70a08231' + addressParam;
+        const callData = '0x70a08231' + addressParam;
         
-        const rpcUrl = this.getRpcUrl(blockchainUpper);
+        // Tatum Gateway RPC endpoint (without credentials in URL)
+        const rpcUrl = `https://${tatumChain}.gateway.tatum.io`;
+        
         const rpcResponse = await fetch(rpcUrl, {
           method: 'POST',
           headers: {
@@ -506,7 +508,7 @@ class TatumAdapter implements IBlockchainProvider {
             params: [
               {
                 to: contractAddress,
-                data: data
+                data: callData
               },
               'latest'
             ]
@@ -1172,29 +1174,6 @@ class TatumAdapter implements IBlockchainProvider {
     // Simplified: assume Tatum handles conversion with visible:true
     // Return the address as-is and let Tatum convert it
     return address.replace(/^T/, '41'); // T -> 41 prefix for TRON
-  }
-
-  /**
-   * Get RPC URL for Tatum Gateway
-   */
-  private getRpcUrl(blockchain: string): string {
-    const chainMap: Record<string, string> = {
-      'ETHEREUM': 'ethereum-mainnet',
-      'BSC': 'bsc-mainnet',
-      'POLYGON': 'polygon-mainnet',
-      'ARBITRUM': 'arb-one-mainnet',
-      'OPTIMISM': 'optimism-mainnet',
-      'BASE': 'base-mainnet',
-      'AVALANCHE': 'avalanche-mainnet'
-    };
-
-    const chain = chainMap[blockchain.toUpperCase()];
-    if (!chain) {
-      throw new Error(`No RPC URL configured for ${blockchain}`);
-    }
-
-    // Tatum Gateway RPC format: https://x-api-key:YOUR_API_KEY@CHAIN.gateway.tatum.io
-    return `https://x-api-key:${this.config!.apiKey}@${chain}.gateway.tatum.io`;
   }
 }
 
