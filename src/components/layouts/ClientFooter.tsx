@@ -180,7 +180,7 @@ export function ClientFooter(): React.ReactElement {
             <div className="flex items-center gap-1.5">
               <span className="text-xs">Powered by</span>
               <a 
-                href="https://apricode.io" 
+                href="https://apricode.agency" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 font-semibold text-primary hover:text-primary/80 transition-colors group"

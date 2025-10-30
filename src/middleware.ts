@@ -46,19 +46,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check maintenance mode (but allow admin access)
+  // Check maintenance mode FIRST (block ALL non-admin users)
   const isMaintenanceMode = await checkMaintenanceMode();
   
   if (isMaintenanceMode) {
     const session = await auth();
     
-    // Allow admins to access during maintenance
+    // Only allow admins during maintenance
     if (session?.user?.role !== 'ADMIN') {
       return NextResponse.redirect(new URL('/maintenance', request.url));
     }
   }
 
-  // Public routes - allow without auth
+  // Public routes - allow without auth (only if NOT in maintenance mode)
   if (
     path === '/' ||
     path.startsWith('/login') ||

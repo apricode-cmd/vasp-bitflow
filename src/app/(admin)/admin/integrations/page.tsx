@@ -481,6 +481,34 @@ export default function IntegrationsPage(): JSX.Element {
                 </div>
               )}
 
+              {/* Webhook URL (for KYC providers) - Read-only info */}
+              {selectedIntegration.category === 'KYC' && (
+                <div className="space-y-2">
+                  <Label>Webhook URL</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      readOnly
+                      value={`${typeof window !== 'undefined' ? window.location.origin : ''}/api/kyc/webhook?provider=${selectedIntegration.service}`}
+                      className="font-mono text-xs bg-muted"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const webhookUrl = `${window.location.origin}/api/kyc/webhook?provider=${selectedIntegration.service}`;
+                        navigator.clipboard.writeText(webhookUrl);
+                        toast.success('Webhook URL copied to clipboard');
+                      }}
+                    >
+                      Copy
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Configure this URL in your {selectedIntegration.displayName} dashboard to receive verification updates
+                  </p>
+                </div>
+              )}
+
               {/* Webhook Secret (for KYC providers) */}
               {selectedIntegration.category === 'KYC' && (
                 <div className="space-y-2">

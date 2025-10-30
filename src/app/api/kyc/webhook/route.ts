@@ -15,8 +15,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                       request.headers.get('x-provider-id');
     
     if (!providerId) {
+      console.error('❌ Webhook rejected: Missing provider ID');
       return NextResponse.json(
-        { error: 'Provider ID required' },
+        { error: 'Provider ID required. Use ?provider=kycaid in URL' },
         { status: 400 }
       );
     }
@@ -29,14 +30,34 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Get raw body for signature verification
     const body = await request.json();
 
-    console.log(`📥 Received webhook from ${providerId}`);
+    console.log(`📥 Received webhook from ${providerId}`, {
+      hasSignature: !!signature,
+      bodyKeys: Object.keys(body),
+      timestamp: new Date().toISOString()
+    });
 
     // Process webhook
     const result = await processKycWebhook(providerId, body, signature || undefined);
 
+    if (result.success) {
+      console.log(`✅ Webhook processed successfully`, {
+        provider: providerId,
+        status: result.status,
+        session: result.session?.id
+      });
+    } else {
+      console.warn(`⚠️ Webhook processing failed`, {
+        provider: providerId,
+        error: result.message
+      });
+    }
+
     return NextResponse.json(result);
   } catch (error: any) {
-    console.error('❌ Webhook processing failed:', error);
+    console.error('❌ Webhook processing failed:', {
+      error: error.message,
+      stack: error.stack
+    });
     
     return NextResponse.json(
       { 
@@ -46,4 +67,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: 500 }
     );
   }
+}
+
+// Add GET endpoint for webhook testing
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const providerId = request.nextUrl.searchParams.get('provider');
+  
+  return NextResponse.json({
+    message: 'KYC Webhook Endpoint',
+    provider: providerId || 'not specified',
+    endpoint: `/api/kyc/webhook?provider=${providerId || 'kycaid'}`,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-signature': 'optional - webhook signature for verification'
+    },
+    status: 'online',
+    timestamp: new Date().toISOString()
+  });
 }
