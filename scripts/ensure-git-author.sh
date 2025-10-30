@@ -7,7 +7,7 @@ email=$(git config user.email || true)
 if [ -z "${name}" ] || [ -z "${email}" ]; then
   echo "⚠️  Git user.name/user.email не налаштовано. Виконай:"
   echo "   git config --global user.name  \"Bohdan Kononenko\""
-  echo "   git config --global user.email \"bogdan.apricode@gmail.com\""
+  echo "   git config --global user.email \"apricode.studio@gmail.com\""
   exit 1
 fi
 

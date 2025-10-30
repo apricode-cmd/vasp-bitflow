@@ -269,7 +269,7 @@ Bank details are managed through the admin settings panel and stored in the \`ba
 
 \`\`\`bash
 git config --global user.name  "Bohdan Kononenko"
-git config --global user.email "bogdan.apricode@gmail.com"
+git config --global user.email "apricode.studio@gmail.com"
 \`\`\`
 
 Тригер деплою:
@@ -328,9 +328,9 @@ npx prisma generate
 Якщо бачиш помилку "A commit author is required" при деплої:
 
 \`\`\`bash
-# Налаштуй Git автора
+# Налаштуй Git автора (використовуй email з GitHub!)
 git config --global user.name  "Bohdan Kononenko"
-git config --global user.email "bogdan.apricode@gmail.com"
+git config --global user.email "apricode.studio@gmail.com"
 
 # Створи порожній коміт для тригеру деплою
 git commit --allow-empty -m "chore: trigger Vercel build"
