@@ -6,13 +6,9 @@
  */
 
 import { prisma } from '@/lib/prisma';
-import { coinGeckoService } from './coingecko';
+import { coinGeckoService, type CoinGeckoRates } from './coingecko';
 import { integrationRegistry } from '@/lib/integrations';
 import { IntegrationCategory } from '@/lib/integrations/types';
-
-export interface ExchangeRates {
-  [crypto: string]: { [fiat: string]: number };
-}
 
 class RateProviderService {
   /**
@@ -92,7 +88,7 @@ class RateProviderService {
   /**
    * Get all exchange rates
    */
-  async getAllRates(): Promise<ExchangeRates> {
+  async getAllRates(): Promise<CoinGeckoRates> {
     const provider = await this.getActiveProvider();
 
     if (!provider) {

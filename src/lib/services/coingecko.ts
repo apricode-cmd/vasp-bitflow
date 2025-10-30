@@ -13,11 +13,11 @@ import { prisma } from '@/lib/prisma';
 const CACHE_DURATION_MS = 30 * 1000;
 
 interface CachedRates {
-  data: ExchangeRates;
+  data: CoinGeckoRates;
   timestamp: number;
 }
 
-interface ExchangeRates {
+export interface CoinGeckoRates {
   BTC: { EUR: number; PLN: number };
   ETH: { EUR: number; PLN: number };
   USDT: { EUR: number; PLN: number };
@@ -74,7 +74,7 @@ class CoinGeckoService {
    * 
    * NOTE: This method does NOT check integration status - that's handled by rateProviderService
    */
-  async getCurrentRates(forceRefresh = false): Promise<ExchangeRates> {
+  async getCurrentRates(forceRefresh = false): Promise<CoinGeckoRates> {
     // Check cache (skip if force refresh requested)
     if (!forceRefresh && ratesCache && Date.now() - ratesCache.timestamp < CACHE_DURATION_MS) {
       console.log('📦 Returning cached rates (age: ' + Math.round((Date.now() - ratesCache.timestamp) / 1000) + 's)');
@@ -108,7 +108,7 @@ class CoinGeckoService {
       });
 
       // Validate and extract rates
-      const rates: ExchangeRates = {
+      const rates: CoinGeckoRates = {
         BTC: {
           EUR: this.validateRate(data.bitcoin?.eur, 'BTC/EUR'),
           PLN: this.validateRate(data.bitcoin?.pln, 'BTC/PLN')
@@ -315,5 +315,4 @@ class CoinGeckoService {
 }
 
 export const coinGeckoService = new CoinGeckoService();
-export type { ExchangeRates };
 

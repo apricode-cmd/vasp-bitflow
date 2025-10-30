@@ -5,6 +5,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import { OrderStatus } from '@prisma/client';
 
 interface LimitCheckResult {
   allowed: boolean;
@@ -84,7 +85,7 @@ export class OrderLimitService {
               gte: twentyFourHoursAgo
             },
             status: {
-              notIn: ['CANCELLED' as const, 'REJECTED' as const]
+              notIn: [OrderStatus.CANCELLED, OrderStatus.REJECTED]
             }
           },
           select: {
@@ -179,7 +180,7 @@ export class OrderLimitService {
           gte: twentyFourHoursAgo
         },
         status: {
-          notIn: ['CANCELLED' as const, 'REJECTED' as const]
+          notIn: [OrderStatus.CANCELLED, OrderStatus.REJECTED]
         }
       },
       select: {
