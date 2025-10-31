@@ -11,11 +11,12 @@ export async function POST(request: NextRequest) {
   try {
     const { email } = await request.json();
 
-    const options = await PasskeyService.generatePasskeyAuthenticationOptions(email);
+    const result = await PasskeyService.generatePasskeyAuthenticationOptions(email);
 
-    return NextResponse.json(options);
+    // Return only options (result contains {options, email})
+    return NextResponse.json(result.options);
   } catch (error) {
-    console.error('Passkey challenge error:', error);
+    console.error('❌ Passkey challenge error:', error);
     return NextResponse.json(
       { error: 'Failed to generate challenge' },
       { status: 500 }

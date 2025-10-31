@@ -192,8 +192,14 @@ export async function verifyPasskeyRegistration(
  * Generate authentication options for passkey login
  */
 export async function generatePasskeyAuthenticationOptions(email?: string) {
-  cleanExpiredChallenges();
+  // Clean expired challenges from DB
+  await prisma.mfaChallenge.deleteMany({
+    where: {
+      expiresAt: { lt: new Date() },
+    },
+  });
 
+  let adminId: string | null = null;
   let allowCredentials: Array<{ id: Buffer; type: 'public-key'; transports?: string[] }> = [];
 
   if (email) {
@@ -209,6 +215,7 @@ export async function generatePasskeyAuthenticationOptions(email?: string) {
     });
 
     if (admin?.webAuthnCreds) {
+      adminId = admin.id;
       allowCredentials = admin.webAuthnCreds.map((cred) => ({
         id: Buffer.from(cred.credentialId, 'base64'),
         type: 'public-key' as const,
@@ -223,14 +230,20 @@ export async function generatePasskeyAuthenticationOptions(email?: string) {
     userVerification: 'required',
   });
 
-  // Store challenge (use email or 'anonymous' as key)
-  const key = email || 'anonymous';
-  challengeStore.set(key, {
-    challenge: options.challenge,
-    timestamp: Date.now(),
+  // Store challenge in DB (use adminId or null for anonymous)
+  await prisma.mfaChallenge.create({
+    data: {
+      adminId: adminId || 'anonymous', // For anonymous login
+      action: 'PASSKEY_LOGIN',
+      challengeType: 'WEBAUTHN',
+      challenge: options.challenge,
+      expiresAt: new Date(Date.now() + CHALLENGE_TTL),
+    },
   });
 
-  return options;
+  console.log('✅ Authentication challenge stored:', adminId || 'anonymous');
+
+  return { options, email };
 }
 
 /**
@@ -279,18 +292,31 @@ export async function verifyPasskeyAuthentication(
       return { verified: false, error: 'Admin account is not active' };
     }
 
-    // Get stored challenge
-    const key = email || 'anonymous';
-    const stored = challengeStore.get(key);
-    if (!stored) {
+    // Get stored challenge from DB
+    const storedChallenge = await prisma.mfaChallenge.findFirst({
+      where: {
+        OR: [
+          { adminId: credential.admin.id },
+          { adminId: 'anonymous' }
+        ],
+        action: 'PASSKEY_LOGIN',
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!storedChallenge) {
+      console.error('❌ Challenge not found in DB');
       return { verified: false, error: 'Challenge not found or expired' };
     }
+
+    console.log('✅ Challenge found:', storedChallenge.challenge.substring(0, 20) + '...');
 
     // Verify authentication
     const verification: VerifiedAuthenticationResponse =
       await verifyAuthenticationResponse({
         response,
-        expectedChallenge: stored.challenge,
+        expectedChallenge: storedChallenge.challenge,
         expectedOrigin: ORIGIN,
         expectedRPID: RP_ID,
         authenticator: {
@@ -314,7 +340,11 @@ export async function verifyPasskeyAuthentication(
     });
 
     // Clean up challenge
-    challengeStore.delete(key);
+    await prisma.mfaChallenge.delete({
+      where: { id: storedChallenge.id },
+    });
+
+    console.log('✅ Passkey authentication successful for:', credential.admin.email);
 
     return {
       verified: true,
