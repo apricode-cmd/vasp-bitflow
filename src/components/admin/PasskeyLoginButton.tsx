@@ -13,22 +13,23 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 interface PasskeyLoginButtonProps {
+  email: string; // Email is REQUIRED for production security
   onSuccess: () => void;
   onError: (error: string) => void;
 }
 
-export function PasskeyLoginButton({ onSuccess, onError }: PasskeyLoginButtonProps) {
+export function PasskeyLoginButton({ email, onSuccess, onError }: PasskeyLoginButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   const handlePasskeyLogin = async () => {
     setIsLoading(true);
 
     try {
-      // 1. Get authentication challenge
+      // 1. Get authentication challenge with email
       const challengeResp = await fetch('/api/admin/passkey/challenge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: null }), // Anonymous (no email needed)
+        body: JSON.stringify({ email }), // Pass email to get admin-specific challenge
       });
 
       if (!challengeResp.ok) {
