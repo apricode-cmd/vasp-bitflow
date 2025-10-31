@@ -9,7 +9,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signIn } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema, type LoginInput } from '@/lib/validations/auth';
@@ -46,15 +45,23 @@ export default function AdminLoginPage(): React.ReactElement {
     setError(null);
 
     try {
-      // Use admin auth endpoint
-      const result = await signIn('credentials', {
-        email: data.email,
-        password: data.password,
-        redirect: false,
-        callbackUrl: '/admin'
+      // Manually call admin auth endpoint (not using next-auth/react signIn)
+      const response = await fetch('/api/admin/auth/callback/credentials', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: data.email,
+          password: data.password,
+          callbackUrl: '/admin',
+          json: true
+        }),
       });
 
-      if (result?.error) {
+      const result = await response.json();
+
+      if (!response.ok || result.error) {
         setError('Invalid credentials. Please try again.');
         setIsLoading(false);
         return;

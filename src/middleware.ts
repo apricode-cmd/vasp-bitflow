@@ -48,13 +48,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // === ADMIN ROUTES ===
-  if (path.startsWith('/admin')) {
-    // Public admin auth pages
-    if (path.startsWith('/admin/auth/login') || path.startsWith('/admin/auth/emergency')) {
-      return NextResponse.next();
-    }
+  // === PUBLIC ADMIN AUTH ROUTES (MUST BE BEFORE ADMIN CHECK) ===
+  if (
+    path.startsWith('/admin/auth/login') || 
+    path.startsWith('/admin/auth/emergency') ||
+    path.startsWith('/admin/auth/setup-passkey')
+  ) {
+    return NextResponse.next();
+  }
 
+  // === ADMIN ROUTES (PROTECTED) ===
+  if (path.startsWith('/admin')) {
     // Protected admin routes - use ADMIN auth
     const adminSession = await getAdminSession();
     
