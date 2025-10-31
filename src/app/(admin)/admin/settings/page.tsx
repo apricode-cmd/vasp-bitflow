@@ -108,11 +108,6 @@ export default function SettingsPage(): JSX.Element {
       // Apply to both light and dark theme
       const root = document.documentElement;
       root.style.setProperty('--primary', `${hue} ${saturation}% ${lightness}%`);
-      
-      // Log for debugging
-        hex: hexColor,
-        hsl: `${hue} ${saturation}% ${lightness}%`
-      });
     } catch (error) {
       console.error('Invalid color:', error);
     }
