@@ -1,17 +1,19 @@
 /**
  * NextAuth v5 Configuration - ADMIN
  * 
- * Authentication for administrators (Admin table)
- * Supports: Passkeys (WebAuthn) + Password + TOTP
+ * Passwordless authentication for administrators
+ * - Passkeys (WebAuthn/FIDO2) - PRIMARY
+ * - SSO (Google Workspace / Azure AD) - TODO
+ * 
+ * Password authentication REMOVED for regular admins
+ * (only available via break-glass emergency access)
+ * 
+ * Compliant with: PSD2/SCA, DORA, AML best practices
  */
 
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
-import { prisma } from '@/lib/prisma';
-import bcrypt from 'bcryptjs';
-import { loginSchema } from '@/lib/validations/auth';
 import { PasskeyService } from '@/lib/services/passkey.service';
-import { verifyUserTotp } from '@/lib/services/totp.service';
 
 export const { 
   handlers: adminHandlers, 
@@ -20,7 +22,7 @@ export const {
   auth: getAdminSession 
 } = NextAuth({
   providers: [
-    // Provider 1: Passkeys (WebAuthn) - PRIMARY
+    // Provider: Passkeys (WebAuthn) - PRIMARY and ONLY
     Credentials({
       id: 'passkey',
       name: 'Passkey',
@@ -61,108 +63,13 @@ export const {
       }
     }),
 
-    // Provider 2: Password + TOTP (FALLBACK)
-    Credentials({
-      id: 'credentials',
-      name: 'Credentials',
-      credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' },
-        twoFactorCode: { label: '2FA Code', type: 'text' }
-      },
-      async authorize(credentials) {
-        try {
-          if (!credentials?.email || !credentials?.password) {
-            return null;
-          }
-
-          const validatedData = loginSchema.parse({
-            email: credentials.email,
-            password: credentials.password
-          });
-
-          // Find admin in Admin table
-          const admin = await prisma.admin.findUnique({
-            where: { email: validatedData.email },
-            select: {
-              id: true,
-              email: true,
-              password: true,
-              role: true,
-              isActive: true,
-              isSuspended: true,
-              authMethod: true,
-              twoFactorAuth: {
-                select: {
-                  totpEnabled: true,
-                  webAuthnEnabled: true,
-                  webAuthnRequired: true
-                }
-              }
-            }
-          });
-
-          if (!admin || !admin.isActive || admin.isSuspended) {
-            return null;
-          }
-
-          // Check if password is set (might be SSO-only account)
-          if (!admin.password) {
-            console.log('Admin has no password set (SSO-only):', admin.email);
-            return null;
-          }
-
-          // Verify password
-          const isValid = await bcrypt.compare(
-            validatedData.password,
-            admin.password
-          );
-
-          if (!isValid) {
-            return null;
-          }
-
-          // Check if 2FA is enabled
-          const has2FA = admin.twoFactorAuth?.totpEnabled === true;
-
-          if (has2FA) {
-            const twoFactorCode = credentials.twoFactorCode as string | undefined;
-
-            if (!twoFactorCode) {
-              console.log('2FA required for admin:', admin.email);
-              return null;
-            }
-
-            // Verify TOTP code (reuse existing service, but pass adminId)
-            // TODO: Create separate verifyAdminTotp service
-            const { success } = await verifyUserTotp(
-              admin.id,
-              admin.email,
-              twoFactorCode
-            );
-
-            if (!success) {
-              console.log('Invalid 2FA code for admin:', admin.email);
-              return null;
-            }
-          }
-
-          return {
-            id: admin.id,
-            email: admin.email,
-            role: admin.role,
-            authMethod: 'PASSWORD'
-          };
-        } catch (error: any) {
-          console.error('Admin auth error:', error);
-          return null;
-        }
-      }
-    })
-
-    // TODO: Add SSO providers (Google Workspace, Azure AD)
-    // GoogleWorkspace({...}),
-    // AzureAD({...})
+    // NOTE: Password authentication REMOVED
+    // Regular admins CANNOT use passwords
+    // Break-glass emergency access uses separate endpoint: /api/admin/auth/emergency
+    
+    // TODO: Add SSO providers
+    // GoogleWorkspace({ ... }),
+    // AzureAD({ ... })
   ],
 
   callbacks: {
