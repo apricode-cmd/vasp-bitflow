@@ -36,6 +36,10 @@ async function checkMaintenanceMode(): Promise<boolean> {
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
+  
+  // Add pathname to headers for server components
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-pathname', path);
 
   // Always allow these critical routes (to prevent infinite loops)
   if (
@@ -45,7 +49,11 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/api/auth') ||  // Client auth
     path.startsWith('/api/admin/auth')  // Admin auth
   ) {
-    return NextResponse.next();
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
   }
 
   // === PUBLIC ADMIN AUTH ROUTES (MUST BE BEFORE ADMIN CHECK) ===
@@ -54,7 +62,11 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/admin/auth/emergency') ||
     path.startsWith('/admin/auth/setup-passkey')
   ) {
-    return NextResponse.next();
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
   }
 
   // === ADMIN ROUTES (PROTECTED) ===
@@ -69,7 +81,11 @@ export async function middleware(request: NextRequest) {
     // Check if admin is active (would need to check DB, but can't in middleware)
     // This check is done in layouts and API routes
     
-    return NextResponse.next();
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
   }
 
   // === CLIENT ROUTES ===
@@ -82,7 +98,11 @@ export async function middleware(request: NextRequest) {
     const adminSession = await getAdminSession();
     if (adminSession?.user) {
       // Admin can access during maintenance
-      return NextResponse.next();
+      return NextResponse.next({
+        request: {
+          headers: requestHeaders,
+        },
+      });
     }
     
     // Block regular users
@@ -106,7 +126,11 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/api/kyc/webhook') ||  // Webhook from KYCAID
     path.startsWith('/legal/')
   ) {
-    return NextResponse.next();
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
   }
 
   // For protected CLIENT routes, check CLIENT session
@@ -121,7 +145,11 @@ export async function middleware(request: NextRequest) {
   // 2. Client layout (src/app/(client)/layout.tsx)
   // 3. API routes (via requireAuth/requireRole)
   
-  return NextResponse.next();
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
 }
 
 export const config = {
