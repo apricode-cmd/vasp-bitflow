@@ -1,0 +1,339 @@
+//  ==========================================
+// IDENTITY & ACCESS MANAGEMENT - NEW MODELS
+// ==========================================
+
+// New Enums
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  COMPLIANCE
+  TREASURY_APPROVER
+  FINANCE
+  SUPPORT
+  READ_ONLY
+}
+
+enum AuthMethod {
+  PASSWORD
+  SSO
+  PASSKEY
+  HYBRID
+}
+
+enum MfaChallengeStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+  FAILED
+}
+
+// Admin Model (separate from User)
+model Admin {
+  id          String     @id @default(cuid())
+  email       String     @unique
+  password    String?    // Optional if using SSO/Passkey only
+  firstName   String
+  lastName    String
+  role        AdminRole  @default(ADMIN)
+  
+  // Status
+  isActive       Boolean   @default(true)
+  isSuspended    Boolean   @default(false)
+  suspendedUntil DateTime?
+  lastLogin      DateTime?
+  
+  // Auth methods
+  authMethod   AuthMethod @default(PASSWORD)
+  ssoProvider  String?    // google-workspace, microsoft, okta
+  ssoSubject   String?    // SSO subject ID
+  
+  // Metadata
+  createdAt    DateTime   @default(now())
+  createdBy    String?    // Admin ID who created
+  updatedAt    DateTime   @updatedAt
+  
+  // Relations
+  twoFactorAuth    AdminTwoFactorAuth?
+  sessions         AdminSession[]
+  settings         AdminSettings?      @relation("AdminToSettings")
+  webAuthnCreds    WebAuthnCredential[]
+  mfaChallenges    MfaChallenge[]
+  auditLogsCreated AuditLog[]          @relation("AdminAuditLogs")
+  
+  @@index([email])
+  @@index([role])
+  @@index([isActive])
+  @@unique([ssoProvider, ssoSubject])
+}
+
+// Roles and Permissions
+model RoleModel {
+  code        String   @id @unique
+  name        String
+  description String?
+  isSystem    Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  priority    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  permissions RolePermission[]
+  
+  @@index([isActive])
+  @@map("Role_")
+}
+
+model Permission {
+  code        String   @id @unique
+  name        String
+  resource    String
+  action      String
+  description String?
+  category    String
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  
+  roles RolePermission[]
+  
+  @@unique([resource, action])
+  @@index([resource])
+  @@index([category])
+}
+
+model RolePermission {
+  id             String   @id @default(cuid())
+  roleCode       String
+  permissionCode String
+  createdAt      DateTime @default(now())
+  
+  role       RoleModel  @relation(fields: [roleCode], references: [code], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionCode], references: [code], onDelete: Cascade)
+  
+  @@unique([roleCode, permissionCode])
+  @@index([roleCode])
+  @@index([permissionCode])
+}
+
+// WebAuthn Credentials (Passkeys)
+model WebAuthnCredential {
+  id            String   @id @default(cuid())
+  adminId       String
+  
+  // WebAuthn fields
+  credentialId  String   @unique
+  publicKey     String
+  counter       Int      @default(0)
+  
+  // Device info
+  deviceName    String?
+  deviceType    String?
+  transports    String[]
+  
+  // Attestation
+  aaguid        String?
+  attestation   String?
+  
+  // Status
+  isActive      Boolean  @default(true)
+  lastUsed      DateTime?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  
+  @@index([adminId])
+  @@index([credentialId])
+}
+
+// Admin 2FA (TOTP + WebAuthn)
+model AdminTwoFactorAuth {
+  id               String   @id @default(cuid())
+  adminId          String   @unique
+  
+  // TOTP
+  totpEnabled      Boolean  @default(false)
+  totpSecret       String?
+  totpVerifiedAt   DateTime?
+  
+  // WebAuthn
+  webAuthnEnabled  Boolean  @default(false)
+  webAuthnRequired Boolean  @default(false)
+  
+  // Backup codes
+  backupCodes      Json?
+  
+  // Settings
+  preferredMethod  String   @default("TOTP")
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  
+  @@index([adminId])
+}
+
+// MFA Challenges (Step-up MFA)
+model MfaChallenge {
+  id           String              @id @default(cuid())
+  adminId      String
+  action       String
+  resourceType String?
+  resourceId   String?
+  
+  // Challenge details
+  challengeType String
+  challenge     String
+  
+  // Status
+  status        MfaChallengeStatus @default(PENDING)
+  attempts      Int                @default(0)
+  maxAttempts   Int                @default(3)
+  
+  // Verification
+  verifiedAt    DateTime?
+  verifiedWith  String?
+  
+  // Expiration
+  expiresAt     DateTime
+  createdAt     DateTime           @default(now())
+  
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  
+  @@index([adminId, status])
+  @@index([expiresAt])
+}
+
+// Admin Sessions (Enhanced)
+model AdminSession {
+  id             String   @id @default(cuid())
+  adminId        String
+  
+  // Session identification
+  sessionId      String   @unique
+  sessionToken   String   @unique
+  sessionKey     String
+  
+  // Device info
+  ipAddress      String
+  deviceType     String?
+  browser        String?
+  browserVersion String?
+  os             String?
+  osVersion      String?
+  userAgent      String
+  
+  // Location
+  country        String?
+  city           String?
+  
+  // MFA info
+  mfaMethod      String?
+  mfaVerifiedAt  DateTime?
+  
+  // Status
+  isActive       Boolean  @default(true)
+  
+  // Timeouts
+  createdAt      DateTime @default(now())
+  lastActivity   DateTime @default(now())
+  expiresAt      DateTime
+  
+  // Settings
+  idleTimeout    Int?
+  maxDuration    Int?
+  
+  // Termination
+  terminatedAt   DateTime?
+  terminatedBy   String?
+  terminationReason String?
+  
+  updatedAt      DateTime @updatedAt
+  
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  
+  @@index([adminId, isActive])
+  @@index([sessionId])
+  @@index([sessionToken])
+  @@index([sessionKey])
+  @@index([lastActivity])
+  @@index([expiresAt])
+  @@index([ipAddress])
+}
+
+// Break-glass Emergency Access
+model BreakGlassUser {
+  id                 String    @id @default(cuid())
+  username           String    @unique
+  passwordHash       String
+  totpSecret         String
+  
+  // Restrictions
+  isActive           Boolean   @default(false)
+  lastUsed           DateTime?
+  usageCount         Int       @default(0)
+  
+  // Access info
+  accessInstructions String
+  
+  // Auto-disable
+  autoDisableAfter   Int       @default(24)
+  
+  createdAt          DateTime  @default(now())
+}
+
+// Enhanced Audit Log
+model AuditLogEnhanced {
+  id        String   @id @default(cuid())
+  
+  // Who
+  userId    String?
+  userEmail String?
+  userRole  String?
+  
+  // What
+  action    String
+  entity    String
+  entityId  String
+  
+  // Changes
+  oldValue  Json?
+  newValue  Json?
+  changes   Json?
+  
+  // Context
+  metadata  Json?
+  reason    String?
+  
+  // Where & When
+  ipAddress String
+  userAgent String
+  country   String?
+  city      String?
+  
+  // MFA verification
+  mfaRequired   Boolean  @default(false)
+  mfaMethod     String?
+  mfaVerifiedAt DateTime?
+  
+  // Compliance
+  severity     String   @default("INFO")
+  isReviewable Boolean  @default(false)
+  reviewedAt   DateTime?
+  reviewedBy   String?
+  
+  // Immutability
+  createdAt DateTime @default(now())
+  hash      String?
+  
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([severity])
+  @@index([isReviewable])
+  @@index([userRole])
+  @@map("AuditLog_Enhanced")
+}
+

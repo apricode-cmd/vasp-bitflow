@@ -1,6 +1,3 @@
-// Prisma Schema for Apricode Exchange - IMPROVED VERSION
-// Database: PostgreSQL
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,12 +5,1278 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL") // For migrations only
+  directUrl = env("DIRECT_URL")
 }
 
-// ==========================================
-// ENUMS
-// ==========================================
+model User {
+  id                   String              @id @default(cuid())
+  email                String              @unique
+  password             String
+  role                 Role                @default(CLIENT)
+  isActive             Boolean             @default(true)
+  lastLogin            DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  adminSettings        AdminSettings?      @relation("AdminSettings")
+  apiKeys              ApiKey[]
+  auditLogs            AuditLog[]
+  emailLogs            EmailLog[]
+  blockedIPs           IPBlacklist[]       @relation("BlockedBy")
+  kycSession           KycSession?
+  orders               Order[]
+  payInsReconciled     PayIn[]             @relation("PayInReconciler")
+  payInsAsUser         PayIn[]             @relation("PayInUser")
+  payInsVerified       PayIn[]             @relation("PayInVerifier")
+  payOutsProcessed     PayOut[]            @relation("PayOutProcessor")
+  payOutsAsUser        PayOut[]            @relation("PayOutUser")
+  paymentProofs        PaymentProof[]
+  profile              Profile?
+  sessionRevocationsBy SessionRevocation[] @relation("RevokedBy")
+  revokedSessions      SessionRevocation[] @relation("RevokedSessions")
+  systemLogs           SystemLog[]
+  twoFactorAuth        TwoFactorAuth?
+  kycLevelData         UserKycLevel?       @relation("UserKycLevelRelation")
+  userWallets          UserWallet[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model Profile {
+  id           String    @id @default(cuid())
+  userId       String    @unique
+  firstName    String
+  lastName     String
+  phoneNumber  String?
+  country      String
+  city         String?
+  address      String?
+  postalCode   String?
+  dateOfBirth  DateTime?
+  nationality  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  phoneCountry String?
+  placeOfBirth String?
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([country])
+}
+
+model KycSession {
+  id                   String        @id @default(cuid())
+  userId               String        @unique
+  kycaidVerificationId String?       @unique
+  kycaidApplicantId    String?
+  kycaidFormId         String?
+  status               KycStatus     @default(PENDING)
+  submittedAt          DateTime?
+  reviewedAt           DateTime?
+  reviewedBy           String?
+  reviewNotes          String?
+  completedAt          DateTime?
+  expiresAt            DateTime?
+  rejectionReason      String?
+  webhookData          Json?
+  metadata             Json?
+  attempts             Int           @default(0)
+  lastAttemptAt        DateTime?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  kycProviderId        String?
+  documents            KycDocument[]
+  formData             KycFormData[]
+  profile              KycProfile?
+  provider             KycProvider?  @relation(fields: [kycProviderId], references: [id])
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([kycaidVerificationId])
+  @@index([kycProviderId])
+}
+
+model Currency {
+  code               String                      @id
+  name               String
+  symbol             String
+  decimals           Int                         @default(8)
+  precision          Int                         @default(8)
+  coingeckoId        String
+  isActive           Boolean                     @default(true)
+  priority           Int                         @default(0)
+  isToken            Boolean                     @default(false)
+  iconUrl            String?
+  minOrderAmount     Float                       @default(0.001)
+  maxOrderAmount     Float                       @default(100)
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+  blockchainNetworks CurrencyBlockchainNetwork[]
+  orders             Order[]
+  payIns             PayIn[]                     @relation("PayInCrypto")
+  payOuts            PayOut[]
+  paymentAccounts    PaymentAccount[]            @relation("PaymentAccountCrypto")
+  platformWallets    PlatformWallet[]
+  rateHistory        RateHistory[]               @relation("CryptoCurrency")
+  tradingPairs       TradingPair[]               @relation("CryptoCurrency")
+  userWallets        UserWallet[]
+
+  @@index([isToken])
+}
+
+model FiatCurrency {
+  code            String           @id
+  name            String
+  symbol          String
+  precision       Int              @default(2)
+  isActive        Boolean          @default(true)
+  priority        Int              @default(0)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  bankDetails     BankDetails[]
+  feeProfiles     FeeProfile[]
+  limitsMatrix    LimitsMatrix[]
+  orders          Order[]
+  payIns          PayIn[]
+  payOuts         PayOut[]         @relation("PayOutFiat")
+  paymentAccounts PaymentAccount[]
+  rateHistory     RateHistory[]    @relation("FiatCurrency")
+  tradingPairs    TradingPair[]    @relation("FiatCurrency")
+}
+
+model TradingPair {
+  id              String       @id @default(cuid())
+  cryptoCode      String
+  fiatCode        String
+  isActive        Boolean      @default(true)
+  minCryptoAmount Float
+  maxCryptoAmount Float
+  minFiatAmount   Float
+  maxFiatAmount   Float
+  feePercent      Float        @default(1.5)
+  priority        Int          @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  crypto          Currency     @relation("CryptoCurrency", fields: [cryptoCode], references: [code])
+  fiat            FiatCurrency @relation("FiatCurrency", fields: [fiatCode], references: [code])
+
+  @@unique([cryptoCode, fiatCode])
+  @@index([isActive])
+}
+
+model RateHistory {
+  id         String       @id @default(cuid())
+  cryptoCode String
+  fiatCode   String
+  rate       Float
+  source     String       @default("coingecko")
+  createdAt  DateTime     @default(now())
+  crypto     Currency     @relation("CryptoCurrency", fields: [cryptoCode], references: [code])
+  fiat       FiatCurrency @relation("FiatCurrency", fields: [fiatCode], references: [code])
+
+  @@index([cryptoCode, fiatCode, createdAt])
+}
+
+model Order {
+  id                String               @id @default(cuid())
+  userId            String
+  currencyCode      String
+  fiatCurrencyCode  String
+  paymentReference  String               @unique
+  cryptoAmount      Float
+  fiatAmount        Float
+  rate              Float
+  feePercent        Float
+  feeAmount         Float
+  totalFiat         Float
+  userWalletId      String?
+  walletAddress     String
+  blockchainCode    String?
+  paymentMethodCode String?
+  status            OrderStatus          @default(PENDING)
+  createdByAdmin    Boolean              @default(false)
+  adminNotes        String?
+  transactionHash   String?
+  processedBy       String?
+  processedAt       DateTime?
+  expiresAt         DateTime
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  blockchain        BlockchainNetwork?   @relation(fields: [blockchainCode], references: [code])
+  currency          Currency             @relation(fields: [currencyCode], references: [code])
+  fiatCurrency      FiatCurrency         @relation(fields: [fiatCurrencyCode], references: [code])
+  paymentMethod     PaymentMethod?       @relation(fields: [paymentMethodCode], references: [code])
+  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userWallet        UserWallet?          @relation(fields: [userWalletId], references: [id])
+  statusHistory     OrderStatusHistory[]
+  payIn             PayIn?
+  payOut            PayOut?
+  paymentProofs     PaymentProof[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([paymentReference])
+  @@index([userWalletId])
+  @@index([blockchainCode])
+}
+
+model PaymentProof {
+  id         String   @id @default(cuid())
+  orderId    String
+  fileUrl    String
+  fileName   String
+  fileSize   Int
+  mimeType   String
+  uploadedBy String
+  uploadedAt DateTime @default(now())
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [uploadedBy], references: [id])
+
+  @@index([orderId])
+}
+
+model PaymentAccount {
+  id                 String             @id @default(cuid())
+  code               String             @unique
+  name               String
+  type               PaymentAccountType
+  description        String?
+  currency           String?
+  bankName           String?
+  bankAddress        String?
+  accountHolder      String?
+  iban               String?
+  swift              String?
+  bic                String?
+  sortCode           String?
+  referenceTemplate  String?
+  cryptocurrencyCode String?
+  blockchainCode     String?
+  address            String?
+  balance            Float?
+  minBalance         Float?
+  instructions       String?
+  isActive           Boolean            @default(true)
+  isDefault          Boolean            @default(false)
+  priority           Int                @default(0)
+  lastUsed           DateTime?
+  lastChecked        DateTime?
+  alertsEnabled      Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  createdBy          String?
+  payOuts            PayOut[]           @relation("PaymentAccountPayOuts")
+  blockchain         BlockchainNetwork? @relation(fields: [blockchainCode], references: [code])
+  cryptocurrency     Currency?          @relation("PaymentAccountCrypto", fields: [cryptocurrencyCode], references: [code])
+  fiatCurrency       FiatCurrency?      @relation(fields: [currency], references: [code])
+  paymentMethods     PaymentMethod[]
+
+  @@index([type, isActive])
+  @@index([currency])
+  @@index([cryptocurrencyCode])
+  @@index([isDefault])
+}
+
+model BankDetails {
+  id                String          @id @default(cuid())
+  currency          String
+  bankName          String
+  bankAddress       String?
+  accountHolder     String
+  iban              String
+  swift             String?
+  bic               String?
+  sortCode          String?
+  referenceTemplate String          @default("APR-{orderId}")
+  instructions      String?
+  isActive          Boolean         @default(true)
+  priority          Int             @default(0)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  fiatCurrency      FiatCurrency    @relation(fields: [currency], references: [code])
+  paymentMethods    PaymentMethod[]
+
+  @@index([currency, isActive])
+}
+
+model PlatformWallet {
+  id             String            @id @default(cuid())
+  currencyCode   String
+  blockchainCode String
+  address        String            @unique
+  label          String
+  isActive       Boolean           @default(true)
+  balance        Float             @default(0)
+  lastUsed       DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  payOuts        PayOut[]
+  blockchain     BlockchainNetwork @relation(fields: [blockchainCode], references: [code])
+  currency       Currency          @relation(fields: [currencyCode], references: [code])
+
+  @@index([currencyCode, isActive])
+}
+
+model PayIn {
+  id                 String             @id @default(cuid())
+  orderId            String             @unique
+  userId             String
+  amount             Float
+  fiatCurrencyCode   String?
+  cryptocurrencyCode String?
+  currencyType       CurrencyType
+  paymentMethodCode  String?
+  senderName         String?
+  senderAccount      String?
+  senderBank         String?
+  reference          String?
+  networkCode        String?
+  senderAddress      String?
+  transactionHash    String?
+  blockNumber        Int?
+  confirmations      Int                @default(0)
+  transactionId      String?            @unique
+  status             PayInStatus        @default(PENDING)
+  expectedAmount     Float
+  receivedAmount     Float?
+  amountMismatch     Boolean            @default(false)
+  verifiedBy         String?
+  verifiedAt         DateTime?
+  verificationNotes  String?
+  reconciledWith     String?
+  reconciledAt       DateTime?
+  reconciledBy       String?
+  proofUrls          String[]
+  explorerUrl        String?
+  paymentDate        DateTime?
+  receivedDate       DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  cryptocurrency     Currency?          @relation("PayInCrypto", fields: [cryptocurrencyCode], references: [code])
+  fiatCurrency       FiatCurrency?      @relation(fields: [fiatCurrencyCode], references: [code])
+  network            BlockchainNetwork? @relation("PayInNetwork", fields: [networkCode], references: [code])
+  order              Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentMethod      PaymentMethod?     @relation(fields: [paymentMethodCode], references: [code])
+  reconciler         User?              @relation("PayInReconciler", fields: [reconciledBy], references: [id])
+  user               User               @relation("PayInUser", fields: [userId], references: [id])
+  verifier           User?              @relation("PayInVerifier", fields: [verifiedBy], references: [id])
+
+  @@index([orderId])
+  @@index([userId])
+  @@index([fiatCurrencyCode])
+  @@index([cryptocurrencyCode])
+  @@index([status])
+  @@index([currencyType])
+  @@index([paymentDate])
+  @@index([transactionId])
+  @@index([transactionHash])
+  @@index([createdAt])
+}
+
+model PayOut {
+  id                 String             @id @default(cuid())
+  orderId            String             @unique
+  userId             String
+  amount             Float
+  fiatCurrencyCode   String?
+  cryptocurrencyCode String?
+  currencyType       CurrencyType
+  networkCode        String?
+  destinationAddress String?
+  destinationTag     String?
+  userWalletId       String?
+  transactionHash    String?            @unique
+  explorerUrl        String?
+  blockNumber        Int?
+  confirmations      Int                @default(0)
+  networkFee         Float?
+  networkFeeCurrency String?
+  recipientName      String?
+  recipientAccount   String?
+  recipientBank      String?
+  paymentReference   String?
+  bankTransactionId  String?
+  paymentMethodCode  String?
+  status             PayOutStatus       @default(PENDING)
+  failureReason      String?
+  retryCount         Int                @default(0)
+  processedBy        String?
+  processedAt        DateTime?
+  processingNotes    String?
+  paymentAccountId   String?
+  fromWalletId       String?
+  scheduledFor       DateTime?
+  sentAt             DateTime?
+  confirmedAt        DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  cryptocurrency     Currency?          @relation(fields: [cryptocurrencyCode], references: [code])
+  fiatCurrency       FiatCurrency?      @relation("PayOutFiat", fields: [fiatCurrencyCode], references: [code])
+  platformWallet     PlatformWallet?    @relation(fields: [fromWalletId], references: [id])
+  network            BlockchainNetwork? @relation(fields: [networkCode], references: [code])
+  order              Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentAccount     PaymentAccount?    @relation("PaymentAccountPayOuts", fields: [paymentAccountId], references: [id])
+  paymentMethod      PaymentMethod?     @relation("PayOutMethod", fields: [paymentMethodCode], references: [code])
+  processor          User?              @relation("PayOutProcessor", fields: [processedBy], references: [id])
+  user               User               @relation("PayOutUser", fields: [userId], references: [id])
+  userWallet         UserWallet?        @relation(fields: [userWalletId], references: [id])
+
+  @@index([orderId])
+  @@index([userId])
+  @@index([fiatCurrencyCode])
+  @@index([cryptocurrencyCode])
+  @@index([status])
+  @@index([transactionHash])
+  @@index([destinationAddress])
+  @@index([currencyType])
+  @@index([scheduledFor])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+
+  // Who (Actor)
+  userId    String? // User ID (CLIENT)
+  adminId   String? // Admin ID (ADMIN/SUPER_ADMIN/etc)
+  userEmail String? // Email snapshot
+  userRole  String? // Role snapshot
+
+  // What (Action)
+  action   String
+  entity   String
+  entityId String
+
+  // Changes
+  oldValue Json?
+  newValue Json?
+  changes  Json? // Detailed diff
+
+  // Context
+  metadata Json?
+  reason   String? // For critical actions
+
+  // Where & When
+  ipAddress String?
+  userAgent String?
+  country   String?
+  city      String?
+
+  // MFA verification
+  mfaRequired   Boolean   @default(false)
+  mfaMethod     String?
+  mfaVerifiedAt DateTime?
+
+  // Compliance
+  severity     String    @default("INFO") // INFO, WARNING, CRITICAL
+  isReviewable Boolean   @default(false)
+  reviewedAt   DateTime?
+  reviewedBy   String?
+
+  // Immutability
+  createdAt DateTime @default(now())
+  hash      String? // SHA-256 for integrity
+
+  // Relations
+  user  User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  admin Admin? @relation("AdminAuditLogs", fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([adminId])
+  @@index([entity, entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([severity])
+  @@index([isReviewable])
+  @@index([userRole])
+}
+
+model EmailLog {
+  id          String      @id @default(cuid())
+  userId      String?
+  recipient   String
+  subject     String
+  template    String
+  status      EmailStatus @default(PENDING)
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  failedAt    DateTime?
+  error       String?
+  metadata    Json?
+  createdAt   DateTime    @default(now())
+  user        User?       @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([template])
+  @@index([createdAt])
+}
+
+model SystemSettings {
+  key         String      @id
+  value       String
+  type        SettingType @default(STRING)
+  category    String      @default("general")
+  description String?
+  isPublic    Boolean     @default(false)
+  updatedAt   DateTime    @updatedAt
+  updatedBy   String?
+
+  @@index([category])
+  @@index([isPublic])
+}
+
+model BlockchainNetwork {
+  id               String                      @id @default(cuid())
+  code             String                      @unique
+  name             String
+  symbol           String?
+  nativeToken      String
+  nativeAsset      String?
+  explorerUrl      String
+  rpcUrl           String?
+  chainId          Int?
+  minConfirmations Int                         @default(12)
+  confirmations    Int                         @default(12)
+  isActive         Boolean                     @default(true)
+  priority         Int                         @default(0)
+  metadata         Json?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+  currencies       CurrencyBlockchainNetwork[]
+  orders           Order[]
+  payIns           PayIn[]                     @relation("PayInNetwork")
+  payOuts          PayOut[]
+  paymentAccounts  PaymentAccount[]
+  platformWallets  PlatformWallet[]
+  transactions     Transaction[]
+  userWallets      UserWallet[]
+
+  @@index([isActive])
+}
+
+model CurrencyBlockchainNetwork {
+  id              String            @id @default(cuid())
+  currencyCode    String
+  blockchainCode  String
+  contractAddress String?
+  isNative        Boolean           @default(false)
+  isActive        Boolean           @default(true)
+  priority        Int               @default(0)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  blockchain      BlockchainNetwork @relation(fields: [blockchainCode], references: [code], onDelete: Cascade)
+  currency        Currency          @relation(fields: [currencyCode], references: [code], onDelete: Cascade)
+
+  @@unique([currencyCode, blockchainCode])
+  @@index([currencyCode])
+  @@index([blockchainCode])
+  @@index([isActive])
+}
+
+model UserWallet {
+  id             String            @id @default(cuid())
+  userId         String
+  blockchainCode String
+  currencyCode   String
+  address        String
+  label          String?
+  isVerified     Boolean           @default(false)
+  isDefault      Boolean           @default(false)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  orders         Order[]
+  payOuts        PayOut[]
+  blockchain     BlockchainNetwork @relation(fields: [blockchainCode], references: [code])
+  currency       Currency          @relation(fields: [currencyCode], references: [code])
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, address])
+  @@index([userId, currencyCode])
+  @@index([address])
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(cuid())
+  orderId   String
+  oldStatus OrderStatus
+  newStatus OrderStatus
+  changedBy String
+  note      String?
+  createdAt DateTime    @default(now())
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([createdAt])
+}
+
+model KycFormField {
+  id         String   @id @default(cuid())
+  fieldName  String   @unique
+  label      String
+  fieldType  String
+  isRequired Boolean  @default(true)
+  isEnabled  Boolean  @default(true)
+  category   String
+  validation Json?
+  options    Json?
+  priority   Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([category])
+  @@index([isEnabled])
+}
+
+model KycDocument {
+  id               String     @id @default(cuid())
+  kycSessionId     String
+  documentType     String
+  fileUrl          String
+  fileName         String
+  fileSize         Int
+  mimeType         String
+  verifiedByAI     Boolean    @default(false)
+  verificationData Json?
+  uploadedAt       DateTime   @default(now())
+  kycSession       KycSession @relation(fields: [kycSessionId], references: [id], onDelete: Cascade)
+
+  @@index([kycSessionId])
+  @@index([documentType])
+}
+
+model KycFormData {
+  id           String     @id @default(cuid())
+  kycSessionId String
+  fieldName    String
+  fieldValue   String
+  createdAt    DateTime   @default(now())
+  kycSession   KycSession @relation(fields: [kycSessionId], references: [id], onDelete: Cascade)
+
+  @@unique([kycSessionId, fieldName])
+  @@index([kycSessionId])
+}
+
+model PaymentMethod {
+  code                  String           @id @unique
+  name                  String
+  description           String?
+  type                  String
+  direction             PaymentDirection @default(IN)
+  providerType          ProviderType     @default(MANUAL)
+  automationLevel       AutomationLevel  @default(MANUAL)
+  currency              String
+  supportedNetworks     String[]         @default([])
+  pspConnector          String?
+  paymentAccountId      String?
+  bankAccountId         String?
+  minAmount             Float?
+  maxAmount             Float?
+  feeFixed              Float            @default(0)
+  feePercent            Float            @default(0)
+  processingTime        String?
+  instructions          String?
+  iconUrl               String?
+  priority              Int              @default(0)
+  config                Json?
+  isActive              Boolean          @default(true)
+  isAvailableForClients Boolean          @default(true)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  createdBy             String?
+  limitsMatrix          LimitsMatrix[]
+  orders                Order[]
+  payIns                PayIn[]
+  payOuts               PayOut[]         @relation("PayOutMethod")
+  bankAccount           BankDetails?     @relation(fields: [bankAccountId], references: [id])
+  paymentAccount        PaymentAccount?  @relation(fields: [paymentAccountId], references: [id])
+  psp                   PspConnector?    @relation(fields: [pspConnector], references: [code])
+
+  @@index([type, isActive])
+  @@index([currency])
+  @@index([direction])
+  @@index([providerType])
+  @@index([automationLevel])
+  @@index([isAvailableForClients])
+}
+
+model ManualRate {
+  id         String    @id @default(cuid())
+  cryptoCode String
+  fiatCode   String
+  rate       Float
+  validFrom  DateTime  @default(now())
+  validTo    DateTime?
+  isActive   Boolean   @default(true)
+  createdBy  String
+  reason     String?
+  createdAt  DateTime  @default(now())
+
+  @@index([cryptoCode, fiatCode, isActive])
+  @@index([validFrom, validTo])
+}
+
+model IntegrationSetting {
+  id         String    @id @default(cuid())
+  service    String    @unique
+  isEnabled  Boolean   @default(true)
+  config     Json
+  lastTested DateTime?
+  status     String    @default("unconfigured")
+  errorLog   String?
+  updatedAt  DateTime  @updatedAt
+  updatedBy  String?
+
+  @@index([service])
+  @@index([status])
+}
+
+model ApiKey {
+  id          String        @id @default(cuid())
+  userId      String?
+  key         String
+  keyHash     String        @unique
+  name        String
+  prefix      String
+  permissions Json
+  isActive    Boolean       @default(true)
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  lastUsedIp  String?
+  usageCount  Int           @default(0)
+  rateLimit   Int           @default(100)
+  createdBy   String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  user        User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usage       ApiKeyUsage[]
+
+  @@index([keyHash])
+  @@index([userId])
+  @@index([isActive])
+  @@index([prefix])
+}
+
+model ApiKeyUsage {
+  id           String   @id @default(cuid())
+  apiKeyId     String
+  endpoint     String
+  method       String
+  statusCode   Int
+  responseTime Int
+  ipAddress    String
+  userAgent    String?
+  errorMessage String?
+  createdAt    DateTime @default(now())
+  apiKey       ApiKey   @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@index([apiKeyId, createdAt])
+  @@index([endpoint])
+  @@index([createdAt])
+}
+
+model IpRule {
+  id        String    @id @default(cuid())
+  ipAddress String    @unique
+  type      String
+  reason    String?
+  createdBy String
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+
+  @@index([ipAddress, type])
+  @@index([type])
+}
+
+model TwoFactorAuth {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  passkeys        Json?
+  passkeysEnabled Boolean   @default(false)
+  totpEnabled     Boolean   @default(false)
+  totpSecret      String?
+  totpVerifiedAt  DateTime?
+  backupCodes     Json?
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model DataRetentionPolicy {
+  id            String   @id @default(cuid())
+  entityType    String   @unique
+  retentionDays Int
+  autoDelete    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model RateProvider {
+  code          String         @id @unique
+  name          String
+  type          String
+  weight        Float          @default(1.0)
+  isActive      Boolean        @default(true)
+  apiConfig     Json?
+  priority      Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  rateSnapshots RateSnapshot[]
+
+  @@index([isActive])
+  @@index([type])
+}
+
+model RateSnapshot {
+  id         String       @id @default(cuid())
+  providerId String
+  assetCode  String
+  fiatCode   String
+  rate       Float
+  timestamp  DateTime     @default(now())
+  provider   RateProvider @relation(fields: [providerId], references: [code])
+
+  @@index([assetCode, fiatCode, timestamp])
+  @@index([providerId, timestamp])
+}
+
+model FeeProfile {
+  code              String        @id @unique
+  name              String
+  spreadBps         Int
+  fixedFeeFiat      Float         @default(0)
+  fiatCurrency      String?
+  networkFeePolicy  String        @default("pass-through")
+  networkFeeAmount  Float?
+  networkFeePercent Float?
+  isActive          Boolean       @default(true)
+  priority          Int           @default(0)
+  description       String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  fiat              FiatCurrency? @relation(fields: [fiatCurrency], references: [code])
+
+  @@index([isActive])
+}
+
+model KycLevel {
+  code         String         @id @unique
+  name         String
+  description  String?
+  allowMethods String[]
+  requirements Json?
+  dailyLimit   Float?
+  monthlyLimit Float?
+  isActive     Boolean        @default(true)
+  priority     Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  limitsMatrix LimitsMatrix[]
+
+  @@index([isActive])
+}
+
+model LimitsMatrix {
+  id            String        @id @default(cuid())
+  kycLevel      String
+  paymentMethod String
+  fiatCurrency  String
+  period        String
+  limitAmount   Float
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  fiatRel       FiatCurrency  @relation(fields: [fiatCurrency], references: [code])
+  kycLevelRel   KycLevel      @relation(fields: [kycLevel], references: [code])
+  paymentRel    PaymentMethod @relation(fields: [paymentMethod], references: [code])
+
+  @@unique([kycLevel, paymentMethod, fiatCurrency, period])
+  @@index([kycLevel])
+  @@index([paymentMethod])
+}
+
+model PspConnector {
+  code               String          @id @unique
+  name               String
+  capabilities       String[]
+  settlementCurrency String
+  apiConfig          Json?
+  isEnabled          Boolean         @default(true)
+  lastTested         DateTime?
+  status             String          @default("unconfigured")
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  paymentMethods     PaymentMethod[]
+
+  @@index([isEnabled])
+  @@index([status])
+}
+
+model OrderStatusConfig {
+  code         String   @id @unique
+  name         String
+  description  String?
+  color        String   @default("#6b7280")
+  isTerminal   Boolean  @default(false)
+  priority     Int      @default(0)
+  nextStatuses String[] @default([])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([priority])
+}
+
+model TransactionStatusConfig {
+  code        String   @id @unique
+  name        String
+  description String?
+  color       String   @default("#6b7280")
+  isTerminal  Boolean  @default(false)
+  priority    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([priority])
+}
+
+model Transaction {
+  id            String            @id @default(cuid())
+  orderId       String?
+  walletId      String?
+  txHash        String?           @unique
+  currencyCode  String
+  chainCode     String
+  amount        Float
+  fee           Float?
+  statusCode    String
+  confirmations Int               @default(0)
+  broadcastAt   DateTime?
+  confirmedAt   DateTime?
+  failedAt      DateTime?
+  errorMessage  String?
+  metadata      Json?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  chain         BlockchainNetwork @relation(fields: [chainCode], references: [code])
+
+  @@index([orderId])
+  @@index([txHash])
+  @@index([statusCode])
+  @@index([chainCode])
+}
+
+model WidgetConfig {
+  id               String   @id @default(cuid())
+  code             String   @unique
+  name             String
+  supportedPairs   String[]
+  defaultFiat      String
+  defaultCrypto    String?
+  theme            Json
+  minKycForMethods Json
+  allowedMethods   String[]
+  feeProfileCode   String?
+  isActive         Boolean  @default(true)
+  domain           String?
+  webhookUrl       String?
+  apiKey           String?
+  metadata         Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([code])
+  @@index([isActive])
+}
+
+model UserKycLevel {
+  userId    String   @unique
+  kycLevel  String
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+  user      User     @relation("UserKycLevelRelation", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([kycLevel])
+}
+
+model Integration {
+  id          String    @id @default(cuid())
+  service     String    @unique
+  isEnabled   Boolean   @default(false)
+  status      String    @default("inactive")
+  apiKey      String?
+  apiEndpoint String?
+  lastTested  DateTime?
+  config      Json?
+  rates       Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([service])
+  @@index([isEnabled])
+  @@index([status])
+}
+
+model SystemLog {
+  id             String   @id @default(cuid())
+  userId         String?
+  sessionId      String?
+  action         String
+  method         String?
+  path           String
+  query          Json?
+  body           Json?
+  statusCode     Int?
+  ipAddress      String
+  userAgent      String?
+  deviceType     String?
+  browser        String?
+  browserVersion String?
+  os             String?
+  osVersion      String?
+  isMobile       Boolean  @default(false)
+  isBot          Boolean  @default(false)
+  country        String?
+  city           String?
+  responseTime   Int?
+  errorMessage   String?
+  errorStack     String?
+  referrer       String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  user           User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([ipAddress])
+  @@index([action])
+  @@index([createdAt])
+  @@index([isBot])
+  @@index([deviceType])
+}
+
+model IPBlacklist {
+  id              String    @id @default(cuid())
+  ipAddress       String    @unique
+  reason          String
+  blockedBy       String
+  isActive        Boolean   @default(true)
+  expiresAt       DateTime?
+  blockedAttempts Int       @default(0)
+  lastAttemptAt   DateTime?
+  metadata        Json?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  blockedByUser   User      @relation("BlockedBy", fields: [blockedBy], references: [id])
+
+  @@index([ipAddress])
+  @@index([isActive])
+  @@index([expiresAt])
+  @@index([blockedBy])
+}
+
+model SessionRevocation {
+  id            String   @id @default(cuid())
+  sessionKey    String   @unique
+  userId        String
+  ipAddress     String
+  deviceType    String?
+  browser       String?
+  os            String?
+  revokedBy     String
+  reason        String?
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+  revokedByUser User     @relation("RevokedBy", fields: [revokedBy], references: [id])
+  user          User     @relation("RevokedSessions", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sessionKey])
+  @@index([userId])
+  @@index([ipAddress])
+  @@index([expiresAt])
+  @@index([createdAt])
+}
+
+model AdminSettings {
+  id      String  @id @default(cuid())
+  userId  String? @unique // Optional - for backward compatibility with User
+  adminId String? @unique // New - for Admin model
+
+  // Session Management
+  idleTimeout        Int     @default(15)
+  maxSessionDuration Int     @default(8)
+  sessionTimeout     Int     @default(30) // Deprecated, use idleTimeout
+  rememberDevice     Boolean @default(false)
+
+  // MFA Settings
+  twoFactorEnabled Boolean  @default(false)
+  twoFactorMethod  String?
+  requireMfaAlways Boolean  @default(false)
+  requireStepUpFor String[] @default([])
+
+  // Security
+  loginNotifications  Boolean  @default(true)
+  activityDigest      Boolean  @default(false)
+  securityAlerts      Boolean  @default(true)
+  allowedIPs          String[] @default([])
+  blockUnknownDevices Boolean  @default(false)
+
+  // Audit
+  logAllActions Boolean @default(true)
+  retainLogsFor Int     @default(90)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations (one will be null)
+  user  User?  @relation("AdminSettings", fields: [userId], references: [id], onDelete: Cascade)
+  admin Admin? @relation("AdminToSettings", fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([adminId])
+}
+
+model KycProvider {
+  id               String       @id @default(cuid())
+  code             String       @unique
+  name             String
+  isActive         Boolean      @default(true)
+  priority         Int          @default(0)
+  apiUrl           String
+  apiKey           String
+  webhookUrl       String?
+  webhookSecret    String?
+  supportsLiveness Boolean      @default(false)
+  supportsAml      Boolean      @default(false)
+  supportsPep      Boolean      @default(false)
+  supportsDocScan  Boolean      @default(true)
+  costPerCheck     Float?
+  monthlyFee       Float?
+  currency         String       @default("EUR")
+  config           Json?
+  metadata         Json?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  kycSessions      KycSession[]
+
+  @@index([code])
+  @@index([isActive])
+}
+
+model KycProfile {
+  id                     String     @id @default(cuid())
+  kycSessionId           String     @unique
+  firstName              String
+  lastName               String
+  dateOfBirth            DateTime
+  placeOfBirth           String?
+  nationality            String
+  email                  String
+  phone                  String
+  phoneCountry           String?
+  addressStreet          String?
+  addressCity            String?
+  addressRegion          String?
+  addressCountry         String?
+  addressPostal          String?
+  idType                 String?
+  idNumber               String?
+  idIssuingCountry       String?
+  idIssuingAuth          String?
+  idIssueDate            DateTime?
+  idExpiryDate           DateTime?
+  idScanFront            String?
+  idScanBack             String?
+  livenessSelfie         String?
+  pepStatus              Boolean    @default(false)
+  pepCategory            String?
+  sanctionsScreeningDone Boolean    @default(false)
+  sanctionsProvider      String?
+  sanctionsScreeningDate DateTime?
+  sanctionsResult        String?
+  sanctionsMatches       Json?
+  employmentStatus       String?
+  occupation             String?
+  employerName           String?
+  purposeOfAccount       String?
+  intendedUse            String?
+  expectedVolume         Float?
+  expectedFrequency      String?
+  expectedCountries      String[]
+  sourceOfFunds          String?
+  sourceOfWealth         String?
+  riskScore              Int?
+  riskFactors            Json?
+  riskJustification      String?
+  consentKyc             Boolean    @default(false)
+  consentAml             Boolean    @default(false)
+  consentTfr             Boolean    @default(false)
+  consentPrivacy         Boolean    @default(false)
+  termsVersion           String?
+  privacyVersion         String?
+  ipAddress              String?
+  userAgent              String?
+  completedAt            DateTime?
+  verifiedBy             String?
+  verifiedAt             DateTime?
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+  kycSession             KycSession @relation(fields: [kycSessionId], references: [id], onDelete: Cascade)
+
+  @@index([kycSessionId])
+  @@index([email])
+  @@index([nationality])
+  @@index([pepStatus])
+}
+
+model LegalDocument {
+  id                String           @id @default(cuid())
+  key               String           @unique
+  title             String
+  description       String?
+  slug              String?          @unique
+  category          DocumentCategory
+  isRequired        Boolean          @default(false)
+  content           Json
+  htmlContent       String?
+  plainText         String?
+  status            DocumentStatus   @default(DRAFT)
+  publishedAt       DateTime?
+  publishedBy       String?
+  version           Int              @default(1)
+  previousVersionId String?
+  isLatest          Boolean          @default(true)
+  metaTitle         String?
+  metaDescription   String?
+  ogImage           String?
+  isPublic          Boolean          @default(false)
+  allowedRoles      String[]         @default(["ADMIN"])
+  createdBy         String
+  updatedBy         String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  changeLog         Json?
+
+  @@index([key])
+  @@index([slug])
+  @@index([category])
+  @@index([status])
+  @@index([isPublic])
+  @@index([publishedAt])
+}
+
+model DocumentTemplate {
+  id          String           @id @default(cuid())
+  name        String
+  description String?
+  category    DocumentCategory
+  content     Json
+  variables   Json?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([category])
+}
 
 enum Role {
   CLIENT
@@ -28,15 +1291,15 @@ enum KycStatus {
 }
 
 enum OrderStatus {
-  PENDING // Создан, ждёт оплаты
-  PAYMENT_PENDING // Пользователь загрузил proof, ждём проверки
-  PAYMENT_RECEIVED // Платёж подтверждён
-  PROCESSING // В обработке (админ отправляет крипту)
-  COMPLETED // Выполнен успешно
-  CANCELLED // Отменён пользователем
-  EXPIRED // Истёк срок оплаты (24 часа)
-  REFUNDED // Возврат средств
-  FAILED // Ошибка при отправке криптовалюты
+  PENDING
+  PAYMENT_PENDING
+  PAYMENT_RECEIVED
+  PROCESSING
+  COMPLETED
+  CANCELLED
+  EXPIRED
+  REFUNDED
+  FAILED
 }
 
 enum EmailStatus {
@@ -54,1648 +1317,406 @@ enum SettingType {
   JSON
 }
 
-// ==========================================
-// USER & AUTHENTICATION
-// ==========================================
-
-model User {
-  id        String    @id @default(cuid())
-  email     String    @unique
-  password  String // Hashed with bcrypt (10 rounds)
-  role      Role      @default(CLIENT)
-  isActive  Boolean   @default(true)
-  lastLogin DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  // Relations
-  profile       Profile?
-  kycSession    KycSession?
-  orders        Order[]
-  auditLogs     AuditLog[]
-  emailLogs     EmailLog[]
-  paymentProofs PaymentProof[]
-  userWallets   UserWallet[]
-  apiKeys       ApiKey[]
-  twoFactorAuth TwoFactorAuth?
-  kycLevelData  UserKycLevel?  @relation("UserKycLevelRelation")
-  systemLogs    SystemLog[]
-  blockedIPs    IPBlacklist[]  @relation("BlockedBy")
-  adminSettings AdminSettings? @relation("AdminSettings")
-  
-  // Session Revocation Relations
-  revokedSessions       SessionRevocation[] @relation("RevokedSessions") // Sessions revoked for this user
-  sessionRevocationsBy  SessionRevocation[] @relation("RevokedBy") // Sessions revoked by this admin
-  
-  // Payment Relations
-  payInsAsUser      PayIn[]  @relation("PayInUser")
-  payInsVerified    PayIn[]  @relation("PayInVerifier")
-  payInsReconciled  PayIn[]  @relation("PayInReconciler")
-  payOutsAsUser     PayOut[] @relation("PayOutUser")
-  payOutsProcessed  PayOut[] @relation("PayOutProcessor")
-
-  @@index([email])
-  @@index([role])
-}
-
-model Profile {
-  id          String    @id @default(cuid())
-  userId      String    @unique
-  firstName   String
-  lastName    String
-  phoneNumber String?
-  phoneCountry String?  // Country code for phone (PL, DE, etc.)
-  country     String
-  city        String?
-  address     String?
-  postalCode  String?
-  dateOfBirth DateTime?
-  placeOfBirth String? // City/country of birth
-  nationality String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([country])
-}
-
-// ==========================================
-// KYC VERIFICATION
-// ==========================================
-
-model KycSession {
-  id                   String    @id @default(cuid())
-  userId               String    @unique
-  kycProviderId        String?   // Link to KYC provider
-  kycaidVerificationId String?   @unique
-  kycaidApplicantId    String?
-  kycaidFormId         String?
-  status               KycStatus @default(PENDING)
-  submittedAt          DateTime?
-  reviewedAt           DateTime?
-  reviewedBy           String? // Admin user ID who reviewed
-  reviewNotes          String?   @db.Text
-  completedAt          DateTime?
-  expiresAt            DateTime? // KYC может истечь через N месяцев
-  rejectionReason      String?   @db.Text
-  webhookData          Json? // Raw KYCAID webhook data for debugging
-  metadata             Json? // Additional data
-  attempts             Int       @default(0)
-  lastAttemptAt        DateTime?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-
-  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  provider  KycProvider?  @relation(fields: [kycProviderId], references: [id])
-  documents KycDocument[]
-  formData  KycFormData[]
-  profile   KycProfile?   // 1:1 relation to detailed KYC profile
-
-  @@index([status])
-  @@index([kycaidVerificationId])
-  @@index([kycProviderId])
-}
-
-// ==========================================
-// CURRENCIES & TRADING
-// ==========================================
-
-model Currency {
-  code        String  @id // BTC, ETH, USDT, SOL
-  name        String // Bitcoin, Ethereum, Tether, Solana
-  symbol      String // ₿, Ξ, ₮, ◎
-  decimals    Int     @default(8)
-  precision   Int     @default(8) // Alias for decimals (CRM compatibility)
-  coingeckoId String // bitcoin, ethereum, tether, solana
-  isActive    Boolean @default(true)
-  priority    Int     @default(0) // Порядок отображения
-
-  // NEW: Token support
-  isToken Boolean @default(false) // true if ERC-20, TRC-20, etc.
-  iconUrl String? // Icon/logo URL
-
-  // Minimum and maximum order amounts
-  minOrderAmount Float @default(0.001)
-  maxOrderAmount Float @default(100)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  blockchainNetworks CurrencyBlockchainNetwork[] // Many-to-many: Currency supports multiple blockchains
-  orders             Order[]
-  tradingPairs       TradingPair[]               @relation("CryptoCurrency")
-  rateHistory        RateHistory[]               @relation("CryptoCurrency")
-  platformWallets    PlatformWallet[]            // DEPRECATED
-  userWallets        UserWallet[]
-  payIns             PayIn[]                     @relation("PayInCrypto") // Входящие платежи криптой
-  payOuts            PayOut[]                    // Исходящие платежи криптой
-  paymentAccounts    PaymentAccount[]            @relation("PaymentAccountCrypto") // NEW: криптовалютные счета
-
-  @@index([isToken])
-}
-
-model FiatCurrency {
-  code      String   @id // EUR, PLN, USD, GBP
-  name      String // Euro, Polish Zloty
-  symbol    String // €, zł, $, £
-  precision Int      @default(2) // Decimal places for display
-  isActive  Boolean  @default(true)
-  priority  Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  orders         Order[]
-  tradingPairs   TradingPair[]    @relation("FiatCurrency")
-  bankDetails    BankDetails[]    // DEPRECATED
-  rateHistory    RateHistory[]    @relation("FiatCurrency")
-  // NOTE: PaymentMethod.currency can be fiat or crypto, no FK relation
-  feeProfiles    FeeProfile[]
-  limitsMatrix   LimitsMatrix[]
-  payIns         PayIn[] // Входящие платежи в этой валюте
-  payOuts        PayOut[]         @relation("PayOutFiat") // Исходящие фиатные платежи
-  paymentAccounts PaymentAccount[] // NEW: фиатные счета
-}
-
-// Торговые пары с настройками лимитов и комиссий
-model TradingPair {
-  id              String   @id @default(cuid())
-  cryptoCode      String
-  fiatCode        String
-  isActive        Boolean  @default(true)
-  minCryptoAmount Float // Минимум в крипте (например, 0.001 BTC)
-  maxCryptoAmount Float // Максимум в крипте
-  minFiatAmount   Float // Минимум в фиате (например, 50 EUR)
-  maxFiatAmount   Float // Максимум в фиате
-  feePercent      Float    @default(1.5) // Комиссия платформы (настраиваемая)
-  priority        Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  crypto Currency     @relation("CryptoCurrency", fields: [cryptoCode], references: [code])
-  fiat   FiatCurrency @relation("FiatCurrency", fields: [fiatCode], references: [code])
-
-  @@unique([cryptoCode, fiatCode])
-  @@index([isActive])
-}
-
-// История курсов для проверки и аналитики
-model RateHistory {
-  id         String   @id @default(cuid())
-  cryptoCode String
-  fiatCode   String
-  rate       Float // Курс на момент времени
-  source     String   @default("coingecko")
-  createdAt  DateTime @default(now())
-
-  crypto Currency     @relation("CryptoCurrency", fields: [cryptoCode], references: [code])
-  fiat   FiatCurrency @relation("FiatCurrency", fields: [fiatCode], references: [code])
-
-  @@index([cryptoCode, fiatCode, createdAt])
-}
-
-// ==========================================
-// ORDERS & PAYMENTS
-// ==========================================
-
-model Order {
-  id               String @id @default(cuid())
-  userId           String
-  currencyCode     String
-  fiatCurrencyCode String
-
-  // Уникальный референс для платежа (APR-2025-ABC123)
-  paymentReference String @unique
-
-  // Amounts
-  cryptoAmount Float // Сколько криптовалюты купить
-  fiatAmount   Float // Сумма в фиате без комиссии
-  rate         Float // Курс на момент создания
-  feePercent   Float // Процент комиссии (сохраняем на момент создания)
-  feeAmount    Float // Сумма комиссии
-  totalFiat    Float // Итого к оплате (fiatAmount + feeAmount)
-
-  // Wallet & Payment - IMPROVED: добавлена связь с UserWallet и BlockchainNetwork
-  userWalletId      String? // ID кошелька пользователя из UserWallet
-  walletAddress     String // Адрес кошелька пользователя (duplicate для backward compatibility)
-  blockchainCode    String? // Blockchain network для этого адреса (ETH, BSC, POLYGON, etc.)
-  paymentMethodCode String? // Способ оплаты (код)
-
-  // Status & Processing
-  status         OrderStatus @default(PENDING)
-  createdByAdmin Boolean     @default(false) // Заказ создан админом
-
-  // Admin fields
-  adminNotes      String?   @db.Text
-  transactionHash String? // TX hash после отправки криптовалюты
-  processedBy     String? // Admin user ID who processed
-  processedAt     DateTime?
-
-  // Timestamps
-  expiresAt DateTime // Когда истекает срок оплаты (24 часа)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  currency      Currency             @relation(fields: [currencyCode], references: [code])
-  fiatCurrency  FiatCurrency         @relation(fields: [fiatCurrencyCode], references: [code])
-  userWallet    UserWallet?          @relation(fields: [userWalletId], references: [id], onDelete: SetNull)
-  blockchain    BlockchainNetwork?   @relation(fields: [blockchainCode], references: [code])
-  paymentMethod PaymentMethod?       @relation(fields: [paymentMethodCode], references: [code])
-  paymentProofs PaymentProof[]
-  statusHistory OrderStatusHistory[]
-  payIn         PayIn? // Входящий платеж (1:1)
-  payOut        PayOut? // Исходящий платеж (1:1)
-
-  @@index([userId])
-  @@index([status])
-  @@index([createdAt])
-  @@index([paymentReference])
-  @@index([userWalletId])
-  @@index([blockchainCode])
-}
-
-// Файлы подтверждения оплаты
-model PaymentProof {
-  id         String   @id @default(cuid())
-  orderId    String
-  fileUrl    String // Vercel Blob URL
-  fileName   String
-  fileSize   Int // Размер в байтах
-  mimeType   String // image/jpeg, image/png, application/pdf
-  uploadedBy String // User ID
-  uploadedAt DateTime @default(now())
-
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  user  User  @relation(fields: [uploadedBy], references: [id])
-
-  @@index([orderId])
-}
-
-// ==========================================
-// BANK DETAILS
-// ==========================================
-
-// ==========================================
-// PAYMENT ACCOUNTS (UNIFIED)
-// ==========================================
-
-// Payment Account Type
 enum PaymentAccountType {
-  BANK_ACCOUNT   // Банковский счёт (фиат)
-  CRYPTO_WALLET  // Криптовалютный кошелёк
+  BANK_ACCOUNT
+  CRYPTO_WALLET
 }
 
-// Payment Accounts - универсальная модель для банковских счетов и крипто-кошельков
-model PaymentAccount {
-  id          String             @id @default(cuid())
-  code        String             @unique // sepa_eur_main, btc_hot_wallet
-  name        String // "Main EUR SEPA Account", "BTC Hot Wallet"
-  type        PaymentAccountType
-  description String?            @db.Text
-  
-  // For BANK_ACCOUNT (фиат)
-  currency          String? // EUR, PLN (для фиата)
-  bankName          String?
-  bankAddress       String?
-  accountHolder     String?
-  iban              String?
-  swift             String?
-  bic               String?
-  sortCode          String? // Для UK банков
-  referenceTemplate String? // "APR-{orderId}"
-  
-  // For CRYPTO_WALLET (крипто)
-  cryptocurrencyCode String? // BTC, ETH, USDT
-  blockchainCode     String? // BITCOIN, ETHEREUM, BSC
-  address            String? // Wallet address
-  
-  // Common fields
-  balance        Float?   // Текущий баланс (опционально)
-  minBalance     Float? // Минимальный баланс для оповещений
-  instructions   String?  @db.Text // Инструкции для использования
-  isActive       Boolean  @default(true)
-  isDefault      Boolean  @default(false) // Использовать по умолчанию
-  priority       Int      @default(0)
-  
-  // Security & Monitoring
-  lastUsed       DateTime?
-  lastChecked    DateTime? // Последняя проверка баланса
-  alertsEnabled  Boolean   @default(true)
-  
-  // Metadata
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  createdBy      String? // Admin user ID
-  
-  // Relations
-  fiatCurrency   FiatCurrency?      @relation(fields: [currency], references: [code])
-  cryptocurrency Currency?          @relation("PaymentAccountCrypto", fields: [cryptocurrencyCode], references: [code])
-  blockchain     BlockchainNetwork? @relation(fields: [blockchainCode], references: [code])
-  
-  // Payment methods using this account
-  paymentMethods PaymentMethod[]
-  payOuts        PayOut[]           @relation("PaymentAccountPayOuts")
-  
-  @@index([type, isActive])
-  @@index([currency])
-  @@index([cryptocurrencyCode])
-  @@index([isDefault])
-}
-
-// DEPRECATED: Keep for migration compatibility, will be removed
-model BankDetails {
-  id                String   @id @default(cuid())
-  currency          String
-  bankName          String
-  bankAddress       String?
-  accountHolder     String
-  iban              String
-  swift             String?
-  bic               String?
-  sortCode          String?
-  referenceTemplate String   @default("APR-{orderId}")
-  instructions      String?  @db.Text
-  isActive          Boolean  @default(true)
-  priority          Int      @default(0)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  fiatCurrency   FiatCurrency @relation(fields: [currency], references: [code])
-  paymentMethods PaymentMethod[] // DEPRECATED
-
-  @@index([currency, isActive])
-}
-
-// DEPRECATED: Keep for migration compatibility, will be removed
-model PlatformWallet {
-  id             String    @id @default(cuid())
-  currencyCode   String
-  blockchainCode String
-  address        String    @unique
-  label          String
-  isActive       Boolean   @default(true)
-  balance        Float     @default(0)
-  lastUsed       DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  currency   Currency          @relation(fields: [currencyCode], references: [code])
-  blockchain BlockchainNetwork @relation(fields: [blockchainCode], references: [code])
-  payOuts    PayOut[] // DEPRECATED
-
-  @@index([currencyCode, isActive])
-}
-
-// ==========================================
-// PAYMENT TRACKING (PAY IN / PAY OUT)
-// ==========================================
-
-// Pay In - Входящие платежи (фиат от клиента)
-model PayIn {
-  id               String   @id @default(cuid())
-  orderId          String   @unique // Связь 1:1 с заказом
-  userId           String // Кто платит
-  
-  // Payment Details
-  amount           Float // Сумма платежа
-  fiatCurrencyCode String? // EUR, PLN (для фиатных платежей)
-  cryptocurrencyCode String? // BTC, ETH, USDT (для крипто платежей)
-  currencyType     CurrencyType // FIAT or CRYPTO
-  paymentMethodCode String? // SEPA, SWIFT, BLIK (для фиата)
-  
-  // For FIAT payments
-  senderName       String? // Имя отправителя
-  senderAccount    String? // Счет/карта отправителя
-  senderBank       String? // Банк отправителя
-  reference        String? // Reference из платежа
-  
-  // For CRYPTO payments
-  networkCode      String? // ETHEREUM, BSC, POLYGON, TRON (для крипты)
-  senderAddress    String? // Адрес отправителя крипты
-  transactionHash  String? // TX hash в блокчейне
-  blockNumber      Int? // Номер блока
-  confirmations    Int @default(0) // Количество подтверждений
-  
-  // Universal transaction ID
-  transactionId    String? @unique // ID транзакции (bank ID или TX hash)
-  
-  // Status & Verification
-  status           PayInStatus @default(PENDING)
-  expectedAmount   Float // Ожидаемая сумма (для сверки)
-  receivedAmount   Float? // Фактически полученная сумма
-  amountMismatch   Boolean @default(false) // Несоответствие суммы
-  
-  // Verification
-  verifiedBy       String? // Admin ID who verified
-  verifiedAt       DateTime?
-  verificationNotes String? @db.Text
-  
-  // Reconciliation
-  reconciledWith   String? // Bank statement reference или block explorer
-  reconciledAt     DateTime?
-  reconciledBy     String?
-  
-  // Receipt/Proof
-  proofUrls        String[] // URLs документов подтверждения
-  explorerUrl      String? // Ссылка на block explorer (для крипты)
-  
-  // Timestamps
-  paymentDate      DateTime? // Дата платежа
-  receivedDate     DateTime? // Когда получили
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  
-  // Relations
-  order         Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  user          User               @relation("PayInUser", fields: [userId], references: [id])
-  fiatCurrency  FiatCurrency?      @relation(fields: [fiatCurrencyCode], references: [code])
-  cryptocurrency Currency?         @relation("PayInCrypto", fields: [cryptocurrencyCode], references: [code])
-  network       BlockchainNetwork? @relation("PayInNetwork", fields: [networkCode], references: [code])
-  paymentMethod PaymentMethod?     @relation(fields: [paymentMethodCode], references: [code])
-  verifier      User?              @relation("PayInVerifier", fields: [verifiedBy], references: [id])
-  reconciler    User?              @relation("PayInReconciler", fields: [reconciledBy], references: [id])
-  
-  @@index([orderId])
-  @@index([userId])
-  @@index([fiatCurrencyCode])
-  @@index([cryptocurrencyCode])
-  @@index([status])
-  @@index([currencyType])
-  @@index([paymentDate])
-  @@index([transactionId])
-  @@index([transactionHash])
-  @@index([createdAt])
-}
-
-// Pay Out - Исходящие платежи (криптой или фиатом клиенту)
-model PayOut {
-  id                String   @id @default(cuid())
-  orderId           String   @unique // Связь 1:1 с заказом
-  userId            String // Кому отправляем
-  
-  // Payment Details
-  amount            Float // Количество для отправки
-  fiatCurrencyCode  String? // EUR, PLN (для фиатных платежей)
-  cryptocurrencyCode String? // BTC, ETH, USDT (для крипто платежей)
-  currencyType      CurrencyType // CRYPTO or FIAT
-  
-  // For CRYPTO payments
-  networkCode       String? // ETHEREUM, BSC, POLYGON, TRON
-  destinationAddress String? // Адрес получателя
-  destinationTag     String? // Tag/Memo для некоторых сетей
-  userWalletId       String? // Связь с UserWallet
-  transactionHash    String? @unique // TX hash в блокчейне
-  explorerUrl        String? // Ссылка на explorer
-  blockNumber        Int?
-  confirmations      Int @default(0)
-  networkFee         Float? // Комиссия сети
-  networkFeeCurrency String? // В какой валюте комиссия
-  
-  // For FIAT payments
-  recipientName      String? // Имя получателя
-  recipientAccount   String? // IBAN/Account получателя
-  recipientBank      String? // Банк получателя
-  paymentReference   String? // Reference для перевода
-  bankTransactionId  String? // ID транзакции в банке
-  paymentMethodCode  String? // SEPA, SWIFT, BLIK
-  
-  // Status & Processing
-  status             PayOutStatus @default(PENDING)
-  failureReason      String? @db.Text
-  retryCount         Int @default(0)
-  
-  // Processing
-  processedBy        String? // Admin ID who sent
-  processedAt        DateTime?
-  processingNotes    String? @db.Text
-  
-  // Source Account (NEW: unified)
-  paymentAccountId   String? // PaymentAccount откуда отправляем (банк или кошелёк)
-  
-  // DEPRECATED: старые поля
-  fromWalletId       String? // DEPRECATED: use paymentAccountId
-  
-  // Timestamps
-  scheduledFor       DateTime? // Запланировано на
-  sentAt             DateTime? // Фактически отправлено
-  confirmedAt        DateTime? // Подтверждено
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  
-  // Relations
-  order          Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  user           User               @relation("PayOutUser", fields: [userId], references: [id])
-  cryptocurrency Currency?          @relation(fields: [cryptocurrencyCode], references: [code])
-  fiatCurrency   FiatCurrency?      @relation("PayOutFiat", fields: [fiatCurrencyCode], references: [code])
-  network        BlockchainNetwork? @relation(fields: [networkCode], references: [code])
-  userWallet     UserWallet?        @relation(fields: [userWalletId], references: [id])
-  processor      User?              @relation("PayOutProcessor", fields: [processedBy], references: [id])
-  paymentAccount PaymentAccount?    @relation("PaymentAccountPayOuts", fields: [paymentAccountId], references: [id])
-  paymentMethod  PaymentMethod?     @relation("PayOutMethod", fields: [paymentMethodCode], references: [code])
-  
-  // DEPRECATED relations
-  platformWallet PlatformWallet?   @relation(fields: [fromWalletId], references: [id])
-  
-  @@index([orderId])
-  @@index([userId])
-  @@index([fiatCurrencyCode])
-  @@index([cryptocurrencyCode])
-  @@index([status])
-  @@index([transactionHash])
-  @@index([destinationAddress])
-  @@index([currencyType])
-  @@index([scheduledFor])
-  @@index([createdAt])
-}
-
-// Payment Status Enums
 enum PayInStatus {
-  PENDING          // Ожидается платеж
-  RECEIVED         // Получен, но не проверен
-  VERIFIED         // Проверен и подтвержден
-  PARTIAL          // Частичная оплата
-  MISMATCH         // Несоответствие суммы
-  RECONCILED       // Сверен с выпиской
-  FAILED           // Не получен
-  REFUNDED         // Возвращен
-  EXPIRED          // Истек срок
+  PENDING
+  RECEIVED
+  VERIFIED
+  PARTIAL
+  MISMATCH
+  RECONCILED
+  FAILED
+  REFUNDED
+  EXPIRED
 }
 
 enum PayOutStatus {
-  PENDING          // Ожидает отправки
-  QUEUED           // В очереди на отправку
-  PROCESSING       // Обрабатывается
-  SENT             // Отправлено
-  CONFIRMING       // Ждем подтверждений
-  CONFIRMED        // Подтверждено в сети
-  FAILED           // Ошибка отправки
-  CANCELLED        // Отменено
+  PENDING
+  QUEUED
+  PROCESSING
+  SENT
+  CONFIRMING
+  CONFIRMED
+  FAILED
+  CANCELLED
 }
 
 enum CurrencyType {
-  FIAT             // Фиатные валюты (EUR, USD, PLN)
-  CRYPTO           // Криптовалюты (BTC, ETH, USDT)
+  FIAT
+  CRYPTO
 }
 
-// ==========================================
-// SYSTEM & LOGGING
+enum PaymentDirection {
+  IN
+  OUT
+  BOTH
+}
+
+enum ProviderType {
+  MANUAL
+  BANK_ACCOUNT
+  PSP
+  CRYPTO_WALLET
+}
+
+enum AutomationLevel {
+  MANUAL
+  SEMI_AUTO
+  FULLY_AUTO
+}
+
+enum DocumentCategory {
+  PUBLIC
+  INTERNAL
+  LEGAL
+}
+
+enum DocumentStatus {
+  DRAFT
+  REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+//  ==========================================
+// IDENTITY & ACCESS MANAGEMENT - NEW MODELS
 // ==========================================
 
-// Аудит логи для отслеживания действий
-model AuditLog {
-  id        String   @id @default(cuid())
-  userId    String? // Кто совершил действие (может быть system)
-  action    String // ORDER_CREATED, KYC_APPROVED, ORDER_STATUS_CHANGED
-  entity    String // Order, KycSession, User
-  entityId  String // ID сущности
-  oldValue  Json? // Старое значение
-  newValue  Json? // Новое значение
-  metadata  Json? // Дополнительная информация
-  ipAddress String?
-  userAgent String?  @db.Text
+// New Enums
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  COMPLIANCE
+  TREASURY_APPROVER
+  FINANCE
+  SUPPORT
+  READ_ONLY
+}
+
+enum AuthMethod {
+  PASSWORD
+  SSO
+  PASSKEY
+  HYBRID
+}
+
+enum MfaChallengeStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+  FAILED
+}
+
+// Admin Model (separate from User)
+model Admin {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String? // Optional if using SSO/Passkey only
+  firstName String
+  lastName  String
+  role      AdminRole @default(ADMIN)
+
+  // Status
+  isActive       Boolean   @default(true)
+  isSuspended    Boolean   @default(false)
+  suspendedUntil DateTime?
+  lastLogin      DateTime?
+
+  // Auth methods
+  authMethod  AuthMethod @default(PASSWORD)
+  ssoProvider String? // google-workspace, microsoft, okta
+  ssoSubject  String? // SSO subject ID
+
+  // Metadata
+  createdAt DateTime @default(now())
+  createdBy String? // Admin ID who created
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  twoFactorAuth    AdminTwoFactorAuth?
+  sessions         AdminSession[]
+  settings         AdminSettings?       @relation("AdminToSettings")
+  webAuthnCreds    WebAuthnCredential[]
+  mfaChallenges    MfaChallenge[]
+  auditLogsCreated AuditLog[]           @relation("AdminAuditLogs")
+
+  @@unique([ssoProvider, ssoSubject])
+  @@index([email])
+  @@index([role])
+  @@index([isActive])
+}
+
+// Roles and Permissions
+model RoleModel {
+  code        String   @id @unique
+  name        String
+  description String?
+  isSystem    Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  priority    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  permissions RolePermission[]
+
+  @@index([isActive])
+  @@map("Role_")
+}
+
+model Permission {
+  code        String   @id @unique
+  name        String
+  resource    String
+  action      String
+  description String?
+  category    String
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  roles RolePermission[]
+
+  @@unique([resource, action])
+  @@index([resource])
+  @@index([category])
+}
+
+model RolePermission {
+  id             String   @id @default(cuid())
+  roleCode       String
+  permissionCode String
+  createdAt      DateTime @default(now())
+
+  role       RoleModel  @relation(fields: [roleCode], references: [code], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionCode], references: [code], onDelete: Cascade)
+
+  @@unique([roleCode, permissionCode])
+  @@index([roleCode])
+  @@index([permissionCode])
+}
+
+// WebAuthn Credentials (Passkeys)
+model WebAuthnCredential {
+  id      String @id @default(cuid())
+  adminId String
+
+  // WebAuthn fields
+  credentialId String @unique
+  publicKey    String
+  counter      Int    @default(0)
+
+  // Device info
+  deviceName String?
+  deviceType String?
+  transports String[]
+
+  // Attestation
+  aaguid      String?
+  attestation String?
+
+  // Status
+  isActive Boolean   @default(true)
+  lastUsed DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([credentialId])
+}
+
+// Admin 2FA (TOTP + WebAuthn)
+model AdminTwoFactorAuth {
+  id      String @id @default(cuid())
+  adminId String @unique
+
+  // TOTP
+  totpEnabled    Boolean   @default(false)
+  totpSecret     String?
+  totpVerifiedAt DateTime?
+
+  // WebAuthn
+  webAuthnEnabled  Boolean @default(false)
+  webAuthnRequired Boolean @default(false)
+
+  // Backup codes
+  backupCodes Json?
+
+  // Settings
+  preferredMethod String @default("TOTP")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+}
+
+// MFA Challenges (Step-up MFA)
+model MfaChallenge {
+  id           String  @id @default(cuid())
+  adminId      String
+  action       String
+  resourceType String?
+  resourceId   String?
+
+  // Challenge details
+  challengeType String
+  challenge     String
+
+  // Status
+  status      MfaChallengeStatus @default(PENDING)
+  attempts    Int                @default(0)
+  maxAttempts Int                @default(3)
+
+  // Verification
+  verifiedAt   DateTime?
+  verifiedWith String?
+
+  // Expiration
+  expiresAt DateTime
   createdAt DateTime @default(now())
 
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId, status])
+  @@index([expiresAt])
+}
+
+// Admin Sessions (Enhanced)
+model AdminSession {
+  id      String @id @default(cuid())
+  adminId String
+
+  // Session identification
+  sessionId    String @unique
+  sessionToken String @unique
+  sessionKey   String
+
+  // Device info
+  ipAddress      String
+  deviceType     String?
+  browser        String?
+  browserVersion String?
+  os             String?
+  osVersion      String?
+  userAgent      String
+
+  // Location
+  country String?
+  city    String?
+
+  // MFA info
+  mfaMethod     String?
+  mfaVerifiedAt DateTime?
+
+  // Status
+  isActive Boolean @default(true)
+
+  // Timeouts
+  createdAt    DateTime @default(now())
+  lastActivity DateTime @default(now())
+  expiresAt    DateTime
+
+  // Settings
+  idleTimeout Int?
+  maxDuration Int?
+
+  // Termination
+  terminatedAt      DateTime?
+  terminatedBy      String?
+  terminationReason String?
+
+  updatedAt DateTime @updatedAt
+
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId, isActive])
+  @@index([sessionId])
+  @@index([sessionToken])
+  @@index([sessionKey])
+  @@index([lastActivity])
+  @@index([expiresAt])
+  @@index([ipAddress])
+}
+
+// Break-glass Emergency Access
+model BreakGlassUser {
+  id           String @id @default(cuid())
+  username     String @unique
+  passwordHash String
+  totpSecret   String
+
+  // Restrictions
+  isActive   Boolean   @default(false)
+  lastUsed   DateTime?
+  usageCount Int       @default(0)
+
+  // Access info
+  accessInstructions String
+
+  // Auto-disable
+  autoDisableAfter Int @default(24)
+
+  createdAt DateTime @default(now())
+}
+
+// Enhanced Audit Log
+model AuditLogEnhanced {
+  id String @id @default(cuid())
+
+  // Who
+  userId    String?
+  userEmail String?
+  userRole  String?
+
+  // What
+  action   String
+  entity   String
+  entityId String
+
+  // Changes
+  oldValue Json?
+  newValue Json?
+  changes  Json?
+
+  // Context
+  metadata Json?
+  reason   String?
+
+  // Where & When
+  ipAddress String
+  userAgent String
+  country   String?
+  city      String?
+
+  // MFA verification
+  mfaRequired   Boolean   @default(false)
+  mfaMethod     String?
+  mfaVerifiedAt DateTime?
+
+  // Compliance
+  severity     String    @default("INFO")
+  isReviewable Boolean   @default(false)
+  reviewedAt   DateTime?
+  reviewedBy   String?
+
+  // Immutability
+  createdAt DateTime @default(now())
+  hash      String?
 
   @@index([userId])
   @@index([entity, entityId])
   @@index([action])
   @@index([createdAt])
-}
-
-// Лог отправленных email
-model EmailLog {
-  id          String      @id @default(cuid())
-  userId      String?
-  recipient   String
-  subject     String
-  template    String // WELCOME, ORDER_CREATED, KYC_APPROVED, etc.
-  status      EmailStatus @default(PENDING)
-  sentAt      DateTime?
-  deliveredAt DateTime?
-  failedAt    DateTime?
-  error       String?     @db.Text
-  metadata    Json? // Email variables, Resend ID, etc.
-  createdAt   DateTime    @default(now())
-
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([userId])
-  @@index([status])
-  @@index([template])
-  @@index([createdAt])
-}
-
-// Настройки системы
-model SystemSettings {
-  key         String      @id
-  value       String      @db.Text
-  type        SettingType @default(STRING)
-  category    String      @default("general") // general, email, kyc, payment, trading
-  description String?     @db.Text
-  isPublic    Boolean     @default(false) // Можно ли показать на фронтенде
-  updatedAt   DateTime    @updatedAt
-  updatedBy   String? // Admin user ID
-
-  @@index([category])
-  @@index([isPublic])
-}
-
-// ==========================================
-// BLOCKCHAIN & WALLETS
-// ==========================================
-
-// Blockchain Networks - справочник блокчейнов (chains)
-model BlockchainNetwork {
-  id               String   @id @default(cuid())
-  code             String   @unique // ETH, BSC, POLYGON, SOLANA, BITCOIN, TRON
-  name             String // Ethereum, Binance Smart Chain, Polygon, Solana, Bitcoin, Tron
-  symbol           String? // ETH, BNB, MATIC, SOL, BTC, TRX
-  nativeToken      String // ETH, BNB, MATIC, SOL, BTC, TRX
-  nativeAsset      String? // NEW: Redundant with nativeToken for CRM compatibility
-  explorerUrl      String // https://etherscan.io
-  rpcUrl           String? // Optional RPC endpoint
-  chainId          Int? // For EVM chains
-  minConfirmations Int      @default(12) // Required confirmations (renamed from confirmations)
-  confirmations    Int      @default(12) // Keep for backward compatibility
-  isActive         Boolean  @default(true)
-  priority         Int      @default(0)
-  metadata         Json? // Additional chain info
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  // Relations
-  currencies      CurrencyBlockchainNetwork[] // Many-to-many: Multiple currencies can use this blockchain
-  userWallets     UserWallet[]
-  platformWallets PlatformWallet[]            // DEPRECATED
-  transactions    Transaction[]
-  orders          Order[] // Заказы, использующие эту сеть
-  payIns          PayIn[]                     @relation("PayInNetwork") // Входящие платежи в этой сети
-  payOuts         PayOut[] // Исходящие платежи в этой сети
-  paymentAccounts PaymentAccount[] // NEW: крипто-кошельки на этой сети
-
-  @@index([isActive])
-}
-
-// Many-to-Many: Currency <-> BlockchainNetwork
-// Example: USDC can exist on Ethereum, Polygon, Solana, etc.
-model CurrencyBlockchainNetwork {
-  id              String   @id @default(cuid())
-  currencyCode    String
-  blockchainCode  String
-  contractAddress String? // Smart contract address for tokens (0x... for ERC-20, etc.)
-  isNative        Boolean  @default(false) // true if native coin (BTC on Bitcoin, ETH on Ethereum)
-  isActive        Boolean  @default(true) // Can disable specific currency-blockchain pair
-  priority        Int      @default(0) // Display order
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  // Relations
-  currency   Currency          @relation(fields: [currencyCode], references: [code], onDelete: Cascade)
-  blockchain BlockchainNetwork @relation(fields: [blockchainCode], references: [code], onDelete: Cascade)
-
-  @@unique([currencyCode, blockchainCode]) // One currency can only be on one blockchain once
-  @@index([currencyCode])
-  @@index([blockchainCode])
-  @@index([isActive])
-}
-
-// User Wallets - кошельки пользователей
-model UserWallet {
-  id             String   @id @default(cuid())
-  userId         String
-  blockchainCode String
-  currencyCode   String // BTC, ETH, USDT, etc.
-  address        String
-  label          String? // "My Main BTC Wallet"
-  isVerified     Boolean  @default(false) // Верификация через тестовую транзакцию
-  isDefault      Boolean  @default(false) // Кошелек по умолчанию для валюты
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  blockchain BlockchainNetwork @relation(fields: [blockchainCode], references: [code])
-  currency   Currency          @relation(fields: [currencyCode], references: [code])
-  orders     Order[] // Заказы, использующие этот кошелек
-  payOuts    PayOut[] // Исходящие платежи на этот кошелек
-
-  @@unique([userId, address])
-  @@index([userId, currencyCode])
-  @@index([address])
-}
-
-// ==========================================
-// ORDER STATUS TRACKING
-// ==========================================
-
-// Order Status History - история изменений статуса заказа (для Kanban)
-model OrderStatusHistory {
-  id        String      @id @default(cuid())
-  orderId   String
-  oldStatus OrderStatus
-  newStatus OrderStatus
-  changedBy String // User ID (admin)
-  note      String?     @db.Text
-  createdAt DateTime    @default(now())
-
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  @@index([orderId])
-  @@index([createdAt])
-}
-
-// ==========================================
-// KYC EXTENDED MODELS
-// ==========================================
-
-// KYC Form Fields - настраиваемые поля KYC
-model KycFormField {
-  id         String   @id @default(cuid())
-  fieldName  String   @unique // first_name, passport_number, etc.
-  label      String // Отображаемое название
-  fieldType  String // text, number, date, file, select
-  isRequired Boolean  @default(true)
-  isEnabled  Boolean  @default(true)
-  category   String // personal, documents, address
-  validation Json? // JSON с правилами валидации
-  options    Json? // Для select/radio
-  priority   Int      @default(0)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@index([category])
-  @@index([isEnabled])
-}
-
-// KYC Documents - хранение загруженных документов
-model KycDocument {
-  id               String   @id @default(cuid())
-  kycSessionId     String
-  documentType     String // passport, id_card, driver_license, selfie
-  fileUrl          String // Vercel Blob URL
-  fileName         String
-  fileSize         Int
-  mimeType         String
-  verifiedByAI     Boolean  @default(false) // KYCAID liveness check
-  verificationData Json? // Результат от KYCAID
-  uploadedAt       DateTime @default(now())
-
-  kycSession KycSession @relation(fields: [kycSessionId], references: [id], onDelete: Cascade)
-
-  @@index([kycSessionId])
-  @@index([documentType])
-}
-
-// KYC Form Data - заполненные данные KYC
-model KycFormData {
-  id           String   @id @default(cuid())
-  kycSessionId String
-  fieldName    String
-  fieldValue   String   @db.Text
-  createdAt    DateTime @default(now())
-
-  kycSession KycSession @relation(fields: [kycSessionId], references: [id], onDelete: Cascade)
-
-  @@unique([kycSessionId, fieldName])
-  @@index([kycSessionId])
-}
-
-// ==========================================
-// PAYMENT METHODS
-// ==========================================
-
-// Payment Method Direction
-enum PaymentDirection {
-  IN   // Только входящие (клиент → платформа)
-  OUT  // Только исходящие (платформа → клиент)
-  BOTH // Оба направления
-}
-
-// Payment Provider Type
-enum ProviderType {
-  MANUAL         // Ручная обработка (админ проверяет вручную)
-  BANK_ACCOUNT   // Привязан к банковскому счёту
-  PSP            // Через платёжный провайдер (Stripe, TPay)
-  CRYPTO_WALLET  // Криптовалютный кошелёк
-}
-
-// Automation Level
-enum AutomationLevel {
-  MANUAL      // Полностью вручную (админ всё делает)
-  SEMI_AUTO   // Полуавтомат (админ подтверждает)
-  FULLY_AUTO  // Полный автомат (система сама обрабатывает)
-}
-
-// Payment Methods - способы оплаты (REFACTORED v2)
-model PaymentMethod {
-  code           String           @id @unique // sepa, swift, card_eur, blik, crypto_btc
-  name           String // "SEPA Transfer (EUR)", "Visa/Mastercard", "Bitcoin Network"
-  description    String?          @db.Text // Подробное описание
-  
-  // Classification
-  type           String // bank_transfer, card_payment, instant, crypto_transfer
-  direction      PaymentDirection @default(IN) // IN, OUT, BOTH
-  providerType   ProviderType     @default(MANUAL)
-  automationLevel AutomationLevel @default(MANUAL)
-  
-  // Payment Details
-  currency       String // EUR, PLN (для фиата) | BTC, ETH, USDT (для криптовалют)
-  supportedNetworks String[] @default([]) // Для крипты: ["ETHEREUM", "BSC", "POLYGON"]
-  
-  // Provider Connection (NEW: unified approach)
-  pspConnector     String? // stripe, tpay, revolut (если через PSP)
-  paymentAccountId String? // Связь с PaymentAccount (банк или крипто кошелёк)
-  
-  // DEPRECATED: старые поля (keep for backward compatibility)
-  bankAccountId  String? // DEPRECATED: use paymentAccountId instead
-  
-  // Limits & Fees
-  minAmount      Float?
-  maxAmount      Float?
-  feeFixed       Float    @default(0)
-  feePercent     Float    @default(0)
-  processingTime String? // "Instant", "1-3 business days"
-  
-  // UI & Instructions
-  instructions   String?  @db.Text // Инструкции для пользователя
-  iconUrl        String? // Иконка метода оплаты
-  priority       Int      @default(0) // Порядок отображения
-  
-  // Config & Status
-  config         Json? // Дополнительные настройки (API ключи, webhook URLs)
-  isActive       Boolean  @default(true)
-  isAvailableForClients Boolean @default(true) // Показывать клиентам?
-  
-  // Metadata
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  createdBy      String? // Admin user ID
-  
-  // Relations
-  // NOTE: currency is a string that can be either FiatCurrency or Cryptocurrency code
-  // We don't enforce FK constraint to allow flexibility
-  psp            PspConnector?   @relation(fields: [pspConnector], references: [code])
-  paymentAccount PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
-  
-  // DEPRECATED relations
-  bankAccount  BankDetails?   @relation(fields: [bankAccountId], references: [id])
-  
-  orders       Order[]
-  limitsMatrix LimitsMatrix[]
-  payIns       PayIn[] // Входящие платежи через этот метод
-  payOuts      PayOut[] @relation("PayOutMethod") // Исходящие платежи через этот метод
-
-  @@index([type, isActive])
-  @@index([currency])
-  @@index([direction])
-  @@index([providerType])
-  @@index([automationLevel])
-  @@index([isAvailableForClients])
-}
-
-// ==========================================
-// EXCHANGE RATES
-// ==========================================
-
-// Manual Exchange Rates - ручные переопределения курсов
-model ManualRate {
-  id         String    @id @default(cuid())
-  cryptoCode String
-  fiatCode   String
-  rate       Float
-  validFrom  DateTime  @default(now())
-  validTo    DateTime?
-  isActive   Boolean   @default(true)
-  createdBy  String // Admin user ID
-  reason     String?   @db.Text
-  createdAt  DateTime  @default(now())
-
-  @@index([cryptoCode, fiatCode, isActive])
-  @@index([validFrom, validTo])
-}
-
-// ==========================================
-// INTEGRATIONS
-// ==========================================
-
-// Integration Settings - настройки интеграций
-model IntegrationSetting {
-  id         String    @id @default(cuid())
-  service    String    @unique // kycaid, resend, coingecko
-  isEnabled  Boolean   @default(true)
-  config     Json // API keys, webhook secrets, etc. (ENCRYPTED)
-  lastTested DateTime?
-  status     String    @default("unconfigured") // unconfigured, active, error
-  errorLog   String?   @db.Text
-  updatedAt  DateTime  @updatedAt
-  updatedBy  String? // Admin user ID
-
-  @@index([service])
-  @@index([status])
-}
-
-// ==========================================
-// API KEYS & ACCESS
-// ==========================================
-
-// API Keys для внешнего доступа
-model ApiKey {
-  id          String    @id @default(cuid())
-  userId      String? // Null = admin-generated key
-  key         String // Encrypted API key (AES-256-GCM)
-  keyHash     String    @unique // SHA-256 hash for fast lookup
-  name        String // Описание ключа ("Production Bot", "Test Integration")
-  prefix      String // Первые символы для идентификации (apx_abc...)
-  permissions Json // { "orders": ["read", "create"], "rates": ["read"] }
-  isActive    Boolean   @default(true)
-  expiresAt   DateTime? // Опционально, срок действия
-  lastUsedAt  DateTime?
-  lastUsedIp  String?
-  usageCount  Int       @default(0)
-  rateLimit   Int       @default(100) // Requests per hour
-  createdBy   String // Admin user ID
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  user  User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  usage ApiKeyUsage[]
-
-  @@index([keyHash])
-  @@index([userId])
-  @@index([isActive])
-  @@index([prefix])
-}
-
-// API Key Usage Logs
-model ApiKeyUsage {
-  id           String   @id @default(cuid())
-  apiKeyId     String
-  endpoint     String // /api/v1/orders
-  method       String // GET, POST
-  statusCode   Int
-  responseTime Int // milliseconds
-  ipAddress    String
-  userAgent    String?  @db.Text
-  errorMessage String?  @db.Text
-  createdAt    DateTime @default(now())
-
-  apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
-
-  @@index([apiKeyId, createdAt])
-  @@index([endpoint])
-  @@index([createdAt])
-}
-
-// ==========================================
-// SECURITY
-// ==========================================
-
-// IP Whitelist/Blacklist
-model IpRule {
-  id        String    @id @default(cuid())
-  ipAddress String    @unique
-  type      String // whitelist, blacklist
-  reason    String?   @db.Text
-  createdBy String // Admin user ID
-  createdAt DateTime  @default(now())
-  expiresAt DateTime?
-
-  @@index([ipAddress, type])
-  @@index([type])
-}
-
-// Two-Factor Authentication (TOTP + Passkeys support)
-model TwoFactorAuth {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  
-  // TOTP (Google Authenticator)
-  totpEnabled Boolean  @default(false)
-  totpSecret  String?  // Encrypted TOTP secret
-  totpVerifiedAt DateTime?
-  
-  // Backup Codes (одноразовые)
-  backupCodes Json?    // Encrypted array of {code: string, used: boolean}
-  
-  // Passkeys/WebAuthn (Future)
-  passkeysEnabled Boolean @default(false)
-  passkeys        Json?   // Array of {id, publicKey, counter, transports}
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([userId])
-}
-
-// ==========================================
-// DATA RETENTION & GDPR
-// ==========================================
-
-// Data Retention Policies
-model DataRetentionPolicy {
-  id            String   @id @default(cuid())
-  entityType    String // User, Order, KycSession
-  retentionDays Int // Сколько дней хранить
-  autoDelete    Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@unique([entityType])
-}
-
-// ==========================================
-// CRM REFERENCE TABLES
-// ==========================================
-
-// Rate Providers - источники курсов
-model RateProvider {
-  code      String   @id @unique // coingecko, binance, kraken, aggregator
-  name      String // CoinGecko, Binance, Kraken
-  type      String // market, average, aggregator
-  weight    Float    @default(1.0) // For weighted average
-  isActive  Boolean  @default(true)
-  apiConfig Json? // API endpoints, keys (encrypted)
-  priority  Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  rateSnapshots RateSnapshot[]
-
-  @@index([isActive])
-  @@index([type])
-}
-
-// Rate Snapshots - история курсов по провайдерам
-model RateSnapshot {
-  id         String   @id @default(cuid())
-  providerId String
-  assetCode  String
-  fiatCode   String
-  rate       Float
-  timestamp  DateTime @default(now())
-
-  provider RateProvider @relation(fields: [providerId], references: [code])
-
-  @@index([assetCode, fiatCode, timestamp])
-  @@index([providerId, timestamp])
-}
-
-// Fee Profiles - профили комиссий
-model FeeProfile {
-  code              String   @id @unique // standard, vip, wholesale
-  name              String // Standard Fee, VIP Client, Wholesale
-  spreadBps         Int // Spread in basis points (150 = 1.5%)
-  fixedFeeFiat      Float    @default(0) // Fixed fee amount
-  fiatCurrency      String? // EUR, PLN
-  networkFeePolicy  String   @default("pass-through") // pass-through, fixed, markup
-  networkFeeAmount  Float? // If fixed
-  networkFeePercent Float? // If markup
-  isActive          Boolean  @default(true)
-  priority          Int      @default(0)
-  description       String?  @db.Text
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  fiat FiatCurrency? @relation(fields: [fiatCurrency], references: [code])
-
-  @@index([isActive])
-}
-
-// KYC Levels - уровни верификации
-model KycLevel {
-  code         String   @id @unique // L0, L1, L2, L3
-  name         String // Unverified, Basic, Advanced, VIP
-  description  String?  @db.Text
-  allowMethods String[] // ["card", "bank", "blik"]
-  requirements Json? // What documents/data needed
-  dailyLimit   Float? // Daily transaction limit
-  monthlyLimit Float? // Monthly transaction limit
-  isActive     Boolean  @default(true)
-  priority     Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  // Relations
-  limitsMatrix LimitsMatrix[]
-
-  @@index([isActive])
-}
-
-// Limits Matrix - лимиты по KYC уровню и способу оплаты
-model LimitsMatrix {
-  id            String   @id @default(cuid())
-  kycLevel      String // L0, L1, L2
-  paymentMethod String // card, sepa, blik
-  fiatCurrency  String // EUR, PLN
-  period        String // day, month, year
-  limitAmount   Float // Maximum amount per period
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  kycLevelRel KycLevel      @relation(fields: [kycLevel], references: [code])
-  paymentRel  PaymentMethod @relation(fields: [paymentMethod], references: [code])
-  fiatRel     FiatCurrency  @relation(fields: [fiatCurrency], references: [code])
-
-  @@unique([kycLevel, paymentMethod, fiatCurrency, period])
-  @@index([kycLevel])
-  @@index([paymentMethod])
-}
-
-// PSP Connectors - платежные провайдеры
-model PspConnector {
-  code               String    @id @unique // tpay, stripe, revolut, manual
-  name               String // TPay, Stripe
-  capabilities       String[] // ["card", "bank", "blik"]
-  settlementCurrency String // EUR, PLN
-  apiConfig          Json? // Encrypted config
-  isEnabled          Boolean   @default(true)
-  lastTested         DateTime?
-  status             String    @default("unconfigured")
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-
-  // Relations
-  paymentMethods PaymentMethod[]
-
-  @@index([isEnabled])
-  @@index([status])
-}
-
-// Order Status Config - справочник статусов заказов
-model OrderStatusConfig {
-  code         String   @id @unique // created, kyc_pending, payment_pending, etc.
-  name         String // Created, KYC Pending
-  description  String?  @db.Text
-  color        String   @default("#6b7280") // Hex color for UI
-  isTerminal   Boolean  @default(false) // Can't change from this status
-  priority     Int      @default(0)
-  nextStatuses String[] @default([]) // Allowed next statuses
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@index([priority])
-}
-
-// Transaction Status - справочник статусов транзакций
-model TransactionStatusConfig {
-  code        String   @id @unique // queued, broadcast, confirming, confirmed, failed
-  name        String // Queued, Broadcasting
-  description String?  @db.Text
-  color       String   @default("#6b7280")
-  isTerminal  Boolean  @default(false)
-  priority    Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([priority])
-}
-
-// Transactions - блокчейн транзакции
-model Transaction {
-  id            String    @id @default(cuid())
-  orderId       String? // Link to order
-  walletId      String? // Platform wallet ID
-  txHash        String?   @unique
-  currencyCode  String // BTC, ETH, USDT
-  chainCode     String // BITCOIN, ETHEREUM, BSC
-  amount        Float
-  fee           Float?
-  statusCode    String // References TransactionStatusConfig
-  confirmations Int       @default(0)
-  broadcastAt   DateTime?
-  confirmedAt   DateTime?
-  failedAt      DateTime?
-  errorMessage  String?   @db.Text
-  metadata      Json?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  chain BlockchainNetwork @relation(fields: [chainCode], references: [code])
-
-  @@index([orderId])
-  @@index([txHash])
-  @@index([statusCode])
-  @@index([chainCode])
-}
-
-// Widget Configuration - настройки виджетов
-model WidgetConfig {
-  id               String   @id @default(cuid())
-  code             String   @unique // main, partner_1, mobile_app
-  name             String // Main Widget, Partner 1
-  supportedPairs   String[] // ["EUR→BTC", "PLN→ETH"]
-  defaultFiat      String // EUR
-  defaultCrypto    String? // BTC
-  theme            Json // { logo, colors, fonts }
-  minKycForMethods Json // { "card": "L1", "bank": "L0" }
-  allowedMethods   String[] // ["card", "sepa"]
-  feeProfileCode   String? // Reference to FeeProfile
-  isActive         Boolean  @default(true)
-  domain           String? // Allowed domain for CORS
-  webhookUrl       String? // Callback URL for order updates
-  apiKey           String? // Widget-specific API key
-  metadata         Json?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  @@index([code])
-  @@index([isActive])
-}
-
-// User Extensions - добавить KYC level к User
-model UserKycLevel {
-  userId    String   @unique
-  kycLevel  String // L0, L1, L2
-  updatedAt DateTime @updatedAt
-  updatedBy String? // Admin who updated
-
-  user User @relation("UserKycLevelRelation", fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([kycLevel])
-}
-
-// External Service Integrations
-model Integration {
-  id          String    @id @default(cuid())
-  service     String    @unique // coingecko, kycaid, resend, etc.
-  isEnabled   Boolean   @default(false)
-  status      String    @default("inactive") // active, inactive, error
-  apiKey      String? // Encrypted API key
-  apiEndpoint String? // API endpoint URL
-  lastTested  DateTime? // Last connection test
-  config      Json? // Additional configuration
-  rates       Json? // Current exchange rates (for CoinGecko)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@index([service])
-  @@index([isEnabled])
-  @@index([status])
-}
-
-// System Logs - детальное логирование всех действий пользователей
-model SystemLog {
-  id         String  @id @default(cuid())
-  userId     String? // User who performed the action (null for anonymous)
-  sessionId  String? // Session identifier
-  action     String // Action performed (PAGE_VIEW, API_CALL, LOGIN, LOGOUT, etc.)
-  method     String? // HTTP method (GET, POST, PUT, DELETE, etc.)
-  path       String // URL path
-  query      Json? // Query parameters
-  body       Json? // Request body (sanitized, no passwords)
-  statusCode Int? // HTTP status code
-
-  // Request details
-  ipAddress String // IP address
-  userAgent String? @db.Text // Full user agent string
-
-  // Parsed device info
-  deviceType     String? // desktop, mobile, tablet
-  browser        String? // Chrome, Firefox, Safari, etc.
-  browserVersion String?
-  os             String? // Windows, macOS, Linux, iOS, Android
-  osVersion      String?
-  isMobile       Boolean @default(false)
-  isBot          Boolean @default(false)
-
-  // Geographic info (optional, can be added later)
-  country String?
-  city    String?
-
-  // Response details
-  responseTime Int? // Response time in ms
-  errorMessage String? @db.Text
-  errorStack   String? @db.Text
-
-  // Additional metadata
-  referrer String?
-  metadata Json?
-
-  createdAt DateTime @default(now())
-
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([userId])
-  @@index([ipAddress])
-  @@index([action])
-  @@index([createdAt])
-  @@index([isBot])
-  @@index([deviceType])
-}
-
-// IP Blacklist - блокировка IP адресов
-model IPBlacklist {
-  id        String    @id @default(cuid())
-  ipAddress String    @unique // IP address to block
-  reason    String    @db.Text // Reason for blocking
-  blockedBy String // Admin user ID who blocked
-  isActive  Boolean   @default(true)
-  expiresAt DateTime? // Optional expiration date
-
-  // Statistics
-  blockedAttempts Int       @default(0) // Count of blocked attempts
-  lastAttemptAt   DateTime?
-
-  // Metadata
-  metadata Json?
-  notes    String? @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  blockedByUser User @relation("BlockedBy", fields: [blockedBy], references: [id])
-
-  @@index([ipAddress])
-  @@index([isActive])
-  @@index([expiresAt])
-  @@index([blockedBy])
-}
-
-// Session Revocation - отзыв активных сессий (Server-side logout)
-model SessionRevocation {
-  id          String   @id @default(cuid())
-  sessionKey  String   @unique // Format: "IP-device-browser"
-  userId      String   // User whose session is revoked
-  ipAddress   String   // IP address of the session
-  deviceType  String?  // desktop, mobile, tablet
-  browser     String?  // Chrome, Firefox, Safari, etc.
-  os          String?  // Windows, macOS, Linux, etc.
-  
-  // Revocation details
-  revokedBy   String   // Admin user ID who revoked the session
-  reason      String?  @db.Text // Reason for revocation
-  
-  // Expiration (auto-cleanup after 7 days)
-  expiresAt   DateTime // Sessions auto-expire after 7 days
-  
-  createdAt   DateTime @default(now())
-  
-  user          User @relation("RevokedSessions", fields: [userId], references: [id], onDelete: Cascade)
-  revokedByUser User @relation("RevokedBy", fields: [revokedBy], references: [id])
-  
-  @@index([sessionKey])
-  @@index([userId])
-  @@index([ipAddress])
-  @@index([expiresAt])
-  @@index([createdAt])
-}
-
-// ==========================================
-// ADMIN SETTINGS
-// ==========================================
-
-// Admin Security Settings - настройки безопасности администратора
-model AdminSettings {
-  id     String @id @default(cuid())
-  userId String @unique
-
-  // Session Management
-  sessionTimeout Int @default(30) // Timeout in minutes (15, 30, 60, 120, 480, 1440)
-
-  // Two-Factor Authentication
-  twoFactorEnabled Boolean @default(false)
-  twoFactorMethod  String? // "EMAIL", "SMS", "AUTHENTICATOR"
-
-  // Notifications
-  loginNotifications  Boolean @default(true) // Email on new login
-  activityDigest      Boolean @default(false) // Daily activity summary
-  securityAlerts      Boolean @default(true) // Security-related notifications
-
-  // IP Restrictions
-  allowedIPs String[] // List of allowed IP addresses (empty = all allowed)
-  blockUnknownDevices Boolean @default(false)
-
-  // Audit Preferences
-  logAllActions Boolean @default(true)
-  retainLogsFor Int     @default(90) // Days to retain logs
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation("AdminSettings", fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-}
-
-// ==========================================
-// EXTENDED KYC MODELS
-// ==========================================
-
-// KYC Provider Configuration - supports multiple KYC providers
-model KycProvider {
-  id          String   @id @default(cuid())
-  code        String   @unique // kycaid, sumsub, onfido
-  name        String // "KYCAID", "Sumsub", "Onfido"
-  isActive    Boolean  @default(true)
-  priority    Int      @default(0)
-  
-  // API Configuration
-  apiUrl      String
-  apiKey      String   @db.Text // Encrypted
-  webhookUrl  String?
-  webhookSecret String? @db.Text
-  
-  // Features
-  supportsLiveness Boolean @default(false)
-  supportsAml      Boolean @default(false)
-  supportsPep      Boolean @default(false)
-  supportsDocScan  Boolean @default(true)
-  
-  // Pricing
-  costPerCheck    Float?
-  monthlyFee      Float?
-  currency        String  @default("EUR")
-  
-  // Metadata
-  config      Json? // Provider-specific configuration
-  metadata    Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  kycSessions KycSession[]
-  
-  @@index([code])
-  @@index([isActive])
-}
-
-// KYC Profile - Comprehensive CDD/KYC data storage
-model KycProfile {
-  id            String   @id @default(cuid())
-  kycSessionId  String   @unique
-  
-  // === PERSONAL IDENTIFICATION ===
-  firstName     String
-  lastName      String
-  dateOfBirth   DateTime
-  placeOfBirth  String?
-  nationality   String
-  
-  // === CONTACT ===
-  email         String
-  phone         String
-  phoneCountry  String? // Country code
-  
-  // === ADDRESS ===
-  addressStreet  String?
-  addressCity    String?
-  addressRegion  String?
-  addressCountry String?
-  addressPostal  String?
-  
-  // === IDENTITY DOCUMENT ===
-  idType           String? // passport, id_card, residence_permit
-  idNumber         String?
-  idIssuingCountry String?
-  idIssuingAuth    String?
-  idIssueDate      DateTime?
-  idExpiryDate     DateTime?
-  idScanFront      String? // Vercel Blob URL
-  idScanBack       String? // Vercel Blob URL
-  livenessSelfie   String? // Vercel Blob URL or video session ID
-  
-  // === PEP & SANCTIONS ===
-  pepStatus               Boolean @default(false)
-  pepCategory             String? // family, close_associate, etc.
-  sanctionsScreeningDone  Boolean @default(false)
-  sanctionsProvider       String? // WorldCheck, Dow Jones, etc.
-  sanctionsScreeningDate  DateTime?
-  sanctionsResult         String? // clean, match_found
-  sanctionsMatches        Json? // Array of matches
-  
-  // === EMPLOYMENT & PURPOSE ===
-  employmentStatus String? // employed, self_employed, unemployed, retired, student
-  occupation       String?
-  employerName     String?
-  purposeOfAccount String? @db.Text // "buying crypto for investment"
-  intendedUse      String? @db.Text
-  
-  // === EXPECTED ACTIVITY ===
-  expectedVolume      Float? // Average transaction amount
-  expectedFrequency   String? // daily, weekly, monthly
-  expectedCountries   String[] // Countries of counterparties
-  
-  // === SOURCE OF FUNDS & WEALTH ===
-  sourceOfFunds  String? // salary, business_income, investment, inheritance
-  sourceOfWealth String? @db.Text // For EDD
-  
-  // === RISK ASSESSMENT ===
-  riskScore       Int? // 0-100
-  riskFactors     Json? // Array of risk factors
-  riskJustification String? @db.Text
-  
-  // === CONSENTS & COMPLIANCE ===
-  consentKyc       Boolean @default(false)
-  consentAml       Boolean @default(false)
-  consentTfr       Boolean @default(false)
-  consentPrivacy   Boolean @default(false)
-  termsVersion     String?
-  privacyVersion   String?
-  
-  // === METADATA ===
-  ipAddress        String?
-  userAgent        String?
-  completedAt      DateTime?
-  verifiedBy       String? // Admin ID
-  verifiedAt       DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  
-  kycSession KycSession @relation(fields: [kycSessionId], references: [id], onDelete: Cascade)
-  
-  @@index([kycSessionId])
-  @@index([email])
-  @@index([nationality])
-  @@index([pepStatus])
-}
-
-// ==========================================
-// LEGAL DOCUMENTS & COMPLIANCE
-// ==========================================
-
-enum DocumentCategory {
-  PUBLIC      // Public policies (Privacy, Terms, etc.)
-  INTERNAL    // Internal procedures (AML, KYC SOP, etc.)
-  LEGAL       // Legal agreements (Client Agreement, DPA, etc.)
-}
-
-enum DocumentStatus {
-  DRAFT       // Work in progress
-  REVIEW      // Ready for review
-  PUBLISHED   // Live and accessible
-  ARCHIVED    // No longer active
-}
-
-model LegalDocument {
-  id          String   @id @default(cuid())
-  
-  // Document metadata
-  key         String   @unique // Unique identifier (e.g., "terms_of_service")
-  title       String
-  description String?  @db.Text
-  slug        String?  @unique // URL slug for public documents (e.g., "/terms")
-  
-  // Categorization
-  category    DocumentCategory
-  isRequired  Boolean  @default(false) // Required for compliance
-  
-  // Content (rich text stored as JSON)
-  content     Json     // Lexical editor state
-  htmlContent String?  @db.Text // Rendered HTML for display
-  plainText   String?  @db.Text // Plain text for search
-  
-  // Publishing
-  status      DocumentStatus @default(DRAFT)
-  publishedAt DateTime?
-  publishedBy String? // User ID who published
-  
-  // Versioning
-  version     Int      @default(1)
-  previousVersionId String? // Reference to previous version
-  isLatest    Boolean  @default(true)
-  
-  // SEO & metadata
-  metaTitle       String?
-  metaDescription String?
-  ogImage         String? // URL to Open Graph image
-  
-  // Access control
-  isPublic    Boolean  @default(false) // Accessible without auth
-  allowedRoles String[] @default(["ADMIN"]) // Roles that can view
-  
-  // Audit trail
-  createdBy   String   // User ID
-  updatedBy   String?  // User ID
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // Change tracking
-  changeLog   Json?    // Array of changes
-  
-  @@index([key])
-  @@index([slug])
-  @@index([category])
-  @@index([status])
-  @@index([isPublic])
-  @@index([publishedAt])
-}
-
-// Document templates for quick creation
-model DocumentTemplate {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  category    DocumentCategory
-  content     Json     // Default Lexical editor state
-  variables   Json?    // Placeholders to be replaced (e.g., {{COMPANY_NAME}})
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@index([category])
+  @@index([severity])
+  @@index([isReviewable])
+  @@index([userRole])
+  @@map("AuditLog_Enhanced")
 }
