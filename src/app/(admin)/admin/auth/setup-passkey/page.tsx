@@ -41,10 +41,12 @@ function SetupPasskeyContent() {
       const optionsResp = await fetch('/api/admin/passkey/register/options', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }), // Pass email for first-time setup
       });
 
       if (!optionsResp.ok) {
-        throw new Error('Failed to get registration options');
+        const error = await optionsResp.json();
+        throw new Error(error.error || 'Failed to get registration options');
       }
 
       const options = await optionsResp.json();
@@ -69,6 +71,7 @@ function SetupPasskeyContent() {
         body: JSON.stringify({
           response: registrationResponse,
           deviceName,
+          email, // Pass email for first-time setup
         }),
       });
 
