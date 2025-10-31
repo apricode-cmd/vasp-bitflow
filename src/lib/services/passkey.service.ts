@@ -80,8 +80,9 @@ export async function generatePasskeyRegistrationOptions(
   await prisma.mfaChallenge.create({
     data: {
       adminId,
+      action: 'PASSKEY_REGISTRATION',
+      challengeType: 'WEBAUTHN',
       challenge: options.challenge,
-      type: 'PASSKEY_REGISTRATION',
       expiresAt: new Date(Date.now() + CHALLENGE_TTL),
     },
   });
@@ -103,7 +104,7 @@ export async function verifyPasskeyRegistration(
   const storedChallenge = await prisma.mfaChallenge.findFirst({
     where: {
       adminId,
-      type: 'PASSKEY_REGISTRATION',
+      action: 'PASSKEY_REGISTRATION',
       expiresAt: { gt: new Date() },
     },
     orderBy: { createdAt: 'desc' },
