@@ -2,7 +2,7 @@
  * Admin Login Page
  * 
  * Separate login for administrators
- * Supports: Password + TOTP (Passkeys TODO)
+ * Supports: Passkeys (primary) + Password + TOTP (fallback)
  */
 
 'use client';
@@ -26,6 +26,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { PasskeyLoginButton } from '@/components/admin/PasskeyLoginButton';
 
 export default function AdminLoginPage(): React.ReactElement {
   const router = useRouter();
@@ -181,15 +183,35 @@ export default function AdminLoginPage(): React.ReactElement {
                   ) : (
                     <>
                       <Shield className="w-4 h-4 mr-2" />
-                      Sign In
+                      Sign In with Password
                     </>
                   )}
                 </Button>
 
+                {/* Separator */}
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <Separator className="w-full bg-blue-500/20" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-slate-900 px-2 text-blue-300/50">Or</span>
+                  </div>
+                </div>
+
+                {/* Passkey Login Button */}
+                <PasskeyLoginButton
+                  onSuccess={() => {
+                    window.location.href = '/admin';
+                  }}
+                  onError={(err) => {
+                    setError(err);
+                  }}
+                />
+
                 {/* Info */}
                 <div className="text-center text-xs text-blue-200/50 mt-4">
                   <p>🔐 This is a secure admin area</p>
-                  <p className="mt-1">2FA will be required if enabled on your account</p>
+                  <p className="mt-1">Passkey = Face ID / Touch ID (recommended)</p>
                 </div>
               </form>
             </Form>

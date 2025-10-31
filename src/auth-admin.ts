@@ -2,7 +2,7 @@
  * NextAuth v5 Configuration - ADMIN
  * 
  * Authentication for administrators (Admin table)
- * Supports: Passkeys (WebAuthn) + Password + TOTP + SSO
+ * Supports: Passkeys (WebAuthn) + Password + TOTP
  */
 
 import NextAuth from 'next-auth';
@@ -10,9 +10,8 @@ import Credentials from 'next-auth/providers/credentials';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { loginSchema } from '@/lib/validations/auth';
-// import { verifyAdminPasskey } from '@/lib/services/passkey.service'; // TODO: implement
+import { PasskeyService } from '@/lib/services/passkey.service';
 import { verifyUserTotp } from '@/lib/services/totp.service';
-import UAParser from 'ua-parser-js';
 
 export const { 
   handlers: adminHandlers, 
@@ -31,15 +30,30 @@ export const {
       },
       async authorize(credentials) {
         try {
-          // TODO: Implement passkey verification
-          // const admin = await verifyAdminPasskey(
-          //   credentials.email as string,
-          //   JSON.parse(credentials.passkeyResponse as string)
-          // );
+          if (!credentials?.passkeyResponse) {
+            return null;
+          }
+
+          const response = JSON.parse(credentials.passkeyResponse as string);
           
-          // Temporary: return null to skip passkey for now
-          console.log('Passkey auth not yet implemented');
-          return null;
+          // Verify passkey
+          const result = await PasskeyService.verifyPasskeyAuthentication(
+            response,
+            credentials.email as string
+          );
+
+          if (!result.verified || !result.admin) {
+            console.log('Passkey verification failed:', result.error);
+            return null;
+          }
+
+          return {
+            id: result.admin.id,
+            email: result.admin.email,
+            role: result.admin.role,
+            name: `${result.admin.firstName} ${result.admin.lastName}`,
+            authMethod: 'PASSKEY'
+          };
         } catch (error) {
           console.error('Passkey auth error:', error);
           return null;
