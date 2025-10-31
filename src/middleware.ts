@@ -2,19 +2,20 @@
  * Next.js Middleware
  * 
  * Protects routes and handles:
+ * - Separate Client and Admin authentication
  * - Maintenance Mode (blocks all non-admin users)
- * - Authentication checks
  * - Role-based access
  * 
+ * CLIENT routes: /, /login, /dashboard, /orders, etc. → use getClientSession
+ * ADMIN routes: /admin/* → use getAdminSession
+ * 
  * NOTE: Cannot use Prisma in Edge Middleware!
- * Session revocation is checked in:
- * - Server Components (layout.tsx)
- * - API routes (via requireAuth)
  */
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { auth } from '@/auth';
+import { getClientSession } from '@/auth-client';
+import { getAdminSession } from '@/auth-admin';
 
 async function checkMaintenanceMode(): Promise<boolean> {
   try {
@@ -40,22 +41,48 @@ export async function middleware(request: NextRequest) {
   if (
     path === '/maintenance' ||
     path.startsWith('/_next') ||
-    path.startsWith('/api/settings/public') || // Must be before maintenance check!
-    path.startsWith('/api/auth')
+    path.startsWith('/api/settings/public') ||
+    path.startsWith('/api/auth') ||  // Client auth
+    path.startsWith('/api/admin/auth')  // Admin auth
   ) {
     return NextResponse.next();
   }
 
-  // Check maintenance mode FIRST (block ALL non-admin users)
+  // === ADMIN ROUTES ===
+  if (path.startsWith('/admin')) {
+    // Public admin auth pages
+    if (path.startsWith('/admin/auth/login') || path.startsWith('/admin/auth/emergency')) {
+      return NextResponse.next();
+    }
+
+    // Protected admin routes - use ADMIN auth
+    const adminSession = await getAdminSession();
+    
+    if (!adminSession?.user) {
+      return NextResponse.redirect(new URL('/admin/auth/login', request.url));
+    }
+
+    // Check if admin is active (would need to check DB, but can't in middleware)
+    // This check is done in layouts and API routes
+    
+    return NextResponse.next();
+  }
+
+  // === CLIENT ROUTES ===
+  
+  // Check maintenance mode FIRST (block ALL non-admin clients)
   const isMaintenanceMode = await checkMaintenanceMode();
   
   if (isMaintenanceMode) {
-    const session = await auth();
-    
-    // Only allow admins during maintenance
-    if (session?.user?.role !== 'ADMIN') {
-      return NextResponse.redirect(new URL('/maintenance', request.url));
+    // Check if user is admin (try admin session first)
+    const adminSession = await getAdminSession();
+    if (adminSession?.user) {
+      // Admin can access during maintenance
+      return NextResponse.next();
     }
+    
+    // Block regular users
+    return NextResponse.redirect(new URL('/maintenance', request.url));
   }
 
   // Temporarily redirect landing page to login
@@ -63,31 +90,26 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // Public routes - allow without auth (only if NOT in maintenance mode)
+  // Public routes - allow without auth
   if (
     path.startsWith('/login') ||
     path.startsWith('/register') ||
-    path.startsWith('/2fa-verify') ||  // 2FA verification page
-    path.startsWith('/api/rates') ||  // Public API for rates
-    path.startsWith('/api/payment-methods') ||  // Public API for payment methods
-    path.startsWith('/api/legal-documents/public') ||  // Public legal documents
+    path.startsWith('/2fa-verify') ||
+    path.startsWith('/api/rates') ||
+    path.startsWith('/api/payment-methods') ||
+    path.startsWith('/api/legal-documents/public') ||
     path.startsWith('/api/v1/') ||  // Public API v1 (uses API keys)
     path.startsWith('/api/kyc/webhook') ||  // Webhook from KYCAID
-    path.startsWith('/legal/')  // Legal pages
+    path.startsWith('/legal/')
   ) {
     return NextResponse.next();
   }
 
-  // For protected routes, check session using NextAuth v5
-  const session = await auth();
+  // For protected CLIENT routes, check CLIENT session
+  const clientSession = await getClientSession();
   
-  if (!session) {
+  if (!clientSession) {
     return NextResponse.redirect(new URL('/login', request.url));
-  }
-
-  // Check admin routes
-  if (path.startsWith('/admin') && session.user?.role !== 'ADMIN') {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
   // Session revocation is checked server-side in:
