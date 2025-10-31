@@ -25,6 +25,13 @@ const RP_NAME = process.env.RP_NAME || 'Apricode Exchange';
 const RP_ID = process.env.RP_ID || 'localhost';
 const ORIGIN = process.env.ORIGIN || 'http://localhost:3000';
 
+// Debug logging
+console.log('🔐 WebAuthn Config:', {
+  RP_NAME,
+  RP_ID,
+  ORIGIN,
+});
+
 // In-memory storage for challenges (in production, use Redis)
 const challengeStore = new Map<string, { challenge: string; timestamp: number }>();
 const CHALLENGE_TTL = 5 * 60 * 1000; // 5 minutes

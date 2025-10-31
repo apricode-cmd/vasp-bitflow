@@ -47,7 +47,8 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/_next') ||
     path.startsWith('/api/settings/public') ||
     path.startsWith('/api/auth') ||  // Client auth
-    path.startsWith('/api/admin/auth')  // Admin auth
+    path.startsWith('/api/admin/auth') ||  // Admin auth
+    path.startsWith('/api/admin/passkey')  // Passkey registration (first-time, no session)
   ) {
     return NextResponse.next({
       request: {
