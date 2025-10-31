@@ -5,10 +5,9 @@
  * Note: Skips auth check for /admin/auth/* pages
  */
 
-import { auth } from '@/auth';
+import { getAdminSessionData } from '@/lib/services/admin-session.service';
 import { redirect } from 'next/navigation';
 import { AdminLayoutClient } from '@/components/layouts/AdminLayoutClient';
-import { isSessionRevoked } from '@/lib/session-revocation-check';
 import { headers } from 'next/headers';
 
 export default async function AdminLayout({
@@ -16,27 +15,24 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }): Promise<React.ReactElement> {
-  // Get current pathname
+  // Get current pathname from headers (set by middleware)
   const headersList = headers();
   const pathname = headersList.get('x-pathname') || '';
   
-  // Skip auth check for /admin/auth/* pages
+  
+  // Skip auth check for /admin/auth/* pages (login, setup-passkey, etc.)
   if (pathname.startsWith('/admin/auth')) {
     return <>{children}</>;
   }
   
-  const session = await auth();
+  // For all other /admin/* pages, check authentication
+  const sessionData = await getAdminSessionData();
 
-  // Redirect if not admin
-  if (!session || session.user.role !== 'ADMIN') {
-    redirect('/dashboard');
+  // Redirect if not authenticated or not admin
+  if (!sessionData) {
+    redirect('/admin/auth/login');
   }
 
-  // Check if session has been revoked (server-side, secure)
-  const sessionRevoked = await isSessionRevoked();
-  if (sessionRevoked) {
-    redirect('/login?error=SessionRevoked&message=Your+session+has+been+terminated');
-  }
 
   return <AdminLayoutClient>{children}</AdminLayoutClient>;
 }

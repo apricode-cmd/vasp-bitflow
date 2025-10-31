@@ -6,42 +6,64 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-utils';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { z } from 'zod';
 
 const securitySettingsSchema = z.object({
-  sessionTimeout: z.enum(['15', '30', '60', '120', '480', '1440']),
-  twoFactorEnabled: z.boolean(),
-  loginNotifications: z.boolean(),
+  // Session Management
+  idleTimeout: z.number().min(5).max(120).optional(), // minutes
+  maxSessionDuration: z.number().min(1).max(24).optional(), // hours
+  sessionTimeout: z.enum(['15', '30', '60', '120', '480', '1440']).optional(),
+  rememberDevice: z.boolean().optional(),
+  
+  // MFA Settings
+  twoFactorEnabled: z.boolean().optional(),
+  requireMfaAlways: z.boolean().optional(),
+  requireStepUpFor: z.array(z.string()).optional(),
+  
+  // Security
+  loginNotifications: z.boolean().optional(),
+  activityDigest: z.boolean().optional(),
+  securityAlerts: z.boolean().optional(),
+  allowedIPs: z.array(z.string()).optional(),
+  blockUnknownDevices: z.boolean().optional(),
+  
+  // Audit
+  logAllActions: z.boolean().optional(),
+  retainLogsFor: z.number().min(30).max(365).optional(),
 });
 
 export async function GET(request: NextRequest) {
   try {
-    const { error, session } = await requireRole('ADMIN');
-    if (error) {
-      return error;
+    const session = await requireAdminRole('ADMIN');
+    if (session instanceof NextResponse) {
+      return session;
     }
 
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: 'User not authenticated' },
-        { status: 401 }
-      );
-    }
-
-    const userId = session.user.id;
+    const adminId = session.user.id;
 
     // Get settings or return defaults
     const settings = await prisma.adminSettings.findUnique({
-      where: { userId },
+      where: { adminId },
     });
 
     return NextResponse.json({
       success: true,
       data: settings || {
+        idleTimeout: 15,
+        maxSessionDuration: 8,
         sessionTimeout: 30,
+        rememberDevice: false,
         twoFactorEnabled: false,
+        requireMfaAlways: false,
+        requireStepUpFor: [],
         loginNotifications: true,
+        activityDigest: false,
+        securityAlerts: true,
+        allowedIPs: [],
+        blockUnknownDevices: false,
+        logAllActions: true,
+        retainLogsFor: 90,
       },
     });
   } catch (error) {
@@ -55,47 +77,51 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { error, session } = await requireRole('ADMIN');
-    if (error) {
-      return error;
+    const session = await requireAdminRole('ADMIN');
+    if (session instanceof NextResponse) {
+      return session;
     }
 
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: 'User not authenticated' },
-        { status: 401 }
-      );
-    }
-
-    const userId = session.user.id;
+    const adminId = session.user.id;
     const body = await request.json();
 
     // Validate input
     const validatedData = securitySettingsSchema.parse(body);
 
+    // Prepare update data
+    const updateData: any = {};
+    if (validatedData.idleTimeout !== undefined) updateData.idleTimeout = validatedData.idleTimeout;
+    if (validatedData.maxSessionDuration !== undefined) updateData.maxSessionDuration = validatedData.maxSessionDuration;
+    if (validatedData.sessionTimeout !== undefined) updateData.sessionTimeout = parseInt(validatedData.sessionTimeout);
+    if (validatedData.rememberDevice !== undefined) updateData.rememberDevice = validatedData.rememberDevice;
+    if (validatedData.twoFactorEnabled !== undefined) updateData.twoFactorEnabled = validatedData.twoFactorEnabled;
+    if (validatedData.requireMfaAlways !== undefined) updateData.requireMfaAlways = validatedData.requireMfaAlways;
+    if (validatedData.requireStepUpFor !== undefined) updateData.requireStepUpFor = validatedData.requireStepUpFor;
+    if (validatedData.loginNotifications !== undefined) updateData.loginNotifications = validatedData.loginNotifications;
+    if (validatedData.activityDigest !== undefined) updateData.activityDigest = validatedData.activityDigest;
+    if (validatedData.securityAlerts !== undefined) updateData.securityAlerts = validatedData.securityAlerts;
+    if (validatedData.allowedIPs !== undefined) updateData.allowedIPs = validatedData.allowedIPs;
+    if (validatedData.blockUnknownDevices !== undefined) updateData.blockUnknownDevices = validatedData.blockUnknownDevices;
+    if (validatedData.logAllActions !== undefined) updateData.logAllActions = validatedData.logAllActions;
+    if (validatedData.retainLogsFor !== undefined) updateData.retainLogsFor = validatedData.retainLogsFor;
+
     // Update or create settings
     await prisma.adminSettings.upsert({
-      where: { userId },
-      update: {
-        sessionTimeout: parseInt(validatedData.sessionTimeout),
-        twoFactorEnabled: validatedData.twoFactorEnabled,
-        loginNotifications: validatedData.loginNotifications,
-      },
+      where: { adminId },
+      update: updateData,
       create: {
-        userId,
-        sessionTimeout: parseInt(validatedData.sessionTimeout),
-        twoFactorEnabled: validatedData.twoFactorEnabled,
-        loginNotifications: validatedData.loginNotifications,
+        adminId,
+        ...updateData,
       },
     });
 
     // Log settings change
     await prisma.auditLog.create({
       data: {
-        userId,
+        adminId,
         action: 'SETTINGS_UPDATED',
         entity: 'ADMIN_SETTINGS',
-        entityId: userId,
+        entityId: adminId,
         newValue: JSON.stringify(validatedData),
         ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
         userAgent: request.headers.get('user-agent') || 'unknown',

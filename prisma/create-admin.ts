@@ -33,9 +33,10 @@ async function createAdmin() {
       process.exit(1);
     }
 
-    // Generate invite token
-    const inviteToken = crypto.randomBytes(32).toString('hex');
-    const inviteExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    // Generate setup token (not invite!)
+    const setupToken = crypto.randomBytes(32).toString('hex');
+    const setupTokenHashed = crypto.createHash('sha256').update(setupToken).digest('hex');
+    const setupTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
     // Create admin
     const admin = await prisma.admin.create({
@@ -47,6 +48,8 @@ async function createAdmin() {
         authMethod: 'PASSKEY',
         password: null, // No password - Passkey only!
         isActive: true,
+        setupToken: setupTokenHashed, // Store hashed token
+        setupTokenExpiry
       }
     });
 
@@ -60,7 +63,7 @@ async function createAdmin() {
     console.log(`   Created:    ${admin.createdAt.toISOString()}`);
 
     console.log('\n🔑 Setup Passkey:');
-    console.log(`   URL: http://localhost:3000/admin/auth/setup-passkey?token=${inviteToken}&email=${encodeURIComponent(email)}`);
+    console.log(`   URL: http://localhost:3000/admin/auth/setup-passkey?token=${setupToken}&email=${encodeURIComponent(email)}`);
     console.log('\n📝 Next steps:');
     console.log('   1. Open the URL above in your browser');
     console.log('   2. Click "Register Passkey"');

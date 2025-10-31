@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/auth';
+import { requireAdminAuth } from '@/lib/middleware/admin-auth';
 import { publishDocumentSchema } from '@/lib/validations/legal-document';
 import { lexicalToHtml, lexicalToPlainText } from '@/lib/utils/lexical-to-html';
 

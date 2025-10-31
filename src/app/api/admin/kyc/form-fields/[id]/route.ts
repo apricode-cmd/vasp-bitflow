@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-utils';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { z } from 'zod';
 
 // Валидация для обновления поля
@@ -22,7 +22,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const authResult = await requireRole('ADMIN');
+    const authResult = await requireAdminRole('ADMIN');
     if (authResult instanceof NextResponse) {
       return authResult;
     }
@@ -57,7 +57,7 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const authResult = await requireRole('ADMIN');
+    const authResult = await requireAdminRole('ADMIN');
     if (authResult instanceof NextResponse) {
       return authResult;
     }

@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminSession } from '@/auth-admin';
+import { requireAdminAuth } from '@/lib/middleware/admin-auth';
 import { PasskeyService } from '@/lib/services/passkey.service';
 import { prisma } from '@/lib/prisma';
 
@@ -23,7 +23,8 @@ export async function POST(request: NextRequest) {
     });
 
     // Try to get session (for adding additional passkeys)
-    const session = await getAdminSession();
+    const session = await requireAdminAuth();
+  if (session instanceof NextResponse) return session;
     
     let adminId: string;
 
@@ -74,6 +75,18 @@ export async function POST(request: NextRequest) {
         { error: result.error || 'Verification failed' },
         { status: 400 }
       );
+    }
+
+    // Clear setup token after successful first-time registration
+    if (!session?.user && email) {
+      await prisma.admin.update({
+        where: { id: adminId },
+        data: {
+          setupToken: null,
+          setupTokenExpiry: null
+        }
+      });
+      console.log('✅ Setup token cleared for:', email);
     }
 
     return NextResponse.json({

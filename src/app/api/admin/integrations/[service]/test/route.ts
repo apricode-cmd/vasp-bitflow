@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireRole } from '@/lib/auth-utils';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { testIntegrationConnection } from '@/lib/services/integration-management.service';
 
 export async function POST(
@@ -14,7 +14,7 @@ export async function POST(
 ): Promise<NextResponse> {
   try {
     // Check admin authentication
-    const authResult = await requireRole('ADMIN');
+    const authResult = await requireAdminRole('ADMIN');
     if (authResult.error) {
       return authResult.error;
     }

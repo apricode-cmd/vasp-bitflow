@@ -5,15 +5,16 @@
  */
 
 import { NextResponse } from 'next/server';
-import { requireRole } from '@/lib/auth-utils';
+import { requireAdminAuth } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { auditService } from '@/lib/services/audit.service';
 
 export async function GET(request: Request): Promise<NextResponse> {
   // Check admin authorization
-  const sessionOrError = await requireRole('ADMIN');
-  if (sessionOrError instanceof NextResponse) {
-    return sessionOrError;
+  const session = await requireAdminAuth();
+  
+  if (session instanceof NextResponse) {
+    return session; // Return 401 error
   }
 
   try {

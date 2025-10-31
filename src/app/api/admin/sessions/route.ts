@@ -6,20 +6,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-utils';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 
 export async function GET(request: NextRequest) {
   try {
-    const { error, session } = await requireRole('ADMIN');
-    if (error) {
-      return error;
-    }
-
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: 'User not authenticated' },
-        { status: 401 }
-      );
+    const session = await requireAdminRole('ADMIN');
+    if (session instanceof NextResponse) {
+      return session;
     }
 
     const userId = session.user.id;

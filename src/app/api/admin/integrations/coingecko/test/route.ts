@@ -5,13 +5,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireRole } from '@/lib/auth-utils';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { coinGeckoService } from '@/lib/services/coingecko';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     // Check admin authentication
-    const session = await requireRole('ADMIN');
+    const session = await requireAdminRole('ADMIN');
     if (!session) {
       return NextResponse.json(
         { error: 'Unauthorized' },

@@ -3,12 +3,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireRole } from '@/lib/auth-utils';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(): Promise<NextResponse> {
   try {
-    const sessionOrError = await requireRole('ADMIN');
+    const sessionOrError = await requireAdminRole('ADMIN');
     if (sessionOrError instanceof NextResponse) return sessionOrError;
 
     const data = await prisma.transactionStatusConfig.findMany({ orderBy: { priority: 'asc' } });

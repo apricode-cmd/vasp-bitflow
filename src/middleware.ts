@@ -46,9 +46,8 @@ export async function middleware(request: NextRequest) {
     path === '/maintenance' ||
     path.startsWith('/_next') ||
     path.startsWith('/api/settings/public') ||
-    path.startsWith('/api/auth') ||  // Client auth
-    path.startsWith('/api/admin/auth') ||  // Admin auth
-    path.startsWith('/api/admin/passkey')  // Passkey registration (first-time, no session)
+    path.startsWith('/api/auth') ||  // Client auth (NextAuth endpoints)
+    path.startsWith('/api/admin/')  // Admin API (auth checked in each route)
   ) {
     return NextResponse.next({
       request: {
@@ -71,17 +70,10 @@ export async function middleware(request: NextRequest) {
   }
 
   // === ADMIN ROUTES (PROTECTED) ===
+  // NOTE: Admin auth check is done in layout.tsx, not here!
+  // This prevents conflicts between two NextAuth instances in Edge Runtime
   if (path.startsWith('/admin')) {
-    // Protected admin routes - use ADMIN auth
-    const adminSession = await getAdminSession();
-    
-    if (!adminSession?.user) {
-      return NextResponse.redirect(new URL('/admin/auth/login', request.url));
-    }
-
-    // Check if admin is active (would need to check DB, but can't in middleware)
-    // This check is done in layouts and API routes
-    
+    // Skip auth check in middleware - it's handled in server layout
     return NextResponse.next({
       request: {
         headers: requestHeaders,
@@ -90,15 +82,15 @@ export async function middleware(request: NextRequest) {
   }
 
   // === CLIENT ROUTES ===
-  
+
   // Check maintenance mode FIRST (block ALL non-admin clients)
   const isMaintenanceMode = await checkMaintenanceMode();
   
   if (isMaintenanceMode) {
-    // Check if user is admin (try admin session first)
-    const adminSession = await getAdminSession();
-    if (adminSession?.user) {
-      // Admin can access during maintenance
+    // During maintenance, admins can still access
+    // But we can't check admin session in middleware (Edge Runtime conflict)
+    // So we just allow /admin/* routes and let layout.tsx handle auth
+    if (path.startsWith('/admin')) {
       return NextResponse.next({
         request: {
           headers: requestHeaders,

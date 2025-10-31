@@ -136,11 +136,8 @@ export default function PaymentsPage(): JSX.Element {
       const accountsRes = await fetch('/api/admin/payment-accounts');
       if (accountsRes.ok) {
         const data = await accountsRes.json();
-        console.log('📦 Payment Accounts API response:', data);
         const banks = data.accounts.filter((a: PaymentAccount) => a.type === 'BANK_ACCOUNT');
         const wallets = data.accounts.filter((a: PaymentAccount) => a.type === 'CRYPTO_WALLET');
-        console.log('🏦 Bank Accounts:', banks.length, banks);
-        console.log('💰 Crypto Wallets:', wallets.length, wallets);
         setBankAccounts(banks);
         setCryptoWallets(wallets);
       } else {
@@ -151,8 +148,6 @@ export default function PaymentsPage(): JSX.Element {
       const methodsRes = await fetch('/api/admin/payment-methods');
       if (methodsRes.ok) {
         const data = await methodsRes.json();
-        console.log('💳 Payment Methods API response:', data);
-        console.log('💳 Payment Methods count:', data.methods?.length || 0, data.methods);
         setPaymentMethods(data.methods || []);
       } else {
         console.error('❌ Payment Methods API failed:', methodsRes.status);
@@ -162,8 +157,6 @@ export default function PaymentsPage(): JSX.Element {
       const pspRes = await fetch('/api/admin/resources?type=psp_connector');
       if (pspRes.ok) {
         const data = await pspRes.json();
-        console.log('🌐 PSP Connectors API response:', data);
-        console.log('🌐 PSP Connectors count:', data.resources?.length || 0, data.resources);
         setPspConnectors(data.resources || []);
       } else {
         console.error('❌ PSP Connectors API failed:', pspRes.status);
@@ -178,19 +171,16 @@ export default function PaymentsPage(): JSX.Element {
 
       if (fiatRes.ok) {
         const data = await fiatRes.json();
-        console.log('💵 Fiat Currencies:', data);
         setFiatCurrencies(data.data || []);
       }
 
       if (cryptoRes.ok) {
         const data = await cryptoRes.json();
-        console.log('💰 Cryptocurrencies:', data);
         setCryptocurrencies(data.data || []);
       }
 
       if (blockchainsRes.ok) {
         const data = await blockchainsRes.json();
-        console.log('⛓️ Blockchains:', data);
         setBlockchains(data.data || []);
       }
     } catch (error) {
@@ -455,16 +445,6 @@ export default function PaymentsPage(): JSX.Element {
         const lastChecked = row.original.updatedAt;
         const isLow = balance && minBalance && balance < minBalance;
         const hasBalance = balance && balance > 0;
-        
-        // Debug: log что показывается
-        if (typeof window !== 'undefined' && balance !== undefined) {
-          console.log('Balance cell data:', {
-            balance,
-            minBalance,
-            cryptocurrency: row.original.cryptocurrency,
-            hasMinBalance: minBalance !== undefined
-          });
-        }
         
         if (balance === undefined || balance === null) {
           return (

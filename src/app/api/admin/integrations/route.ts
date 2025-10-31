@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireRole } from '@/lib/auth-utils';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { integrationRegistry } from '@/lib/integrations';
 import { 
@@ -18,7 +18,7 @@ import { decrypt, maskApiKey } from '@/lib/services/encryption.service';
 export async function GET(): Promise<NextResponse> {
   try {
     // Check admin authentication
-    const authResult = await requireRole('ADMIN');
+    const authResult = await requireAdminRole('ADMIN');
     if (authResult.error) {
       return authResult.error;
     }
@@ -82,7 +82,7 @@ export async function GET(): Promise<NextResponse> {
 export async function PUT(request: NextRequest): Promise<NextResponse> {
   try {
     // Check admin authentication
-    const authResult = await requireRole('ADMIN');
+    const authResult = await requireAdminRole('ADMIN');
     if (authResult.error) {
       return authResult.error;
     }

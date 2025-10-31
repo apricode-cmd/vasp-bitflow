@@ -91,7 +91,7 @@ export default function LoginPage(): React.ReactElement {
         
         // Small delay to ensure toast shows, then redirect
         setTimeout(() => {
-          window.location.href = `/2fa-verify?email=${encodeURIComponent(data.email)}`;
+        window.location.href = `/2fa-verify?email=${encodeURIComponent(data.email)}`;
         }, 500);
         return;
       }

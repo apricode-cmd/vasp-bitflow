@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/auth';
+import { requireAdminAuth } from '@/lib/middleware/admin-auth';
 import { 
   createDocumentSchema, 
   queryDocumentsSchema,
@@ -14,13 +14,9 @@ import { lexicalToHtml, lexicalToPlainText } from '@/lib/utils/lexical-to-html';
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const session = await requireAdminAuth();
+    if (session instanceof NextResponse) {
+      return session;
     }
 
     // Parse query parameters
@@ -124,13 +120,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const session = await requireAdminAuth();
+    if (session instanceof NextResponse) {
+      return session;
     }
 
     const body = await request.json();

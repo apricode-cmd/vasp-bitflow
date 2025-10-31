@@ -10,7 +10,7 @@ import { put } from '@vercel/blob';
 import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
-import { requireRole, getCurrentUserId } from '@/lib/auth-utils';
+import { requireAdminRole, getCurrentUserId } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 
@@ -19,7 +19,7 @@ const isDevelopment = process.env.NODE_ENV === 'development';
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     // Check admin permission
-    const sessionOrError = await requireRole('ADMIN');
+    const sessionOrError = await requireAdminRole('ADMIN');
     if (sessionOrError instanceof NextResponse) {
       return sessionOrError;
     }

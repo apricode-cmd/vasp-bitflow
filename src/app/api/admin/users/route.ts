@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireRole } from '@/lib/auth-utils';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 
@@ -21,7 +21,7 @@ const usersQuerySchema = z.object({
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     // Check admin permission
-    const sessionOrError = await requireRole('ADMIN');
+    const sessionOrError = await requireAdminRole('ADMIN');
     if (sessionOrError instanceof NextResponse) {
       return sessionOrError;
     }

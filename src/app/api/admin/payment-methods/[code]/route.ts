@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireRole, getCurrentUserId } from '@/lib/auth-utils';
+import { requireAdminRole, getCurrentUserId } from '@/lib/middleware/admin-auth';
 import { paymentMethodService } from '@/lib/services/payment-method.service';
 import { updatePaymentMethodSchema } from '@/lib/validations/payment-method';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
@@ -18,7 +18,7 @@ export async function PUT(
 ): Promise<NextResponse> {
   try {
     // Check admin permission
-    const sessionOrError = await requireRole('ADMIN');
+    const sessionOrError = await requireAdminRole('ADMIN');
     if (sessionOrError instanceof NextResponse) {
       return sessionOrError;
     }
@@ -102,7 +102,7 @@ export async function DELETE(
 ): Promise<NextResponse> {
   try {
     // Check admin permission
-    const sessionOrError = await requireRole('ADMIN');
+    const sessionOrError = await requireAdminRole('ADMIN');
     if (sessionOrError instanceof NextResponse) {
       return sessionOrError;
     }

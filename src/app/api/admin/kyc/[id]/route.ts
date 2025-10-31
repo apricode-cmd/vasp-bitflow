@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireRole } from '@/lib/auth-utils';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { kycFormService } from '@/lib/services/kyc-form.service';
 import { auditService } from '@/lib/services/audit.service';
@@ -25,7 +25,7 @@ export async function GET(
 ): Promise<NextResponse> {
   try {
     // Check admin permission
-    const { error } = await requireRole('ADMIN');
+    const { error } = await requireAdminRole('ADMIN');
     if (error) return error;
 
     const { id } = await params;
@@ -98,7 +98,7 @@ export async function PUT(
 ): Promise<NextResponse> {
   try {
     // Check admin permission
-    const { error, session } = await requireRole('ADMIN');
+    const { error, session } = await requireAdminRole('ADMIN');
     if (error) return error;
 
     const { id } = await params;
@@ -211,7 +211,7 @@ export async function DELETE(
 ): Promise<NextResponse> {
   try {
     // Check admin permission
-    const { error, session } = await requireRole('ADMIN');
+    const { error, session } = await requireAdminRole('ADMIN');
     if (error) return error;
 
     const { id } = await params;

@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireRole } from '@/lib/auth-utils';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 
 interface RouteContext {
@@ -19,7 +19,7 @@ export async function GET(
   { params }: RouteContext
 ): Promise<NextResponse> {
   // Check admin authorization
-  const sessionOrError = await requireRole('ADMIN');
+  const sessionOrError = await requireAdminRole('ADMIN');
   if (sessionOrError instanceof NextResponse) {
     return sessionOrError;
   }

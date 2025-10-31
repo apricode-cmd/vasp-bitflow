@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-utils';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 
 /**
  * GET /api/admin/kyc/form-fields
@@ -8,7 +8,7 @@ import { requireRole } from '@/lib/auth-utils';
  */
 export async function GET(request: NextRequest) {
   try {
-    const authResult = await requireRole('ADMIN');
+    const authResult = await requireAdminRole('ADMIN');
     if (authResult instanceof NextResponse) {
       return authResult;
     }

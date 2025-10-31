@@ -241,10 +241,6 @@ export default function AdminKycPage(): JSX.Element {
   };
 
   const viewKycDetails = (session: KycSession) => {
-    console.log('📊 Selected KYC Session:', session);
-    console.log('📝 Form Data:', session.formData);
-    console.log('📄 Documents:', session.documents);
-    console.log('🏢 Provider:', session.provider);
     setSelectedSession(session);
     setSheetOpen(true);
   };

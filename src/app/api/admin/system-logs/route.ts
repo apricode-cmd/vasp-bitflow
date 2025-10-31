@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireRole } from '@/lib/auth-utils';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { systemLogService } from '@/lib/services/system-log.service';
 import { z } from 'zod';
 
@@ -23,7 +23,7 @@ const systemLogFiltersSchema = z.object({
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     // Check admin permission
-    const sessionOrError = await requireRole('ADMIN');
+    const sessionOrError = await requireAdminRole('ADMIN');
     if (sessionOrError instanceof NextResponse) {
       return sessionOrError;
     }

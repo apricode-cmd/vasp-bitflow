@@ -13,6 +13,7 @@ declare module 'next-auth' {
     id: string;
     email: string;
     role: Role;
+    authMethod?: string; // 'PASSWORD', 'TOTP', 'PASSKEY', 'SSO'
   }
 
   interface Session {
@@ -20,6 +21,7 @@ declare module 'next-auth' {
       id: string;
       email: string;
       role: Role;
+      authMethod?: string;
     };
   }
 }
@@ -28,6 +30,7 @@ declare module 'next-auth/jwt' {
   interface JWT {
     id: string;
     role: Role;
+    authMethod?: string;
   }
 }
 

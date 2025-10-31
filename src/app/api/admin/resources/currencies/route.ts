@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireRole, getCurrentUserId } from '@/lib/auth-utils';
+import { requireAdminRole, getCurrentUserId } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { auditService, AUDIT_ACTIONS } from '@/lib/services/audit.service';
 import { z } from 'zod';
@@ -37,7 +37,7 @@ const updateSchema = createSchema.partial().omit({ code: true });
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   try {
-    const sessionOrError = await requireRole('ADMIN');
+    const sessionOrError = await requireAdminRole('ADMIN');
     if (sessionOrError instanceof NextResponse) return sessionOrError;
 
     // Check if only active items should be returned (for selects/comboboxes)
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
-    const sessionOrError = await requireRole('ADMIN');
+    const sessionOrError = await requireAdminRole('ADMIN');
     if (sessionOrError instanceof NextResponse) return sessionOrError;
 
     const body = await req.json();

@@ -23,11 +23,47 @@ function SetupPasskeyContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isValidating, setIsValidating] = useState(true);
 
+  // Validate token on mount
   useEffect(() => {
-    if (!email || !token) {
-      setError('Invalid setup link. Please contact your administrator.');
-    }
+    const validateToken = async () => {
+      if (!email || !token) {
+        setError('Invalid setup link. Please contact your administrator.');
+        setIsValidating(false);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/admin/auth/validate-setup-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, token })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          if (result.alreadySetup || result.expired) {
+            // Redirect to login if already setup or expired
+            toast.error(result.error);
+            setTimeout(() => {
+              window.location.href = '/admin/auth/login';
+            }, 2000);
+            return;
+          }
+          setError(result.error || 'Invalid setup link');
+        }
+
+        setIsValidating(false);
+      } catch (error) {
+        console.error('Token validation error:', error);
+        setError('Failed to validate setup link');
+        setIsValidating(false);
+      }
+    };
+
+    validateToken();
   }, [email, token]);
 
   const handleRegisterPasskey = async () => {
@@ -56,7 +92,6 @@ function SetupPasskeyContent() {
       try {
         registrationResponse = await startRegistration(options);
       } catch (error) {
-        console.log('User cancelled registration:', error);
         setIsLoading(false);
         return;
       }
@@ -95,6 +130,19 @@ function SetupPasskeyContent() {
       setIsLoading(false);
     }
   };
+
+  if (isValidating) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+        <Card className="max-w-md border-blue-500/20 bg-slate-900/80">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="h-12 w-12 animate-spin text-blue-400 mb-4" />
+            <p className="text-blue-200/70">Validating setup link...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (error && !email) {
     return (

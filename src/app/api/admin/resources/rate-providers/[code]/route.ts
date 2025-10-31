@@ -3,7 +3,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireRole, getCurrentUserId } from '@/lib/auth-utils';
+import { requireAdminRole, getCurrentUserId } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { auditService, AUDIT_ACTIONS } from '@/lib/services/audit.service';
 import { z } from 'zod';
@@ -19,7 +19,7 @@ const updateSchema = z.object({
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ code: string }> }): Promise<NextResponse> {
   try {
-    const sessionOrError = await requireRole('ADMIN');
+    const sessionOrError = await requireAdminRole('ADMIN');
     if (sessionOrError instanceof NextResponse) return sessionOrError;
 
     const { code } = await params;
@@ -42,7 +42,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ co
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ code: string }> }): Promise<NextResponse> {
   try {
-    const sessionOrError = await requireRole('ADMIN');
+    const sessionOrError = await requireAdminRole('ADMIN');
     if (sessionOrError instanceof NextResponse) return sessionOrError;
 
     const { code } = await params;

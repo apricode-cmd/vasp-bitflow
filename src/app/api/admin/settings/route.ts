@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireRole, getCurrentUserId } from '@/lib/auth-utils';
+import { requireAdminRole, getCurrentUserId } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 import { z } from 'zod';
@@ -21,7 +21,7 @@ const updateSettingsSchema = z.array(
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     // Check admin permission
-    const sessionOrError = await requireRole('ADMIN');
+    const sessionOrError = await requireAdminRole('ADMIN');
     if (sessionOrError instanceof NextResponse) {
       return sessionOrError;
     }
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 export async function PATCH(request: NextRequest): Promise<NextResponse> {
   try {
     // Check admin permission
-    const sessionOrError = await requireRole('ADMIN');
+    const sessionOrError = await requireAdminRole('ADMIN');
     if (sessionOrError instanceof NextResponse) {
       return sessionOrError;
     }

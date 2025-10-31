@@ -5,12 +5,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireRole } from '@/lib/auth-utils';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   // Check admin authorization
-  const { error } = await requireRole('ADMIN');
+  const { error } = await requireAdminRole('ADMIN');
   if (error) return error;
 
   try {

@@ -4,12 +4,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireRole } from '@/lib/auth-utils';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { syncAllWalletBalances } from '@/lib/services/blockchain-provider.service';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   // Check admin authorization
-  const authResponse = await requireRole('ADMIN');
+  const authResponse = await requireAdminRole('ADMIN');
   if (authResponse instanceof NextResponse) {
     return authResponse;
   }

@@ -7,14 +7,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-utils';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { auditService } from '@/lib/services/audit.service';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const authResult = await requireRole('ADMIN');
+  const authResult = await requireAdminRole('ADMIN');
   if (authResult instanceof NextResponse) return authResult;
 
   try {
@@ -69,7 +69,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const authResult = await requireRole('ADMIN');
+  const authResult = await requireAdminRole('ADMIN');
   if (authResult instanceof NextResponse) return authResult;
   const { session } = authResult;
 
@@ -153,7 +153,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const authResult = await requireRole('ADMIN');
+  const authResult = await requireAdminRole('ADMIN');
   if (authResult instanceof NextResponse) return authResult;
   const { session } = authResult;
 

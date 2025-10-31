@@ -227,8 +227,6 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
         methodsRes.json()
       ]);
 
-      console.log('Loaded data:', { cryptoData, fiatData, blockchainData, methodsData });
-
       if (cryptoData.success && Array.isArray(cryptoData.data)) {
         setCryptocurrencies(cryptoData.data);
       }
@@ -239,13 +237,11 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
 
       if (blockchainData.success && Array.isArray(blockchainData.data)) {
         const activeNetworks = blockchainData.data.filter((n: any) => n.isActive);
-        console.log('Active blockchain networks:', activeNetworks);
         setBlockchainNetworks(activeNetworks);
       }
 
       if (Array.isArray(methodsData.methods)) {
         setPaymentMethods(methodsData.methods);
-        console.log('Payment methods loaded:', methodsData.methods.length);
       }
     } catch (error) {
       console.error('Failed to fetch currencies/networks:', error);

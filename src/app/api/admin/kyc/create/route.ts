@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireRole } from '@/lib/auth-utils';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { auditService } from '@/lib/services/audit.service';
 import { z } from 'zod';
@@ -16,7 +16,7 @@ const createKycSchema = z.object({
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     // Check admin permission
-    const { error, session } = await requireRole('ADMIN');
+    const { error, session } = await requireAdminRole('ADMIN');
     if (error) return error;
 
     const body = await request.json();

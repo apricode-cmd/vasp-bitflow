@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireRole } from '@/lib/auth-utils';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { syncWalletBalance } from '@/lib/services/blockchain-provider.service';
 
 export async function POST(
@@ -12,7 +12,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   // Check admin authorization
-  const authResponse = await requireRole('ADMIN');
+  const authResponse = await requireAdminRole('ADMIN');
   if (authResponse instanceof NextResponse) {
     return authResponse;
   }

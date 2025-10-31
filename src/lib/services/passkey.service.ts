@@ -1,22 +1,22 @@
 /**
- * Passkey (WebAuthn) Service
+ * Passkey Service
  * 
- * Handles passkey registration and authentication for admins
- * Uses @simplewebauthn for FIDO2/WebAuthn implementation
+ * WebAuthn (FIDO2) authentication service for admins
  */
 
 import {
-  generateRegistrationOptions,
-  verifyRegistrationResponse,
   generateAuthenticationOptions,
+  generateRegistrationOptions,
   verifyAuthenticationResponse,
+  verifyRegistrationResponse,
   type VerifiedRegistrationResponse,
   type VerifiedAuthenticationResponse,
 } from '@simplewebauthn/server';
 import type {
   RegistrationResponseJSON,
   AuthenticationResponseJSON,
-} from '@simplewebauthn/server/script/deps';
+  AuthenticatorTransportFuture,
+} from '@simplewebauthn/types';
 import { prisma } from '@/lib/prisma';
 import { AdminRole } from '@prisma/client';
 
@@ -25,12 +25,7 @@ const RP_NAME = process.env.RP_NAME || 'Apricode Exchange';
 const RP_ID = process.env.RP_ID || 'localhost';
 const ORIGIN = process.env.ORIGIN || 'http://localhost:3000';
 
-// Debug logging
-console.log('🔐 WebAuthn Config:', {
-  RP_NAME,
-  RP_ID,
-  ORIGIN,
-});
+console.log('🔐 WebAuthn Config:', { RP_NAME, RP_ID, ORIGIN });
 
 // Challenge TTL
 const CHALLENGE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -66,7 +61,7 @@ export async function generatePasskeyRegistrationOptions(
     excludeCredentials: existingPasskeys.map((passkey) => ({
       id: Buffer.from(passkey.credentialId, 'base64'),
       type: 'public-key',
-      transports: ['internal', 'hybrid'],
+      transports: ['internal', 'hybrid'] as AuthenticatorTransportFuture[],
     })),
     authenticatorSelection: {
       authenticatorAttachment: 'platform', // Prefer platform authenticators (Touch ID, Face ID)
@@ -191,7 +186,7 @@ export async function verifyPasskeyRegistration(
 /**
  * Generate authentication options for passkey login
  */
-export async function generatePasskeyAuthenticationOptions(email?: string) {
+export async function generatePasskeyAuthenticationOptions(email: string) {
   // Clean expired challenges from DB
   await prisma.mfaChallenge.deleteMany({
     where: {
@@ -200,28 +195,28 @@ export async function generatePasskeyAuthenticationOptions(email?: string) {
   });
 
   let adminId: string | null = null;
-  let allowCredentials: Array<{ id: Buffer; type: 'public-key'; transports?: string[] }> = [];
+  let allowCredentials: Array<{ id: Buffer; type: 'public-key'; transports?: AuthenticatorTransportFuture[] }> = [];
 
-  if (email) {
-    // Get admin's passkeys
-    const admin = await prisma.admin.findUnique({
-      where: { email },
-      include: {
-        webAuthnCreds: {
-          where: { isActive: true },
-          select: { credentialId: true, transports: true },
-        },
+  // Get admin's passkeys
+  const admin = await prisma.admin.findUnique({
+    where: { email },
+    include: {
+      webAuthnCreds: {
+        where: { isActive: true },
+        select: { credentialId: true, transports: true },
       },
-    });
+    },
+  });
 
-    if (admin?.webAuthnCreds) {
-      adminId = admin.id;
-      allowCredentials = admin.webAuthnCreds.map((cred) => ({
-        id: Buffer.from(cred.credentialId, 'base64'),
-        type: 'public-key' as const,
-        transports: cred.transports as AuthenticatorTransport[],
-      }));
-    }
+  if (admin?.webAuthnCreds) {
+    adminId = admin.id;
+    allowCredentials = admin.webAuthnCreds.map((cred) => ({
+      id: Buffer.from(cred.credentialId, 'base64'),
+      type: 'public-key' as const,
+      transports: cred.transports as AuthenticatorTransportFuture[],
+    }));
+  } else {
+    throw new Error('No passkeys registered for this admin.');
   }
 
   const options = await generateAuthenticationOptions({
@@ -230,10 +225,10 @@ export async function generatePasskeyAuthenticationOptions(email?: string) {
     userVerification: 'required',
   });
 
-  // Store challenge in DB (use adminId or null for anonymous)
+  // Store challenge in DB
   await prisma.mfaChallenge.create({
     data: {
-      adminId: adminId || 'anonymous', // For anonymous login
+      adminId: adminId,
       action: 'PASSKEY_LOGIN',
       challengeType: 'WEBAUTHN',
       challenge: options.challenge,
@@ -241,9 +236,9 @@ export async function generatePasskeyAuthenticationOptions(email?: string) {
     },
   });
 
-  console.log('✅ Authentication challenge stored:', adminId || 'anonymous');
+  console.log('✅ Authentication challenge stored for admin:', adminId);
 
-  return { options, email };
+  return options;
 }
 
 /**
@@ -251,7 +246,7 @@ export async function generatePasskeyAuthenticationOptions(email?: string) {
  */
 export async function verifyPasskeyAuthentication(
   response: AuthenticationResponseJSON,
-  email?: string
+  email: string
 ): Promise<{
   verified: boolean;
   admin?: {
@@ -295,10 +290,7 @@ export async function verifyPasskeyAuthentication(
     // Get stored challenge from DB
     const storedChallenge = await prisma.mfaChallenge.findFirst({
       where: {
-        OR: [
-          { adminId: credential.admin.id },
-          { adminId: 'anonymous' }
-        ],
+        adminId: credential.admin.id,
         action: 'PASSKEY_LOGIN',
         expiresAt: { gt: new Date() },
       },
@@ -357,7 +349,7 @@ export async function verifyPasskeyAuthentication(
       },
     };
   } catch (error) {
-    console.error('Passkey authentication verification error:', error);
+    console.error('❌ Passkey authentication verification error:', error);
     return {
       verified: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -365,45 +357,10 @@ export async function verifyPasskeyAuthentication(
   }
 }
 
-/**
- * Get admin's passkeys
- */
-export async function getAdminPasskeys(adminId: string) {
-  return await prisma.webAuthnCredential.findMany({
-    where: { adminId },
-    select: {
-      id: true,
-      deviceName: true,
-      deviceType: true,
-      isActive: true,
-      lastUsed: true,
-      createdAt: true,
-    },
-    orderBy: { createdAt: 'desc' },
-  });
-}
-
-/**
- * Delete passkey
- */
-export async function deletePasskey(credentialId: string, adminId: string) {
-  return await prisma.webAuthnCredential.update({
-    where: {
-      id: credentialId,
-      adminId, // Ensure ownership
-    },
-    data: {
-      isActive: false,
-    },
-  });
-}
-
+// Export as PasskeyService for compatibility
 export const PasskeyService = {
   generatePasskeyRegistrationOptions,
   verifyPasskeyRegistration,
   generatePasskeyAuthenticationOptions,
   verifyPasskeyAuthentication,
-  getAdminPasskeys,
-  deletePasskey,
 };
-

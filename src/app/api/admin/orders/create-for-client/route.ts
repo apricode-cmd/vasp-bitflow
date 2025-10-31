@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireRole, getCurrentUserId } from '@/lib/auth-utils';
+import { requireAdminRole, getCurrentUserId } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { createAdminOrderSchema } from '@/lib/validations/admin-order';
 import { rateManagementService } from '@/lib/services/rate-management.service';
@@ -16,7 +16,7 @@ import { z } from 'zod';
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     // Check admin permission
-    const sessionOrError = await requireRole('ADMIN');
+    const sessionOrError = await requireAdminRole('ADMIN');
     if (sessionOrError instanceof NextResponse) {
       return sessionOrError;
     }

@@ -5,22 +5,26 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { PasskeyService } from '@/lib/services/passkey.service';
+import { generatePasskeyAuthenticationOptions } from '@/lib/services/passkey.service';
 
 export async function POST(request: NextRequest) {
   try {
     const { email } = await request.json();
 
-    const result = await PasskeyService.generatePasskeyAuthenticationOptions(email);
+    console.log('🔐 Generating challenge for:', email);
 
-    // Return only options (result contains {options, email})
-    return NextResponse.json(result.options);
+    const options = await generatePasskeyAuthenticationOptions(email);
+
+    console.log('✅ Challenge generated successfully');
+
+    return NextResponse.json(options);
   } catch (error) {
     console.error('❌ Passkey challenge error:', error);
     return NextResponse.json(
-      { error: 'Failed to generate challenge' },
+      { error: error instanceof Error ? error.message : 'Failed to generate challenge' },
       { status: 500 }
     );
   }
 }
+
 

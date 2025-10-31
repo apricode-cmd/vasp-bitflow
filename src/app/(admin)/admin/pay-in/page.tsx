@@ -196,15 +196,6 @@ export default function PayInPage(): JSX.Element {
       if (accountsData.success) {
         setPaymentAccounts(accountsData.accounts || []);
       }
-      
-      console.log('Loaded options:', {
-        orders: availableOrders.length,
-        users: usersData.success ? usersData.data.length : 0,
-        fiatCurrencies: fiatData.success ? fiatData.data.length : 0,
-        cryptocurrencies: cryptoData.success ? cryptoData.data.length : 0,
-        paymentMethods: methodsData.success ? methodsData.methods.length : 0,
-        paymentAccounts: accountsData.success ? accountsData.accounts.length : 0
-      });
     } catch (error) {
       console.error('Failed to load options:', error);
       toast.error('Failed to load options');
@@ -243,8 +234,6 @@ export default function PayInPage(): JSX.Element {
   const handlePaymentMethodChange = (methodCode: string): void => {
     const selectedMethod = paymentMethods.find(m => m.code === methodCode);
     if (!selectedMethod) return;
-    
-    console.log('📝 Selected Payment Method:', selectedMethod);
     
     // Auto-fill from payment method
     setCreateForm(prev => ({

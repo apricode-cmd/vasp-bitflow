@@ -3,7 +3,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireRole, getCurrentUserId } from '@/lib/auth-utils';
+import { requireAdminRole, getCurrentUserId } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { auditService, AUDIT_ACTIONS } from '@/lib/services/audit.service';
 import { z } from 'zod';
@@ -21,7 +21,7 @@ const schema = z.object({
 
 export async function GET(): Promise<NextResponse> {
   try {
-    const sessionOrError = await requireRole('ADMIN');
+    const sessionOrError = await requireAdminRole('ADMIN');
     if (sessionOrError instanceof NextResponse) return sessionOrError;
 
     const data = await prisma.feeProfile.findMany({ orderBy: { priority: 'asc' } });
@@ -33,7 +33,7 @@ export async function GET(): Promise<NextResponse> {
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
-    const sessionOrError = await requireRole('ADMIN');
+    const sessionOrError = await requireAdminRole('ADMIN');
     if (sessionOrError instanceof NextResponse) return sessionOrError;
 
     const validated = schema.parse(await req.json());

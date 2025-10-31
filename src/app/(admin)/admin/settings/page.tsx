@@ -110,7 +110,6 @@ export default function SettingsPage(): JSX.Element {
       root.style.setProperty('--primary', `${hue} ${saturation}% ${lightness}%`);
       
       // Log for debugging
-      console.log('Applied theme color:', {
         hex: hexColor,
         hsl: `${hue} ${saturation}% ${lightness}%`
       });
@@ -436,7 +435,6 @@ export default function SettingsPage(): JSX.Element {
                       value={previewColor || '#06b6d4'}
                       onChange={(color) => {
                         try {
-                          console.log('ColorPicker onChange received:', color);
                           
                           // ColorPicker returns rgba array like [r, g, b, a]
                           // Sometimes alpha can be NaN, so we need to handle that
@@ -460,7 +458,6 @@ export default function SettingsPage(): JSX.Element {
                             return;
                           }
                           
-                          console.log('Converted to hex:', hex);
                           setPreviewColor(hex);
                         } catch (error) {
                           console.error('Color conversion error:', error);

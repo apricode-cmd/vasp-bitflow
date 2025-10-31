@@ -1,7 +1,10 @@
 /**
  * Passkey Login Button Component
  * 
- * Handles passkey authentication flow
+ * Handles passkey authentication flow with OTAT
+ * 
+ * IMPORTANT: Uses direct POST to /api/admin/auth because next-auth/react signIn()
+ * doesn't support custom basePath for separate admin instance
  */
 
 'use client';
@@ -49,12 +52,13 @@ export function PasskeyLoginButton({ email, onSuccess, onError }: PasskeyLoginBu
         return;
       }
 
-      // 3. Verify authentication
+      // 3. Verify authentication and get OTAT
       const verifyResp = await fetch('/api/admin/passkey/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           response: authResponse,
+          email,
         }),
       });
 
@@ -66,12 +70,37 @@ export function PasskeyLoginButton({ email, onSuccess, onError }: PasskeyLoginBu
         return;
       }
 
+      console.log('✅ Passkey verified, got OTAT token');
+
+      // 4. Create admin session using OTAT
+      console.log('📤 Creating admin session...');
+      
+      const sessionRes = await fetch('/api/admin/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: result.token }),
+        credentials: 'include', // Critical: include cookies
+      });
+
+      if (!sessionRes.ok) {
+        const errorData = await sessionRes.json();
+        console.error('❌ Session creation failed:', errorData.error);
+        onError(errorData.error || 'Failed to create session');
+        setIsLoading(false);
+        return;
+      }
+
+      const sessionData = await sessionRes.json();
+      console.log('✅ Session created successfully:', sessionData.admin.email);
+
       toast.success('Passkey authentication successful!');
       
-      // Wait for session
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Small delay for cookie propagation
+      await new Promise(resolve => setTimeout(resolve, 200));
       
-      onSuccess();
+      // Redirect to admin panel
+      console.log('🔄 Redirecting to /admin...');
+      window.location.href = '/admin';
     } catch (error) {
       console.error('Passkey login error:', error);
       onError('Failed to authenticate with passkey');

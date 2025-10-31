@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireRole, getCurrentUserId } from '@/lib/auth-utils';
+import { requireAdminRole, getCurrentUserId } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { updateOrderStatusSchema } from '@/lib/validations/order';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
@@ -19,7 +19,7 @@ interface RouteContext {
 
 export async function PATCH(request: NextRequest, { params }: RouteContext): Promise<NextResponse> {
   // Check admin authorization
-  const sessionOrError = await requireRole('ADMIN');
+  const sessionOrError = await requireAdminRole('ADMIN');
   if (sessionOrError instanceof NextResponse) {
     return sessionOrError;
   }
@@ -243,7 +243,7 @@ export async function DELETE(
 ): Promise<NextResponse> {
   try {
     // Check admin authorization
-    const sessionOrError = await requireRole('ADMIN');
+    const sessionOrError = await requireAdminRole('ADMIN');
     if (sessionOrError instanceof NextResponse) {
       return sessionOrError;
     }

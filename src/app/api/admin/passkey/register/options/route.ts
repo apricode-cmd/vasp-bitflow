@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminSession } from '@/auth-admin';
+import { requireAdminAuth } from '@/lib/middleware/admin-auth';
 import { PasskeyService } from '@/lib/services/passkey.service';
 import { prisma } from '@/lib/prisma';
 
@@ -16,7 +16,8 @@ export async function POST(request: NextRequest) {
     const { email } = body;
 
     // Try to get session (for adding additional passkeys)
-    const session = await getAdminSession();
+    const session = await requireAdminAuth();
+  if (session instanceof NextResponse) return session;
     
     let adminId: string;
     let adminEmail: string;

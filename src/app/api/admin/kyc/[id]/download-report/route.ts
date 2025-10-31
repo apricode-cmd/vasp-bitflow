@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/auth';
+import { requireAdminAuth } from '@/lib/middleware/admin-auth';
 import { syncKycDocuments } from '@/lib/services/kyc.service';
 
 export async function POST(

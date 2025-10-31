@@ -1,19 +1,18 @@
 /**
  * NextAuth v5 Configuration - ADMIN
  * 
- * Passwordless authentication for administrators
- * - Passkeys (WebAuthn/FIDO2) - PRIMARY
+ * Production-ready Passwordless authentication for administrators
+ * - Passkeys (WebAuthn/FIDO2) via OTAT - PRIMARY
  * - SSO (Google Workspace / Azure AD) - TODO
  * 
- * Password authentication REMOVED for regular admins
- * (only available via break-glass emergency access)
+ * Uses One-Time Authentication Token (OTAT) for secure session creation
  * 
  * Compliant with: PSD2/SCA, DORA, AML best practices
  */
 
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
-import { PasskeyService } from '@/lib/services/passkey.service';
+import { prisma } from '@/lib/prisma';
 
 export const { 
   handlers: adminHandlers, 
@@ -21,43 +20,89 @@ export const {
   signOut: adminSignOut, 
   auth: getAdminSession 
 } = NextAuth({
+  basePath: '/api/admin/auth', // CRITICAL: Tell NextAuth where the API route is
   providers: [
-    // Provider: Passkeys (WebAuthn) - PRIMARY and ONLY
+    // Provider: One-Time Authentication Token (after Passkey verification)
     Credentials({
-      id: 'passkey',
-      name: 'Passkey',
+      id: 'credentials', // Use default credentials id for NextAuth compatibility
+      name: 'One-Time Token',
       credentials: {
         email: { label: 'Email', type: 'email' },
-        passkeyResponse: { label: 'Passkey Response', type: 'text' }
+        token: { label: 'Token', type: 'text' }
       },
       async authorize(credentials) {
         try {
-          if (!credentials?.passkeyResponse) {
+          if (!credentials?.email || !credentials?.token) {
             return null;
           }
 
-          const response = JSON.parse(credentials.passkeyResponse as string);
-          
-          // Verify passkey
-          const result = await PasskeyService.verifyPasskeyAuthentication(
-            response,
-            credentials.email as string
-          );
+          // Find and validate One-Time Authentication Token
+          const otat = await prisma.oneTimeAuthToken.findUnique({
+            where: { token: credentials.token as string },
+            include: { 
+              admin: {
+                select: {
+                  id: true,
+                  email: true,
+                  role: true,
+                  firstName: true,
+                  lastName: true,
+                  isActive: true,
+                  isSuspended: true,
+                }
+              } 
+            },
+          });
 
-          if (!result.verified || !result.admin) {
-            console.log('Passkey verification failed:', result.error);
+          if (!otat) {
             return null;
           }
 
+          // Check if already used
+          if (otat.usedAt) {
+            return null;
+          }
+
+          // Check if expired
+          const now = new Date();
+          if (otat.expiresAt < now) {
+            // Clean up expired token
+            await prisma.oneTimeAuthToken.delete({ where: { id: otat.id } });
+            return null;
+          }
+
+          // Check email matches
+          if (otat.admin.email !== credentials.email) {
+            return null;
+          }
+
+          // Check admin is active
+          if (!otat.admin.isActive || otat.admin.isSuspended) {
+            return null;
+          }
+
+          // Mark OTAT as used (one-time use only!)
+          await prisma.oneTimeAuthToken.update({
+            where: { id: otat.id },
+            data: { 
+              usedAt: new Date(),
+              usedFrom: 'nextauth-authorize',
+            },
+          });
+
+          // Return admin user for session
           return {
-            id: result.admin.id,
-            email: result.admin.email,
-            role: result.admin.role,
-            name: `${result.admin.firstName} ${result.admin.lastName}`,
-            authMethod: 'PASSKEY'
+            id: otat.admin.id,
+            email: otat.admin.email,
+            role: otat.admin.role,
+            name: `${otat.admin.firstName} ${otat.admin.lastName}`,
+            authMethod: 'PASSKEY',
           };
         } catch (error) {
-          console.error('Passkey auth error:', error);
+          // Log only critical errors in production
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Admin authorize error:', error);
+          }
           return null;
         }
       }
@@ -133,22 +178,22 @@ export const {
 
   session: {
     strategy: 'jwt',
-    maxAge: 8 * 60 * 60, // 8 hours for admins
-    updateAge: 15 * 60, // Update every 15 minutes
+    maxAge: 30 * 24 * 60 * 60, // 30 days for admins (like regular sessions)
+    updateAge: 24 * 60 * 60, // Update once per day
   },
 
   cookies: {
     sessionToken: {
-      name: 'admin.session-token', // SEPARATE cookie for admins!
+      name: 'next-auth.session-token.admin', // Different name for admins
       options: {
         httpOnly: true,
         sameSite: 'lax',
-        path: '/admin', // Only for /admin paths
+        path: '/', // MUST be '/' for NextAuth to work properly
         secure: process.env.NODE_ENV === 'production'
       }
     }
   },
 
-  secret: process.env.NEXTAUTH_SECRET
+  secret: process.env.NEXTAUTH_ADMIN_SECRET || process.env.NEXTAUTH_SECRET
 });
 
