@@ -65,21 +65,43 @@ export default function TwoFactorVerifyPage(): React.ReactElement {
         setError('Invalid code. Please try again.');
         setCode('');
         setIsVerifying(false);
-      } else if (result?.ok) {
+        return;
+      }
+      
+      if (result?.ok) {
         // Clear sessionStorage after successful login
         sessionStorage.removeItem('2fa_email');
         sessionStorage.removeItem('2fa_password');
         
-        toast.success('Login successful!');
+        toast.success('Login successful! Redirecting...');
+        
+        // Log the login to SystemLog
+        try {
+          await fetch('/api/auth/log-login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          console.log('✅ Login logged to SystemLog');
+        } catch (logError) {
+          console.error('❌ Failed to log login:', logError);
+          // Don't block login if logging fails
+        }
+        
+        // Wait a bit for session to be fully established
+        await new Promise(resolve => setTimeout(resolve, 300));
         
         // Get session to determine redirect
         const sessionResponse = await fetch('/api/auth/session');
         const session = await sessionResponse.json();
         
-        // Redirect based on role
+        console.log('✅ Session retrieved:', session?.user?.role);
+        
+        // Redirect based on role using window.location for hard redirect
         if (session?.user?.role === 'ADMIN') {
+          console.log('🔄 Redirecting to /admin');
           window.location.href = '/admin';
         } else {
+          console.log('🔄 Redirecting to /dashboard');
           window.location.href = '/dashboard';
         }
       }

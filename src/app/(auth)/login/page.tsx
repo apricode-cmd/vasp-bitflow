@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { signIn } from 'next-auth/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -44,6 +44,12 @@ export default function LoginPage(): React.ReactElement {
     },
   });
 
+  // Clear any residual 2FA data on mount
+  useEffect(() => {
+    sessionStorage.removeItem('2fa_email');
+    sessionStorage.removeItem('2fa_password');
+  }, []);
+
   const onSubmit = async (data: LoginInput) => {
     // Prevent multiple submissions
     if (isLoading || isRedirecting) {
@@ -67,7 +73,14 @@ export default function LoginPage(): React.ReactElement {
       console.log('🔐 requires2FA:', checkData.requires2FA);
       console.log('🔐 validPassword:', checkData.validPassword);
       
-      // Step 2: If 2FA is enabled, redirect to 2FA page
+      // Step 2: If password is wrong (check failed)
+      if (!checkResponse.ok || !checkData.validPassword) {
+        setError('Invalid email or password. Please try again.');
+        setIsLoading(false);
+        return;
+      }
+      
+      // Step 3: If 2FA is enabled, redirect to 2FA page
       if (checkData.requires2FA === true) {
         setIsRedirecting(true);
         toast.success('Password verified. Redirecting to 2FA...');
@@ -76,16 +89,10 @@ export default function LoginPage(): React.ReactElement {
         sessionStorage.setItem('2fa_email', data.email);
         sessionStorage.setItem('2fa_password', data.password);
         
-        // Use window.location for hard redirect
-        await new Promise(resolve => setTimeout(resolve, 800));
-        window.location.href = `/2fa-verify?email=${encodeURIComponent(data.email)}`;
-        return;
-      }
-      
-      // Step 3: If password is wrong (check failed)
-      if (!checkResponse.ok || checkData.requires2FA === false && !checkData.validPassword) {
-        setError('Invalid email or password. Please try again.');
-        setIsLoading(false);
+        // Small delay to ensure toast shows, then redirect
+        setTimeout(() => {
+          window.location.href = `/2fa-verify?email=${encodeURIComponent(data.email)}`;
+        }, 500);
         return;
       }
 
@@ -125,7 +132,7 @@ export default function LoginPage(): React.ReactElement {
       toast.success('Login successful! Redirecting...');
       
       // Wait for session to be fully established
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       // Redirect based on role (ADMIN → /admin, CLIENT → /dashboard)
       if (session?.user?.role === 'ADMIN') {
