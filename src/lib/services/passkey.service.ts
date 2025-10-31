@@ -32,21 +32,8 @@ console.log('🔐 WebAuthn Config:', {
   ORIGIN,
 });
 
-// In-memory storage for challenges (in production, use Redis)
-const challengeStore = new Map<string, { challenge: string; timestamp: number }>();
+// Challenge TTL
 const CHALLENGE_TTL = 5 * 60 * 1000; // 5 minutes
-
-/**
- * Clean expired challenges
- */
-function cleanExpiredChallenges(): void {
-  const now = Date.now();
-  for (const [key, value] of challengeStore.entries()) {
-    if (now - value.timestamp > CHALLENGE_TTL) {
-      challengeStore.delete(key);
-    }
-  }
-}
 
 /**
  * Generate registration options for new passkey
@@ -56,7 +43,12 @@ export async function generatePasskeyRegistrationOptions(
   email: string,
   displayName: string
 ) {
-  cleanExpiredChallenges();
+  // Clean expired challenges from DB
+  await prisma.mfaChallenge.deleteMany({
+    where: {
+      expiresAt: { lt: new Date() },
+    },
+  });
 
   // Get existing passkeys for this admin
   const existingPasskeys = await prisma.webAuthnCredential.findMany({
@@ -84,11 +76,17 @@ export async function generatePasskeyRegistrationOptions(
     attestationType: 'none',
   });
 
-  // Store challenge
-  challengeStore.set(adminId, {
-    challenge: options.challenge,
-    timestamp: Date.now(),
+  // Store challenge in DB
+  await prisma.mfaChallenge.create({
+    data: {
+      adminId,
+      challenge: options.challenge,
+      type: 'PASSKEY_REGISTRATION',
+      expiresAt: new Date(Date.now() + CHALLENGE_TTL),
+    },
   });
+
+  console.log('✅ Challenge stored in DB for admin:', adminId);
 
   return options;
 }
@@ -101,17 +99,28 @@ export async function verifyPasskeyRegistration(
   response: RegistrationResponseJSON,
   deviceName?: string
 ): Promise<{ verified: boolean; error?: string; credentialId?: string }> {
-  // Get stored challenge
-  const stored = challengeStore.get(adminId);
-  if (!stored) {
+  // Get stored challenge from DB
+  const storedChallenge = await prisma.mfaChallenge.findFirst({
+    where: {
+      adminId,
+      type: 'PASSKEY_REGISTRATION',
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  if (!storedChallenge) {
+    console.error('❌ Challenge not found for admin:', adminId);
     return { verified: false, error: 'Challenge not found or expired' };
   }
+
+  console.log('✅ Challenge found in DB:', storedChallenge.challenge.substring(0, 20) + '...');
 
   try {
     const verification: VerifiedRegistrationResponse =
       await verifyRegistrationResponse({
         response,
-        expectedChallenge: stored.challenge,
+        expectedChallenge: storedChallenge.challenge,
         expectedOrigin: ORIGIN,
         expectedRPID: RP_ID,
       });
@@ -137,6 +146,8 @@ export async function verifyPasskeyRegistration(
       },
     });
 
+    console.log('✅ Credential saved:', credential.id);
+
     // Update admin's 2FA settings
     await prisma.admin.update({
       where: { id: adminId },
@@ -157,14 +168,18 @@ export async function verifyPasskeyRegistration(
     });
 
     // Clean up challenge
-    challengeStore.delete(adminId);
+    await prisma.mfaChallenge.delete({
+      where: { id: storedChallenge.id },
+    });
+
+    console.log('✅ Registration complete for admin:', adminId);
 
     return {
       verified: true,
       credentialId: credential.id,
     };
   } catch (error) {
-    console.error('Passkey registration verification error:', error);
+    console.error('❌ Passkey registration verification error:', error);
     return {
       verified: false,
       error: error instanceof Error ? error.message : 'Unknown error',
