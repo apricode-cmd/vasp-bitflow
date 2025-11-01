@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { useAdminSession } from '@/hooks/useAdminSession';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { 
   LayoutDashboard, Users, ShoppingCart, Settings, CreditCard,
   TrendingUp, Shield, Database, Activity, Coins,
@@ -38,6 +39,7 @@ interface NavigationItem {
   description?: string;
   badge?: string;
   superAdminOnly?: boolean;
+  requiredPermission?: string; // Format: "resource:action" (e.g., "orders:read")
 }
 
 interface NavigationSection {
@@ -69,20 +71,23 @@ const navigation = [
         href: '/admin/orders', 
         icon: ShoppingCart,
         description: 'Manage all orders',
-        badge: 'pending' // Will show pending count
+        badge: 'pending',
+        requiredPermission: 'orders:read'
       },
       { 
         name: 'Users', 
         href: '/admin/users', 
         icon: Users,
-        description: 'Customer management'
+        description: 'Customer management',
+        requiredPermission: 'users:read'
       },
       { 
         name: 'KYC Reviews', 
         href: '/admin/kyc', 
         icon: Shield,
         description: 'Identity verification',
-        badge: 'pending'
+        badge: 'pending',
+        requiredPermission: 'kyc:read'
       },
     ],
     defaultOpen: true,
@@ -121,32 +126,37 @@ const navigation = [
         href: '/admin/pay-in', 
         icon: ArrowDownCircle,
         description: 'Incoming fiat payments',
-        badge: 'pending'
+        badge: 'pending',
+        requiredPermission: 'finance:read'
       },
       { 
         name: 'Pay Out', 
         href: '/admin/pay-out', 
         icon: ArrowUpCircle,
         description: 'Outgoing crypto payments',
-        badge: 'pending'
+        badge: 'pending',
+        requiredPermission: 'payouts:read'
       },
       { 
         name: 'Payment Accounts', 
         href: '/admin/payments', 
         icon: CreditCard,
-        description: 'Banks, Wallets, Methods'
+        description: 'Banks, Wallets, Methods',
+        requiredPermission: 'finance:read'
       },
       { 
         name: 'User Wallets', 
         href: '/admin/user-wallets', 
         icon: Wallet,
-        description: 'Customer wallets'
+        description: 'Customer wallets',
+        requiredPermission: 'users:read'
       },
       { 
         name: 'Blockchain Networks', 
         href: '/admin/blockchains', 
         icon: Globe,
-        description: 'ETH, BSC, Polygon, etc.'
+        description: 'ETH, BSC, Polygon, etc.',
+        requiredPermission: 'settings:read'
       },
     ],
     defaultOpen: false,
@@ -159,7 +169,8 @@ const navigation = [
         name: 'Legal Library', 
         href: '/admin/documents', 
         icon: BookOpen,
-        description: 'Policies, Terms, Agreements'
+        description: 'Policies, Terms, Agreements',
+        requiredPermission: 'settings:read'
       },
     ],
     defaultOpen: false,
@@ -173,37 +184,43 @@ const navigation = [
         href: '/admin/admins', 
         icon: Shield,
         description: 'Admin accounts & roles',
-        superAdminOnly: true
+        superAdminOnly: true,
+        requiredPermission: 'admins:read'
       },
       { 
         name: 'Settings', 
         href: '/admin/settings', 
         icon: Settings,
-        description: 'Brand, SEO, Legal'
+        description: 'Brand, SEO, Legal',
+        requiredPermission: 'settings:read'
       },
       { 
         name: 'Integrations', 
         href: '/admin/integrations', 
         icon: Globe,
-        description: 'CoinGecko, KYCAID'
+        description: 'CoinGecko, KYCAID',
+        requiredPermission: 'integrations:read'
       },
       { 
         name: 'KYC Form Fields', 
         href: '/admin/kyc-fields', 
         icon: FileText,
-        description: 'Configure KYC fields'
+        description: 'Configure KYC fields',
+        requiredPermission: 'settings:system'
       },
       { 
         name: 'API Keys', 
         href: '/admin/api-keys', 
         icon: Key,
-        description: 'Access tokens'
+        description: 'Access tokens',
+        requiredPermission: 'api_keys:read'
       },
       { 
         name: 'Audit Logs', 
         href: '/admin/audit', 
         icon: Activity,
-        description: 'System activity'
+        description: 'System activity',
+        requiredPermission: 'audit:read'
       },
     ],
     defaultOpen: false,
@@ -214,6 +231,7 @@ const navigation = [
 export function AdminSidebar(): JSX.Element {
   const pathname = usePathname();
   const { session } = useAdminSession();
+  const { hasPermissionByCode, loading: permissionsLoading } = useAdminPermissions();
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(
     navigation.reduce((acc, section) => ({
       ...acc,
@@ -230,12 +248,23 @@ export function AdminSidebar(): JSX.Element {
 
   const isSuperAdmin = session?.role === 'SUPER_ADMIN' || session?.roleCode === 'SUPER_ADMIN';
 
-  // Filter navigation items based on role
-  const filteredByRole = navigation.map(section => ({
+  // Filter navigation items based on role AND permissions
+  const filteredByRoleAndPermissions = navigation.map(section => ({
     ...section,
-    items: section.items.filter(item => 
-      !item.superAdminOnly || isSuperAdmin
-    )
+    items: section.items.filter(item => {
+      // Check superAdminOnly flag
+      if (item.superAdminOnly && !isSuperAdmin) {
+        return false;
+      }
+      
+      // Check required permission
+      if (item.requiredPermission && !permissionsLoading) {
+        return hasPermissionByCode(item.requiredPermission);
+      }
+      
+      // No permission required, show by default
+      return true;
+    })
   })).filter(section => section.items.length > 0);
 
   // Fetch pending counts for badges
@@ -271,14 +300,14 @@ export function AdminSidebar(): JSX.Element {
 
   // Filter navigation items based on search
   const filteredNavigation = searchQuery
-    ? filteredByRole.map(section => ({
+    ? filteredByRoleAndPermissions.map(section => ({
         ...section,
         items: section.items.filter(item =>
           item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           item.description?.toLowerCase().includes(searchQuery.toLowerCase())
         )
       })).filter(section => section.items.length > 0)
-    : filteredByRole;
+    : filteredByRoleAndPermissions;
 
   const getBadgeCount = (itemName: string): number | null => {
     if (!stats) return null;

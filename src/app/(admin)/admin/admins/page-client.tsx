@@ -13,6 +13,7 @@
 
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { 
   Users, 
   UserPlus, 
@@ -132,6 +133,16 @@ export function AdminManagementClient({
   const [filteredAdmins, setFilteredAdmins] = useState<Admin[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Get admin permissions
+  const { hasPermission } = useAdminPermissions();
+  
+  // Check permissions for actions
+  const canCreate = hasPermission('admins', 'create');
+  const canUpdate = hasPermission('admins', 'update');
+  const canSuspend = hasPermission('admins', 'suspend');
+  const canDelete = hasPermission('admins', 'delete');
+  const canChangeRole = hasPermission('admins', 'change_role');
   
   // Dialogs
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -369,10 +380,12 @@ export function AdminManagementClient({
             Manage admin accounts, roles, and permissions
           </p>
         </div>
-        <Button onClick={() => setInviteDialogOpen(true)}>
-          <UserPlus className="w-4 h-4 mr-2" />
-          Invite Admin
-        </Button>
+        {canCreate && (
+          <Button onClick={() => setInviteDialogOpen(true)}>
+            <UserPlus className="w-4 h-4 mr-2" />
+            Invite Admin
+          </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -499,40 +512,48 @@ export function AdminManagementClient({
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem>
-                              <Edit className="w-4 h-4 mr-2" />
-                              Edit Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Mail className="w-4 h-4 mr-2" />
-                              Resend Invite
-                            </DropdownMenuItem>
+                            {canUpdate && (
+                              <DropdownMenuItem>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit Details
+                              </DropdownMenuItem>
+                            )}
+                            {canCreate && (
+                              <DropdownMenuItem>
+                                <Mail className="w-4 h-4 mr-2" />
+                                Resend Invite
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuSeparator />
                             {(admin.status === 'ACTIVE' && admin.isActive) && admin.id !== currentAdminId && (
                               <>
-                                <DropdownMenuItem
-                                  className="text-amber-600"
-                                  onClick={() => {
-                                    setSelectedAdmin(admin);
-                                    setSuspendAlertOpen(true);
-                                  }}
-                                >
-                                  <Ban className="w-4 h-4 mr-2" />
-                                  Suspend
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="text-destructive"
-                                  onClick={() => {
-                                    setSelectedAdmin(admin);
-                                    setTerminateAlertOpen(true);
-                                  }}
-                                >
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Terminate
-                                </DropdownMenuItem>
+                                {canSuspend && (
+                                  <DropdownMenuItem
+                                    className="text-amber-600"
+                                    onClick={() => {
+                                      setSelectedAdmin(admin);
+                                      setSuspendAlertOpen(true);
+                                    }}
+                                  >
+                                    <Ban className="w-4 h-4 mr-2" />
+                                    Suspend
+                                  </DropdownMenuItem>
+                                )}
+                                {canDelete && (
+                                  <DropdownMenuItem
+                                    className="text-destructive"
+                                    onClick={() => {
+                                      setSelectedAdmin(admin);
+                                      setTerminateAlertOpen(true);
+                                    }}
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Terminate
+                                  </DropdownMenuItem>
+                                )}
                               </>
                             )}
-                            {(admin.status === 'SUSPENDED' || admin.isSuspended) && (
+                            {(admin.status === 'SUSPENDED' || admin.isSuspended) && canUpdate && (
                               <DropdownMenuItem
                                 className="text-green-600"
                                 onClick={() => handleReactivate(admin)}
