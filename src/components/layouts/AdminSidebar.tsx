@@ -183,17 +183,9 @@ const navigation = [
         name: 'Administrators', 
         href: '/admin/admins', 
         icon: Shield,
-        description: 'Admin accounts & roles',
+        description: 'Admins, roles & permissions',
         superAdminOnly: true,
         requiredPermission: 'admins:read'
-      },
-      { 
-        name: 'Roles & Permissions', 
-        href: '/admin/roles', 
-        icon: Scale,
-        description: 'Manage roles and access',
-        superAdminOnly: true,
-        requiredPermission: 'settings:system'
       },
       { 
         name: 'Settings', 

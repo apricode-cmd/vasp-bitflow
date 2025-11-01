@@ -7,6 +7,7 @@
  * - Edit admin details
  * - Suspend/Terminate admins
  * - View team hierarchy
+ * - Manage roles and permissions
  */
 
 'use client';
@@ -28,13 +29,15 @@ import {
   XCircle,
   Clock,
   Copy,
-  Send
+  Send,
+  Scale
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -373,7 +376,7 @@ export function AdminManagementClient({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Users className="w-8 h-8" />
+            <Shield className="w-8 h-8" />
             Administrator Management
           </h1>
           <p className="text-muted-foreground">
@@ -388,8 +391,23 @@ export function AdminManagementClient({
         )}
       </div>
 
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      {/* Tabs */}
+      <Tabs defaultValue="admins" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="admins" className="flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            Administrators
+          </TabsTrigger>
+          <TabsTrigger value="roles" className="flex items-center gap-2">
+            <Scale className="w-4 h-4" />
+            Roles & Permissions
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Administrators Tab */}
+        <TabsContent value="admins" className="space-y-6">
+          {/* Stats */}
+          <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">Total Admins</CardTitle>
@@ -767,7 +785,165 @@ export function AdminManagementClient({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+        </TabsContent>
+
+        {/* Roles & Permissions Tab */}
+        <TabsContent value="roles" className="space-y-6">
+          <RolesPermissionsTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
 
+/**
+ * Roles & Permissions Tab Component
+ */
+function RolesPermissionsTab() {
+  const [roles, setRoles] = useState<any[]>([]);
+  const [permissions, setPermissions] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchRolesAndPermissions();
+  }, []);
+
+  const fetchRolesAndPermissions = async () => {
+    try {
+      setIsLoading(true);
+
+      // Fetch roles
+      const rolesResponse = await fetch('/api/admin/roles');
+      const rolesData = await rolesResponse.json();
+
+      // Fetch permissions  
+      const permsResponse = await fetch('/api/admin/permissions/all');
+      const permsData = await permsResponse.json();
+
+      if (rolesData.success) {
+        setRoles(rolesData.roles || []);
+      }
+
+      if (permsData.success) {
+        setPermissions(permsData.permissions || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch roles/permissions:', error);
+      toast.error('Failed to load roles and permissions');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Group permissions by category
+  const permissionsByCategory = permissions.reduce((acc: any, perm: any) => {
+    if (!acc[perm.category]) {
+      acc[perm.category] = [];
+    }
+    acc[perm.category].push(perm);
+    return acc;
+  }, {});
+
+  return (
+    <div className="space-y-6">
+      {/* Roles Overview */}
+      <div className="grid gap-4 md:grid-cols-3">
+        {isLoading ? (
+          <Card>
+            <CardContent className="p-6">
+              <div className="text-center text-muted-foreground">Loading...</div>
+            </CardContent>
+          </Card>
+        ) : (
+          roles.map((role) => (
+            <Card key={role.code}>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>{role.name}</span>
+                  {role.isSystem && (
+                    <Badge variant="secondary">System</Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>{role.description}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Permissions:</span>
+                    <Badge variant="outline">{role._count?.permissions || 0}</Badge>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Admins:</span>
+                    <Badge variant="outline">{role._count?.admins || 0}</Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {/* Permissions by Category */}
+      <Card>
+        <CardHeader>
+          <CardTitle>All Permissions</CardTitle>
+          <CardDescription>
+            System permissions organized by category
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="text-center py-8 text-muted-foreground">Loading permissions...</div>
+          ) : (
+            <div className="space-y-6">
+              {Object.entries(permissionsByCategory).map(([category, perms]: [string, any]) => (
+                <div key={category}>
+                  <h3 className="font-semibold text-lg mb-3 capitalize">{category}</h3>
+                  <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+                    {perms.map((perm: any) => (
+                      <div 
+                        key={perm.code}
+                        className="flex items-start gap-2 p-3 rounded-lg border bg-card/50"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm">{perm.name}</div>
+                          <div className="text-xs text-muted-foreground font-mono">
+                            {perm.code}
+                          </div>
+                          {perm.description && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {perm.description}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Role-Permission Matrix */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Role-Permission Matrix</CardTitle>
+          <CardDescription>
+            Overview of which permissions each role has
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="text-center py-8 text-muted-foreground">Loading matrix...</div>
+          ) : (
+            <div className="text-sm text-muted-foreground">
+              Matrix view will be implemented here showing checkmarks for each role's permissions
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
