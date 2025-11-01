@@ -86,7 +86,7 @@ export class StepUpMfaService {
     const admin = await prisma.admin.findUnique({
       where: { id: adminId },
       include: {
-        webAuthnCredentials: {
+        webAuthnCreds: {
           where: { isActive: true },
           orderBy: { lastUsed: 'desc' },
         },
@@ -102,14 +102,14 @@ export class StepUpMfaService {
     }
 
     // Check if admin has any credentials
-    if (admin.webAuthnCredentials.length === 0) {
+    if (admin.webAuthnCreds.length === 0) {
       throw new Error('No WebAuthn credentials registered. Please set up Passkey first.');
     }
 
     // Generate WebAuthn authentication options
     const options = await generateAuthenticationOptions({
       rpID: this.RP_ID,
-      allowCredentials: admin.webAuthnCredentials.map((cred) => ({
+      allowCredentials: admin.webAuthnCreds.map((cred) => ({
         id: Buffer.from(cred.credentialId, 'base64'),
         type: 'public-key',
         transports: cred.transports as any[],
@@ -156,7 +156,7 @@ export class StepUpMfaService {
       include: {
         admin: {
           include: {
-            webAuthnCredentials: {
+            webAuthnCreds: {
               where: { isActive: true },
             },
           },
@@ -185,7 +185,7 @@ export class StepUpMfaService {
 
     // Find the credential being used
     const credentialId = response.id;
-    const credential = challenge.admin.webAuthnCredentials.find(
+    const credential = challenge.admin.webAuthnCreds.find(
       (c) => c.credentialId === credentialId
     );
 
