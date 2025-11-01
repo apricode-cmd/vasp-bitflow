@@ -11,6 +11,7 @@ import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { loginSchema } from '@/lib/validations/auth';
 import { verifyUserTotp } from '@/lib/services/totp.service';
+import { securityAuditService } from '@/lib/services/security-audit.service';
 
 export const { 
   handlers: clientHandlers, 
@@ -56,7 +57,22 @@ export const {
             }
           });
 
-          if (!user || !user.isActive) {
+          // User not found or inactive
+          if (!user) {
+            await securityAuditService.logFailedLogin(
+              validatedData.email,
+              'USER_NOT_FOUND',
+              'CLIENT'
+            );
+            return null;
+          }
+
+          if (!user.isActive) {
+            await securityAuditService.logFailedLogin(
+              validatedData.email,
+              'ACCOUNT_DISABLED',
+              'CLIENT'
+            );
             return null;
           }
 
@@ -67,6 +83,11 @@ export const {
           );
 
           if (!isValid) {
+            await securityAuditService.logFailedLogin(
+              validatedData.email,
+              'INVALID_PASSWORD',
+              'CLIENT'
+            );
             return null;
           }
 
@@ -90,9 +111,21 @@ export const {
 
             if (!success) {
               console.log('Invalid 2FA code for user:', user.email);
+              await securityAuditService.logFailedLogin(
+                user.email,
+                'INVALID_2FA',
+                'CLIENT'
+              );
               return null;
             }
           }
+
+          // Success - log it
+          await securityAuditService.logSuccessfulLogin(
+            user.id,
+            user.email,
+            'CLIENT'
+          );
 
           return {
             id: user.id,

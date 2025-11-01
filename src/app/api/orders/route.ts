@@ -13,6 +13,7 @@ import { rateManagementService } from '@/lib/services/rate-management.service';
 import { calculateOrderTotal, validateOrderLimits } from '@/lib/utils/order-calculations';
 import { orderLimitService } from '@/lib/services/order-limit.service';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
+import { userActivityService } from '@/lib/services/user-activity.service';
 import { z } from 'zod';
 
 /**
@@ -135,7 +136,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     });
 
-    // Log order creation
+    // Log order creation with FULL details
+    await userActivityService.logOrderCreated(
+      userId,
+      session.user.email || 'unknown',
+      order.id,
+      {
+        amount: order.cryptoAmount,
+        currency: order.currencyCode,
+        fiatCurrency: order.fiatCurrencyCode,
+        paymentMethod: order.paymentMethodCode || undefined
+      }
+    );
+
+    // Also log to old audit service for backward compatibility
     await auditService.logUserAction(
       userId,
       AUDIT_ACTIONS.ORDER_CREATED,
