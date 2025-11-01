@@ -15,6 +15,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { RolePermissionsEditor } from './role-editor';
 import { 
   Users, 
   UserPlus, 
@@ -803,6 +804,10 @@ function RolesPermissionsTab() {
   const [roles, setRoles] = useState<any[]>([]);
   const [permissions, setPermissions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedRole, setSelectedRole] = useState<any | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingPermissions, setEditingPermissions] = useState<string[]>([]);
 
   useEffect(() => {
     fetchRolesAndPermissions();
@@ -835,6 +840,96 @@ function RolesPermissionsTab() {
     }
   };
 
+  const handleEditRole = async (role: any) => {
+    try {
+      // Fetch role details with permissions
+      const response = await fetch(`/api/admin/roles/${role.code}`);
+      const data = await response.json();
+      
+      if (data.success && data.role) {
+        setSelectedRole(data.role);
+        setEditingPermissions(
+          data.role.permissions?.map((rp: any) => rp.permission.code) || []
+        );
+        setIsEditDialogOpen(true);
+      }
+    } catch (error) {
+      console.error('Failed to fetch role details:', error);
+      toast.error('Failed to load role details');
+    }
+  };
+
+  const handleCreateRole = () => {
+    setSelectedRole(null);
+    setEditingPermissions([]);
+    setIsCreateDialogOpen(true);
+  };
+
+  const handleSaveRole = async (roleData: any) => {
+    try {
+      const url = selectedRole 
+        ? `/api/admin/roles/${selectedRole.code}`
+        : '/api/admin/roles';
+      
+      const method = selectedRole ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...roleData,
+          permissions: editingPermissions,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(selectedRole ? 'Role updated successfully' : 'Role created successfully');
+        setIsEditDialogOpen(false);
+        setIsCreateDialogOpen(false);
+        fetchRolesAndPermissions();
+      } else {
+        toast.error(data.error || 'Failed to save role');
+      }
+    } catch (error) {
+      console.error('Failed to save role:', error);
+      toast.error('Failed to save role');
+    }
+  };
+
+  const handleDeleteRole = async (roleCode: string) => {
+    if (!confirm('Are you sure you want to delete this role? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/roles/${roleCode}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Role deleted successfully');
+        fetchRolesAndPermissions();
+      } else {
+        toast.error(data.error || 'Failed to delete role');
+      }
+    } catch (error) {
+      console.error('Failed to delete role:', error);
+      toast.error('Failed to delete role');
+    }
+  };
+
+  const togglePermission = (permCode: string) => {
+    setEditingPermissions(prev => 
+      prev.includes(permCode)
+        ? prev.filter(p => p !== permCode)
+        : [...prev, permCode]
+    );
+  };
+
   // Group permissions by category
   const permissionsByCategory = permissions.reduce((acc: any, perm: any) => {
     if (!acc[perm.category]) {
@@ -846,6 +941,18 @@ function RolesPermissionsTab() {
 
   return (
     <div className="space-y-6">
+      {/* Header with Create Button */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Roles & Permissions</h2>
+          <p className="text-muted-foreground">Manage system roles and their permissions</p>
+        </div>
+        <Button onClick={handleCreateRole}>
+          <UserPlus className="w-4 h-4 mr-2" />
+          Create Custom Role
+        </Button>
+      </div>
+
       {/* Roles Overview */}
       <div className="grid gap-4 md:grid-cols-3">
         {isLoading ? (
@@ -856,7 +963,7 @@ function RolesPermissionsTab() {
           </Card>
         ) : (
           roles.map((role) => (
-            <Card key={role.code}>
+            <Card key={role.code} className="relative">
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span>{role.name}</span>
@@ -867,7 +974,7 @@ function RolesPermissionsTab() {
                 <CardDescription>{role.description}</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Permissions:</span>
                     <Badge variant="outline">{role._count?.permissions || 0}</Badge>
@@ -875,6 +982,26 @@ function RolesPermissionsTab() {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Admins:</span>
                     <Badge variant="outline">{role._count?.admins || 0}</Badge>
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="flex-1"
+                      onClick={() => handleEditRole(role)}
+                    >
+                      <Edit className="w-3 h-3 mr-1" />
+                      Edit
+                    </Button>
+                    {!role.isSystem && (
+                      <Button 
+                        size="sm" 
+                        variant="destructive" 
+                        onClick={() => handleDeleteRole(role.code)}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -886,7 +1013,7 @@ function RolesPermissionsTab() {
       {/* Permissions by Category */}
       <Card>
         <CardHeader>
-          <CardTitle>All Permissions</CardTitle>
+          <CardTitle>All Permissions ({permissions.length})</CardTitle>
           <CardDescription>
             System permissions organized by category
           </CardDescription>
@@ -898,12 +1025,15 @@ function RolesPermissionsTab() {
             <div className="space-y-6">
               {Object.entries(permissionsByCategory).map(([category, perms]: [string, any]) => (
                 <div key={category}>
-                  <h3 className="font-semibold text-lg mb-3 capitalize">{category}</h3>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold text-lg capitalize">{category}</h3>
+                    <Badge variant="outline">{perms.length} permissions</Badge>
+                  </div>
                   <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
                     {perms.map((perm: any) => (
                       <div 
                         key={perm.code}
-                        className="flex items-start gap-2 p-3 rounded-lg border bg-card/50"
+                        className="flex items-start gap-2 p-3 rounded-lg border bg-card/50 hover:bg-card transition-colors"
                       >
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-sm">{perm.name}</div>
@@ -926,24 +1056,52 @@ function RolesPermissionsTab() {
         </CardContent>
       </Card>
 
-      {/* Role-Permission Matrix */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Role-Permission Matrix</CardTitle>
-          <CardDescription>
-            Overview of which permissions each role has
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading matrix...</div>
-          ) : (
-            <div className="text-sm text-muted-foreground">
-              Matrix view will be implemented here showing checkmarks for each role's permissions
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Edit Role Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Edit Role: {selectedRole?.name}</DialogTitle>
+            <DialogDescription>
+              {selectedRole?.isSystem 
+                ? 'System roles cannot be renamed or deleted, but you can modify their permissions'
+                : 'Modify role permissions and settings'
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto">
+            <RolePermissionsEditor
+              role={selectedRole}
+              permissions={permissions}
+              selectedPermissions={editingPermissions}
+              onTogglePermission={togglePermission}
+              onSave={handleSaveRole}
+              onCancel={() => setIsEditDialogOpen(false)}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Role Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Create Custom Role</DialogTitle>
+            <DialogDescription>
+              Create a new role with custom permissions
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto">
+            <RolePermissionsEditor
+              role={null}
+              permissions={permissions}
+              selectedPermissions={editingPermissions}
+              onTogglePermission={togglePermission}
+              onSave={handleSaveRole}
+              onCancel={() => setIsCreateDialogOpen(false)}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
