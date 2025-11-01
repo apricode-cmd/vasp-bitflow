@@ -1,12 +1,13 @@
 /**
  * Audit Logs Statistics API
  * 
- * GET - Get audit log statistics
+ * GET - Get audit log statistics from AdminAuditLog and UserAuditLog
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminPermission } from '@/lib/middleware/admin-auth';
-import { auditLogService } from '@/lib/services/audit-log.service';
+import { adminAuditLogService } from '@/lib/services/admin-audit-log.service';
+import { userAuditLogService } from '@/lib/services/user-audit-log.service';
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,7 +23,20 @@ export async function GET(request: NextRequest) {
       ? new Date(searchParams.get('endDate')!)
       : undefined;
 
-    const statistics = await auditLogService.getStatistics(startDate, endDate);
+    // Get statistics from both tables
+    const [adminStats, userStats] = await Promise.all([
+      adminAuditLogService.getStats(startDate, endDate),
+      userAuditLogService.getStats(startDate, endDate),
+    ]);
+
+    // Combine statistics
+    const statistics = {
+      admin: adminStats,
+      user: userStats,
+      combined: {
+        totalActions: adminStats.totalActions + userStats.totalActions,
+      },
+    };
 
     return NextResponse.json({
       success: true,

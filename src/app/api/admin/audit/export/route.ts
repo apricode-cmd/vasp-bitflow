@@ -1,12 +1,13 @@
 /**
  * Audit Logs Export API
  * 
- * GET - Export audit logs to CSV or JSON
+ * GET - Export audit logs to CSV or JSON from AdminAuditLog and UserAuditLog
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminPermission } from '@/lib/middleware/admin-auth';
-import { auditLogService, type AuditLogFilters } from '@/lib/services/audit-log.service';
+import { adminAuditLogService, type AdminAuditLogFilters } from '@/lib/services/admin-audit-log.service';
+import { userAuditLogService, type UserAuditLogFilters } from '@/lib/services/user-audit-log.service';
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
 
     // Parse format
-    const format = searchParams.get('format') || 'csv';
+    const format = (searchParams.get('format') || 'json') as 'csv' | 'json';
     if (!['csv', 'json'].includes(format)) {
       return NextResponse.json(
         { success: false, error: 'Invalid format. Use csv or json' },
@@ -24,55 +25,72 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Parse filters
-    const filters: AuditLogFilters = {
-      userId: searchParams.get('userId') || undefined,
-      adminId: searchParams.get('adminId') || undefined,
-      action: searchParams.get('action') || undefined,
-      entity: searchParams.get('entity') || undefined,
-      severity: (searchParams.get('severity') as any) || undefined,
-      isReviewable: searchParams.get('isReviewable')
-        ? searchParams.get('isReviewable') === 'true'
-        : undefined,
-      startDate: searchParams.get('startDate')
-        ? new Date(searchParams.get('startDate')!)
-        : undefined,
-      endDate: searchParams.get('endDate')
-        ? new Date(searchParams.get('endDate')!)
-        : undefined,
-      search: searchParams.get('search') || undefined,
-    };
+    // Parse log type (admin, user, or both)
+    const logType = searchParams.get('type') || 'admin'; // Default to admin logs
 
-    // Export logs
+    // Parse date filters
+    const startDate = searchParams.get('startDate')
+      ? new Date(searchParams.get('startDate')!)
+      : undefined;
+    const endDate = searchParams.get('endDate')
+      ? new Date(searchParams.get('endDate')!)
+      : undefined;
+
     let content: string;
     let contentType: string;
     let filename: string;
 
-    if (format === 'csv') {
-      content = await auditLogService.exportToCSV(filters);
-      contentType = 'text/csv';
-      filename = `audit-logs-${new Date().toISOString().split('T')[0]}.csv`;
+    if (logType === 'admin') {
+      // Export admin logs
+      const filters: AdminAuditLogFilters = {
+        adminId: searchParams.get('adminId') || undefined,
+        action: searchParams.get('action') || undefined,
+        entityType: searchParams.get('entity') || undefined,
+        severity: (searchParams.get('severity') as any) || undefined,
+        dateFrom: startDate,
+        dateTo: endDate,
+        search: searchParams.get('search') || undefined,
+      };
+
+      content = await adminAuditLogService.exportLogs(filters, format);
+      filename = `admin-audit-logs-${new Date().toISOString().split('T')[0]}.${format}`;
+    } else if (logType === 'user') {
+      // Export user logs
+      const filters: UserAuditLogFilters = {
+        userId: searchParams.get('userId') || undefined,
+        action: searchParams.get('action') || undefined,
+        entityType: searchParams.get('entity') || undefined,
+        dateFrom: startDate,
+        dateTo: endDate,
+        search: searchParams.get('search') || undefined,
+      };
+
+      content = await userAuditLogService.exportLogs(filters, format);
+      filename = `user-audit-logs-${new Date().toISOString().split('T')[0]}.${format}`;
     } else {
-      content = await auditLogService.exportToJSON(filters);
-      contentType = 'application/json';
-      filename = `audit-logs-${new Date().toISOString().split('T')[0]}.json`;
+      return NextResponse.json(
+        { success: false, error: 'Invalid type. Use admin or user' },
+        { status: 400 }
+      );
     }
 
-    // Log export action
-    await auditLogService.log({
+    contentType = format === 'csv' ? 'text/csv' : 'application/json';
+
+    // Log export action to AdminAuditLog
+    await adminAuditLogService.createLog({
       adminId: session.adminId,
-      userEmail: session.email,
-      userRole: session.roleCode,
+      adminEmail: session.email || 'unknown',
+      adminRole: session.roleCode || 'ADMIN',
       action: 'AUDIT_LOGS_EXPORTED',
-      entity: 'AuditLog',
+      entityType: 'AuditLog',
       entityId: 'export',
-      metadata: {
+      context: {
         format,
-        filters,
-        exportedBy: session.adminId,
+        logType,
+        filters: Object.fromEntries(searchParams.entries()),
+        ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
+        userAgent: request.headers.get('user-agent') || 'unknown',
       },
-      ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
-      userAgent: request.headers.get('user-agent') || 'unknown',
       severity: 'WARNING',
     });
 
