@@ -499,6 +499,7 @@ model AdminAuditLog {
   isReviewable Boolean @default(false)
   reviewedAt   DateTime?
   reviewedBy   String?
+  reviewNotes  String?
 
   // Immutability
   createdAt      DateTime @default(now())
