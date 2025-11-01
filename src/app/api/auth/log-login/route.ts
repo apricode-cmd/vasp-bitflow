@@ -7,7 +7,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
-import { UAParser } from 'ua-parser-js'; // Changed: Named import instead of default
+import { UAParser } from 'ua-parser-js';
+import { systemLogService } from '@/lib/services/system-log.service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,12 +30,17 @@ export async function POST(request: NextRequest) {
     const parser = new UAParser(userAgent);
     const uaResult = parser.getResult();
 
-    // Log login to SystemLog
-    await prisma.systemLog.create({
-      data: {
+    // Log login to SystemLog with NEW schema
+    await systemLogService.createLog({
+      source: 'NODE',
+      eventType: 'LOGIN',
+      level: 'INFO',
+      endpoint: '/api/auth/callback/credentials',
+      method: 'POST',
+      statusCode: 200,
+      metadata: {
         userId: session.user.id,
-        action: 'LOGIN',
-        path: '/api/auth/callback/credentials',
+        role: session.user.role,
         ipAddress,
         userAgent,
         deviceType: uaResult.device.type || 'desktop',
@@ -43,12 +49,8 @@ export async function POST(request: NextRequest) {
         os: uaResult.os.name || 'Unknown',
         osVersion: uaResult.os.version,
         isMobile: uaResult.device.type === 'mobile',
-        isBot: false,
-        metadata: {
-          action: 'User logged in',
-          role: session.user.role,
-        },
-      },
+        isBot: false
+      }
     });
 
     // Update lastLogin
