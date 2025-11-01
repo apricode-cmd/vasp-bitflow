@@ -520,6 +520,201 @@ export default function AuditPage(): JSX.Element {
     );
   }, [systemLogs, filters.search]);
 
+  // Admin audit log columns
+  const adminAuditColumns: ColumnDef<AdminAuditLog>[] = [
+    {
+      accessorKey: 'createdAt',
+      header: 'Time',
+      cell: ({ row }) => (
+        <div className="text-sm">
+          <div className="font-medium">
+            {new Date(row.original.createdAt).toLocaleTimeString()}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {new Date(row.original.createdAt).toLocaleDateString()}
+          </div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'admin',
+      header: 'Administrator',
+      cell: ({ row }) => {
+        const log = row.original;
+        return (
+          <div className="space-y-1">
+            <div className="text-sm font-medium">{log.adminEmail}</div>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-xs">
+                {log.adminRole}
+              </Badge>
+            </div>
+            <code className="text-xs text-muted-foreground">
+              ID: {log.adminId.slice(0, 8)}...
+            </code>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'action',
+      header: 'Action',
+      cell: ({ row }) => (
+        <div className="space-y-1">
+          <Badge variant={getActionVariant(row.original.action)}>
+            {row.original.action}
+          </Badge>
+          {row.original.mfaRequired && (
+            <div className="flex items-center gap-1 mt-1">
+              <Badge variant="secondary" className="text-xs gap-1">
+                <Shield className="h-3 w-3" />
+                MFA: {row.original.mfaMethod}
+              </Badge>
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'entityType',
+      header: 'Entity',
+      cell: ({ row }) => {
+        const EntityIcon = getEntityIcon(row.original.entityType);
+        return (
+          <div className="flex items-center gap-2">
+            <EntityIcon className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <div className="text-sm font-medium">{row.original.entityType}</div>
+              <code className="text-xs text-muted-foreground">
+                {row.original.entityId.slice(0, 8)}...
+              </code>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'severity',
+      header: 'Severity',
+      cell: ({ row }) => {
+        const severity = row.original.severity;
+        const variant = severity === 'CRITICAL' ? 'destructive' : severity === 'WARNING' ? 'default' : 'secondary';
+        return (
+          <Badge variant={variant} className="text-xs">
+            {severity}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: 'context',
+      header: 'IP Address',
+      cell: ({ row }) => {
+        const context = row.original.context as any;
+        return (
+          <span className="text-sm text-muted-foreground font-mono">
+            {context?.ipAddress || 'N/A'}
+          </span>
+        );
+      },
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => (
+        <Button 
+          variant="ghost" 
+          size="sm"
+          onClick={() => handleViewDetails(row.original)}
+        >
+          <FileText className="h-4 w-4" />
+        </Button>
+      ),
+    },
+  ];
+
+  // User audit log columns
+  const userAuditColumns: ColumnDef<UserAuditLog>[] = [
+    {
+      accessorKey: 'createdAt',
+      header: 'Time',
+      cell: ({ row }) => (
+        <div className="text-sm">
+          <div className="font-medium">
+            {new Date(row.original.createdAt).toLocaleTimeString()}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {new Date(row.original.createdAt).toLocaleDateString()}
+          </div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'user',
+      header: 'User',
+      cell: ({ row }) => {
+        const log = row.original;
+        return (
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <User className="h-3 w-3 text-blue-500" />
+              <span className="text-sm font-medium">Client</span>
+            </div>
+            <div className="text-xs text-muted-foreground">{log.userEmail}</div>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-xs">
+                {log.userRole}
+              </Badge>
+              <code className="text-xs text-muted-foreground">
+                {log.userId.slice(0, 8)}...
+              </code>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'action',
+      header: 'Action',
+      cell: ({ row }) => (
+        <Badge variant={getActionVariant(row.original.action)}>
+          {row.original.action}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: 'entityType',
+      header: 'Entity',
+      cell: ({ row }) => {
+        const EntityIcon = getEntityIcon(row.original.entityType);
+        return (
+          <div className="flex items-center gap-2">
+            <EntityIcon className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <div className="text-sm font-medium">{row.original.entityType}</div>
+              <code className="text-xs text-muted-foreground">
+                {row.original.entityId.slice(0, 8)}...
+              </code>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => (
+        <Button 
+          variant="ghost" 
+          size="sm"
+          onClick={() => handleViewDetails(row.original)}
+        >
+          <FileText className="h-4 w-4" />
+        </Button>
+      ),
+    },
+  ];
+
   const auditColumns: ColumnDef<AuditLog>[] = [
     {
       accessorKey: 'createdAt',
@@ -791,7 +986,7 @@ export default function AuditPage(): JSX.Element {
             </CardHeader>
             <CardContent>
               <DataTable
-                columns={auditColumns}
+                columns={adminAuditColumns}
                 data={adminLogs}
                 isLoading={isLoading}
                 searchKey="action"
@@ -815,7 +1010,7 @@ export default function AuditPage(): JSX.Element {
             </CardHeader>
             <CardContent>
               <DataTable
-                columns={auditColumns}
+                columns={userAuditColumns}
                 data={userLogs}
                 isLoading={isLoading}
                 searchKey="action"
@@ -846,7 +1041,7 @@ export default function AuditPage(): JSX.Element {
                 </div>
               ) : (
                 <DataTable
-                  columns={auditColumns}
+                  columns={adminAuditColumns}
                   data={criticalLogs}
                   isLoading={isLoading}
                   searchKey="action"
