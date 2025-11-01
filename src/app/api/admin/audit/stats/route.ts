@@ -1,44 +1,37 @@
 /**
- * Admin Audit Statistics API
+ * Audit Logs Statistics API
  * 
- * GET /api/admin/audit/stats - Get audit log statistics
+ * GET - Get audit log statistics
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminRole } from '@/lib/middleware/admin-auth';
-import { auditService } from '@/lib/services/audit.service';
+import { requireAdminPermission } from '@/lib/middleware/admin-auth';
+import { auditLogService } from '@/lib/services/audit-log.service';
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
+export async function GET(request: NextRequest) {
   try {
-    // Check admin permission
-    const sessionOrError = await requireAdminRole('ADMIN');
-    if (sessionOrError instanceof NextResponse) {
-      return sessionOrError;
-    }
+    const session = await requireAdminPermission('audit', 'read');
+    if (session instanceof NextResponse) return session;
 
-    // Parse optional date range
-    const searchParams = request.nextUrl.searchParams;
-    const fromDateStr = searchParams.get('fromDate');
-    const toDateStr = searchParams.get('toDate');
+    const { searchParams } = new URL(request.url);
 
-    const fromDate = fromDateStr ? new Date(fromDateStr) : undefined;
-    const toDate = toDateStr ? new Date(toDateStr) : undefined;
+    const startDate = searchParams.get('startDate')
+      ? new Date(searchParams.get('startDate')!)
+      : undefined;
+    const endDate = searchParams.get('endDate')
+      ? new Date(searchParams.get('endDate')!)
+      : undefined;
 
-    // Get statistics
-    const stats = await auditService.getAuditStatistics(fromDate, toDate);
+    const statistics = await auditLogService.getStatistics(startDate, endDate);
 
     return NextResponse.json({
       success: true,
-      data: stats
+      statistics,
     });
   } catch (error) {
-    console.error('Get audit statistics error:', error);
-
+    console.error('❌ Get audit statistics error:', error);
     return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to retrieve audit statistics'
-      },
+      { success: false, error: 'Internal server error' },
       { status: 500 }
     );
   }
