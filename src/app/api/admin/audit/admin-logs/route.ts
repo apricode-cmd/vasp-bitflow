@@ -78,6 +78,11 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('❌ Fetch admin logs error:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      error,
+    });
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -87,7 +92,11 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch admin logs' },
+      { 
+        success: false, 
+        error: 'Failed to fetch admin logs',
+        details: process.env.NODE_ENV === 'development' ? error instanceof Error ? error.message : String(error) : undefined
+      },
       { status: 500 }
     );
   }
