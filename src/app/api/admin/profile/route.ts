@@ -14,6 +14,11 @@ const profileUpdateSchema = z.object({
   firstName: z.string().min(2, 'First name must be at least 2 characters'),
   lastName: z.string().min(2, 'Last name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
+  workEmail: z.string().email('Invalid work email address').optional(),
+  jobTitle: z.string().min(2, 'Job title must be at least 2 characters'),
+  department: z.string().optional(),
+  locale: z.enum(['en', 'ru', 'uk', 'pl']).default('en'),
+  timezone: z.string().default('UTC'),
 });
 
 export async function GET(request: NextRequest) {
@@ -36,11 +41,18 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         email: true,
+        workEmail: true,
         firstName: true,
         lastName: true,
+        jobTitle: true,
+        department: true,
+        employeeId: true,
+        locale: true,
+        timezone: true,
         role: true,
         isActive: true,
         isSuspended: true,
+        status: true,
         lastLogin: true,
         authMethod: true,
         createdAt: true,
@@ -61,7 +73,14 @@ export async function GET(request: NextRequest) {
         firstName: admin.firstName,
         lastName: admin.lastName,
         email: admin.email,
+        workEmail: admin.workEmail,
+        jobTitle: admin.jobTitle,
+        department: admin.department,
+        employeeId: admin.employeeId,
+        locale: admin.locale,
+        timezone: admin.timezone,
         role: admin.role,
+        status: admin.status,
         isActive: admin.isActive,
         isSuspended: admin.isSuspended,
         lastLogin: admin.lastLogin,
@@ -113,6 +132,11 @@ export async function PUT(request: NextRequest) {
         data: {
           firstName: validatedData.firstName,
           lastName: validatedData.lastName,
+          workEmail: validatedData.workEmail,
+          jobTitle: validatedData.jobTitle,
+          department: validatedData.department,
+          locale: validatedData.locale,
+          timezone: validatedData.timezone,
         },
       });
 
@@ -128,6 +152,11 @@ export async function PUT(request: NextRequest) {
         newValue: JSON.stringify({
           firstName: validatedData.firstName,
           lastName: validatedData.lastName,
+          workEmail: validatedData.workEmail,
+          jobTitle: validatedData.jobTitle,
+          department: validatedData.department,
+          locale: validatedData.locale,
+          timezone: validatedData.timezone,
         }),
         ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
         userAgent: request.headers.get('user-agent') || 'unknown',
@@ -141,6 +170,12 @@ export async function PUT(request: NextRequest) {
         firstName: updatedAdmin.firstName,
         lastName: updatedAdmin.lastName,
         email: updatedAdmin.email,
+        workEmail: updatedAdmin.workEmail,
+        jobTitle: updatedAdmin.jobTitle,
+        department: updatedAdmin.department,
+        employeeId: updatedAdmin.employeeId,
+        locale: updatedAdmin.locale,
+        timezone: updatedAdmin.timezone,
       },
     });
   } catch (error) {
