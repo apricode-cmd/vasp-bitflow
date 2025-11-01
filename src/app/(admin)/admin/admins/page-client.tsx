@@ -215,10 +215,11 @@ export function AdminManagementClient({
     }
   };
 
-  // Invite new admin
+  // Invite new admin (with Step-up MFA)
   const onInviteSubmit = async (data: InviteAdminFormData) => {
     setActionLoading(true);
     try {
+      // First request - will trigger MFA challenge
       const response = await fetch('/api/admin/admins/invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -227,7 +228,46 @@ export function AdminManagementClient({
 
       const result = await response.json();
 
-      if (result.success) {
+      // If MFA is required, handle it
+      if (result.requiresMfa) {
+        toast.info('MFA verification required');
+        
+        // Import startAuthentication dynamically
+        const { startAuthentication } = await import('@simplewebauthn/browser');
+        
+        try {
+          // Prompt for MFA
+          const mfaResponse = await startAuthentication(result.options);
+          
+          // Retry with MFA response
+          const mfaVerifyResponse = await fetch('/api/admin/admins/invite', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...data,
+              mfaChallengeId: result.challengeId,
+              mfaResponse,
+            }),
+          });
+
+          const mfaResult = await mfaVerifyResponse.json();
+
+          if (mfaResult.success) {
+            toast.success('Admin invited successfully! (MFA verified)');
+            setInviteLink(mfaResult.inviteLink);
+            setInviteDialogOpen(false);
+            setInviteLinkDialogOpen(true);
+            inviteForm.reset();
+            loadAdmins();
+          } else {
+            toast.error(mfaResult.error || 'MFA verification failed');
+          }
+        } catch (mfaError) {
+          console.error('MFA error:', mfaError);
+          toast.error('MFA verification cancelled or failed');
+        }
+      } else if (result.success) {
+        // Success without MFA (shouldn't happen, but handle it)
         toast.success('Admin invited successfully!');
         setInviteLink(result.inviteLink);
         setInviteDialogOpen(false);

@@ -2,11 +2,13 @@
  * Admin Invite API
  * 
  * POST: Generate invite link for new admin (SUPER_ADMIN only)
+ * Requires Step-up MFA for security
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminRole } from '@/lib/middleware/admin-auth';
+import { stepUpMfaService } from '@/lib/services/step-up-mfa.service';
 import { z } from 'zod';
 import crypto from 'crypto';
 
@@ -17,6 +19,9 @@ const inviteAdminSchema = z.object({
   jobTitle: z.string().min(2, 'Job title must be at least 2 characters'),
   role: z.enum(['ADMIN', 'COMPLIANCE', 'TREASURY_APPROVER', 'FINANCE', 'SUPPORT', 'READ_ONLY']),
   department: z.string().optional(),
+  // Step-up MFA fields
+  mfaChallengeId: z.string().optional(),
+  mfaResponse: z.any().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -27,6 +32,41 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const validatedData = inviteAdminSchema.parse(body);
+
+    // ✅ Step-up MFA: CREATE_ADMIN action requires MFA
+    if (!validatedData.mfaChallengeId || !validatedData.mfaResponse) {
+      // First call - request MFA challenge
+      const challenge = await stepUpMfaService.requestChallenge(
+        session.adminId,
+        'CREATE_ADMIN',
+        'Admin',
+        'invite',
+        {
+          email: validatedData.email,
+          role: validatedData.role,
+        }
+      );
+
+      return NextResponse.json({
+        success: false,
+        requiresMfa: true,
+        challengeId: challenge.challengeId,
+        options: challenge.options,
+      });
+    }
+
+    // Verify MFA
+    const verified = await stepUpMfaService.verifyChallenge(
+      validatedData.mfaChallengeId,
+      validatedData.mfaResponse
+    );
+
+    if (!verified) {
+      return NextResponse.json(
+        { success: false, error: 'MFA verification failed' },
+        { status: 403 }
+      );
+    }
 
     // Check if admin with this email already exists
     const existingAdmin = await prisma.admin.findFirst({
@@ -53,7 +93,7 @@ export async function POST(request: NextRequest) {
     const setupTokenExpiry = new Date();
     setupTokenExpiry.setDate(setupTokenExpiry.getDate() + 7);
 
-    // Create admin with PENDING status
+    // Create admin with SUSPENDED status (until Passkey setup)
     const newAdmin = await prisma.admin.create({
       data: {
         email: validatedData.email,
@@ -63,14 +103,15 @@ export async function POST(request: NextRequest) {
         jobTitle: validatedData.jobTitle,
         department: validatedData.department,
         role: validatedData.role,
-        status: 'SUSPENDED', // Suspended until they complete setup
+        roleCode: validatedData.role,
+        status: 'SUSPENDED', // Will be activated after Passkey setup
         isActive: false,
-        authMethod: 'PASSKEY',
+        authMethod: 'PASSKEY', // Force Passkey authentication
         setupToken: hashedToken,
         setupTokenExpiry,
-        invitedBy: session.user.id,
+        invitedBy: session.adminId,
         invitedAt: new Date(),
-        createdBy: session.user.id,
+        createdBy: session.adminId,
       },
     });
 
@@ -78,20 +119,31 @@ export async function POST(request: NextRequest) {
     const origin = request.headers.get('origin') || process.env.NEXTAUTH_URL || 'http://localhost:3000';
     const inviteLink = `${origin}/admin/auth/setup-passkey?token=${setupToken}&email=${encodeURIComponent(validatedData.email)}`;
 
-    // Log to audit
-    await prisma.auditLog.create({
+    // Log to AdminAuditLog
+    await prisma.adminAuditLog.create({
       data: {
-        adminId: session.user.id,
+        adminId: session.adminId,
+        adminEmail: session.email,
+        adminRole: session.roleCode,
         action: 'ADMIN_INVITED',
-        entity: 'ADMIN',
+        entityType: 'Admin',
         entityId: newAdmin.id,
-        newValue: JSON.stringify({
+        diffAfter: {
           email: validatedData.email,
           role: validatedData.role,
           jobTitle: validatedData.jobTitle,
-        }),
-        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
-        userAgent: request.headers.get('user-agent') || 'unknown',
+          firstName: validatedData.firstName,
+          lastName: validatedData.lastName,
+        },
+        context: {
+          ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+          userAgent: request.headers.get('user-agent') || 'unknown',
+        },
+        mfaRequired: true,
+        mfaMethod: 'WEBAUTHN',
+        mfaVerifiedAt: new Date(),
+        mfaEventId: validatedData.mfaChallengeId,
+        severity: 'WARNING', // Creating admin is important action
       },
     });
 
@@ -103,6 +155,7 @@ export async function POST(request: NextRequest) {
         id: newAdmin.id,
         email: newAdmin.email,
         role: newAdmin.role,
+        expiresAt: setupTokenExpiry.toISOString(),
       },
     });
   } catch (error) {

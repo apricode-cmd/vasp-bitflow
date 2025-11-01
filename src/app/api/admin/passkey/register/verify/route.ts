@@ -77,16 +77,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Clear setup token after successful first-time registration
+    // Clear setup token and ACTIVATE admin after successful first-time registration
     if (!session?.user && email) {
       await prisma.admin.update({
         where: { id: adminId },
         data: {
           setupToken: null,
-          setupTokenExpiry: null
+          setupTokenExpiry: null,
+          status: 'ACTIVE', // ✅ Activate admin after successful Passkey setup
+          isActive: true,
         }
       });
-      console.log('✅ Setup token cleared for:', email);
+      console.log('✅ Admin activated after Passkey setup:', email);
+      
+      // Log MFA Event
+      await prisma.mfaEvent.create({
+        data: {
+          actorId: adminId,
+          actorType: 'ADMIN',
+          actionType: 'REGISTER',
+          method: 'WEBAUTHN',
+          result: 'SUCCESS',
+          ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+          userAgent: request.headers.get('user-agent') || 'unknown',
+          credentialIdHash: result.credentialId ? 
+            require('crypto').createHash('sha256').update(result.credentialId).digest('hex') : 
+            undefined,
+        }
+      });
     }
 
     return NextResponse.json({
