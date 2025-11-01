@@ -9,6 +9,7 @@
 
 import { NextResponse } from 'next/server';
 import { getAdminSessionData, type AdminSessionData } from '@/lib/services/admin-session.service';
+import { permissionService } from '@/lib/services/permission.service';
 import { AdminRole } from '@prisma/client';
 
 /**
@@ -107,18 +108,19 @@ export async function requireAdminRole(role: AdminRole | AdminRole[]) {
 /**
  * Require admin authentication with permission check
  * 
- * @param permission - Required permission code
+ * @param resource - Resource name (e.g., 'orders', 'kyc', 'users')
+ * @param action - Action name (e.g., 'read', 'create', 'delete')
  * @returns Admin session (NextAuth-style wrapper) or 401/403 error response
  * 
  * @example
- * export async function POST(request: NextRequest) {
- *   const session = await requireAdminPermission('users.delete');
+ * export async function DELETE(request: NextRequest) {
+ *   const session = await requireAdminPermission('users', 'delete');
  *   if (session instanceof NextResponse) return session;
  *   
- *   // Admin has users.delete permission
+ *   // Admin has users:delete permission
  * }
  */
-export async function requireAdminPermission(permission: string) {
+export async function requireAdminPermission(resource: string, action: string) {
   const sessionData = await getAdminSessionData();
 
   if (!sessionData) {
@@ -128,9 +130,22 @@ export async function requireAdminPermission(permission: string) {
     );
   }
 
-  // TODO: Implement permission check via PermissionService
-  // For now, allow all authenticated admins
-  // Later: check sessionData.role -> role.permissions
+  // Check permission via PermissionService
+  const hasPermission = await permissionService.hasPermission(
+    sessionData.adminId,
+    resource,
+    action
+  );
+
+  if (!hasPermission) {
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: `Permission denied: ${resource}:${action}` 
+      },
+      { status: 403 }
+    );
+  }
 
   return wrapSession(sessionData);
 }

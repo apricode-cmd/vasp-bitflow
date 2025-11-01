@@ -1,277 +1,346 @@
 /**
  * Permission Service
  * 
- * Manages role-based permissions for admins
- * Implements caching for performance
+ * Сервис для проверки прав доступа администраторов на основе RBAC (Role-Based Access Control)
+ * 
+ * @module services/permission
  */
 
 import { prisma } from '@/lib/prisma';
-import { AdminRole } from '@prisma/client';
 
-// Cache for permissions (in-memory, можно заменить на Redis в production)
-const permissionsCache = new Map<string, Set<string>>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-const cacheTimestamps = new Map<string, number>();
+export class PermissionService {
+  /**
+   * Проверяет, имеет ли администратор определенное право
+   * 
+   * @param adminId - ID администратора
+   * @param resource - Ресурс (orders, kyc, users, settings, etc.)
+   * @param action - Действие (read, create, update, delete, approve, etc.)
+   * @returns true если право есть, false если нет
+   * 
+   * @example
+   * ```ts
+   * const canApproveKYC = await permissionService.hasPermission(
+   *   adminId,
+   *   'kyc',
+   *   'approve'
+   * );
+   * ```
+   */
+  async hasPermission(
+    adminId: string,
+    resource: string,
+    action: string
+  ): Promise<boolean> {
+    try {
+      // Получить админа с его ролью
+      const admin = await prisma.admin.findUnique({
+        where: { id: adminId },
+        select: {
+          roleCode: true,
+          status: true,
+          isActive: true,
+          isSuspended: true,
+        },
+      });
 
-/**
- * Get all permissions for a specific role
- */
-export async function getRolePermissions(role: AdminRole): Promise<string[]> {
-  const cacheKey = `role:${role}`;
-  
-  // Check cache
-  const cached = permissionsCache.get(cacheKey);
-  const timestamp = cacheTimestamps.get(cacheKey);
-  
-  if (cached && timestamp && Date.now() - timestamp < CACHE_TTL) {
-    return Array.from(cached);
-  }
+      // Проверить статус админа
+      if (!admin) {
+        return false;
+      }
 
-  // Fetch from DB
-  const rolePermissions = await prisma.rolePermission.findMany({
-    where: { roleCode: role },
-    select: { permissionCode: true }
-  });
+      if (!admin.isActive || admin.isSuspended || admin.status !== 'ACTIVE') {
+        return false;
+      }
 
-  const permissions = rolePermissions.map(rp => rp.permissionCode);
-  
-  // Update cache
-  permissionsCache.set(cacheKey, new Set(permissions));
-  cacheTimestamps.set(cacheKey, Date.now());
+      if (!admin.roleCode) {
+        // Fallback: если roleCode не установлен, нет прав
+        return false;
+      }
 
-  return permissions;
-}
+      // Проверить наличие права в роли
+      const permission = await prisma.rolePermission.findFirst({
+        where: {
+          roleCode: admin.roleCode,
+          permission: {
+            resource,
+            action,
+          },
+        },
+        include: {
+          permission: true,
+        },
+      });
 
-/**
- * Get all permissions for an admin (by admin ID)
- */
-export async function getAdminPermissions(adminId: string): Promise<string[]> {
-  const cacheKey = `admin:${adminId}`;
-  
-  // Check cache
-  const cached = permissionsCache.get(cacheKey);
-  const timestamp = cacheTimestamps.get(cacheKey);
-  
-  if (cached && timestamp && Date.now() - timestamp < CACHE_TTL) {
-    return Array.from(cached);
-  }
-
-  // Fetch admin and role
-  const admin = await prisma.admin.findUnique({
-    where: { id: adminId },
-    select: { role: true, isActive: true, isSuspended: true }
-  });
-
-  if (!admin || !admin.isActive || admin.isSuspended) {
-    return [];
-  }
-
-  // Get role permissions
-  const permissions = await getRolePermissions(admin.role);
-  
-  // Update cache
-  permissionsCache.set(cacheKey, new Set(permissions));
-  cacheTimestamps.set(cacheKey, Date.now());
-
-  return permissions;
-}
-
-/**
- * Check if admin has a specific permission
- */
-export async function hasPermission(
-  adminId: string,
-  resource: string,
-  action: string
-): Promise<boolean> {
-  const permissionCode = `${resource}:${action}`;
-  const permissions = await getAdminPermissions(adminId);
-  
-  return permissions.includes(permissionCode);
-}
-
-/**
- * Check if admin has ANY of the specified permissions
- */
-export async function hasAnyPermission(
-  adminId: string,
-  permissionCodes: string[]
-): Promise<boolean> {
-  const permissions = await getAdminPermissions(adminId);
-  const permissionSet = new Set(permissions);
-  
-  return permissionCodes.some(code => permissionSet.has(code));
-}
-
-/**
- * Check if admin has ALL specified permissions
- */
-export async function hasAllPermissions(
-  adminId: string,
-  permissionCodes: string[]
-): Promise<boolean> {
-  const permissions = await getAdminPermissions(adminId);
-  const permissionSet = new Set(permissions);
-  
-  return permissionCodes.every(code => permissionSet.has(code));
-}
-
-/**
- * Check if role has a specific permission
- */
-export async function roleHasPermission(
-  role: AdminRole,
-  resource: string,
-  action: string
-): Promise<boolean> {
-  const permissionCode = `${resource}:${action}`;
-  const permissions = await getRolePermissions(role);
-  
-  return permissions.includes(permissionCode);
-}
-
-/**
- * Get full permission details for display
- */
-export async function getPermissionDetails(permissionCode: string) {
-  return await prisma.permission.findUnique({
-    where: { code: permissionCode }
-  });
-}
-
-/**
- * Get all permissions grouped by category
- */
-export async function getAllPermissionsGrouped() {
-  const permissions = await prisma.permission.findMany({
-    orderBy: [
-      { category: 'asc' },
-      { name: 'asc' }
-    ]
-  });
-
-  // Group by category
-  const grouped = permissions.reduce((acc, perm) => {
-    if (!acc[perm.category]) {
-      acc[perm.category] = [];
+      return !!permission;
+    } catch (error) {
+      console.error('❌ hasPermission error:', error);
+      return false;
     }
-    acc[perm.category].push(perm);
-    return acc;
-  }, {} as Record<string, typeof permissions>);
+  }
 
-  return grouped;
+  /**
+   * Проверяет, имеет ли администратор право по коду (например, 'orders:read')
+   * 
+   * @param adminId - ID администратора
+   * @param permissionCode - Код права (формат: resource:action)
+   * @returns true если право есть, false если нет
+   * 
+   * @example
+   * ```ts
+   * const canRead = await permissionService.hasPermissionByCode(
+   *   adminId,
+   *   'orders:read'
+   * );
+   * ```
+   */
+  async hasPermissionByCode(
+    adminId: string,
+    permissionCode: string
+  ): Promise<boolean> {
+    const [resource, action] = permissionCode.split(':');
+    
+    if (!resource || !action) {
+      console.error('❌ Invalid permission code format:', permissionCode);
+      return false;
+    }
+
+    return this.hasPermission(adminId, resource, action);
+  }
+
+  /**
+   * Получить все права администратора
+   * 
+   * @param adminId - ID администратора
+   * @returns Массив кодов прав (например, ['orders:read', 'kyc:approve'])
+   * 
+   * @example
+   * ```ts
+   * const permissions = await permissionService.getAdminPermissions(adminId);
+   * // ['orders:read', 'orders:create', 'kyc:read', ...]
+   * ```
+   */
+  async getAdminPermissions(adminId: string): Promise<string[]> {
+    try {
+      const admin = await prisma.admin.findUnique({
+        where: { id: adminId },
+        select: {
+          roleCode: true,
+          roleModel: {
+            include: {
+              permissions: {
+                include: {
+                  permission: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!admin || !admin.roleModel) {
+        return [];
+      }
+
+      return admin.roleModel.permissions.map(rp => rp.permission.code);
+    } catch (error) {
+      console.error('❌ getAdminPermissions error:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Получить детальную информацию о правах администратора
+   * 
+   * @param adminId - ID администратора
+   * @returns Массив объектов с полной информацией о правах
+   */
+  async getAdminPermissionsDetailed(adminId: string) {
+    try {
+      const admin = await prisma.admin.findUnique({
+        where: { id: adminId },
+        select: {
+          roleCode: true,
+          roleModel: {
+            include: {
+              permissions: {
+                include: {
+                  permission: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!admin || !admin.roleModel) {
+        return [];
+      }
+
+      return admin.roleModel.permissions.map(rp => ({
+        code: rp.permission.code,
+        name: rp.permission.name,
+        resource: rp.permission.resource,
+        action: rp.permission.action,
+        category: rp.permission.category,
+        description: rp.permission.description,
+      }));
+    } catch (error) {
+      console.error('❌ getAdminPermissionsDetailed error:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Требовать наличие права (throw error если нет)
+   * Используется в API routes для проверки доступа
+   * 
+   * @param adminId - ID администратора
+   * @param resource - Ресурс
+   * @param action - Действие
+   * @throws Error если права нет
+   * 
+   * @example
+   * ```ts
+   * await permissionService.requirePermission(
+   *   session.user.id,
+   *   'kyc',
+   *   'approve'
+   * );
+   * // Если права нет, будет выброшена ошибка ForbiddenError
+   * ```
+   */
+  async requirePermission(
+    adminId: string,
+    resource: string,
+    action: string
+  ): Promise<void> {
+    const allowed = await this.hasPermission(adminId, resource, action);
+
+    if (!allowed) {
+      throw new ForbiddenError(
+        `Permission denied: ${resource}:${action}`
+      );
+    }
+  }
+
+  /**
+   * Проверить множественные права
+   * 
+   * @param adminId - ID администратора
+   * @param permissions - Массив прав для проверки ['orders:read', 'kyc:approve']
+   * @returns Объект с результатами проверки каждого права
+   * 
+   * @example
+   * ```ts
+   * const checks = await permissionService.checkMultiplePermissions(
+   *   adminId,
+   *   ['orders:read', 'orders:create', 'kyc:approve']
+   * );
+   * // { 'orders:read': true, 'orders:create': false, 'kyc:approve': true }
+   * ```
+   */
+  async checkMultiplePermissions(
+    adminId: string,
+    permissions: string[]
+  ): Promise<Record<string, boolean>> {
+    const results: Record<string, boolean> = {};
+
+    for (const permissionCode of permissions) {
+      results[permissionCode] = await this.hasPermissionByCode(
+        adminId,
+        permissionCode
+      );
+    }
+
+    return results;
+  }
+
+  /**
+   * Получить все доступные роли
+   * 
+   * @returns Список всех ролей в системе
+   */
+  async getAllRoles() {
+    return prisma.roleModel.findMany({
+      where: { isActive: true },
+      orderBy: { priority: 'desc' },
+      include: {
+        _count: {
+          select: { permissions: true, admins: true },
+        },
+      },
+    });
+  }
+
+  /**
+   * Получить детальную информацию о роли
+   * 
+   * @param roleCode - Код роли
+   * @returns Роль с правами
+   */
+  async getRoleDetails(roleCode: string) {
+    return prisma.roleModel.findUnique({
+      where: { code: roleCode },
+      include: {
+        permissions: {
+          include: {
+            permission: true,
+          },
+        },
+        _count: {
+          select: { admins: true },
+        },
+      },
+    });
+  }
+
+  /**
+   * Получить все доступные права
+   * 
+   * @param category - Фильтр по категории (опционально)
+   * @returns Список всех прав
+   */
+  async getAllPermissions(category?: string) {
+    return prisma.permission.findMany({
+      where: category ? { category } : undefined,
+      orderBy: [{ category: 'asc' }, { resource: 'asc' }, { action: 'asc' }],
+    });
+  }
+
+  /**
+   * Получить права по категориям (сгруппированные)
+   * 
+   * @returns Объект с правами, сгруппированными по категориям
+   */
+  async getPermissionsByCategory() {
+    const permissions = await prisma.permission.findMany({
+      orderBy: [{ category: 'asc' }, { resource: 'asc' }, { action: 'asc' }],
+    });
+
+    const grouped: Record<string, any[]> = {};
+
+    for (const permission of permissions) {
+      if (!grouped[permission.category]) {
+        grouped[permission.category] = [];
+      }
+      grouped[permission.category].push(permission);
+    }
+
+    return grouped;
+  }
 }
 
 /**
- * Clear permissions cache (call after role changes)
+ * Custom Error для отказа в доступе
  */
-export function clearPermissionsCache(adminId?: string, role?: AdminRole) {
-  if (adminId) {
-    permissionsCache.delete(`admin:${adminId}`);
-    cacheTimestamps.delete(`admin:${adminId}`);
-  }
-  
-  if (role) {
-    permissionsCache.delete(`role:${role}`);
-    cacheTimestamps.delete(`role:${role}`);
-  }
-  
-  if (!adminId && !role) {
-    // Clear all cache
-    permissionsCache.clear();
-    cacheTimestamps.clear();
+export class ForbiddenError extends Error {
+  statusCode = 403;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'ForbiddenError';
   }
 }
 
-/**
- * Get permissions required for specific action
- * Used to show which permissions are needed
- */
-export function getRequiredPermissions(action: string): string[] {
-  // Map of common actions to required permissions
-  const actionPermissions: Record<string, string[]> = {
-    'approve_kyc': ['kyc:approve'],
-    'reject_kyc': ['kyc:reject'],
-    'approve_payout': ['payouts:approve'], // Step-up MFA required
-    'create_api_key': ['api_keys:create'], // Step-up MFA required
-    'change_admin_role': ['admins:change_role'], // Step-up MFA required
-    'change_limits': ['settings:limits'], // Step-up MFA required
-    'suspend_user': ['users:suspend'],
-    'submit_str': ['aml:submit_str'],
-    'manage_bank_accounts': ['finance:bank_accounts'],
-    'terminate_session': ['sessions:terminate'],
-    'impersonate_user': ['users:impersonate'], // SUPER_ADMIN only
-  };
-
-  return actionPermissions[action] || [];
-}
-
-/**
- * Check if action requires Step-up MFA
- */
-export function requiresStepUpMfa(permissionCode: string): boolean {
-  const stepUpRequired = [
-    'payouts:approve',
-    'api_keys:create',
-    'admins:change_role',
-    'settings:limits',
-    'users:impersonate',
-  ];
-
-  return stepUpRequired.includes(permissionCode);
-}
-
-/**
- * Validate admin can perform action (with detailed error)
- */
-export async function validatePermission(
-  adminId: string,
-  resource: string,
-  action: string
-): Promise<{ allowed: boolean; reason?: string }> {
-  // Check if admin exists and is active
-  const admin = await prisma.admin.findUnique({
-    where: { id: adminId },
-    select: { isActive: true, isSuspended: true, role: true }
-  });
-
-  if (!admin) {
-    return { allowed: false, reason: 'Admin not found' };
-  }
-
-  if (!admin.isActive) {
-    return { allowed: false, reason: 'Admin account is inactive' };
-  }
-
-  if (admin.isSuspended) {
-    return { allowed: false, reason: 'Admin account is suspended' };
-  }
-
-  // Check permission
-  const hasAccess = await hasPermission(adminId, resource, action);
-
-  if (!hasAccess) {
-    return { 
-      allowed: false, 
-      reason: `Missing permission: ${resource}:${action}` 
-    };
-  }
-
-  return { allowed: true };
-}
-
-export const PermissionService = {
-  getRolePermissions,
-  getAdminPermissions,
-  hasPermission,
-  hasAnyPermission,
-  hasAllPermissions,
-  roleHasPermission,
-  getPermissionDetails,
-  getAllPermissionsGrouped,
-  clearPermissionsCache,
-  getRequiredPermissions,
-  requiresStepUpMfa,
-  validatePermission
-};
-
+// Singleton instance
+export const permissionService = new PermissionService();
