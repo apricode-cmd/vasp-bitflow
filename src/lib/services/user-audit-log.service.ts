@@ -19,7 +19,7 @@ import crypto from 'crypto';
 export interface CreateUserAuditLogInput {
   userId: string;
   userEmail: string;
-  userRole: string;
+  userRole?: string;
   action: string;
   entityType: string;
   entityId: string;
@@ -36,7 +36,7 @@ export interface CreateUserAuditLogInput {
   mfaMethod?: string;
   mfaVerifiedAt?: Date;
   mfaEventId?: string;
-  severity?: 'INFO' | 'WARNING' | 'CRITICAL';
+  // Note: UserAuditLog does NOT have severity field (only AdminAuditLog has it)
 }
 
 export interface UserAuditLogFilters {
@@ -81,7 +81,7 @@ class UserAuditLogService {
         mfaMethod: input.mfaMethod,
         mfaVerifiedAt: input.mfaVerifiedAt,
         mfaEventId: input.mfaEventId,
-        severity: input.severity || 'INFO',
+        // Note: severity field removed - UserAuditLog doesn't have it
         freezeChecksum,
       },
     });

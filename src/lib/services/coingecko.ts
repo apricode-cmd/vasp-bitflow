@@ -8,6 +8,7 @@
 import axios, { AxiosInstance } from 'axios';
 import { config } from '@/lib/config';
 import { prisma } from '@/lib/prisma';
+import { systemLogService } from './system-log.service';
 
 // In-memory cache for rates (30 seconds TTL)
 const CACHE_DURATION_MS = 30 * 1000;
@@ -116,6 +117,7 @@ class CoinGeckoService {
     }
 
     try {
+      const startTime = Date.now();
       console.log('🔄 Fetching fresh rates from CoinGecko API' + (forceRefresh ? ' (forced refresh)' : '') + '...');
       
       // ✅ Get active currencies from database dynamically
@@ -155,6 +157,7 @@ class CoinGeckoService {
 
       // Fetch prices from CoinGecko
       const response = await this.client.get('/simple/price', { params });
+      const responseTime = Date.now() - startTime;
 
       const data: CoinGeckoResponse = response.data;
       console.log('📊 CoinGecko API response:', {
@@ -162,6 +165,25 @@ class CoinGeckoService {
         dataKeys: Object.keys(data),
         timestamp: new Date().toISOString()
       });
+
+      // Log API call to SystemLog
+      await systemLogService.createLog({
+        source: 'COINGECKO_API',
+        eventType: 'API_CALL',
+        level: 'INFO',
+        endpoint: '/simple/price',
+        method: 'GET',
+        statusCode: response.status,
+        responseTime,
+        payload: {
+          coins: currencies.map(c => c.code),
+          vs_currencies: ['EUR', 'PLN']
+        },
+        metadata: {
+          ratesCount: Object.keys(data).length,
+          forceRefresh
+        }
+      }).catch(err => console.error('Failed to log API call:', err));
 
       // ✅ Dynamically build rates object from database currencies
       const rates: CoinGeckoRates = {

@@ -102,7 +102,7 @@ class SystemLogService {
    * Create system log with NEW schema (source, eventType, level)
    */
   async createLog(options: {
-    source: 'KYCAID_WEBHOOK' | 'RAPYD_WEBHOOK' | 'TATUM_API' | 'NODE' | 'API' | 'SYSTEM';
+    source: 'KYCAID_WEBHOOK' | 'RAPYD_WEBHOOK' | 'TATUM_API' | 'COINGECKO_API' | 'NODE' | 'API' | 'SYSTEM';
     eventType: 'WEBHOOK_RECEIVED' | 'API_CALL' | 'INTEGRATION_SYNC' | 'API_REQUEST' | 'LOGIN' | 'ERROR';
     level: 'INFO' | 'WARN' | 'ERROR' | 'CRITICAL';
     endpoint?: string;
