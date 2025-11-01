@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminRole, getCurrentUserId } from '@/lib/middleware/admin-auth';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 import { handleStepUpMfa } from '@/lib/middleware/step-up-mfa';
@@ -108,19 +108,12 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
-    const sessionOrError = await requireAdminRole('ADMIN');
-    if (sessionOrError instanceof NextResponse) {
-      return sessionOrError;
+    const session = await requireAdminRole('ADMIN');
+    if (session instanceof NextResponse) {
+      return session;
     }
 
     const { id } = await params;
-    const adminId = await getCurrentUserId();
-    if (!adminId) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
 
     const body = await request.json();
     const validated = updatePayOutSchema.parse(body);
@@ -148,7 +141,7 @@ export async function PATCH(
     if (isCriticalAction) {
       const mfaResult = await handleStepUpMfa(
         body,
-        adminId,
+        session.user.id,
         'APPROVE_PAYOUT',
         'PayOut',
         id
@@ -182,12 +175,12 @@ export async function PATCH(
 
       // Auto-set processing fields if status is SENT or PROCESSING
       if ((validated.status === 'SENT' || validated.status === 'PROCESSING') && !existing.processedBy) {
-        updateData.processedBy = adminId;
+        updateData.processedBy = session.user.id;
         updateData.processedAt = new Date();
         
         // For SoD (Separation of Duties): if approvalRequired is set
         if (existing.approvalRequired) {
-          updateData.approvedBy = adminId;
+          updateData.approvedBy = session.user.id;
           updateData.approvedAt = new Date();
         }
       }
@@ -241,7 +234,7 @@ export async function PATCH(
 
     // Log audit (with MFA verification for critical actions)
     await auditService.logAdminAction(
-      adminId,
+      session.user.id,
       isCriticalAction ? AUDIT_ACTIONS.ORDER_COMPLETED : AUDIT_ACTIONS.ORDER_STATUS_CHANGED,
       AUDIT_ENTITIES.ORDER,
       updated.orderId,

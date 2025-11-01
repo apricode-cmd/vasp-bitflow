@@ -19,9 +19,9 @@ interface RouteContext {
 
 export async function PATCH(request: NextRequest, { params }: RouteContext): Promise<NextResponse> {
   // Check admin authorization
-  const sessionOrError = await requireAdminRole('ADMIN');
-  if (sessionOrError instanceof NextResponse) {
-    return sessionOrError;
+  const session = await requireAdminRole('ADMIN');
+  if (session instanceof NextResponse) {
+    return session;
   }
 
   try {
@@ -29,15 +29,6 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
     
     // Validate input
     const validatedData = updateOrderStatusSchema.parse(body);
-
-    // Get admin ID
-    const adminId = await getCurrentUserId();
-    if (!adminId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
 
     // Check if order exists with full data
     const order = await prisma.order.findUnique({
@@ -135,7 +126,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
               transactionHash: validatedData.payOutData.transactionHash,
               paymentMethodCode: validatedData.payOutData.paymentMethodCode,
               status: 'SENT',
-              processedBy: adminId,
+              processedBy: session.user.id,
               processedAt: new Date()
             }
           });
@@ -149,7 +140,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
           status: newStatus,
           adminNotes: validatedData.adminNotes,
           transactionHash: validatedData.transactionHash || validatedData.payOutData?.transactionHash,
-          processedBy: adminId,
+          processedBy: session.user.id,
           processedAt: newStatus === 'COMPLETED' ? new Date() : order.processedAt
         },
         include: {
@@ -183,7 +174,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
             orderId: params.id,
             oldStatus,
             newStatus,
-            changedBy: adminId,
+            changedBy: session.user.id,
             note: validatedData.adminNotes
           }
         });
@@ -194,7 +185,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
 
     // Log admin action
     await auditService.logAdminAction(
-      adminId,
+      session.user.id,
       AUDIT_ACTIONS.ORDER_STATUS_CHANGED,
       AUDIT_ENTITIES.ORDER,
       params.id,
@@ -243,21 +234,12 @@ export async function DELETE(
 ): Promise<NextResponse> {
   try {
     // Check admin authorization
-    const sessionOrError = await requireAdminRole('ADMIN');
-    if (sessionOrError instanceof NextResponse) {
-      return sessionOrError;
+    const session = await requireAdminRole('ADMIN');
+    if (session instanceof NextResponse) {
+      return session;
     }
 
     const { id } = params;
-
-    // Get admin ID
-    const adminId = await getCurrentUserId();
-    if (!adminId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
 
     // Check if order exists
     const order = await prisma.order.findUnique({
@@ -284,7 +266,7 @@ export async function DELETE(
 
     // Log admin action
     await auditService.logAdminAction(
-      adminId,
+      session.user.id,
       AUDIT_ACTIONS.ORDER_DELETED,
       AUDIT_ENTITIES.ORDER,
       id,
