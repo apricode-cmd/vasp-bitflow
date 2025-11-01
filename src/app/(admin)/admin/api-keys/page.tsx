@@ -13,6 +13,8 @@ import { toast } from 'sonner';
 import { Key, Copy, Trash2, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
+import { StepUpMfaDialog } from '@/components/admin/StepUpMfaDialog';
+import type { AuthenticationResponseJSON } from '@simplewebauthn/types';
 
 interface ApiKey {
   id: string;
@@ -40,6 +42,10 @@ export default function ApiKeysPage(): JSX.Element {
   // Delete confirmation dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [keyToRevoke, setKeyToRevoke] = useState<string | null>(null);
+  
+  // Step-up MFA state
+  const [mfaDialogOpen, setMfaDialogOpen] = useState(false);
+  const [mfaPendingAction, setMfaPendingAction] = useState<'revoke' | null>(null);
 
   useEffect(() => {
     fetchApiKeys();
@@ -115,25 +121,56 @@ export default function ApiKeysPage(): JSX.Element {
     setDeleteDialogOpen(true);
   };
 
-  const confirmRevoke = async (): Promise<void> => {
+  const confirmRevoke = async (mfaChallengeId?: string, mfaResponse?: AuthenticationResponseJSON): Promise<void> => {
     if (!keyToRevoke) return;
 
     try {
+      const body: any = {};
+      
+      // If MFA data provided, include it
+      if (mfaChallengeId && mfaResponse) {
+        body.mfaChallengeId = mfaChallengeId;
+        body.mfaResponse = mfaResponse;
+      }
+
       const response = await fetch(`/api/admin/api-keys/${keyToRevoke}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
       });
 
-      if (response.ok) {
+      const data = await response.json();
+
+      // Check if MFA is required
+      if (data.requiresMfa && !mfaChallengeId) {
+        // Open MFA dialog
+        setMfaPendingAction('revoke');
+        setMfaDialogOpen(true);
+        setDeleteDialogOpen(false);
+        return;
+      }
+
+      if (response.ok && data.success) {
         toast.success('API key revoked successfully');
         await fetchApiKeys();
+        setKeyToRevoke(null);
+        setDeleteDialogOpen(false);
+        setMfaDialogOpen(false);
       } else {
-        toast.error('Failed to revoke API key');
+        toast.error(data.error || 'Failed to revoke API key');
       }
     } catch (error) {
+      console.error('Revoke error:', error);
       toast.error('Failed to revoke API key');
-    } finally {
-      setKeyToRevoke(null);
-      setDeleteDialogOpen(false);
+    }
+  };
+
+  const handleMfaSuccess = (challengeId: string, response: AuthenticationResponseJSON) => {
+    // Retry the action with MFA data
+    if (mfaPendingAction === 'revoke') {
+      confirmRevoke(challengeId, response);
     }
   };
 
@@ -340,12 +377,26 @@ export default function ApiKeysPage(): JSX.Element {
       <ConfirmDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
-        onConfirm={confirmRevoke}
+        onConfirm={() => confirmRevoke()}
         title="Are you sure you want to revoke this API key?"
         description="This action cannot be undone. The API key will be permanently revoked and any applications using it will lose access immediately."
         confirmText="Revoke"
         cancelText="Cancel"
         variant="destructive"
+      />
+
+      {/* Step-up MFA Dialog */}
+      <StepUpMfaDialog
+        open={mfaDialogOpen}
+        onOpenChange={setMfaDialogOpen}
+        action="REVOKE_API_KEY"
+        actionDescription="Revoking an API key requires additional verification for security."
+        onSuccess={handleMfaSuccess}
+        onCancel={() => {
+          setMfaDialogOpen(false);
+          setMfaPendingAction(null);
+          setKeyToRevoke(null);
+        }}
       />
     </div>
   );

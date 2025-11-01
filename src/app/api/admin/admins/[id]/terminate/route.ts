@@ -1,12 +1,14 @@
 /**
  * Admin Terminate API
  * 
- * POST: Terminate admin account permanently (SUPER_ADMIN only)
+ * POST: Terminate admin account permanently (SUPER_ADMIN only, REQUIRES STEP-UP MFA)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminRole } from '@/lib/middleware/admin-auth';
+import { handleStepUpMfa } from '@/lib/middleware/step-up-mfa';
+import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 
 export async function POST(
   request: NextRequest,
@@ -47,6 +49,42 @@ export async function POST(
       );
     }
 
+    // 🔐 STEP-UP MFA REQUIRED FOR TERMINATING ADMIN
+    const mfaResult = await handleStepUpMfa(
+      request,
+      session.user.id,
+      'DELETE_ADMIN',
+      'Admin',
+      adminId,
+      {
+        metadata: {
+          targetAdmin: admin.email,
+          targetRole: admin.role,
+        }
+      }
+    );
+
+    // Return MFA challenge if required
+    if (mfaResult.requiresMfa) {
+      return NextResponse.json({
+        success: false,
+        requiresMfa: true,
+        challengeId: mfaResult.challengeId,
+        options: mfaResult.options
+      });
+    }
+
+    // Check MFA verification
+    if (!mfaResult.verified) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: mfaResult.error || 'MFA verification required'
+        },
+        { status: 403 }
+      );
+    }
+
     // Terminate admin
     await prisma.admin.update({
       where: { id: adminId },
@@ -77,8 +115,34 @@ export async function POST(
       data: { isActive: false },
     });
 
-    // Log to audit
-    await prisma.auditLog.create({
+    // Log to audit with MFA verification
+    await auditService.logAdminAction(
+      session.user.id,
+      AUDIT_ACTIONS.ADMIN_DELETED,
+      AUDIT_ENTITIES.ADMIN,
+      adminId,
+      { status: 'ACTIVE' },
+      { status: 'TERMINATED' },
+      {
+        targetAdmin: admin.email,
+        targetRole: admin.role,
+        mfaVerified: true
+      }
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: 'Admin terminated successfully',
+    });
+  } catch (error) {
+    console.error('❌ Terminate admin error:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to terminate admin' },
+      { status: 500 }
+    );
+  }
+}
+({
       data: {
         adminId: session.user.id,
         action: 'ADMIN_TERMINATED',

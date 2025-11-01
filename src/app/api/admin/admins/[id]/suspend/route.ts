@@ -1,12 +1,14 @@
 /**
  * Admin Suspend API
  * 
- * POST: Suspend admin account (SUPER_ADMIN only)
+ * POST: Suspend admin account (SUPER_ADMIN only, REQUIRES STEP-UP MFA)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminRole } from '@/lib/middleware/admin-auth';
+import { handleStepUpMfa } from '@/lib/middleware/step-up-mfa';
+import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 
 export async function POST(
   request: NextRequest,
@@ -47,6 +49,42 @@ export async function POST(
       );
     }
 
+    // 🔐 STEP-UP MFA REQUIRED FOR SUSPENDING ADMIN
+    const mfaResult = await handleStepUpMfa(
+      request,
+      session.user.id,
+      'SUSPEND_ADMIN',
+      'Admin',
+      adminId,
+      {
+        metadata: {
+          targetAdmin: admin.email,
+          targetRole: admin.role,
+        }
+      }
+    );
+
+    // Return MFA challenge if required
+    if (mfaResult.requiresMfa) {
+      return NextResponse.json({
+        success: false,
+        requiresMfa: true,
+        challengeId: mfaResult.challengeId,
+        options: mfaResult.options
+      });
+    }
+
+    // Check MFA verification
+    if (!mfaResult.verified) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: mfaResult.error || 'MFA verification required'
+        },
+        { status: 403 }
+      );
+    }
+
     // Suspend admin
     await prisma.admin.update({
       where: { id: adminId },
@@ -71,19 +109,20 @@ export async function POST(
       },
     });
 
-    // Log to audit
-    await prisma.auditLog.create({
-      data: {
-        adminId: session.user.id,
-        action: 'ADMIN_SUSPENDED',
-        entity: 'ADMIN',
-        entityId: adminId,
-        oldValue: JSON.stringify({ status: 'ACTIVE' }),
-        newValue: JSON.stringify({ status: 'SUSPENDED' }),
-        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
-        userAgent: request.headers.get('user-agent') || 'unknown',
-      },
-    });
+    // Log to audit with MFA verification
+    await auditService.logAdminAction(
+      session.user.id,
+      AUDIT_ACTIONS.ADMIN_SUSPENDED,
+      AUDIT_ENTITIES.ADMIN,
+      adminId,
+      { status: 'ACTIVE' },
+      { status: 'SUSPENDED' },
+      {
+        targetAdmin: admin.email,
+        targetRole: admin.role,
+        mfaVerified: true
+      }
+    );
 
     return NextResponse.json({
       success: true,

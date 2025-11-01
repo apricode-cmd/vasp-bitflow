@@ -21,7 +21,8 @@ export interface StepUpMfaResult {
  * 
  * Usage in API route:
  * ```typescript
- * const mfaResult = await handleStepUpMfa(request, adminId, 'APPROVE_PAYOUT');
+ * const body = await request.json();
+ * const mfaResult = await handleStepUpMfa(body, adminId, 'APPROVE_PAYOUT');
  * if (mfaResult.requiresMfa) {
  *   return NextResponse.json(mfaResult);
  * }
@@ -32,20 +33,20 @@ export interface StepUpMfaResult {
  * ```
  */
 export async function handleStepUpMfa(
-  request: NextRequest,
+  body: any,
   adminId: string,
   action: StepUpAction,
   resourceType?: string,
   resourceId?: string,
-  metadata?: Record<string, any>
+  options?: {
+    metadata?: Record<string, any>;
+  }
 ): Promise<StepUpMfaResult> {
   try {
     // Check if action requires Step-up MFA
     if (!stepUpMfaService.requiresStepUp(action)) {
       return { requiresMfa: false, verified: true };
     }
-
-    const body = await request.json();
 
     // If no MFA data provided, request challenge
     if (!body.mfaChallengeId || !body.mfaResponse) {
@@ -54,7 +55,7 @@ export async function handleStepUpMfa(
         action,
         resourceType,
         resourceId,
-        metadata
+        options?.metadata
       );
 
       return {

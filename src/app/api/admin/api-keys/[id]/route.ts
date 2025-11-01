@@ -36,9 +36,12 @@ export async function DELETE(
       );
     }
 
+    // Read body (might contain MFA data)
+    const body = await request.json().catch(() => ({}));
+
     // 🔐 STEP-UP MFA REQUIRED FOR API KEY REVOCATION
     const mfaResult = await handleStepUpMfa(
-      request,
+      body,
       adminId,
       'REVOKE_API_KEY',
       'ApiKey',

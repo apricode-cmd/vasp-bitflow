@@ -62,9 +62,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    const body = await request.json();
+
     // 🔐 STEP-UP MFA REQUIRED FOR API KEY GENERATION
     const mfaResult = await handleStepUpMfa(
-      request,
+      body,
       adminId,
       'GENERATE_API_KEY',
       'ApiKey',
@@ -91,8 +93,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         { status: 403 }
       );
     }
-
-    const body = await request.json();
 
     // Validate
     const validated = createApiKeySchema.parse(body);
