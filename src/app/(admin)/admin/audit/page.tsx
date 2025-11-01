@@ -84,6 +84,39 @@ interface AuditLog {
   } | null;
 }
 
+interface AdminAuditLog {
+  id: string;
+  adminId: string;
+  adminEmail: string;
+  adminRole: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  diffBefore: any;
+  diffAfter: any;
+  context: any;
+  severity: 'INFO' | 'WARNING' | 'CRITICAL';
+  mfaRequired: boolean;
+  mfaMethod: string | null;
+  createdAt: string;
+}
+
+interface UserAuditLog {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userRole: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  diffBefore: any;
+  diffAfter: any;
+  context: any;
+  mfaRequired: boolean;
+  mfaMethod: string | null;
+  createdAt: string;
+}
+
 interface SystemLog {
   id: string;
   userId: string | null;
@@ -156,13 +189,16 @@ const getStatusVariant = (code: number | null): "default" | "secondary" | "destr
 
 export default function AuditPage(): JSX.Element {
   const [auditLogs, setAuditLogs] = React.useState<AuditLog[]>([]);
+  const [adminLogs, setAdminLogs] = React.useState<AdminAuditLog[]>([]);
+  const [userLogs, setUserLogs] = React.useState<UserAuditLog[]>([]);
+  const [criticalLogs, setCriticalLogs] = React.useState<AdminAuditLog[]>([]);
   const [systemLogs, setSystemLogs] = React.useState<SystemLog[]>([]);
   const [stats, setStats] = React.useState<Statistics | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [selectedLog, setSelectedLog] = React.useState<any>(null);
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
-  const [activeTab, setActiveTab] = React.useState('audit');
+  const [activeTab, setActiveTab] = React.useState('admin');
 
   // Block IP Dialog
   const [blockDialogOpen, setBlockDialogOpen] = React.useState(false);
@@ -189,7 +225,13 @@ export default function AuditPage(): JSX.Element {
   }, []);
 
   React.useEffect(() => {
-    if (activeTab === 'audit') {
+    if (activeTab === 'admin') {
+      fetchAdminLogs();
+    } else if (activeTab === 'user') {
+      fetchUserLogs();
+    } else if (activeTab === 'critical') {
+      fetchCriticalLogs();
+    } else if (activeTab === 'audit') {
       fetchAuditLogs();
     } else if (activeTab === 'system') {
       fetchSystemLogs();
@@ -199,7 +241,107 @@ export default function AuditPage(): JSX.Element {
   }, [filters, pagination.offset, activeTab]);
 
   const fetchData = async () => {
-    await Promise.all([fetchAuditLogs(), fetchStats()]);
+    await Promise.all([fetchAdminLogs(), fetchStats()]);
+  };
+
+  const fetchAdminLogs = async () => {
+    try {
+      setIsLoading(true);
+      const params = new URLSearchParams();
+      
+      if (filters.action) params.append('action', filters.action);
+      if (filters.entity) params.append('entityType', filters.entity);
+      if (filters.userId) params.append('adminId', filters.userId);
+      if (filters.ipAddress) params.append('ipAddress', filters.ipAddress);
+      params.append('limit', pagination.limit.toString());
+      params.append('offset', pagination.offset.toString());
+
+      const response = await fetch(`/api/admin/audit/admin-logs?${params}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setAdminLogs(data.logs);
+        setPagination({
+          ...pagination,
+          total: data.pagination.total
+        });
+      } else {
+        toast.error('Failed to fetch admin logs');
+      }
+    } catch (error) {
+      console.error('Fetch admin logs error:', error);
+      toast.error('Failed to fetch admin logs');
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  const fetchUserLogs = async () => {
+    try {
+      setIsLoading(true);
+      const params = new URLSearchParams();
+      
+      if (filters.action) params.append('action', filters.action);
+      if (filters.entity) params.append('entityType', filters.entity);
+      if (filters.userId) params.append('userId', filters.userId);
+      if (filters.ipAddress) params.append('ipAddress', filters.ipAddress);
+      params.append('limit', pagination.limit.toString());
+      params.append('offset', pagination.offset.toString());
+
+      const response = await fetch(`/api/admin/audit/user-logs?${params}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setUserLogs(data.logs);
+        setPagination({
+          ...pagination,
+          total: data.pagination.total
+        });
+      } else {
+        toast.error('Failed to fetch user logs');
+      }
+    } catch (error) {
+      console.error('Fetch user logs error:', error);
+      toast.error('Failed to fetch user logs');
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  const fetchCriticalLogs = async () => {
+    try {
+      setIsLoading(true);
+      const params = new URLSearchParams();
+      
+      params.append('severity', 'CRITICAL');
+      if (filters.action) params.append('action', filters.action);
+      if (filters.entity) params.append('entityType', filters.entity);
+      if (filters.userId) params.append('adminId', filters.userId);
+      if (filters.ipAddress) params.append('ipAddress', filters.ipAddress);
+      params.append('limit', pagination.limit.toString());
+      params.append('offset', pagination.offset.toString());
+
+      const response = await fetch(`/api/admin/audit/admin-logs?${params}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setCriticalLogs(data.logs);
+        setPagination({
+          ...pagination,
+          total: data.pagination.total
+        });
+      } else {
+        toast.error('Failed to fetch critical logs');
+      }
+    } catch (error) {
+      console.error('Fetch critical logs error:', error);
+      toast.error('Failed to fetch critical logs');
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
   };
 
   const fetchAuditLogs = async () => {
@@ -283,7 +425,13 @@ export default function AuditPage(): JSX.Element {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    if (activeTab === 'audit') {
+    if (activeTab === 'admin') {
+      await fetchAdminLogs();
+    } else if (activeTab === 'user') {
+      await fetchUserLogs();
+    } else if (activeTab === 'critical') {
+      await fetchCriticalLogs();
+    } else if (activeTab === 'audit') {
       await fetchAuditLogs();
     } else if (activeTab === 'system') {
       await fetchSystemLogs();
@@ -603,9 +751,21 @@ export default function AuditPage(): JSX.Element {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
+          <TabsTrigger value="admin" className="gap-2">
+            <Shield className="h-4 w-4" />
+            Admin Log
+          </TabsTrigger>
+          <TabsTrigger value="user" className="gap-2">
+            <User className="h-4 w-4" />
+            User Log
+          </TabsTrigger>
+          <TabsTrigger value="critical" className="gap-2">
+            <ShieldOff className="h-4 w-4 text-destructive" />
+            Critical Actions
+          </TabsTrigger>
           <TabsTrigger value="audit" className="gap-2">
             <FileText className="h-4 w-4" />
-            Audit Logs
+            Audit Logs (Legacy)
           </TabsTrigger>
           <TabsTrigger value="system" className="gap-2">
             <Activity className="h-4 w-4" />

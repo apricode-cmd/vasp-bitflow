@@ -2,12 +2,15 @@
  * PayOut API - /api/admin/pay-out/[id]
  * GET - Get specific payment details
  * PATCH - Update payment status (process, confirm, etc.)
+ * 
+ * CRITICAL ACTION: Requires Step-up MFA for SENT/PROCESSING status
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRole, getCurrentUserId } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
+import { stepUpMfaService } from '@/lib/services/step-up-mfa.service';
 import { z } from 'zod';
 
 const updatePayOutSchema = z.object({
@@ -21,7 +24,10 @@ const updatePayOutSchema = z.object({
   fromWalletId: z.string().optional(),
   scheduledFor: z.string().datetime().optional(),
   sentAt: z.string().datetime().optional(),
-  confirmedAt: z.string().datetime().optional()
+  confirmedAt: z.string().datetime().optional(),
+  // Step-up MFA fields
+  mfaChallengeId: z.string().optional(),
+  mfaResponse: z.any().optional(),
 });
 
 export async function GET(
@@ -123,7 +129,9 @@ export async function PATCH(
     const existing = await prisma.payOut.findUnique({
       where: { id },
       include: {
-        network: true
+        network: true,
+        cryptocurrency: true,
+        fiatCurrency: true,
       }
     });
 
@@ -132,6 +140,48 @@ export async function PATCH(
         { success: false, error: 'Payment not found' },
         { status: 404 }
       );
+    }
+
+    // ✅ Step-up MFA: SENT/PROCESSING requires MFA (critical action)
+    const isCriticalAction = validated.status === 'SENT' || validated.status === 'PROCESSING';
+    
+    if (isCriticalAction) {
+      if (!validated.mfaChallengeId || !validated.mfaResponse) {
+        // First call - request MFA challenge
+        const challenge = await stepUpMfaService.requestChallenge(
+          adminId,
+          'PAYOUT_APPROVE',
+          'PayOut',
+          id,
+          {
+            status: validated.status,
+            amount: existing.amount,
+            currency: existing.cryptocurrency?.code || existing.fiatCurrency?.code,
+            destinationAddress: existing.destinationAddress,
+          }
+        );
+
+        return NextResponse.json({
+          success: false,
+          requiresMfa: true,
+          challengeId: challenge.challengeId,
+          options: challenge.options,
+          message: 'MFA verification required for payout approval',
+        });
+      }
+
+      // Verify MFA
+      const verified = await stepUpMfaService.verifyChallenge(
+        validated.mfaChallengeId,
+        validated.mfaResponse
+      );
+
+      if (!verified) {
+        return NextResponse.json(
+          { success: false, error: 'MFA verification failed' },
+          { status: 403 }
+        );
+      }
     }
 
     // Build update data
@@ -144,6 +194,12 @@ export async function PATCH(
       if ((validated.status === 'SENT' || validated.status === 'PROCESSING') && !existing.processedBy) {
         updateData.processedBy = adminId;
         updateData.processedAt = new Date();
+        
+        // For SoD (Separation of Duties): if approvalRequired is set
+        if (existing.approvalRequired) {
+          updateData.approvedBy = adminId;
+          updateData.approvedAt = new Date();
+        }
       }
 
       // Auto-set sentAt if status is SENT
@@ -160,7 +216,9 @@ export async function PATCH(
     if (validated.transactionHash) {
       updateData.transactionHash = validated.transactionHash;
       // Generate explorer URL
-      updateData.explorerUrl = `${existing.network.explorerUrl}/tx/${validated.transactionHash}`;
+      if (existing.network?.explorerUrl) {
+        updateData.explorerUrl = `${existing.network.explorerUrl}/tx/${validated.transactionHash}`;
+      }
     }
 
     if (validated.blockNumber !== undefined) updateData.blockNumber = validated.blockNumber;
@@ -185,24 +243,32 @@ export async function PATCH(
             email: true
           }
         },
-        network: true
+        network: true,
+        cryptocurrency: true,
+        fiatCurrency: true,
       }
     });
 
-    // Log audit
+    // Log audit (with MFA info for critical actions)
     await auditService.logAdminAction(
       adminId,
-      AUDIT_ACTIONS.ORDER_STATUS_CHANGED,
+      isCriticalAction ? AUDIT_ACTIONS.ORDER_COMPLETED : AUDIT_ACTIONS.ORDER_STATUS_CHANGED,
       AUDIT_ENTITIES.ORDER,
       updated.orderId,
       { payOutStatus: existing.status },
-      { payOutStatus: updated.status }
+      { payOutStatus: updated.status },
+      isCriticalAction ? {
+        mfaRequired: true,
+        mfaMethod: 'WEBAUTHN',
+        mfaChallengeId: validated.mfaChallengeId,
+      } : undefined
     );
 
     return NextResponse.json({
       success: true,
       data: updated,
-      message: 'Payment updated successfully'
+      message: 'Payment updated successfully',
+      mfaVerified: isCriticalAction,
     });
   } catch (error) {
     console.error('Update PayOut error:', error);
