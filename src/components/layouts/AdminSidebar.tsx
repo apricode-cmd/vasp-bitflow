@@ -9,6 +9,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { useAdminSession } from '@/hooks/useAdminSession';
 import { 
   LayoutDashboard, Users, ShoppingCart, Settings, CreditCard,
   TrendingUp, Shield, Database, Activity, Coins,
@@ -29,6 +30,22 @@ import {
 import { ApricodeLogo } from '@/components/icons/ApricodeLogo';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { UserMenu } from '@/components/layouts/UserMenu';
+
+interface NavigationItem {
+  name: string;
+  href: string;
+  icon: any;
+  description?: string;
+  badge?: string;
+  superAdminOnly?: boolean;
+}
+
+interface NavigationSection {
+  section: string;
+  items: NavigationItem[];
+  defaultOpen: boolean;
+  priority: 'high' | 'medium' | 'low';
+}
 
 const navigation = [
   {
@@ -152,10 +169,11 @@ const navigation = [
     section: 'System & Settings',
     items: [
       { 
-        name: 'Admin Profile', 
-        href: '/admin/profile', 
-        icon: User,
-        description: 'Account & Security'
+        name: 'Administrators', 
+        href: '/admin/admins', 
+        icon: Shield,
+        description: 'Admin accounts & roles',
+        superAdminOnly: true
       },
       { 
         name: 'Settings', 
@@ -195,6 +213,7 @@ const navigation = [
 
 export function AdminSidebar(): JSX.Element {
   const pathname = usePathname();
+  const { session } = useAdminSession();
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(
     navigation.reduce((acc, section) => ({
       ...acc,
@@ -208,6 +227,16 @@ export function AdminSidebar(): JSX.Element {
     pendingPayIn: number;
     pendingPayOut: number;
   } | null>(null);
+
+  const isSuperAdmin = session?.role === 'SUPER_ADMIN' || session?.roleCode === 'SUPER_ADMIN';
+
+  // Filter navigation items based on role
+  const filteredByRole = navigation.map(section => ({
+    ...section,
+    items: section.items.filter(item => 
+      !item.superAdminOnly || isSuperAdmin
+    )
+  })).filter(section => section.items.length > 0);
 
   // Fetch pending counts for badges
   useEffect(() => {
@@ -242,14 +271,14 @@ export function AdminSidebar(): JSX.Element {
 
   // Filter navigation items based on search
   const filteredNavigation = searchQuery
-    ? navigation.map(section => ({
+    ? filteredByRole.map(section => ({
         ...section,
         items: section.items.filter(item =>
           item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           item.description?.toLowerCase().includes(searchQuery.toLowerCase())
         )
       })).filter(section => section.items.length > 0)
-    : navigation;
+    : filteredByRole;
 
   const getBadgeCount = (itemName: string): number | null => {
     if (!stats) return null;

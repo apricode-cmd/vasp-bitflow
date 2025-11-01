@@ -1467,7 +1467,8 @@ model Admin {
   password String? // Optional if using SSO/Passkey only
 
   // Role and Access (RBAC/SoD)
-  role AdminRole @default(ADMIN)
+  role     AdminRole @default(ADMIN) // Legacy enum (deprecated, use roleCode)
+  roleCode String?   @default("ADMIN") // New: reference to Role table
 
   // Separation of Duties (SoD) flags
   canInitiatePayout Boolean @default(false) // Может инициировать выплату
@@ -1814,4 +1815,63 @@ model OneTimeAuthToken {
   @@index([token, expiresAt])
   @@index([adminId])
   @@map("OneTimeAuthToken")
+}
+
+// ============================================
+// RBAC System: Roles, Permissions & Access Control
+// ============================================
+
+// Role (System or Custom roles)
+model Role {
+  code        String   @id @unique // super_admin, admin, compliance, etc.
+  name        String   // Super Administrator, Compliance Officer
+  description String?  @db.Text
+  isSystem    Boolean  @default(false) // System role (cannot be deleted)
+  isActive    Boolean  @default(true)
+  priority    Int      @default(0) // Display priority
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  permissions RolePermission[]
+
+  @@index([isActive])
+  @@index([priority])
+  @@map("Role")
+}
+
+// Permission (Granular access rights)
+model Permission {
+  code        String   @id @unique // orders:read, orders:update, kyc:approve
+  name        String   // Read Orders, Update Orders, Approve KYC
+  resource    String   // orders, kyc, users, settings
+  action      String   // read, create, update, delete, approve
+  description String?  @db.Text
+  category    String   // orders, kyc, finance, system
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  // Relations
+  roles RolePermission[]
+
+  @@unique([resource, action])
+  @@index([resource])
+  @@index([category])
+  @@map("Permission")
+}
+
+// Many-to-Many: Role <-> Permission
+model RolePermission {
+  id             String   @id @default(cuid())
+  roleCode       String
+  permissionCode String
+  createdAt      DateTime @default(now())
+
+  role       Role       @relation(fields: [roleCode], references: [code], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionCode], references: [code], onDelete: Cascade)
+
+  @@unique([roleCode, permissionCode])
+  @@index([roleCode])
+  @@index([permissionCode])
+  @@map("RolePermission")
 }

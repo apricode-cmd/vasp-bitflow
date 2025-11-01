@@ -1,14 +1,14 @@
 /**
  * User Menu Component
  * 
- * Admin profile menu with theme toggle, profile link, and logout
+ * Admin profile menu in sidebar footer with profile link, theme toggle, and logout
  */
 
 'use client';
 
-import { useSession, signOut } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { User, Settings, LogOut, Shield } from 'lucide-react';
+import { User, LogOut, Settings2 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -31,58 +31,97 @@ import {
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
+import { useAdminSession } from '@/hooks/useAdminSession';
 
 export function UserMenu(): React.ReactElement {
-  const { data: session } = useSession();
+  const { session, loading } = useAdminSession();
+  const router = useRouter();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
-  if (!session?.user) {
-    return <div />;
+  if (loading || !session) {
+    return (
+      <div className="flex items-center gap-3 p-2.5 rounded-lg animate-pulse">
+        <div className="h-9 w-9 bg-muted rounded-full" />
+        <div className="flex-1 space-y-2">
+          <div className="h-3 bg-muted rounded w-20" />
+          <div className="h-2 bg-muted rounded w-32" />
+        </div>
+      </div>
+    );
   }
 
-  const { email, role } = session.user;
-  const initials = email
-    ?.split('@')[0]
-    .slice(0, 2)
-    .toUpperCase() || 'AD';
+  const displayEmail = session.workEmail || session.email;
+  const displayName = `${session.firstName} ${session.lastName}`;
+  const initials = `${session.firstName.charAt(0)}${session.lastName.charAt(0)}`.toUpperCase();
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: '/login' });
+    // Admin logout - clear custom session
+    await fetch('/api/admin/auth/logout', { method: 'POST' });
+    router.push('/admin/auth/login');
+    router.refresh();
+  };
+
+  const getRoleBadge = () => {
+    const role = session.roleCode || session.role;
+    if (role === 'SUPER_ADMIN') {
+      return <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4 font-bold">SUPER</Badge>;
+    }
+    if (role === 'ADMIN') {
+      return <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4">ADMIN</Badge>;
+    }
+    if (role === 'COMPLIANCE') {
+      return <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">COMPLIANCE</Badge>;
+    }
+    if (role === 'TREASURY_APPROVER') {
+      return <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">TREASURY</Badge>;
+    }
+    if (role === 'FINANCE') {
+      return <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">FINANCE</Badge>;
+    }
+    if (role === 'SUPPORT') {
+      return <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">SUPPORT</Badge>;
+    }
+    if (role === 'READ_ONLY') {
+      return <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">READ</Badge>;
+    }
+    return null;
   };
 
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger className="w-full outline-none">
-          <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors cursor-pointer group">
-            <Avatar className="h-10 w-10 border-2 border-primary/20 group-hover:border-primary/40 transition-colors">
-              <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+          <div className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-accent/50 transition-all cursor-pointer group border border-transparent hover:border-border/50">
+            <Avatar className="h-9 w-9 border-2 border-primary/20 group-hover:border-primary/40 transition-colors">
+              <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">
                 {initials}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 text-left min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-semibold truncate">
-                  {email?.split('@')[0]}
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm font-semibold truncate leading-tight">
+                  {displayName}
                 </p>
-                {role === 'ADMIN' && (
-                  <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4">
-                    <Shield className="w-2.5 h-2.5 mr-0.5" />
-                    Admin
-                  </Badge>
-                )}
+                {getRoleBadge()}
               </div>
-              <p className="text-xs text-muted-foreground truncate">
-                {email}
+              <p className="text-[10px] text-muted-foreground truncate leading-tight mt-0.5">
+                {displayEmail}
               </p>
             </div>
+            <Settings2 className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-64" align="end" side="right">
+        <DropdownMenuContent className="w-64" align="end" side="top" sideOffset={8}>
           <DropdownMenuLabel>
             <div className="flex flex-col space-y-1">
-              <p className="text-sm font-medium">My Account</p>
-              <p className="text-xs text-muted-foreground">{email}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold">{displayName}</p>
+                {getRoleBadge()}
+              </div>
+              <p className="text-xs text-muted-foreground font-normal">{displayEmail}</p>
+              {session.jobTitle && (
+                <p className="text-xs text-muted-foreground font-normal">{session.jobTitle}</p>
+              )}
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
@@ -91,13 +130,6 @@ export function UserMenu(): React.ReactElement {
             <DropdownMenuItem className="cursor-pointer">
               <User className="mr-2 h-4 w-4" />
               Profile & Security
-            </DropdownMenuItem>
-          </Link>
-          
-          <Link href="/admin/settings">
-            <DropdownMenuItem className="cursor-pointer">
-              <Settings className="mr-2 h-4 w-4" />
-              System Settings
             </DropdownMenuItem>
           </Link>
 
@@ -127,7 +159,7 @@ export function UserMenu(): React.ReactElement {
           <AlertDialogHeader>
             <AlertDialogTitle>Sign Out</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to sign out? You will need to log in again to access the admin panel.
+              Are you sure you want to sign out? You will need to authenticate again to access the admin panel.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
