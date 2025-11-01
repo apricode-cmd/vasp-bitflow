@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminRole, getCurrentUserId } from '@/lib/middleware/admin-auth';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { apiKeyService } from '@/lib/services/api-key.service';
 import { stepUpMfaService } from '@/lib/services/step-up-mfa.service';
 import { handleStepUpMfa } from '@/lib/middleware/step-up-mfa';
@@ -45,21 +45,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     // Check admin permission
-    const sessionOrError = await requireAdminRole('ADMIN');
-    if (sessionOrError instanceof NextResponse) {
-      return sessionOrError;
-    }
-
-    // Get admin ID
-    const adminId = await getCurrentUserId();
-    if (!adminId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Unauthorized'
-        },
-        { status: 401 }
-      );
+    const session = await requireAdminRole('ADMIN');
+    if (session instanceof NextResponse) {
+      return session;
     }
 
     const body = await request.json();
@@ -67,7 +55,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // 🔐 STEP-UP MFA REQUIRED FOR API KEY GENERATION
     const mfaResult = await handleStepUpMfa(
       body,
-      adminId,
+      session.user.id,
       'GENERATE_API_KEY',
       'ApiKey',
       'new'
@@ -101,7 +89,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const { key, apiKey } = await apiKeyService.generateApiKey(
       validated.name,
       validated.permissions,
-      adminId,
+      session.user.id,
       validated.userId,
       validated.expiresAt ? new Date(validated.expiresAt) : undefined,
       validated.rateLimit
@@ -109,7 +97,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Log admin action with MFA verification
     await auditService.logAdminAction(
-      adminId,
+      session.user.id,
       AUDIT_ACTIONS.API_KEY_GENERATED,
       AUDIT_ENTITIES.API_KEY,
       apiKey.id,

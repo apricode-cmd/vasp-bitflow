@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminRole, getCurrentUserId } from '@/lib/middleware/admin-auth';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { apiKeyService } from '@/lib/services/api-key.service';
 import { handleStepUpMfa } from '@/lib/middleware/step-up-mfa';
 import { prisma } from '@/lib/prisma';
@@ -17,24 +17,12 @@ export async function DELETE(
 ): Promise<NextResponse> {
   try {
     // Check admin permission
-    const sessionOrError = await requireAdminRole('ADMIN');
-    if (sessionOrError instanceof NextResponse) {
-      return sessionOrError;
+    const session = await requireAdminRole('ADMIN');
+    if (session instanceof NextResponse) {
+      return session;
     }
 
     const { id } = await params;
-
-    // Get admin ID
-    const adminId = await getCurrentUserId();
-    if (!adminId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Unauthorized'
-        },
-        { status: 401 }
-      );
-    }
 
     // Read body (might contain MFA data)
     const body = await request.json().catch(() => ({}));
@@ -42,7 +30,7 @@ export async function DELETE(
     // 🔐 STEP-UP MFA REQUIRED FOR API KEY REVOCATION
     const mfaResult = await handleStepUpMfa(
       body,
-      adminId,
+      session.user.id,
       'REVOKE_API_KEY',
       'ApiKey',
       id
@@ -89,7 +77,7 @@ export async function DELETE(
 
     // Log admin action with MFA verification
     await auditService.logAdminAction(
-      adminId,
+      session.user.id,
       AUDIT_ACTIONS.API_KEY_REVOKED,
       AUDIT_ENTITIES.API_KEY,
       id,
