@@ -777,6 +777,86 @@ export default function AuditPage(): JSX.Element {
           </TabsTrigger>
         </TabsList>
 
+        {/* Admin Log Tab */}
+        <TabsContent value="admin" className="space-y-4 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Administrator Actions Log
+              </CardTitle>
+              <CardDescription>
+                All actions performed by administrators with MFA tracking
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DataTable
+                columns={auditColumns}
+                data={adminLogs}
+                isLoading={isLoading}
+                searchKey="action"
+                searchPlaceholder="Search admin actions..."
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* User Log Tab */}
+        <TabsContent value="user" className="space-y-4 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Client Actions Log
+              </CardTitle>
+              <CardDescription>
+                All actions performed by clients (users)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DataTable
+                columns={auditColumns}
+                data={userLogs}
+                isLoading={isLoading}
+                searchKey="action"
+                searchPlaceholder="Search user actions..."
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Critical Actions Tab */}
+        <TabsContent value="critical" className="space-y-4 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-destructive">
+                <ShieldOff className="h-5 w-5" />
+                Critical Actions (SEVERITY: CRITICAL)
+              </CardTitle>
+              <CardDescription>
+                High-risk actions requiring MFA verification and manual review
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {criticalLogs.length === 0 && !isLoading ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <CheckCircle2 className="h-12 w-12 mx-auto mb-4 text-green-500" />
+                  <p className="text-lg font-semibold">No Critical Actions</p>
+                  <p className="text-sm">All systems operating normally</p>
+                </div>
+              ) : (
+                <DataTable
+                  columns={auditColumns}
+                  data={criticalLogs}
+                  isLoading={isLoading}
+                  searchKey="action"
+                  searchPlaceholder="Search critical actions..."
+                />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Audit Logs Tab */}
         <TabsContent value="audit" className="space-y-4 mt-6">
           {/* Filters */}
