@@ -2,12 +2,13 @@
  * Admin Integration Management API
  * 
  * GET /api/admin/integrations/[service] - Get integration config
- * PATCH /api/admin/integrations/[service] - Update integration config
+ * PATCH /api/admin/integrations/[service] - Update integration config (REQUIRES STEP-UP MFA)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRole, getCurrentUserId } from '@/lib/middleware/admin-auth';
 import { integrationConfigService } from '@/lib/services/integration-config.service';
+import { handleStepUpMfa } from '@/lib/middleware/step-up-mfa';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 import { z } from 'zod';
 
@@ -71,10 +72,6 @@ export async function PATCH(
     }
 
     const { service } = await params;
-    const body = await request.json();
-
-    // Validate
-    const validated = updateIntegrationSchema.parse(body);
 
     // Get admin ID
     const adminId = await getCurrentUserId();
@@ -88,6 +85,41 @@ export async function PATCH(
       );
     }
 
+    // 🔐 STEP-UP MFA REQUIRED FOR INTEGRATION CONFIG UPDATE
+    const mfaResult = await handleStepUpMfa(
+      request,
+      adminId,
+      'UPDATE_INTEGRATION_KEYS',
+      'IntegrationConfig',
+      service
+    );
+
+    // Return MFA challenge if required
+    if (mfaResult.requiresMfa) {
+      return NextResponse.json({
+        success: false,
+        requiresMfa: true,
+        challengeId: mfaResult.challengeId,
+        options: mfaResult.options
+      });
+    }
+
+    // Check MFA verification
+    if (!mfaResult.verified) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: mfaResult.error || 'MFA verification required'
+        },
+        { status: 403 }
+      );
+    }
+
+    const body = await request.json();
+
+    // Validate
+    const validated = updateIntegrationSchema.parse(body);
+
     // Update integration config (will be encrypted)
     const integration = await integrationConfigService.updateConfig(
       service,
@@ -100,7 +132,7 @@ export async function PATCH(
       await integrationConfigService.toggleEnabled(service, validated.isEnabled);
     }
 
-    // Log admin action
+    // Log admin action with MFA verification
     await auditService.logAdminAction(
       adminId,
       AUDIT_ACTIONS.INTEGRATION_UPDATED,
@@ -110,7 +142,8 @@ export async function PATCH(
       {},
       {
         service,
-        isEnabled: validated.isEnabled
+        isEnabled: validated.isEnabled,
+        mfaVerified: true
       }
     );
 

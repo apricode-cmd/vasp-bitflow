@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRole, getCurrentUserId } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
-import { stepUpMfaService } from '@/lib/services/step-up-mfa.service';
+import { handleStepUpMfa } from '@/lib/middleware/step-up-mfa';
 import { z } from 'zod';
 
 const updatePayOutSchema = z.object({
@@ -142,43 +142,41 @@ export async function PATCH(
       );
     }
 
-    // ✅ Step-up MFA: SENT/PROCESSING requires MFA (critical action)
+    // 🔐 STEP-UP MFA: SENT/PROCESSING requires MFA (APPROVE_PAYOUT)
     const isCriticalAction = validated.status === 'SENT' || validated.status === 'PROCESSING';
     
     if (isCriticalAction) {
-      if (!validated.mfaChallengeId || !validated.mfaResponse) {
-        // First call - request MFA challenge
-        const challenge = await stepUpMfaService.requestChallenge(
-          adminId,
-          'PAYOUT_APPROVE',
-          'PayOut',
-          id,
-          {
+      const mfaResult = await handleStepUpMfa(
+        request,
+        adminId,
+        'APPROVE_PAYOUT',
+        'PayOut',
+        id,
+        {
+          metadata: {
             status: validated.status,
             amount: existing.amount,
             currency: existing.cryptocurrency?.code || existing.fiatCurrency?.code,
             destinationAddress: existing.destinationAddress,
           }
-        );
+        }
+      );
 
+      // Return MFA challenge if required
+      if (mfaResult.requiresMfa) {
         return NextResponse.json({
           success: false,
           requiresMfa: true,
-          challengeId: challenge.challengeId,
-          options: challenge.options,
+          challengeId: mfaResult.challengeId,
+          options: mfaResult.options,
           message: 'MFA verification required for payout approval',
         });
       }
 
-      // Verify MFA
-      const verified = await stepUpMfaService.verifyChallenge(
-        validated.mfaChallengeId,
-        validated.mfaResponse
-      );
-
-      if (!verified) {
+      // Check MFA verification
+      if (!mfaResult.verified) {
         return NextResponse.json(
-          { success: false, error: 'MFA verification failed' },
+          { success: false, error: mfaResult.error || 'MFA verification failed' },
           { status: 403 }
         );
       }
@@ -249,7 +247,7 @@ export async function PATCH(
       }
     });
 
-    // Log audit (with MFA info for critical actions)
+    // Log audit (with MFA verification for critical actions)
     await auditService.logAdminAction(
       adminId,
       isCriticalAction ? AUDIT_ACTIONS.ORDER_COMPLETED : AUDIT_ACTIONS.ORDER_STATUS_CHANGED,
@@ -258,9 +256,10 @@ export async function PATCH(
       { payOutStatus: existing.status },
       { payOutStatus: updated.status },
       isCriticalAction ? {
-        mfaRequired: true,
+        mfaVerified: true,
         mfaMethod: 'WEBAUTHN',
-        mfaChallengeId: validated.mfaChallengeId,
+        payoutAmount: existing.amount,
+        destinationAddress: existing.destinationAddress
       } : undefined
     );
 
