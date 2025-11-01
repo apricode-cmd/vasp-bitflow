@@ -117,29 +117,51 @@ interface UserAuditLog {
   createdAt: string;
 }
 
-interface SystemLog {
+interface MfaEvent {
   id: string;
-  userId: string | null;
-  sessionId: string | null;
-  action: string;
-  method: string | null;
-  path: string;
-  statusCode: number | null;
-  ipAddress: string;
+  actorId: string;
+  actorType: 'ADMIN' | 'USER';
+  actionType: string; // 'STEPUP' | 'LOGIN' | 'REGISTER'
+  method: string; // 'WEBAUTHN' | 'TOTP'
+  uv: boolean | null; // userVerification
+  credentialIdHash: string | null;
+  aaguid: string | null;
+  signCount: number | null;
+  challengeId: string | null;
+  result: string; // 'success' | 'fail'
+  errorCode: string | null;
+  ipAddress: string | null;
   userAgent: string | null;
-  deviceType: string | null;
-  browser: string | null;
-  os: string | null;
-  isMobile: boolean;
-  isBot: boolean;
-  responseTime: number | null;
-  errorMessage: string | null;
+  deviceInfo: any;
   createdAt: string;
-  user: {
-    id: string;
+  // Relations for display
+  admin?: {
+    email: string;
+    roleCode: string;
+  };
+  user?: {
     email: string;
     role: string;
-  } | null;
+  };
+}
+
+interface SystemLog {
+  id: string;
+  orgId: string | null;
+  source: string | null; // 'KYCAID_WEBHOOK' | 'RAPYD_WEBHOOK' | 'NODE'
+  level: string | null; // 'INFO' | 'WARN' | 'ERROR' | 'CRITICAL'
+  eventType: string | null; // 'WEBHOOK_RECEIVED' | 'API_CALL'
+  endpoint: string | null;
+  method: string | null;
+  statusCode: number | null;
+  payload: any;
+  requestBody: any;
+  responseBody: any;
+  errorMessage: string | null;
+  errorStack: string | null;
+  responseTime: number | null;
+  metadata: any;
+  createdAt: string;
 }
 
 interface Statistics {
@@ -192,6 +214,7 @@ export default function AuditPage(): JSX.Element {
   const [adminLogs, setAdminLogs] = React.useState<AdminAuditLog[]>([]);
   const [userLogs, setUserLogs] = React.useState<UserAuditLog[]>([]);
   const [criticalLogs, setCriticalLogs] = React.useState<AdminAuditLog[]>([]);
+  const [mfaEvents, setMfaEvents] = React.useState<MfaEvent[]>([]);
   const [systemLogs, setSystemLogs] = React.useState<SystemLog[]>([]);
   const [stats, setStats] = React.useState<Statistics | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -338,6 +361,37 @@ export default function AuditPage(): JSX.Element {
     } catch (error) {
       console.error('Fetch critical logs error:', error);
       toast.error('Failed to fetch critical logs');
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  const fetchMfaEvents = async () => {
+    try {
+      setIsLoading(true);
+      const params = new URLSearchParams();
+      
+      if (filters.userId) params.append('actorId', filters.userId);
+      if (filters.ipAddress) params.append('ipAddress', filters.ipAddress);
+      params.append('limit', pagination.limit.toString());
+      params.append('offset', pagination.offset.toString());
+
+      const response = await fetch(`/api/admin/audit/mfa-events?${params}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setMfaEvents(data.data.events);
+        setPagination({
+          ...pagination,
+          total: data.data.total
+        });
+      } else {
+        toast.error('Failed to fetch MFA events');
+      }
+    } catch (error) {
+      console.error('Fetch MFA events error:', error);
+      toast.error('Failed to fetch MFA events');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -513,10 +567,10 @@ export default function AuditPage(): JSX.Element {
     
     const searchLower = filters.search.toLowerCase();
     return systemLogs.filter(log => 
-      log.action.toLowerCase().includes(searchLower) ||
-      log.path.toLowerCase().includes(searchLower) ||
-      log.user?.email.toLowerCase().includes(searchLower) ||
-      log.ipAddress.toLowerCase().includes(searchLower)
+      (log.source && log.source.toLowerCase().includes(searchLower)) ||
+      (log.eventType && log.eventType.toLowerCase().includes(searchLower)) ||
+      (log.endpoint && log.endpoint.toLowerCase().includes(searchLower)) ||
+      (log.level && log.level.toLowerCase().includes(searchLower))
     );
   }, [systemLogs, filters.search]);
 
@@ -715,6 +769,116 @@ export default function AuditPage(): JSX.Element {
     },
   ];
 
+  // MFA Events columns for Critical Actions tab
+  const mfaEventColumns: ColumnDef<MfaEvent>[] = [
+    {
+      accessorKey: 'ts',
+      header: 'Time',
+      cell: ({ row }) => (
+        <div className="text-sm">
+          <div className="font-medium">
+            {new Date(row.original.createdAt).toLocaleTimeString()}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {new Date(row.original.createdAt).toLocaleDateString()}
+          </div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'actor',
+      header: 'Actor',
+      cell: ({ row }) => {
+        const event = row.original;
+        const isAdmin = event.actorType === 'ADMIN';
+        return (
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              {isAdmin ? (
+                <>
+                  <Shield className="h-3 w-3 text-purple-500" />
+                  <span className="text-sm font-medium">Admin</span>
+                </>
+              ) : (
+                <>
+                  <User className="h-3 w-3 text-blue-500" />
+                  <span className="text-sm font-medium">Client</span>
+                </>
+              )}
+            </div>
+            <code className="text-xs text-muted-foreground">
+              {event.actorId.slice(0, 8)}...
+            </code>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'actionType',
+      header: 'Action Type',
+      cell: ({ row }) => {
+        const variant = row.original.actionType === 'STEPUP' 
+          ? 'destructive' 
+          : row.original.actionType === 'LOGIN' 
+          ? 'default' 
+          : 'secondary';
+        return (
+          <Badge variant={variant}>
+            {row.original.actionType}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: 'method',
+      header: 'Method',
+      cell: ({ row }) => (
+        <Badge variant="outline">
+          {row.original.method}
+          {row.original.uv && <span className="ml-1 text-green-600">✓ UV</span>}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: 'result',
+      header: 'Result',
+      cell: ({ row }) => {
+        const isSuccess = row.original.result === 'SUCCESS';
+        return (
+          <Badge variant={isSuccess ? 'default' : 'destructive'}>
+            {isSuccess ? '✓ Success' : '✗ Failed'}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: 'ipAddress',
+      header: 'IP Address',
+      cell: ({ row }) => (
+        <code className="text-xs">
+          {row.original.ipAddress || 'N/A'}
+        </code>
+      ),
+    },
+    {
+      id: 'details',
+      header: 'Details',
+      cell: ({ row }) => (
+        <div className="text-xs text-muted-foreground space-y-1">
+          {row.original.credentialIdHash && (
+            <div>Cred: {row.original.credentialIdHash.slice(0, 8)}...</div>
+          )}
+          {row.original.signCount !== null && (
+            <div>Sign Count: {row.original.signCount}</div>
+          )}
+          {row.original.errorCode && (
+            <div className="text-red-600">Error: {row.original.errorCode}</div>
+          )}
+        </div>
+      ),
+    },
+  ];
+
   const auditColumns: ColumnDef<AuditLog>[] = [
     {
       accessorKey: 'createdAt',
@@ -817,37 +981,29 @@ export default function AuditPage(): JSX.Element {
       ),
     },
     {
-      accessorKey: 'user',
-      header: 'User',
-      cell: ({ row }) => {
-        const log = row.original;
-        return log.user ? (
-          <div className="space-y-1">
-            <div className="text-sm font-medium truncate max-w-[150px]">{log.user.email}</div>
-            <Badge variant="outline" className="text-xs">
-              {log.user.role}
-            </Badge>
-          </div>
-        ) : (
-          <Badge variant="secondary" className="text-xs">Anonymous</Badge>
-        );
-      },
-    },
-    {
-      accessorKey: 'action',
-      header: 'Action',
+      accessorKey: 'source',
+      header: 'Source',
       cell: ({ row }) => (
-        <Badge variant={getActionVariant(row.original.action)} className="font-mono text-xs">
-          {row.original.action}
+        <Badge variant="outline" className="text-xs font-mono">
+          {row.original.source || 'N/A'}
         </Badge>
       ),
     },
     {
-      accessorKey: 'path',
-      header: 'Path',
+      accessorKey: 'eventType',
+      header: 'Event Type',
+      cell: ({ row }) => (
+        <Badge variant="secondary" className="text-xs">
+          {row.original.eventType || 'N/A'}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: 'endpoint',
+      header: 'Endpoint',
       cell: ({ row }) => (
         <div className="max-w-[200px]">
-          <code className="text-xs truncate block">{row.original.path}</code>
+          <code className="text-xs truncate block">{row.original.endpoint || 'N/A'}</code>
           {row.original.method && (
             <Badge variant="outline" className="text-xs mt-1">
               {row.original.method}
@@ -857,40 +1013,32 @@ export default function AuditPage(): JSX.Element {
       ),
     },
     {
-      accessorKey: 'device',
-      header: 'Device',
+      accessorKey: 'level',
+      header: 'Level',
       cell: ({ row }) => {
-        const DeviceIcon = getDeviceIcon(row.original.deviceType);
+        const level = row.original.level;
+        const variant = level === 'CRITICAL' || level === 'ERROR' ? 'destructive' : level === 'WARN' ? 'default' : 'secondary';
         return (
-          <div className="flex items-center gap-2">
-            <DeviceIcon className="h-4 w-4 text-muted-foreground" />
-            <div className="text-xs">
-              {row.original.isBot ? (
-                <Badge variant="secondary" className="gap-1">
-                  <Bot className="h-3 w-3" />
-                  Bot
-                </Badge>
-              ) : (
-                <div>
-                  <div className="font-medium">{row.original.browser || 'Unknown'}</div>
-                  <div className="text-muted-foreground">{row.original.os || 'Unknown'}</div>
-                </div>
-              )}
-            </div>
-          </div>
+          <Badge variant={variant} className="text-xs">
+            {level || 'INFO'}
+          </Badge>
         );
       },
     },
     {
-      accessorKey: 'ipAddress',
-      header: 'IP & Status',
+      accessorKey: 'statusCode',
+      header: 'Status',
       cell: ({ row }) => (
         <div className="space-y-1">
-          <div className="text-sm font-mono">{row.original.ipAddress}</div>
           {row.original.statusCode && (
             <Badge variant={getStatusVariant(row.original.statusCode)} className="text-xs">
               {row.original.statusCode}
             </Badge>
+          )}
+          {row.original.responseTime && (
+            <div className="text-xs text-muted-foreground">
+              {row.original.responseTime}ms
+            </div>
           )}
         </div>
       ),
@@ -899,23 +1047,13 @@ export default function AuditPage(): JSX.Element {
       id: 'actions',
       header: 'Actions',
       cell: ({ row }) => (
-        <div className="flex gap-1">
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => handleViewDetails(row.original)}
-          >
-            <FileText className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => handleBlockIP(row.original.ipAddress)}
-            className="text-destructive hover:text-destructive"
-          >
-            <Ban className="h-4 w-4" />
-          </Button>
-        </div>
+        <Button 
+          variant="ghost" 
+          size="sm"
+          onClick={() => handleViewDetails(row.original)}
+        >
+          <FileText className="h-4 w-4" />
+        </Button>
       ),
     },
   ];
@@ -1026,28 +1164,47 @@ export default function AuditPage(): JSX.Element {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-destructive">
                 <ShieldOff className="h-5 w-5" />
-                Critical Actions (SEVERITY: CRITICAL)
+                Critical Actions & MFA Events
               </CardTitle>
               <CardDescription>
-                High-risk actions requiring MFA verification and manual review
+                High-risk actions and authentication events requiring MFA verification
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {criticalLogs.length === 0 && !isLoading ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <CheckCircle2 className="h-12 w-12 mx-auto mb-4 text-green-500" />
-                  <p className="text-lg font-semibold">No Critical Actions</p>
-                  <p className="text-sm">All systems operating normally</p>
-                </div>
-              ) : (
-                <DataTable
-                  columns={adminAuditColumns}
-                  data={criticalLogs}
-                  isLoading={isLoading}
-                  searchKey="action"
-                  searchPlaceholder="Search critical actions..."
-                />
-              )}
+              <Tabs defaultValue="critical-actions" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="critical-actions">Critical Actions</TabsTrigger>
+                  <TabsTrigger value="mfa-events">MFA Events</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="critical-actions" className="mt-6">
+                  {criticalLogs.length === 0 && !isLoading ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <CheckCircle2 className="h-12 w-12 mx-auto mb-4 text-green-500" />
+                      <p className="text-lg font-semibold">No Critical Actions</p>
+                      <p className="text-sm">All systems operating normally</p>
+                    </div>
+                  ) : (
+                    <DataTable
+                      columns={adminAuditColumns}
+                      data={criticalLogs}
+                      isLoading={isLoading}
+                      searchKey="action"
+                      searchPlaceholder="Search critical actions..."
+                    />
+                  )}
+                </TabsContent>
+                
+                <TabsContent value="mfa-events" className="mt-6">
+                  <DataTable
+                    columns={mfaEventColumns}
+                    data={mfaEvents}
+                    isLoading={isLoading}
+                    searchKey="actionType"
+                    searchPlaceholder="Search MFA events..."
+                  />
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         </TabsContent>

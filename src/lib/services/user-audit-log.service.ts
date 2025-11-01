@@ -36,6 +36,7 @@ export interface CreateUserAuditLogInput {
   mfaMethod?: string;
   mfaVerifiedAt?: Date;
   mfaEventId?: string;
+  severity?: 'INFO' | 'WARNING' | 'CRITICAL';
 }
 
 export interface UserAuditLogFilters {
@@ -80,6 +81,7 @@ class UserAuditLogService {
         mfaMethod: input.mfaMethod,
         mfaVerifiedAt: input.mfaVerifiedAt,
         mfaEventId: input.mfaEventId,
+        severity: input.severity || 'INFO',
         freezeChecksum,
       },
     });

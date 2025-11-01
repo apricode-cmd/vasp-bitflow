@@ -1,12 +1,13 @@
 /**
  * Audit Service
  * 
- * Comprehensive audit logging for tracking all administrative actions
- * and critical user operations
+ * Единая система логирования для User и Admin действий.
+ * Использует единую таблицу AuditLog с полями actorType/actorId.
  */
 
 import prisma from '@/lib/prisma';
 import { headers } from 'next/headers';
+import crypto from 'crypto';
 
 export interface AuditFilters {
   userId?: string;
@@ -36,6 +37,67 @@ export interface AuditLogEntry {
 
 class AuditService {
   /**
+   * Get request context
+   */
+  private async getRequestContext(): Promise<{ ipAddress: string; userAgent: string | null }> {
+    try {
+      const headersList = await headers();
+      const ipAddress = headersList.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                       headersList.get('x-real-ip') || 
+                       'unknown';
+      const userAgent = headersList.get('user-agent') || null;
+      return { ipAddress, userAgent };
+    } catch (error) {
+      console.warn('⚠️ Failed to get request context:', error);
+      return { ipAddress: 'unknown', userAgent: null };
+    }
+  }
+
+  /**
+   * Determine severity based on action
+   */
+  private determineSeverity(action: string): 'INFO' | 'WARNING' | 'CRITICAL' {
+    const criticalActions = [
+      'PAYOUT_APPROVED', 'ADMIN_ROLE_CHANGED', 'SUPER_ADMIN_CREATED',
+      'API_KEY_CREATED', 'API_KEY_REVOKED', 'INTEGRATION_KEY_UPDATED',
+      'USER_IMPERSONATED', 'AML_STR_SUBMITTED', 'BREAK_GLASS_USED',
+      'MFA_DISABLED', 'LIMITS_CHANGED', 'TENANT_DELETED',
+      'ADMIN_DELETED', 'ADMIN_INVITED', 'ADMIN_SUSPENDED', 'ADMIN_TERMINATED',
+      'USER_DELETED', 'KYC_DATA_EXPORTED', 'PII_EXPORTED'
+    ];
+
+    if (criticalActions.includes(action)) {
+      return 'CRITICAL';
+    }
+
+    if (
+      action.includes('DELETE') ||
+      action.includes('SUSPEND') ||
+      action.includes('REJECT') ||
+      action.includes('TERMINATE')
+    ) {
+      return 'WARNING';
+    }
+
+    return 'INFO';
+  }
+
+  /**
+   * Generate freeze checksum for immutability
+   */
+  private generateFreezeChecksum(data: any): string {
+    const hashData = JSON.stringify({
+      ...data,
+      salt: process.env.AUDIT_SALT || 'default-audit-salt-change-in-production',
+    });
+    
+    return crypto
+      .createHash('sha256')
+      .update(hashData)
+      .digest('hex');
+  }
+
+  /**
    * Logs an action with full context
    */
   async logAction(
@@ -49,31 +111,29 @@ class AuditService {
     userId?: string | null,
     additionalMetadata?: Record<string, unknown>
   ): Promise<AuditLogEntry> {
-    // Get request context
-    const headersList = await headers();
-    const ipAddress = headersList.get('x-forwarded-for') || 
-                     headersList.get('x-real-ip') || 
-                     'unknown';
-    const userAgent = headersList.get('user-agent') || null;
+    const { ipAddress, userAgent } = await this.getRequestContext();
+    const severity = this.determineSeverity(action);
 
-    // Validate userId exists in database if provided
-    let validUserId: string | null = null;
-    if (userId) {
-      const userExists = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true }
-      });
-      validUserId = userExists ? userId : null;
-      
-      if (!userExists) {
-        console.warn(`⚠️  AuditLog: userId "${userId}" not found in database, setting to null`);
-      }
-    }
+    // Generate freeze checksum
+    const freezeChecksum = this.generateFreezeChecksum({
+      action,
+      entityType: entity,
+      entityId,
+      timestamp: new Date().toISOString(),
+    });
 
-    // Create audit log entry
+    // Create audit log entry with new fields
     const auditLog = await prisma.auditLog.create({
       data: {
-        userId: validUserId,
+        // New unified fields
+        actorType: userId ? 'ADMIN' : 'SYSTEM',
+        actorId: userId || null,
+        entityType: entity,
+        diffBefore: changes?.oldValue,
+        diffAfter: changes?.newValue,
+        
+        // Legacy fields for backward compatibility
+        userId,
         action,
         entity,
         entityId,
@@ -81,7 +141,18 @@ class AuditService {
         newValue: changes?.newValue || null,
         metadata: additionalMetadata || null,
         ipAddress,
-        userAgent
+        userAgent,
+        
+        // Compliance fields
+        severity,
+        freezeChecksum,
+        
+        // Context
+        context: {
+          ipAddress,
+          userAgent,
+          ...additionalMetadata,
+        },
       }
     });
 
@@ -90,6 +161,7 @@ class AuditService {
 
   /**
    * Logs a user action (e.g., order created, KYC submitted)
+   * Routes to UserAuditLog table
    */
   async logUserAction(
     userId: string,
@@ -98,11 +170,51 @@ class AuditService {
     entityId: string,
     metadata?: Record<string, unknown>
   ): Promise<AuditLogEntry> {
-    return this.logAction(action, entity, entityId, undefined, userId, metadata);
+    const { ipAddress, userAgent } = await this.getRequestContext();
+    const severity = this.determineSeverity(action);
+
+    // Get user details
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, role: true },
+    });
+
+    // Write to UserAuditLog table (not legacy AuditLog)
+    const { userAuditLogService } = await import('./user-audit-log.service');
+    await userAuditLogService.createLog({
+      userId,
+      userEmail: user?.email || 'unknown',
+      userRole: user?.role || 'CLIENT',
+      action,
+      entityType: entity,
+      entityId,
+      context: {
+        ipAddress,
+        userAgent,
+        ...metadata,
+      },
+      severity,
+    });
+
+    // Return in legacy format for compatibility
+    return {
+      id: 'user-log',
+      userId,
+      action,
+      entity,
+      entityId,
+      oldValue: null,
+      newValue: null,
+      metadata: metadata || null,
+      ipAddress,
+      userAgent,
+      createdAt: new Date(),
+    };
   }
 
   /**
    * Logs an admin action with before/after values
+   * Routes to AdminAuditLog table
    */
   async logAdminAction(
     adminId: string,
@@ -113,14 +225,48 @@ class AuditService {
     newValue: Record<string, unknown>,
     metadata?: Record<string, unknown>
   ): Promise<AuditLogEntry> {
-    return this.logAction(
+    const { ipAddress, userAgent } = await this.getRequestContext();
+    const severity = this.determineSeverity(action);
+
+    // Get admin details
+    const admin = await prisma.admin.findUnique({
+      where: { id: adminId },
+      select: { workEmail: true, roleCode: true },
+    });
+
+    // Write to AdminAuditLog table (not legacy AuditLog)
+    const { adminAuditLogService } = await import('./admin-audit-log.service');
+    await adminAuditLogService.createLog({
+      adminId,
+      adminEmail: admin?.workEmail || 'unknown',
+      adminRole: admin?.roleCode || 'ADMIN',
+      action,
+      entityType: entity,
+      entityId,
+      diffBefore: oldValue,
+      diffAfter: newValue,
+      context: {
+        ipAddress,
+        userAgent,
+        ...metadata,
+      },
+      severity,
+    });
+
+    // Return in legacy format for compatibility
+    return {
+      id: 'admin-log',
+      userId: adminId,
       action,
       entity,
       entityId,
-      { oldValue, newValue },
-      adminId,
-      metadata
-    );
+      oldValue,
+      newValue,
+      metadata: metadata || null,
+      ipAddress,
+      userAgent,
+      createdAt: new Date(),
+    };
   }
 
   /**
@@ -132,14 +278,95 @@ class AuditService {
     entityId: string,
     metadata?: Record<string, unknown>
   ): Promise<AuditLogEntry> {
+    const { ipAddress, userAgent } = await this.getRequestContext();
+
+    const freezeChecksum = this.generateFreezeChecksum({
+      actorType: 'SYSTEM',
+      action,
+      entityType: entity,
+      entityId,
+      timestamp: new Date().toISOString(),
+    });
+
     return this.logAction(action, entity, entityId, undefined, null, {
       ...metadata,
-      system: true
+      system: true,
+      freezeChecksum,
     });
   }
 
   /**
-   * Retrieves audit logs with filtering
+   * Alternative method signature for log (used by some routes)
+   */
+  async log(params: {
+    actorType: 'ADMIN' | 'USER' | 'SYSTEM';
+    actorId?: string;
+    actorEmail?: string;
+    actorRole?: string;
+    action: string;
+    entityType: string;
+    entityId: string;
+    diffBefore?: any;
+    diffAfter?: any;
+    changes?: any;
+    context?: any;
+    reason?: string;
+    ipAddress?: string;
+    userAgent?: string;
+    mfaRequired?: boolean;
+    mfaMethod?: string;
+    mfaVerifiedAt?: Date;
+    mfaEventId?: string;
+    severity?: 'INFO' | 'WARNING' | 'CRITICAL';
+    isReviewable?: boolean;
+  }): Promise<void> {
+    const { ipAddress, userAgent } = await this.getRequestContext();
+    const severity = params.severity || this.determineSeverity(params.action);
+
+    const freezeChecksum = this.generateFreezeChecksum({
+      actorType: params.actorType,
+      actorId: params.actorId,
+      action: params.action,
+      entityType: params.entityType,
+      entityId: params.entityId,
+      timestamp: new Date().toISOString(),
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorType: params.actorType,
+        actorId: params.actorId || null,
+        actorEmail: params.actorEmail,
+        actorRole: params.actorRole,
+        action: params.action,
+        entity: params.entityType, // Legacy
+        entityType: params.entityType,
+        entityId: params.entityId,
+        diffBefore: params.diffBefore,
+        diffAfter: params.diffAfter,
+        changes: params.changes,
+        reason: params.reason,
+        ipAddress: params.ipAddress || ipAddress,
+        userAgent: params.userAgent || userAgent,
+        mfaRequired: params.mfaRequired || false,
+        mfaMethod: params.mfaMethod,
+        mfaVerifiedAt: params.mfaVerifiedAt,
+        mfaEventId: params.mfaEventId,
+        severity,
+        isReviewable: params.isReviewable || false,
+        freezeChecksum,
+        context: {
+          ipAddress: params.ipAddress || ipAddress,
+          userAgent: params.userAgent || userAgent,
+          ...params.context,
+        },
+        metadata: params.context,
+      },
+    });
+  }
+
+  /**
+   * Retrieves audit logs with filtering (LEGACY - returns old AuditLog table)
    */
   async getAuditLogs(filters: AuditFilters): Promise<{
     logs: AuditLogEntry[];
@@ -203,7 +430,7 @@ class AuditService {
   }
 
   /**
-   * Gets audit trail for a specific entity
+   * Gets audit trail for a specific entity (LEGACY)
    */
   async getEntityAuditTrail(
     entity: string,
@@ -228,7 +455,7 @@ class AuditService {
   }
 
   /**
-   * Gets user activity history
+   * Gets user activity history (LEGACY)
    */
   async getUserActivity(
     userId: string,
@@ -242,7 +469,7 @@ class AuditService {
   }
 
   /**
-   * Gets recent admin actions
+   * Gets recent admin actions (LEGACY)
    */
   async getRecentAdminActions(limit = 50): Promise<AuditLogEntry[]> {
     return prisma.auditLog.findMany({
@@ -266,7 +493,7 @@ class AuditService {
   }
 
   /**
-   * Gets statistics for audit logs
+   * Gets statistics for audit logs (LEGACY)
    */
   async getAuditStatistics(fromDate?: Date, toDate?: Date): Promise<{
     totalActions: number;
@@ -432,4 +659,3 @@ export const AUDIT_ENTITIES = {
   SYSTEM_SETTINGS: 'SystemSettings',
   API_KEY: 'ApiKey'
 } as const;
-
