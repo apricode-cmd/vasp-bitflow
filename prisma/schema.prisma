@@ -17,9 +17,14 @@ model User {
   lastLogin            DateTime?
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
+  
   adminSettings        AdminSettings?      @relation("AdminSettings")
   apiKeys              ApiKey[]
-  auditLogs            AuditLog[]
+  
+  // Audit Logs
+  userAuditLogs        UserAuditLog[]      @relation("UserAuditLogs") // NEW: отдельная таблица для клиентов
+  auditLogs            AuditLog[]          // LEGACY: старая таблица
+  
   emailLogs            EmailLog[]
   blockedIPs           IPBlacklist[]       @relation("BlockedBy")
   kycSession           KycSession?
@@ -458,30 +463,145 @@ model PayOut {
   @@index([createdAt])
 }
 
+// Admin Audit Log - только действия администраторов
+model AdminAuditLog {
+  id String @id @default(cuid())
+
+  // Organization
+  orgId String?
+
+  // Actor (Admin)
+  adminId    String
+  adminEmail String? // Snapshot
+  adminRole  String? // Snapshot
+
+  // Action
+  action     String
+  entityType String
+  entityId   String
+
+  // Changes (diff)
+  diffBefore Json?
+  diffAfter  Json?
+  changes    Json? // Detailed diff
+
+  // Context
+  context Json? // { ip, ua, device, location, risk, etc }
+  reason  String? // For critical actions
+
+  // MFA verification
+  mfaRequired   Boolean   @default(false)
+  mfaMethod     String?
+  mfaVerifiedAt DateTime?
+  mfaEventId    String? // Link to MfaEvent
+
+  // Compliance
+  severity     String  @default("INFO") // INFO, WARNING, CRITICAL
+  isReviewable Boolean @default(false)
+  reviewedAt   DateTime?
+  reviewedBy   String?
+
+  // Immutability
+  createdAt      DateTime @default(now())
+  freezeChecksum String? // SHA-256 for integrity
+
+  // Relations
+  admin    Admin     @relation("AdminAuditLogs", fields: [adminId], references: [id], onDelete: Cascade)
+  mfaEvent MfaEvent? @relation("AdminMfaLogs", fields: [mfaEventId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, createdAt(sort: Desc)])
+  @@index([adminId, createdAt(sort: Desc)])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([severity])
+  @@index([isReviewable])
+  @@index([mfaEventId])
+}
+
+// User Audit Log - только действия клиентов
+model UserAuditLog {
+  id String @id @default(cuid())
+
+  // Organization
+  orgId String?
+
+  // Actor (User/Client)
+  userId    String
+  userEmail String? // Snapshot
+  userRole  String? // Snapshot (CLIENT)
+
+  // Action
+  action     String
+  entityType String
+  entityId   String
+
+  // Changes (diff)
+  diffBefore Json?
+  diffAfter  Json?
+  changes    Json?
+
+  // Context
+  context Json? // { ip, ua, device, location, risk, etc }
+
+  // MFA verification
+  mfaRequired   Boolean   @default(false)
+  mfaMethod     String?
+  mfaVerifiedAt DateTime?
+  mfaEventId    String?
+
+  // Timestamps
+  createdAt      DateTime @default(now())
+  freezeChecksum String?
+
+  // Relations
+  user     User      @relation("UserAuditLogs", fields: [userId], references: [id], onDelete: Cascade)
+  mfaEvent MfaEvent? @relation("UserMfaLogs", fields: [mfaEventId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([mfaEventId])
+}
+
+// Legacy AuditLog (keep for backward compatibility, will be removed later)
 model AuditLog {
   id String @id @default(cuid())
 
-  // Who (Actor)
-  userId    String? // User ID (CLIENT)
-  adminId   String? // Admin ID (ADMIN/SUPER_ADMIN/etc)
-  userEmail String? // Email snapshot
-  userRole  String? // Role snapshot
+  // Organization (for multi-tenancy)
+  orgId String?
+
+  // Actor (unified for User and Admin)
+  actorType  String  // 'USER' | 'ADMIN' | 'SYSTEM'
+  actorId    String? // userId OR adminId (universal)
+  actorRole  String? // Role snapshot
+  actorEmail String? // Email snapshot
+
+  // Legacy fields (deprecated, use actorType/actorId instead)
+  userId    String? // DEPRECATED: use actorId with actorType='USER'
+  adminId   String? // DEPRECATED: use actorId with actorType='ADMIN'
+  userEmail String? // DEPRECATED: use actorEmail
+  userRole  String? // DEPRECATED: use actorRole
 
   // What (Action)
-  action   String
-  entity   String
-  entityId String
+  action     String
+  entity     String  // DEPRECATED: use entityType
+  entityType String? // New: clearer naming
+  entityId   String
 
-  // Changes
-  oldValue Json?
-  newValue Json?
-  changes  Json? // Detailed diff
+  // Changes (diff)
+  oldValue   Json? // DEPRECATED: use diffBefore
+  newValue   Json? // DEPRECATED: use diffAfter
+  diffBefore Json? // New: before state
+  diffAfter  Json? // New: after state
+  changes    Json? // Detailed diff
 
-  // Context
-  metadata Json?
+  // Context (consolidated)
+  context  Json? // New: { ip, ua, device, location, risk, etc }
+  metadata Json? // Additional metadata
   reason   String? // For critical actions
 
-  // Where & When
+  // Legacy context fields (deprecated)
   ipAddress String?
   userAgent String?
   country   String?
@@ -491,29 +611,128 @@ model AuditLog {
   mfaRequired   Boolean   @default(false)
   mfaMethod     String?
   mfaVerifiedAt DateTime?
+  mfaEventId    String? // Link to MfaEvent table
 
   // Compliance
-  severity     String    @default("INFO") // INFO, WARNING, CRITICAL
-  isReviewable Boolean   @default(false)
+  severity     String  @default("INFO") // INFO, WARNING, CRITICAL
+  isReviewable Boolean @default(false)
   reviewedAt   DateTime?
   reviewedBy   String?
 
   // Immutability
-  createdAt DateTime @default(now())
-  hash      String? // SHA-256 for integrity
+  createdAt      DateTime @default(now())
+  hash           String? // DEPRECATED: use freezeChecksum
+  freezeChecksum String? // New: SHA-256 for integrity
 
   // Relations
-  user  User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
-  admin Admin? @relation("AdminAuditLogs", fields: [adminId], references: [id], onDelete: SetNull)
+  user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  admin    Admin?    @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  mfaEvent MfaEvent? @relation("LegacyMfaLogs", fields: [mfaEventId], references: [id], onDelete: SetNull)
 
-  @@index([userId])
-  @@index([adminId])
-  @@index([entity, entityId])
+  @@index([orgId, createdAt(sort: Desc)])
+  @@index([actorType, actorId])
+  @@index([userId]) // Legacy
+  @@index([adminId]) // Legacy
+  @@index([entity, entityId]) // Legacy
+  @@index([entityType, entityId])
   @@index([action])
   @@index([createdAt])
   @@index([severity])
   @@index([isReviewable])
-  @@index([userRole])
+  @@index([userRole]) // Legacy
+  @@index([mfaEventId])
+}
+
+// MFA Events - общая таблица для User и Admin
+model MfaEvent {
+  id String @id @default(cuid())
+
+  // Organization
+  orgId String?
+
+  // Actor
+  actorId   String
+  actorType String // 'USER' | 'ADMIN'
+  actorRole String?
+
+  // Event details
+  actionType String // 'STEPUP' | 'LOGIN' | 'REGISTER'
+  method     String // 'WEBAUTHN' | 'TOTP' | 'BACKUP_CODE'
+
+  // WebAuthn specific
+  userVerification Boolean? // UV flag
+  credentialIdHash String? // Hashed credential ID (not full ID!)
+  aaguid           String? // Authenticator AAGUID
+  signCount        Int? // Signature counter
+
+  // Challenge
+  challengeId String?
+
+  // Result
+  result       String // 'SUCCESS' | 'FAILED' | 'EXPIRED'
+  errorCode    String?
+  errorMessage String?
+
+  // Context
+  ipAddress  String
+  userAgent  String?
+  deviceInfo Json? // Browser, OS, device type
+
+  // Timestamps
+  createdAt DateTime @default(now())
+
+  // Relations
+  admin          Admin?           @relation("AdminMfaEvents", fields: [actorId], references: [id], onDelete: SetNull)
+  adminAuditLogs AdminAuditLog[]  @relation("AdminMfaLogs")
+  userAuditLogs  UserAuditLog[]   @relation("UserMfaLogs")
+  legacyLogs     AuditLog[]       @relation("LegacyMfaLogs")
+
+  @@index([actorId, createdAt(sort: Desc)])
+  @@index([orgId, createdAt(sort: Desc)])
+  @@index([challengeId])
+  @@index([result])
+  @@index([actionType])
+}
+
+// System Logs - технические события
+model SystemLog {
+  id String @id @default(cuid())
+
+  // Organization
+  orgId String?
+
+  // Source
+  source String // 'KYCAID_WEBHOOK' | 'RAPYD_WEBHOOK' | 'TATUM_API' | 'NODE'
+  level  String // 'INFO' | 'WARN' | 'ERROR' | 'CRITICAL'
+
+  // Event details
+  eventType   String // 'WEBHOOK_RECEIVED' | 'API_CALL' | 'INTEGRATION_SYNC'
+  endpoint    String?
+  method      String?
+  statusCode  Int?
+
+  // Payload (sanitized - no secrets!)
+  payload      Json?
+  requestBody  Json?
+  responseBody Json?
+
+  // Error details
+  errorMessage String?
+  errorStack   String? @db.Text
+
+  // Performance
+  responseTime Int? // milliseconds
+
+  // Context
+  metadata Json?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+
+  @@index([source, createdAt(sort: Desc)])
+  @@index([level, createdAt(sort: Desc)])
+  @@index([orgId, createdAt(sort: Desc)])
+  @@index([eventType])
 }
 
 model EmailLog {
@@ -1504,21 +1723,26 @@ model Admin {
   updatedAt DateTime @updatedAt
 
   // Relations
-  twoFactorAuth    AdminTwoFactorAuth?
-  sessions         AdminSession[]
-  settings         AdminSettings?       @relation("AdminToSettings")
-  webAuthnCreds    WebAuthnCredential[]
-  mfaChallenges    MfaChallenge[]
-  oneTimeTokens    OneTimeAuthToken[]   @relation("AdminOTAT")
-  auditLogsCreated AuditLog[]           @relation("AdminAuditLogs")
-  subordinates     Admin[]              @relation("ManagerSubordinates") // Подчинённые
-  manager          Admin?               @relation("ManagerSubordinates", fields: [managerId], references: [id])
-  payInsInitiated  PayIn[]              @relation("PayInInitiator")
-  payInsApproved   PayIn[]              @relation("PayInApprover")
-  payOutsInitiated PayOut[]             @relation("PayOutInitiator")
-  payOutsApproved  PayOut[]             @relation("PayOutApprover")
-  invitedAdmins    Admin[]              @relation("AdminInviter") // Admins invited by this admin
-  inviter          Admin?               @relation("AdminInviter", fields: [invitedBy], references: [id])
+  twoFactorAuth       AdminTwoFactorAuth?
+  sessions            AdminSession[]
+  settings            AdminSettings?       @relation("AdminToSettings")
+  webAuthnCreds       WebAuthnCredential[]
+  mfaChallenges       MfaChallenge[]
+  oneTimeTokens       OneTimeAuthToken[]   @relation("AdminOTAT")
+  
+  // Audit Logs
+  auditLogs           AdminAuditLog[]      @relation("AdminAuditLogs") // NEW: отдельная таблица для админов
+  auditLogsCreated    AuditLog[]           // LEGACY: старая таблица
+  mfaEvents           MfaEvent[]           @relation("AdminMfaEvents")
+  
+  subordinates        Admin[]              @relation("ManagerSubordinates") // Подчинённые
+  manager             Admin?               @relation("ManagerSubordinates", fields: [managerId], references: [id])
+  payInsInitiated     PayIn[]              @relation("PayInInitiator")
+  payInsApproved      PayIn[]              @relation("PayInApprover")
+  payOutsInitiated    PayOut[]             @relation("PayOutInitiator")
+  payOutsApproved     PayOut[]             @relation("PayOutApprover")
+  invitedAdmins       Admin[]              @relation("AdminInviter") // Admins invited by this admin
+  inviter             Admin?               @relation("AdminInviter", fields: [invitedBy], references: [id])
 
   @@unique([ssoProvider, ssoSubject])
   @@index([workEmail])
