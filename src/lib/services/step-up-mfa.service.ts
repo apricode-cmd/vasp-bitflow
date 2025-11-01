@@ -79,8 +79,7 @@ export class StepUpMfaService {
     adminId: string,
     action: StepUpAction,
     resourceType?: string,
-    resourceId?: string,
-    metadata?: Record<string, any>
+    resourceId?: string
   ): Promise<StepUpChallengeResponse> {
     // Get admin with credentials
     const admin = await prisma.admin.findUnique({
@@ -132,7 +131,6 @@ export class StepUpMfaService {
         attempts: 0,
         maxAttempts: this.MAX_ATTEMPTS,
         expiresAt,
-        metadata: metadata ? JSON.parse(JSON.stringify(metadata)) : null,
       },
     });
 

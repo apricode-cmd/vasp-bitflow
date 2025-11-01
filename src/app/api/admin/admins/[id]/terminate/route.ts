@@ -49,19 +49,16 @@ export async function POST(
       );
     }
 
+    // Read body (might contain MFA data)
+    const body = await request.json().catch(() => ({}));
+
     // 🔐 STEP-UP MFA REQUIRED FOR TERMINATING ADMIN
     const mfaResult = await handleStepUpMfa(
-      request,
+      body,
       session.user.id,
       'DELETE_ADMIN',
       'Admin',
-      adminId,
-      {
-        metadata: {
-          targetAdmin: admin.email,
-          targetRole: admin.role,
-        }
-      }
+      adminId
     );
 
     // Return MFA challenge if required

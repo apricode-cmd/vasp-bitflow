@@ -147,19 +147,11 @@ export async function PATCH(
     
     if (isCriticalAction) {
       const mfaResult = await handleStepUpMfa(
-        request,
+        body,
         adminId,
         'APPROVE_PAYOUT',
         'PayOut',
-        id,
-        {
-          metadata: {
-            status: validated.status,
-            amount: existing.amount,
-            currency: existing.cryptocurrency?.code || existing.fiatCurrency?.code,
-            destinationAddress: existing.destinationAddress,
-          }
-        }
+        id
       );
 
       // Return MFA challenge if required

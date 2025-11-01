@@ -37,10 +37,7 @@ export async function handleStepUpMfa(
   adminId: string,
   action: StepUpAction,
   resourceType?: string,
-  resourceId?: string,
-  options?: {
-    metadata?: Record<string, any>;
-  }
+  resourceId?: string
 ): Promise<StepUpMfaResult> {
   try {
     // Check if action requires Step-up MFA
@@ -54,8 +51,7 @@ export async function handleStepUpMfa(
         adminId,
         action,
         resourceType,
-        resourceId,
-        options?.metadata
+        resourceId
       );
 
       return {

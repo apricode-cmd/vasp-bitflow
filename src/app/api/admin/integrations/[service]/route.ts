@@ -85,9 +85,11 @@ export async function PATCH(
       );
     }
 
+    const body = await request.json();
+
     // 🔐 STEP-UP MFA REQUIRED FOR INTEGRATION CONFIG UPDATE
     const mfaResult = await handleStepUpMfa(
-      request,
+      body,
       adminId,
       'UPDATE_INTEGRATION_KEYS',
       'IntegrationConfig',
@@ -114,8 +116,6 @@ export async function PATCH(
         { status: 403 }
       );
     }
-
-    const body = await request.json();
 
     // Validate
     const validated = updateIntegrationSchema.parse(body);
