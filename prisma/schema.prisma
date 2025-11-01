@@ -38,7 +38,6 @@ model User {
   profile              Profile?
   sessionRevocationsBy SessionRevocation[] @relation("RevokedBy")
   revokedSessions      SessionRevocation[] @relation("RevokedSessions")
-  systemLogs           SystemLog[]
   twoFactorAuth        TwoFactorAuth?
   kycLevelData         UserKycLevel?       @relation("UserKycLevelRelation")
   userWallets          UserWallet[]
@@ -572,7 +571,7 @@ model AuditLog {
   orgId String?
 
   // Actor (unified for User and Admin)
-  actorType  String  // 'USER' | 'ADMIN' | 'SYSTEM'
+  actorType  String?  // 'USER' | 'ADMIN' | 'SYSTEM' (nullable for legacy data)
   actorId    String? // userId OR adminId (universal)
   actorRole  String? // Role snapshot
   actorEmail String? // Email snapshot
@@ -702,11 +701,11 @@ model SystemLog {
   orgId String?
 
   // Source
-  source String // 'KYCAID_WEBHOOK' | 'RAPYD_WEBHOOK' | 'TATUM_API' | 'NODE'
-  level  String // 'INFO' | 'WARN' | 'ERROR' | 'CRITICAL'
+  source String? // 'KYCAID_WEBHOOK' | 'RAPYD_WEBHOOK' | 'TATUM_API' | 'NODE' (nullable for legacy)
+  level  String? // 'INFO' | 'WARN' | 'ERROR' | 'CRITICAL' (nullable for legacy)
 
   // Event details
-  eventType   String // 'WEBHOOK_RECEIVED' | 'API_CALL' | 'INTEGRATION_SYNC'
+  eventType   String? // 'WEBHOOK_RECEIVED' | 'API_CALL' | 'INTEGRATION_SYNC' (nullable for legacy)
   endpoint    String?
   method      String?
   statusCode  Int?
@@ -1259,43 +1258,6 @@ model Integration {
   @@index([service])
   @@index([isEnabled])
   @@index([status])
-}
-
-model SystemLog {
-  id             String   @id @default(cuid())
-  userId         String?
-  sessionId      String?
-  action         String
-  method         String?
-  path           String
-  query          Json?
-  body           Json?
-  statusCode     Int?
-  ipAddress      String
-  userAgent      String?
-  deviceType     String?
-  browser        String?
-  browserVersion String?
-  os             String?
-  osVersion      String?
-  isMobile       Boolean  @default(false)
-  isBot          Boolean  @default(false)
-  country        String?
-  city           String?
-  responseTime   Int?
-  errorMessage   String?
-  errorStack     String?
-  referrer       String?
-  metadata       Json?
-  createdAt      DateTime @default(now())
-  user           User?    @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-  @@index([ipAddress])
-  @@index([action])
-  @@index([createdAt])
-  @@index([isBot])
-  @@index([deviceType])
 }
 
 model IPBlacklist {

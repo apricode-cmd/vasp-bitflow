@@ -2,12 +2,13 @@
  * Admin API Keys Management API
  * 
  * GET /api/admin/api-keys - List all API keys
- * POST /api/admin/api-keys - Generate new API key
+ * POST /api/admin/api-keys - Generate new API key (REQUIRES STEP-UP MFA)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRole, getCurrentUserId } from '@/lib/middleware/admin-auth';
 import { apiKeyService } from '@/lib/services/api-key.service';
+import { stepUpMfaService } from '@/lib/services/step-up-mfa.service';
 import { createApiKeySchema } from '@/lib/validations/api-key';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 import { z } from 'zod';
