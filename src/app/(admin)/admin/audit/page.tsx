@@ -224,8 +224,11 @@ export default function AuditPage(): JSX.Element {
     entity: '',
     userId: '',
     ipAddress: '',
-    deviceType: '',
-    search: ''
+    search: '',
+    // System Log filters
+    source: '',
+    eventType: '',
+    level: ''
   });
 
   const [pagination, setPagination] = React.useState({
@@ -392,10 +395,10 @@ export default function AuditPage(): JSX.Element {
       setIsLoading(true);
       const params = new URLSearchParams();
       
-      if (filters.action) params.append('action', filters.action);
-      if (filters.userId) params.append('userId', filters.userId);
-      if (filters.ipAddress) params.append('ipAddress', filters.ipAddress);
-      if (filters.deviceType) params.append('deviceType', filters.deviceType);
+      if (filters.source) params.append('source', filters.source);
+      if (filters.eventType) params.append('eventType', filters.eventType);
+      if (filters.level) params.append('level', filters.level);
+      if (filters.search) params.append('search', filters.search);
       params.append('limit', pagination.limit.toString());
       params.append('offset', pagination.offset.toString());
 
@@ -1073,11 +1076,11 @@ export default function AuditPage(): JSX.Element {
                 Filters
               </CardTitle>
               <CardDescription>
-                Filter system logs by action, user, device type, or IP address
+                Filter system logs by source, event type, level, or endpoint
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label>Search</Label>
                   <div className="relative">
@@ -1092,49 +1095,59 @@ export default function AuditPage(): JSX.Element {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Action</Label>
-                  <Input
-                    placeholder="e.g., LOGIN_SUCCESS"
-                    value={filters.action}
-                    onChange={(e) => setFilters({ ...filters, action: e.target.value })}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Device Type</Label>
+                  <Label>Source</Label>
                   <Select
-                    value={filters.deviceType || 'all'}
-                    onValueChange={(value) => setFilters({ ...filters, deviceType: value === 'all' ? '' : value })}
+                    value={filters.source || 'all'}
+                    onValueChange={(value) => setFilters({ ...filters, source: value === 'all' ? '' : value })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="All devices" />
+                      <SelectValue placeholder="All sources" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All devices</SelectItem>
-                      <SelectItem value="desktop">Desktop</SelectItem>
-                      <SelectItem value="mobile">Mobile</SelectItem>
-                      <SelectItem value="tablet">Tablet</SelectItem>
+                      <SelectItem value="all">All sources</SelectItem>
+                      <SelectItem value="KYCAID_WEBHOOK">KYCAID Webhook</SelectItem>
+                      <SelectItem value="RAPYD_WEBHOOK">Rapyd Webhook</SelectItem>
+                      <SelectItem value="NODE">Node.js</SelectItem>
+                      <SelectItem value="API">API</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>IP Address</Label>
-                  <Input
-                    placeholder="e.g., 192.168.1.1"
-                    value={filters.ipAddress}
-                    onChange={(e) => setFilters({ ...filters, ipAddress: e.target.value })}
-                    className="font-mono"
-                  />
+                  <Label>Event Type</Label>
+                  <Select
+                    value={filters.eventType || 'all'}
+                    onValueChange={(value) => setFilters({ ...filters, eventType: value === 'all' ? '' : value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="All events" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All events</SelectItem>
+                      <SelectItem value="WEBHOOK_RECEIVED">Webhook Received</SelectItem>
+                      <SelectItem value="API_CALL">API Call</SelectItem>
+                      <SelectItem value="ERROR">Error</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>User ID</Label>
-                  <Input
-                    placeholder="Filter by user..."
-                    value={filters.userId}
-                    onChange={(e) => setFilters({ ...filters, userId: e.target.value })}
-                  />
+                  <Label>Level</Label>
+                  <Select
+                    value={filters.level || 'all'}
+                    onValueChange={(value) => setFilters({ ...filters, level: value === 'all' ? '' : value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="All levels" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All levels</SelectItem>
+                      <SelectItem value="INFO">Info</SelectItem>
+                      <SelectItem value="WARN">Warning</SelectItem>
+                      <SelectItem value="ERROR">Error</SelectItem>
+                      <SelectItem value="CRITICAL">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -1151,8 +1164,8 @@ export default function AuditPage(): JSX.Element {
             columns={systemColumns}
             data={filteredSystemLogs}
             isLoading={isLoading}
-            searchKey="action"
-            searchPlaceholder="Search actions..."
+            searchKey="eventType"
+            searchPlaceholder="Search event types..."
           />
         </TabsContent>
 
