@@ -65,25 +65,6 @@ import {
 } from 'lucide-react';
 
 // Types
-interface AuditLog {
-  id: string;
-  userId: string | null;
-  action: string;
-  entity: string;
-  entityId: string;
-  oldValue: any;
-  newValue: any;
-  metadata: any;
-  ipAddress: string | null;
-  userAgent: string | null;
-  createdAt: string;
-  user: {
-    id: string;
-    email: string;
-    role: string;
-  } | null;
-}
-
 interface AdminAuditLog {
   id: string;
   adminId: string;
@@ -210,7 +191,6 @@ const getStatusVariant = (code: number | null): "default" | "secondary" | "destr
 };
 
 export default function AuditPage(): JSX.Element {
-  const [auditLogs, setAuditLogs] = React.useState<AuditLog[]>([]);
   const [adminLogs, setAdminLogs] = React.useState<AdminAuditLog[]>([]);
   const [userLogs, setUserLogs] = React.useState<UserAuditLog[]>([]);
   const [criticalLogs, setCriticalLogs] = React.useState<AdminAuditLog[]>([]);
@@ -254,8 +234,6 @@ export default function AuditPage(): JSX.Element {
       fetchUserLogs();
     } else if (activeTab === 'critical') {
       fetchCriticalLogs();
-    } else if (activeTab === 'audit') {
-      fetchAuditLogs();
     } else if (activeTab === 'system') {
       fetchSystemLogs();
     } else if (activeTab === 'stats') {
@@ -398,39 +376,6 @@ export default function AuditPage(): JSX.Element {
     }
   };
 
-  const fetchAuditLogs = async () => {
-    try {
-      setIsLoading(true);
-      const params = new URLSearchParams();
-      
-      if (filters.action) params.append('action', filters.action);
-      if (filters.entity) params.append('entity', filters.entity);
-      if (filters.userId) params.append('userId', filters.userId);
-      if (filters.ipAddress) params.append('ipAddress', filters.ipAddress);
-      params.append('limit', pagination.limit.toString());
-      params.append('offset', pagination.offset.toString());
-
-      const response = await fetch(`/api/admin/audit?${params}`);
-      const data = await response.json();
-
-      if (data.success) {
-        setAuditLogs(data.data);
-        setPagination({
-          ...pagination,
-          total: data.pagination.total
-        });
-      } else {
-        toast.error('Failed to fetch audit logs');
-      }
-    } catch (error) {
-      console.error('Fetch logs error:', error);
-      toast.error('Failed to fetch audit logs');
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  };
-
   const fetchSystemLogs = async () => {
     try {
       setIsLoading(true);
@@ -485,8 +430,6 @@ export default function AuditPage(): JSX.Element {
       await fetchUserLogs();
     } else if (activeTab === 'critical') {
       await fetchCriticalLogs();
-    } else if (activeTab === 'audit') {
-      await fetchAuditLogs();
     } else if (activeTab === 'system') {
       await fetchSystemLogs();
     } else if (activeTab === 'stats') {
@@ -548,20 +491,7 @@ export default function AuditPage(): JSX.Element {
     }
   };
 
-  // Filter logs by search
-  const filteredAuditLogs = React.useMemo(() => {
-    if (!filters.search) return auditLogs;
-    
-    const searchLower = filters.search.toLowerCase();
-    return auditLogs.filter(log => 
-      log.action.toLowerCase().includes(searchLower) ||
-      log.entity.toLowerCase().includes(searchLower) ||
-      log.entityId.toLowerCase().includes(searchLower) ||
-      log.user?.email.toLowerCase().includes(searchLower) ||
-      log.ipAddress?.toLowerCase().includes(searchLower)
-    );
-  }, [auditLogs, filters.search]);
-
+  // Filter system logs by search
   const filteredSystemLogs = React.useMemo(() => {
     if (!filters.search) return systemLogs;
     
@@ -879,92 +809,6 @@ export default function AuditPage(): JSX.Element {
     },
   ];
 
-  const auditColumns: ColumnDef<AuditLog>[] = [
-    {
-      accessorKey: 'createdAt',
-      header: 'Time',
-      cell: ({ row }) => (
-        <div className="text-sm">
-          <div className="font-medium">
-            {new Date(row.original.createdAt).toLocaleTimeString()}
-          </div>
-          <div className="text-xs text-muted-foreground">
-            {new Date(row.original.createdAt).toLocaleDateString()}
-          </div>
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'user',
-      header: 'User',
-      cell: ({ row }) => {
-        const log = row.original;
-        return log.user ? (
-          <div className="space-y-1">
-            <div className="text-sm font-medium">{log.user.email}</div>
-            <Badge variant="outline" className="text-xs">
-              {log.user.role}
-            </Badge>
-          </div>
-        ) : (
-          <Badge variant="secondary" className="gap-1">
-            <Settings className="h-3 w-3" />
-            SYSTEM
-          </Badge>
-        );
-      },
-    },
-    {
-      accessorKey: 'action',
-      header: 'Action',
-      cell: ({ row }) => (
-        <Badge variant={getActionVariant(row.original.action)}>
-          {row.original.action}
-        </Badge>
-      ),
-    },
-    {
-      accessorKey: 'entity',
-      header: 'Entity',
-      cell: ({ row }) => {
-        const EntityIcon = getEntityIcon(row.original.entity);
-        return (
-          <div className="flex items-center gap-2">
-            <EntityIcon className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <div className="text-sm font-medium">{row.original.entity}</div>
-              <code className="text-xs text-muted-foreground">
-                {row.original.entityId.slice(0, 8)}...
-              </code>
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: 'ipAddress',
-      header: 'IP Address',
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground font-mono">
-          {row.original.ipAddress || 'N/A'}
-        </span>
-      ),
-    },
-    {
-      id: 'actions',
-      header: 'Actions',
-      cell: ({ row }) => (
-        <Button 
-          variant="ghost" 
-          size="sm"
-          onClick={() => handleViewDetails(row.original)}
-        >
-          <FileText className="h-4 w-4" />
-        </Button>
-      ),
-    },
-  ];
-
   const systemColumns: ColumnDef<SystemLog>[] = [
     {
       accessorKey: 'createdAt',
@@ -1096,10 +940,6 @@ export default function AuditPage(): JSX.Element {
             <ShieldOff className="h-4 w-4 text-destructive" />
             Critical Actions
           </TabsTrigger>
-          <TabsTrigger value="audit" className="gap-2">
-            <FileText className="h-4 w-4" />
-            Audit Logs (Legacy)
-          </TabsTrigger>
           <TabsTrigger value="system" className="gap-2">
             <Activity className="h-4 w-4" />
             System Logs
@@ -1207,99 +1047,6 @@ export default function AuditPage(): JSX.Element {
               </Tabs>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        {/* Audit Logs Tab */}
-        <TabsContent value="audit" className="space-y-4 mt-6">
-          {/* Filters */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Filter className="h-5 w-5" />
-                Filters
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                <div className="space-y-2 md:col-span-2 lg:col-span-1">
-                  <Label>Search</Label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search logs..."
-                      value={filters.search}
-                      onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                      className="pl-9"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Action</Label>
-                  <Input
-                    placeholder="e.g., ORDER_CREATED"
-                    value={filters.action}
-                    onChange={(e) => setFilters({ ...filters, action: e.target.value })}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Entity</Label>
-                  <Select
-                    value={filters.entity || 'all'}
-                    onValueChange={(value) => setFilters({ ...filters, entity: value === 'all' ? '' : value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="All entities" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All entities</SelectItem>
-                      <SelectItem value="User">User</SelectItem>
-                      <SelectItem value="Order">Order</SelectItem>
-                      <SelectItem value="KycSession">KYC Session</SelectItem>
-                      <SelectItem value="TradingPair">Trading Pair</SelectItem>
-                      <SelectItem value="PlatformWallet">Platform Wallet</SelectItem>
-                      <SelectItem value="SystemSettings">System Settings</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>IP Address</Label>
-                  <Input
-                    placeholder="e.g., 192.168.1.1"
-                    value={filters.ipAddress}
-                    onChange={(e) => setFilters({ ...filters, ipAddress: e.target.value })}
-                    className="font-mono"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>User ID</Label>
-                  <Input
-                    placeholder="Filter by user..."
-                    value={filters.userId}
-                    onChange={(e) => setFilters({ ...filters, userId: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <Button variant="outline" size="sm" onClick={handleFilterReset}>
-                  Reset Filters
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Data Table */}
-          <DataTable
-            columns={auditColumns}
-            data={filteredAuditLogs}
-            isLoading={isLoading}
-            searchKey="action"
-            searchPlaceholder="Search actions..."
-          />
         </TabsContent>
 
         {/* System Logs Tab */}
@@ -1550,197 +1297,426 @@ export default function AuditPage(): JSX.Element {
         </TabsContent>
       </Tabs>
 
-      {/* Details Sheet */}
+      {/* Details Sheet - Enhanced for new audit system */}
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent className="sm:max-w-2xl overflow-y-auto">
+        <SheetContent className="sm:max-w-3xl overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>Log Details</SheetTitle>
+            <SheetTitle>Audit Log Details</SheetTitle>
             <SheetDescription>
-              Complete information about this log entry
+              Complete compliance information about this entry
             </SheetDescription>
           </SheetHeader>
 
           {selectedLog && (
             <div className="space-y-6 mt-6">
-              {/* Basic Info */}
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-xs text-muted-foreground">Timestamp</Label>
-                  <div className="text-sm font-medium">
-                    {new Date(selectedLog.createdAt).toLocaleString()}
+              {/* Timestamp & ID */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Entry Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Log ID</Label>
+                    <code className="text-xs block mt-1">{selectedLog.id}</code>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    ({formatRelativeTime(selectedLog.createdAt)})
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div>
-                  <Label className="text-xs text-muted-foreground">User</Label>
-                  {selectedLog.user ? (
-                    <div className="space-y-1 mt-1">
-                      <div className="text-sm font-medium">{selectedLog.user.email}</div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">{selectedLog.user.role}</Badge>
-                        <code className="text-xs text-muted-foreground">{selectedLog.user.id}</code>
-                      </div>
-                    </div>
-                  ) : (
-                    <Badge variant="secondary" className="mt-1">SYSTEM / Anonymous</Badge>
-                  )}
-                </div>
-
-                <Separator />
-
-                <div>
-                  <Label className="text-xs text-muted-foreground">Action</Label>
-                  <div className="mt-1">
-                    <Badge variant={getActionVariant(selectedLog.action)} className="text-sm">
-                      {selectedLog.action}
-                    </Badge>
-                  </div>
-                </div>
-
-                {selectedLog.entity && (
-                  <>
-                    <Separator />
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Entity</Label>
-                      <div className="text-sm font-medium mt-1">{selectedLog.entity}</div>
-                      <code className="text-xs text-muted-foreground block mt-1">
-                        ID: {selectedLog.entityId}
-                      </code>
-                    </div>
-                  </>
-                )}
-
-                {selectedLog.path && (
-                  <>
-                    <Separator />
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Path</Label>
-                      <code className="text-sm block mt-1">{selectedLog.path}</code>
-                      {selectedLog.method && (
-                        <Badge variant="outline" className="mt-1">{selectedLog.method}</Badge>
-                      )}
-                      {selectedLog.statusCode && (
-                        <Badge variant={getStatusVariant(selectedLog.statusCode)} className="mt-1 ml-2">
-                          {selectedLog.statusCode}
-                        </Badge>
-                      )}
-                    </div>
-                  </>
-                )}
-
-                <Separator />
-
-                <div>
-                  <Label className="text-xs text-muted-foreground">IP Address</Label>
-                  <div className="text-sm font-mono mt-1 flex items-center gap-2">
-                    {selectedLog.ipAddress || 'N/A'}
-                    {selectedLog.ipAddress && (
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => handleBlockIP(selectedLog.ipAddress)}
-                      >
-                        <Ban className="h-3 w-3 mr-1" />
-                        Block
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                {selectedLog.deviceType && (
-                  <>
-                    <Separator />
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Device Info</Label>
-                      <div className="mt-1 space-y-1">
-                        <div className="text-sm">
-                          <span className="text-muted-foreground">Type:</span> {selectedLog.deviceType}
-                        </div>
-                        {selectedLog.browser && (
-                          <div className="text-sm">
-                            <span className="text-muted-foreground">Browser:</span> {selectedLog.browser} {selectedLog.browserVersion}
-                          </div>
-                        )}
-                        {selectedLog.os && (
-                          <div className="text-sm">
-                            <span className="text-muted-foreground">OS:</span> {selectedLog.os}
-                          </div>
-                        )}
-                        {selectedLog.isBot && (
-                          <Badge variant="secondary" className="gap-1">
-                            <Bot className="h-3 w-3" />
-                            Bot Detected
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {selectedLog.userAgent && (
-                  <>
-                    <Separator />
-                    <div>
-                      <Label className="text-xs text-muted-foreground">User Agent</Label>
-                      <div className="text-xs text-muted-foreground mt-1 break-all">
-                        {selectedLog.userAgent}
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {selectedLog.responseTime && (
-                  <>
-                    <Separator />
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Response Time</Label>
-                      <div className="text-sm font-medium mt-1">
-                        {selectedLog.responseTime}ms
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Changes */}
-              {(selectedLog.oldValue || selectedLog.newValue) && (
-                <>
                   <Separator />
-                  <div className="space-y-3">
-                    <Label className="text-sm font-semibold">Changes</Label>
-                    
-                    {selectedLog.oldValue && (
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Old Value</Label>
-                        <pre className="mt-1 p-3 bg-muted rounded-lg text-xs overflow-x-auto">
-                          {JSON.stringify(selectedLog.oldValue, null, 2)}
-                        </pre>
-                      </div>
-                    )}
-
-                    {selectedLog.newValue && (
-                      <div>
-                        <Label className="text-xs text-muted-foreground">New Value</Label>
-                        <pre className="mt-1 p-3 bg-muted rounded-lg text-xs overflow-x-auto">
-                          {JSON.stringify(selectedLog.newValue, null, 2)}
-                        </pre>
-                      </div>
-                    )}
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Timestamp</Label>
+                    <div className="text-sm font-medium mt-1">
+                      {new Date(selectedLog.createdAt).toLocaleString('en-US', {
+                        dateStyle: 'full',
+                        timeStyle: 'long'
+                      })}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      ({formatRelativeTime(selectedLog.createdAt)})
+                    </div>
                   </div>
-                </>
+                  {selectedLog.freezeChecksum && (
+                    <>
+                      <Separator />
+                      <div>
+                        <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                          <CheckCircle2 className="h-3 w-3 text-green-600" />
+                          Integrity Checksum
+                        </Label>
+                        <code className="text-xs block mt-1 break-all">{selectedLog.freezeChecksum}</code>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Actor Info - Admin or User */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">
+                    {selectedLog.adminEmail ? 'Administrator' : 'User'}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {selectedLog.adminEmail ? (
+                    // Admin log
+                    <>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Email</Label>
+                        <div className="text-sm font-medium mt-1">{selectedLog.adminEmail}</div>
+                      </div>
+                      <Separator />
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Role</Label>
+                        <Badge variant="outline" className="mt-1">{selectedLog.adminRole}</Badge>
+                      </div>
+                      <Separator />
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Admin ID</Label>
+                        <code className="text-xs block mt-1">{selectedLog.adminId}</code>
+                      </div>
+                    </>
+                  ) : selectedLog.userEmail ? (
+                    // User log
+                    <>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Email</Label>
+                        <div className="text-sm font-medium mt-1">{selectedLog.userEmail}</div>
+                      </div>
+                      <Separator />
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Role</Label>
+                        <Badge variant="outline" className="mt-1">{selectedLog.userRole}</Badge>
+                      </div>
+                      <Separator />
+                      <div>
+                        <Label className="text-xs text-muted-foreground">User ID</Label>
+                        <code className="text-xs block mt-1">{selectedLog.userId}</code>
+                      </div>
+                    </>
+                  ) : (
+                    <Badge variant="secondary">SYSTEM</Badge>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Action & Entity */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Action Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Action</Label>
+                    <div className="mt-1">
+                      <Badge variant={getActionVariant(selectedLog.action)} className="text-sm">
+                        {selectedLog.action}
+                      </Badge>
+                    </div>
+                  </div>
+                  {selectedLog.severity && (
+                    <>
+                      <Separator />
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Severity Level</Label>
+                        <div className="mt-1">
+                          <Badge 
+                            variant={selectedLog.severity === 'CRITICAL' ? 'destructive' : selectedLog.severity === 'WARNING' ? 'default' : 'secondary'}
+                            className="text-sm"
+                          >
+                            {selectedLog.severity}
+                          </Badge>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  {(selectedLog.entityType || selectedLog.entity) && (
+                    <>
+                      <Separator />
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Entity Type</Label>
+                        <div className="text-sm font-medium mt-1">{selectedLog.entityType || selectedLog.entity}</div>
+                        <code className="text-xs text-muted-foreground block mt-1">
+                          ID: {selectedLog.entityId}
+                        </code>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* MFA Information */}
+              {selectedLog.mfaRequired && (
+                <Card className="border-amber-500/50">
+                  <CardHeader>
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-amber-600" />
+                      MFA Verification
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Required</Label>
+                      <Badge variant="default" className="mt-1">Yes</Badge>
+                    </div>
+                    {selectedLog.mfaMethod && (
+                      <>
+                        <Separator />
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Method</Label>
+                          <Badge variant="outline" className="mt-1">{selectedLog.mfaMethod}</Badge>
+                        </div>
+                      </>
+                    )}
+                    {selectedLog.mfaVerifiedAt && (
+                      <>
+                        <Separator />
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Verified At</Label>
+                          <div className="text-sm mt-1">
+                            {new Date(selectedLog.mfaVerifiedAt).toLocaleString()}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    {selectedLog.mfaEventId && (
+                      <>
+                        <Separator />
+                        <div>
+                          <Label className="text-xs text-muted-foreground">MFA Event ID</Label>
+                          <code className="text-xs block mt-1">{selectedLog.mfaEventId}</code>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
               )}
 
-              {/* Error Info */}
+              {/* Changes (Before/After) */}
+              {(selectedLog.diffBefore || selectedLog.diffAfter || selectedLog.oldValue || selectedLog.newValue) && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Data Changes</CardTitle>
+                    <CardDescription>Before and after values for this action</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {(selectedLog.diffBefore || selectedLog.oldValue) && (
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Before</Label>
+                        <pre className="mt-1 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg text-xs overflow-x-auto">
+                          {JSON.stringify(selectedLog.diffBefore || selectedLog.oldValue, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                    {(selectedLog.diffAfter || selectedLog.newValue) && (
+                      <>
+                        {(selectedLog.diffBefore || selectedLog.oldValue) && <Separator />}
+                        <div>
+                          <Label className="text-xs text-muted-foreground">After</Label>
+                          <pre className="mt-1 p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg text-xs overflow-x-auto">
+                            {JSON.stringify(selectedLog.diffAfter || selectedLog.newValue, null, 2)}
+                          </pre>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Context & Metadata */}
+              {selectedLog.context && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Context Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {selectedLog.context.ipAddress && (
+                      <div>
+                        <Label className="text-xs text-muted-foreground">IP Address</Label>
+                        <div className="text-sm font-mono mt-1 flex items-center gap-2">
+                          {selectedLog.context.ipAddress}
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleBlockIP(selectedLog.context.ipAddress)}
+                          >
+                            <Ban className="h-3 w-3 mr-1" />
+                            Block
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    {selectedLog.context.userAgent && (
+                      <>
+                        <Separator />
+                        <div>
+                          <Label className="text-xs text-muted-foreground">User Agent</Label>
+                          <div className="text-xs text-muted-foreground mt-1 break-all">
+                            {selectedLog.context.userAgent}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    {selectedLog.context.location && (
+                      <>
+                        <Separator />
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Location</Label>
+                          <div className="text-sm mt-1">
+                            {selectedLog.context.location.country && `${selectedLog.context.location.country}, `}
+                            {selectedLog.context.location.city}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    {selectedLog.context.device && (
+                      <>
+                        <Separator />
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Device Info</Label>
+                          <div className="text-xs mt-1">
+                            {selectedLog.context.device.type && <div>Type: {selectedLog.context.device.type}</div>}
+                            {selectedLog.context.device.browser && <div>Browser: {selectedLog.context.device.browser}</div>}
+                            {selectedLog.context.device.os && <div>OS: {selectedLog.context.device.os}</div>}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    {Object.keys(selectedLog.context).filter(k => !['ipAddress', 'userAgent', 'location', 'device'].includes(k)).length > 0 && (
+                      <>
+                        <Separator />
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Additional Context</Label>
+                          <pre className="mt-1 p-3 bg-muted rounded-lg text-xs overflow-x-auto">
+                            {JSON.stringify(
+                              Object.fromEntries(
+                                Object.entries(selectedLog.context).filter(([k]) => 
+                                  !['ipAddress', 'userAgent', 'location', 'device'].includes(k)
+                                )
+                              ),
+                              null,
+                              2
+                            )}
+                          </pre>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Compliance & Review */}
+              {selectedLog.isReviewable && (
+                <Card className="border-blue-500/50">
+                  <CardHeader>
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-blue-600" />
+                      Compliance Review
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Requires Review</Label>
+                      <Badge variant="default" className="mt-1">Yes</Badge>
+                    </div>
+                    {selectedLog.reviewedAt && (
+                      <>
+                        <Separator />
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Reviewed At</Label>
+                          <div className="text-sm mt-1">
+                            {new Date(selectedLog.reviewedAt).toLocaleString()}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    {selectedLog.reviewedBy && (
+                      <>
+                        <Separator />
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Reviewed By</Label>
+                          <code className="text-xs block mt-1">{selectedLog.reviewedBy}</code>
+                        </div>
+                      </>
+                    )}
+                    {selectedLog.reviewNotes && (
+                      <>
+                        <Separator />
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Review Notes</Label>
+                          <p className="text-sm mt-1">{selectedLog.reviewNotes}</p>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* System Log specific fields */}
+              {selectedLog.source && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">System Event Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Source</Label>
+                      <Badge variant="outline" className="mt-1">{selectedLog.source}</Badge>
+                    </div>
+                    {selectedLog.level && (
+                      <>
+                        <Separator />
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Level</Label>
+                          <Badge 
+                            variant={selectedLog.level === 'ERROR' || selectedLog.level === 'CRITICAL' ? 'destructive' : 'default'}
+                            className="mt-1"
+                          >
+                            {selectedLog.level}
+                          </Badge>
+                        </div>
+                      </>
+                    )}
+                    {selectedLog.endpoint && (
+                      <>
+                        <Separator />
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Endpoint</Label>
+                          <code className="text-xs block mt-1">{selectedLog.method} {selectedLog.endpoint}</code>
+                        </div>
+                      </>
+                    )}
+                    {selectedLog.statusCode && (
+                      <>
+                        <Separator />
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Status Code</Label>
+                          <Badge variant={getStatusVariant(selectedLog.statusCode)} className="mt-1">
+                            {selectedLog.statusCode}
+                          </Badge>
+                        </div>
+                      </>
+                    )}
+                    {selectedLog.responseTime && (
+                      <>
+                        <Separator />
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Response Time</Label>
+                          <div className="text-sm font-medium mt-1">{selectedLog.responseTime}ms</div>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Error Information */}
               {selectedLog.errorMessage && (
-                <>
-                  <Separator />
-                  <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-destructive">Error Details</Label>
+                <Card className="border-destructive">
+                  <CardHeader>
+                    <CardTitle className="text-sm text-destructive flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4" />
+                      Error Details
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
                     <div className="p-3 bg-destructive/10 rounded-lg">
                       <div className="text-sm text-destructive">
                         {selectedLog.errorMessage}
@@ -1751,21 +1727,22 @@ export default function AuditPage(): JSX.Element {
                         </pre>
                       )}
                     </div>
-                  </div>
-                </>
+                  </CardContent>
+                </Card>
               )}
 
-              {/* Metadata */}
+              {/* Raw Metadata */}
               {selectedLog.metadata && (
-                <>
-                  <Separator />
-                  <div>
-                    <Label className="text-sm font-semibold">Metadata</Label>
-                    <pre className="mt-2 p-3 bg-muted rounded-lg text-xs overflow-x-auto">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Raw Metadata</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <pre className="p-3 bg-muted rounded-lg text-xs overflow-x-auto">
                       {JSON.stringify(selectedLog.metadata, null, 2)}
                     </pre>
-                  </div>
-                </>
+                  </CardContent>
+                </Card>
               )}
             </div>
           )}
