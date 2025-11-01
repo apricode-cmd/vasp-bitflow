@@ -1,0 +1,22 @@
+[{
+    "mcpServers": {
+      "shadcn": {
+        "command": "npx",
+        "args": [
+          "shadcn@latest",
+          "mcp"
+        ]
+      }
+    }
+  },
+  {
+    "mcpServers": {
+      "context7": {
+        "command": "npx",
+        "args": ["-y", "@upstash/context7-mcp"],
+        "env": {
+          "CONTEXT7_API_KEY": "ctx7sk-6a27f1bd-947d-4e4e-ac47-5149e8f95fa1"
+        }
+      }
+    }
+  }]
