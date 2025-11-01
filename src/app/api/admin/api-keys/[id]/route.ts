@@ -1,12 +1,13 @@
 /**
  * Admin API Key Management API
  * 
- * DELETE /api/admin/api-keys/[id] - Revoke API key
+ * DELETE /api/admin/api-keys/[id] - Revoke API key (REQUIRES STEP-UP MFA)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRole, getCurrentUserId } from '@/lib/middleware/admin-auth';
 import { apiKeyService } from '@/lib/services/api-key.service';
+import { handleStepUpMfa } from '@/lib/middleware/step-up-mfa';
 import { prisma } from '@/lib/prisma';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 
@@ -35,6 +36,36 @@ export async function DELETE(
       );
     }
 
+    // 🔐 STEP-UP MFA REQUIRED FOR API KEY REVOCATION
+    const mfaResult = await handleStepUpMfa(
+      request,
+      adminId,
+      'REVOKE_API_KEY',
+      'ApiKey',
+      id
+    );
+
+    // If MFA challenge is required, return it
+    if (mfaResult.requiresMfa) {
+      return NextResponse.json({
+        success: false,
+        requiresMfa: true,
+        challengeId: mfaResult.challengeId,
+        options: mfaResult.options
+      });
+    }
+
+    // If MFA verification failed
+    if (!mfaResult.verified) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: mfaResult.error || 'MFA verification required'
+        },
+        { status: 403 }
+      );
+    }
+
     // Get API key for logging
     const apiKey = await prisma.apiKey.findUnique({
       where: { id }
@@ -53,7 +84,7 @@ export async function DELETE(
     // Revoke API key
     await apiKeyService.revokeApiKey(id);
 
-    // Log admin action
+    // Log admin action with MFA verification
     await auditService.logAdminAction(
       adminId,
       AUDIT_ACTIONS.API_KEY_REVOKED,
@@ -63,7 +94,8 @@ export async function DELETE(
       { isActive: false },
       {
         name: apiKey.name,
-        prefix: apiKey.prefix
+        prefix: apiKey.prefix,
+        mfaVerified: true
       }
     );
 
