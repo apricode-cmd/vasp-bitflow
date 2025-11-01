@@ -95,10 +95,10 @@ export function PasskeyLoginButton({ email, onSuccess, onError }: PasskeyLoginBu
 
       toast.success('Passkey authentication successful!');
       
-      // Small delay for cookie propagation
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Critical: Wait for cookie to be set and propagate (1 second)
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Redirect to admin panel
+      // Hard redirect to force full page reload with new session
       console.log('🔄 Redirecting to /admin...');
       window.location.href = '/admin';
     } catch (error) {

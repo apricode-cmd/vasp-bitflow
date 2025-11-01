@@ -197,9 +197,14 @@ export async function generatePasskeyAuthenticationOptions(email: string) {
   let adminId: string | null = null;
   let allowCredentials: Array<{ id: Buffer; type: 'public-key'; transports?: AuthenticatorTransportFuture[] }> = [];
 
-  // Get admin's passkeys
-  const admin = await prisma.admin.findUnique({
-    where: { email },
+  // Get admin's passkeys (search by workEmail or email for backward compatibility)
+  const admin = await prisma.admin.findFirst({
+    where: {
+      OR: [
+        { workEmail: email },
+        { email: email },
+      ],
+    },
     include: {
       webAuthnCreds: {
         where: { isActive: true },
@@ -269,9 +274,11 @@ export async function verifyPasskeyAuthentication(
           select: {
             id: true,
             email: true,
+            workEmail: true,
             role: true,
             firstName: true,
             lastName: true,
+            status: true,
             isActive: true,
             isSuspended: true,
           },
@@ -283,8 +290,13 @@ export async function verifyPasskeyAuthentication(
       return { verified: false, error: 'Credential not found' };
     }
 
-    if (!credential.admin.isActive || credential.admin.isSuspended) {
-      return { verified: false, error: 'Admin account is not active' };
+    // Check admin account status
+    if (credential.admin.status === 'TERMINATED' || !credential.admin.isActive) {
+      return { verified: false, error: 'Admin account has been terminated' };
+    }
+
+    if (credential.admin.status === 'SUSPENDED' || credential.admin.isSuspended) {
+      return { verified: false, error: 'Admin account is suspended' };
     }
 
     // Get stored challenge from DB

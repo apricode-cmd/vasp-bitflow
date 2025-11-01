@@ -17,12 +17,19 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { email } = checkSchema.parse(body);
 
-    // Find admin by email
-    const admin = await prisma.admin.findUnique({
-      where: { email },
+    // Find admin by workEmail or email (for backward compatibility)
+    const admin = await prisma.admin.findFirst({
+      where: {
+        OR: [
+          { workEmail: email },
+          { email: email },
+        ],
+      },
       select: {
         id: true,
         email: true,
+        workEmail: true,
+        status: true,
         isActive: true,
         isSuspended: true,
         webAuthnCreds: {
@@ -43,14 +50,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!admin.isActive) {
+    // Check account status
+    if (admin.status === 'TERMINATED' || !admin.isActive) {
       return NextResponse.json(
-        { error: 'Admin account is not active' },
+        { error: 'Admin account has been terminated' },
         { status: 403 }
       );
     }
 
-    if (admin.isSuspended) {
+    if (admin.status === 'SUSPENDED' || admin.isSuspended) {
       return NextResponse.json(
         { error: 'Admin account is suspended' },
         { status: 403 }
