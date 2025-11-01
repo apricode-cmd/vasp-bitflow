@@ -40,6 +40,10 @@ export async function handleStepUpMfa(
   resourceId?: string
 ): Promise<StepUpMfaResult> {
   try {
+    // Debug logging
+    console.log('[Step-up MFA] adminId:', adminId);
+    console.log('[Step-up MFA] action:', action);
+    
     // Check if action requires Step-up MFA
     if (!stepUpMfaService.requiresStepUp(action)) {
       return { requiresMfa: false, verified: true };

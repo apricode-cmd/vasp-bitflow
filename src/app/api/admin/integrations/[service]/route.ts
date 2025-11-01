@@ -66,31 +66,19 @@ export async function PATCH(
 ): Promise<NextResponse> {
   try {
     // Check admin permission
-    const sessionOrError = await requireAdminRole('ADMIN');
-    if (sessionOrError instanceof NextResponse) {
-      return sessionOrError;
+    const session = await requireAdminRole('ADMIN');
+    if (session instanceof NextResponse) {
+      return session;
     }
 
     const { service } = await params;
-
-    // Get admin ID
-    const adminId = await getCurrentUserId();
-    if (!adminId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Unauthorized'
-        },
-        { status: 401 }
-      );
-    }
 
     const body = await request.json();
 
     // 🔐 STEP-UP MFA REQUIRED FOR INTEGRATION CONFIG UPDATE
     const mfaResult = await handleStepUpMfa(
       body,
-      adminId,
+      session.user.id,
       'UPDATE_INTEGRATION_KEYS',
       'IntegrationConfig',
       service
@@ -124,7 +112,7 @@ export async function PATCH(
     const integration = await integrationConfigService.updateConfig(
       service,
       validated.config,
-      adminId
+      session.user.id
     );
 
     // Update enabled status if provided
@@ -134,7 +122,7 @@ export async function PATCH(
 
     // Log admin action with MFA verification
     await auditService.logAdminAction(
-      adminId,
+      session.user.id,
       AUDIT_ACTIONS.INTEGRATION_UPDATED,
       AUDIT_ENTITIES.INTEGRATION_SETTING,
       integration.id,

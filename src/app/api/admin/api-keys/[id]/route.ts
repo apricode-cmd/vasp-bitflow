@@ -22,6 +22,10 @@ export async function DELETE(
       return session;
     }
 
+    console.log('[DELETE API Key] session:', session);
+    console.log('[DELETE API Key] session.user:', session.user);
+    console.log('[DELETE API Key] session.user.id:', session.user.id);
+
     const { id } = await params;
 
     // Read body (might contain MFA data)
