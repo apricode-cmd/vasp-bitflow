@@ -146,10 +146,21 @@ interface SystemLog {
 }
 
 interface Statistics {
-  totalActions: number;
-  actionsByType: Record<string, number>;
-  actionsByEntity: Record<string, number>;
-  topUsers: Array<{ userId: string; email: string; actionCount: number }>;
+  admin: {
+    totalActions: number;
+    actionsByType: Array<{ action: string; _count: { id: number } }>;
+    actionsBySeverity: Array<{ severity: string; _count: { id: number } }>;
+    topActiveAdmins: Array<{ adminId: string; adminEmail: string; _count: { id: number } }>;
+    recentCriticalActions: any[];
+  };
+  user: {
+    totalActions: number;
+    actionsByType: Array<{ action: string; _count: { id: number } }>;
+    topActiveUsers: Array<{ userId: string; userEmail: string; _count: { id: number } }>;
+  };
+  combined: {
+    totalActions: number;
+  };
 }
 
 // Entity icons
@@ -415,10 +426,13 @@ export default function AuditPage(): JSX.Element {
       const data = await response.json();
 
       if (data.success) {
-        setStats(data.data);
+        setStats(data.statistics); // Changed from data.data to data.statistics
+      } else {
+        toast.error('Failed to fetch statistics');
       }
     } catch (error) {
       console.error('Fetch stats error:', error);
+      toast.error('Failed to fetch statistics');
     }
   };
 
@@ -1142,98 +1156,100 @@ export default function AuditPage(): JSX.Element {
           />
         </TabsContent>
 
-        {/* Statistics Tab */}
+        {/* Statistics Tab - Enhanced for new audit system */}
         <TabsContent value="stats" className="space-y-4 mt-6">
           {stats ? (
             <>
               {/* Overview Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-sm font-medium">Total Actions</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold">{stats.totalActions.toLocaleString()}</div>
+                    <div className="text-3xl font-bold">{stats.combined.totalActions.toLocaleString()}</div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      All time
+                      Combined (Admin + User)
                     </p>
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-sm font-medium">Action Types</CardTitle>
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-blue-600" />
+                      Admin Actions
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold">
-                      {Object.keys(stats.actionsByType).length}
+                    <div className="text-3xl font-bold text-blue-600">
+                      {stats.admin.totalActions.toLocaleString()}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Unique action types
+                      Administrative operations
                     </p>
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <User className="h-4 w-4 text-green-600" />
+                      User Actions
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold">
-                      {stats.topUsers.length}
+                    <div className="text-3xl font-bold text-green-600">
+                      {stats.user.totalActions.toLocaleString()}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Users with activity
+                      Client operations
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <ShieldOff className="h-4 w-4 text-red-600" />
+                      Critical Actions
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-red-600">
+                      {stats.admin.recentCriticalActions.length}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Recent critical events
                     </p>
                   </CardContent>
                 </Card>
               </div>
 
-              {/* Actions by Type */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Actions by Type</CardTitle>
-                  <CardDescription>Most common actions in the system</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {Object.entries(stats.actionsByType)
-                      .sort(([, a], [, b]) => b - a)
-                      .slice(0, 10)
-                      .map(([action, count]) => (
-                        <div key={action} className="flex items-center justify-between">
-                          <Badge variant={getActionVariant(action)}>
-                            {action}
-                          </Badge>
-                          <span className="font-medium">{count}</span>
-                        </div>
-                      ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Actions by Entity */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Actions by Entity</CardTitle>
-                  <CardDescription>Activity distribution across entities</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {Object.entries(stats.actionsByEntity)
-                      .sort(([, a], [, b]) => b - a)
-                      .map(([entity, count]) => {
-                        const EntityIcon = getEntityIcon(entity);
-                        const total = stats.totalActions;
-                        const percentage = ((count / total) * 100).toFixed(1);
-
+              {/* Admin Statistics */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Admin Actions by Type */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Shield className="h-5 w-5 text-blue-600" />
+                      Admin Actions by Type
+                    </CardTitle>
+                    <CardDescription>Most common administrative actions</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {stats.admin.actionsByType.map((item) => {
+                        const count = item._count.id;
+                        const percentage = stats.admin.totalActions > 0 
+                          ? ((count / stats.admin.totalActions) * 100).toFixed(1)
+                          : '0';
                         return (
-                          <div key={entity} className="space-y-2">
+                          <div key={item.action} className="space-y-1">
                             <div className="flex items-center justify-between text-sm">
-                              <div className="flex items-center gap-2">
-                                <EntityIcon className="h-4 w-4 text-muted-foreground" />
-                                <span className="font-medium">{entity}</span>
-                              </div>
+                              <Badge variant={getActionVariant(item.action)}>
+                                {item.action}
+                              </Badge>
                               <div className="flex items-center gap-2">
                                 <span className="text-muted-foreground">{count}</span>
                                 <span className="text-xs text-muted-foreground">({percentage}%)</span>
@@ -1241,48 +1257,214 @@ export default function AuditPage(): JSX.Element {
                             </div>
                             <div className="h-2 bg-muted rounded-full overflow-hidden">
                               <div 
-                                className="h-full bg-primary transition-all"
+                                className="h-full bg-blue-600 transition-all"
                                 style={{ width: `${percentage}%` }}
                               />
                             </div>
                           </div>
                         );
                       })}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Admin Actions by Severity */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Actions by Severity</CardTitle>
+                    <CardDescription>Security and compliance risk levels</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {stats.admin.actionsBySeverity.map((item) => {
+                        const count = item._count.id;
+                        const percentage = stats.admin.totalActions > 0
+                          ? ((count / stats.admin.totalActions) * 100).toFixed(1)
+                          : '0';
+                        const variant = item.severity === 'CRITICAL' 
+                          ? 'destructive' 
+                          : item.severity === 'WARNING' 
+                          ? 'default' 
+                          : 'secondary';
+                        const color = item.severity === 'CRITICAL'
+                          ? 'bg-red-600'
+                          : item.severity === 'WARNING'
+                          ? 'bg-amber-600'
+                          : 'bg-gray-600';
+                        
+                        return (
+                          <div key={item.severity} className="space-y-1">
+                            <div className="flex items-center justify-between text-sm">
+                              <Badge variant={variant}>
+                                {item.severity}
+                              </Badge>
+                              <div className="flex items-center gap-2">
+                                <span className="text-muted-foreground">{count}</span>
+                                <span className="text-xs text-muted-foreground">({percentage}%)</span>
+                              </div>
+                            </div>
+                            <div className="h-2 bg-muted rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full ${color} transition-all`}
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* User Statistics */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="h-5 w-5 text-green-600" />
+                    User Actions by Type
+                  </CardTitle>
+                  <CardDescription>Most common client actions</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {stats.user.actionsByType.map((item) => {
+                      const count = item._count.id;
+                      const percentage = stats.user.totalActions > 0
+                        ? ((count / stats.user.totalActions) * 100).toFixed(1)
+                        : '0';
+                      return (
+                        <div key={item.action} className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <Badge variant={getActionVariant(item.action)}>
+                              {item.action}
+                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground">{count}</span>
+                              <span className="text-xs text-muted-foreground">({percentage}%)</span>
+                            </div>
+                          </div>
+                          <div className="h-2 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-green-600 transition-all"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Top Users */}
+              {/* Top Active Admins */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Most Active Users</CardTitle>
-                  <CardDescription>Users with the highest activity</CardDescription>
+                  <CardTitle>Most Active Administrators</CardTitle>
+                  <CardDescription>Admins with the highest activity</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {stats.topUsers.map((user, index) => (
-                      <div key={user.userId} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                    {stats.admin.topActiveAdmins.map((admin, index) => (
+                      <div key={admin.adminId} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                         <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
+                          <div className="h-8 w-8 rounded-full bg-blue-600/10 flex items-center justify-center font-bold text-blue-600">
                             #{index + 1}
                           </div>
                           <div>
-                            <div className="text-sm font-medium">{user.email}</div>
-                            <div className="text-xs text-muted-foreground">{user.userId}</div>
+                            <div className="text-sm font-medium">{admin.adminEmail}</div>
+                            <code className="text-xs text-muted-foreground">{admin.adminId.slice(0, 12)}...</code>
                           </div>
                         </div>
                         <Badge variant="secondary">
-                          {user.actionCount} actions
+                          {admin._count.id} actions
                         </Badge>
                       </div>
                     ))}
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Top Active Users */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Most Active Clients</CardTitle>
+                  <CardDescription>Users with the highest activity</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {stats.user.topActiveUsers.map((user, index) => (
+                      <div key={user.userId} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-green-600/10 flex items-center justify-center font-bold text-green-600">
+                            #{index + 1}
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium">{user.userEmail}</div>
+                            <code className="text-xs text-muted-foreground">{user.userId.slice(0, 12)}...</code>
+                          </div>
+                        </div>
+                        <Badge variant="secondary">
+                          {user._count.id} actions
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Recent Critical Actions */}
+              {stats.admin.recentCriticalActions.length > 0 && (
+                <Card className="border-destructive">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-destructive">
+                      <ShieldOff className="h-5 w-5" />
+                      Recent Critical Actions
+                    </CardTitle>
+                    <CardDescription>Latest high-risk administrative actions</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {stats.admin.recentCriticalActions.map((log: any) => (
+                        <div key={log.id} className="p-3 rounded-lg border border-destructive/50 bg-destructive/5">
+                          <div className="flex items-start justify-between">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="destructive">
+                                  {log.action}
+                                </Badge>
+                                {log.mfaRequired && (
+                                  <Badge variant="outline" className="text-xs">
+                                    <Shield className="h-3 w-3 mr-1" />
+                                    MFA
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                by <span className="font-medium">{log.adminEmail}</span>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {new Date(log.createdAt).toLocaleString()}
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleViewDetails(log)}
+                            >
+                              <FileText className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[1, 2, 3].map((i) => (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map((i) => (
                 <Card key={i}>
                   <CardHeader>
                     <Skeleton className="h-4 w-24" />
