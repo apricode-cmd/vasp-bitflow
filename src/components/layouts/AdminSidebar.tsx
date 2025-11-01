@@ -188,6 +188,14 @@ const navigation = [
         requiredPermission: 'admins:read'
       },
       { 
+        name: 'Roles & Permissions', 
+        href: '/admin/roles', 
+        icon: Scale,
+        description: 'Manage roles and access',
+        superAdminOnly: true,
+        requiredPermission: 'settings:system'
+      },
+      { 
         name: 'Settings', 
         href: '/admin/settings', 
         icon: Settings,
