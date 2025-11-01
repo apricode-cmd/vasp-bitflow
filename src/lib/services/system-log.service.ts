@@ -9,11 +9,11 @@ import { headers } from 'next/headers';
 import { UAParser } from 'ua-parser-js';
 
 export interface SystemLogFilters {
-  userId?: string;
-  action?: string;
-  ipAddress?: string;
-  deviceType?: string;
-  isBot?: boolean;
+  source?: string;
+  eventType?: string;
+  level?: string;
+  endpoint?: string;
+  search?: string;
   fromDate?: Date;
   toDate?: Date;
   limit?: number;
@@ -99,7 +99,58 @@ class SystemLogService {
   }
 
   /**
-   * Log a user action
+   * Create system log with NEW schema (source, eventType, level)
+   */
+  async createLog(options: {
+    source: 'KYCAID_WEBHOOK' | 'RAPYD_WEBHOOK' | 'TATUM_API' | 'NODE' | 'API' | 'SYSTEM';
+    eventType: 'WEBHOOK_RECEIVED' | 'API_CALL' | 'INTEGRATION_SYNC' | 'API_REQUEST' | 'LOGIN' | 'ERROR';
+    level: 'INFO' | 'WARN' | 'ERROR' | 'CRITICAL';
+    endpoint?: string;
+    method?: string;
+    statusCode?: number;
+    payload?: any;
+    requestBody?: any;
+    responseBody?: any;
+    errorMessage?: string;
+    errorStack?: string;
+    responseTime?: number;
+    metadata?: any;
+  }): Promise<any> {
+    try {
+      // Sanitize payloads (remove sensitive data)
+      const sanitizedPayload = options.payload ? this.sanitizeBody(options.payload) : null;
+      const sanitizedRequestBody = options.requestBody ? this.sanitizeBody(options.requestBody) : null;
+      const sanitizedResponseBody = options.responseBody ? this.sanitizeBody(options.responseBody) : null;
+
+      // Create log entry with NEW schema
+      const logEntry = await prisma.systemLog.create({
+        data: {
+          source: options.source,
+          eventType: options.eventType,
+          level: options.level,
+          endpoint: options.endpoint || null,
+          method: options.method || null,
+          statusCode: options.statusCode || null,
+          payload: sanitizedPayload,
+          requestBody: sanitizedRequestBody,
+          responseBody: sanitizedResponseBody,
+          errorMessage: options.errorMessage || null,
+          errorStack: options.errorStack || null,
+          responseTime: options.responseTime || null,
+          metadata: options.metadata || null
+        }
+      });
+
+      return logEntry;
+    } catch (error) {
+      console.error('Failed to create system log:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Log a user action (LEGACY - for backward compatibility)
+   * @deprecated Use createLog with new schema instead
    */
   async logAction(
     action: string,
@@ -138,35 +189,47 @@ class SystemLogService {
       // Sanitize body (remove sensitive data)
       const sanitizedBody = options?.body ? this.sanitizeBody(options.body) : null;
 
+      // Determine source, eventType, level based on action
+      const source = action.includes('API') ? 'API' : 'NODE';
+      const eventType = action.includes('LOGIN') ? 'LOGIN' : 'API_REQUEST';
+      const level = options?.errorMessage ? 'ERROR' : 'INFO';
+
       // Create log entry
       const logEntry = await prisma.systemLog.create({
         data: {
-          userId: options?.userId || null,
-          sessionId: options?.sessionId || null,
-          action,
+          // NEW required fields
+          source,
+          eventType,
+          level,
+          endpoint: path,
           method: options?.method || null,
-          path,
-          query: options?.query || null,
-          body: sanitizedBody,
           statusCode: options?.statusCode || null,
-          ipAddress,
-          userAgent,
-          deviceType: deviceInfo.deviceType,
-          browser: deviceInfo.browser,
-          browserVersion: deviceInfo.browserVersion,
-          os: deviceInfo.os,
-          osVersion: deviceInfo.osVersion,
-          isMobile: deviceInfo.isMobile,
-          isBot: deviceInfo.isBot,
+          requestBody: sanitizedBody,
           responseTime: options?.responseTime || null,
           errorMessage: options?.errorMessage || null,
           errorStack: options?.errorStack || null,
-          referrer,
-          metadata: options?.metadata || null
+          metadata: {
+            // Legacy fields in metadata
+            userId: options?.userId,
+            sessionId: options?.sessionId,
+            action,
+            query: options?.query,
+            ipAddress,
+            userAgent,
+            deviceType: deviceInfo.deviceType,
+            browser: deviceInfo.browser,
+            browserVersion: deviceInfo.browserVersion,
+            os: deviceInfo.os,
+            osVersion: deviceInfo.osVersion,
+            isMobile: deviceInfo.isMobile,
+            isBot: deviceInfo.isBot,
+            referrer,
+            ...options?.metadata
+          }
         }
       });
 
-      return logEntry;
+      return logEntry as any;
     } catch (error) {
       console.error('Failed to create system log:', error);
       throw error;
@@ -202,30 +265,32 @@ class SystemLogService {
   }> {
     const where: any = {};
 
-    if (filters.userId) {
-      where.userId = filters.userId;
+    if (filters.source) {
+      where.source = filters.source;
     }
 
-    if (filters.action) {
-      where.action = {
-        contains: filters.action,
+    if (filters.eventType) {
+      where.eventType = filters.eventType;
+    }
+
+    if (filters.level) {
+      where.level = filters.level;
+    }
+
+    if (filters.endpoint) {
+      where.endpoint = {
+        contains: filters.endpoint,
         mode: 'insensitive'
       };
     }
 
-    if (filters.ipAddress) {
-      where.ipAddress = {
-        contains: filters.ipAddress,
-        mode: 'insensitive'
-      };
-    }
-
-    if (filters.deviceType) {
-      where.deviceType = filters.deviceType;
-    }
-
-    if (filters.isBot !== undefined) {
-      where.isBot = filters.isBot;
+    if (filters.search) {
+      where.OR = [
+        { source: { contains: filters.search, mode: 'insensitive' } },
+        { eventType: { contains: filters.search, mode: 'insensitive' } },
+        { endpoint: { contains: filters.search, mode: 'insensitive' } },
+        { level: { contains: filters.search, mode: 'insensitive' } }
+      ];
     }
 
     if (filters.fromDate || filters.toDate) {

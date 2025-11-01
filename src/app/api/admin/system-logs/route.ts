@@ -9,11 +9,11 @@ import { systemLogService } from '@/lib/services/system-log.service';
 import { z } from 'zod';
 
 const systemLogFiltersSchema = z.object({
-  userId: z.string().optional(),
-  action: z.string().optional(),
-  ipAddress: z.string().optional(),
-  deviceType: z.string().optional(),
-  isBot: z.coerce.boolean().optional(),
+  source: z.string().optional(),
+  eventType: z.string().optional(),
+  level: z.string().optional(),
+  endpoint: z.string().optional(),
+  search: z.string().optional(),
   fromDate: z.string().datetime().optional(),
   toDate: z.string().datetime().optional(),
   limit: z.coerce.number().min(1).max(100).optional(),
@@ -31,11 +31,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Parse query parameters
     const searchParams = request.nextUrl.searchParams;
     const params = {
-      userId: searchParams.get('userId') || undefined,
-      action: searchParams.get('action') || undefined,
-      ipAddress: searchParams.get('ipAddress') || undefined,
-      deviceType: searchParams.get('deviceType') || undefined,
-      isBot: searchParams.get('isBot') || undefined,
+      source: searchParams.get('source') || undefined,
+      eventType: searchParams.get('eventType') || undefined,
+      level: searchParams.get('level') || undefined,
+      endpoint: searchParams.get('endpoint') || undefined,
+      search: searchParams.get('search') || undefined,
       fromDate: searchParams.get('fromDate') || undefined,
       toDate: searchParams.get('toDate') || undefined,
       limit: searchParams.get('limit') || undefined,
