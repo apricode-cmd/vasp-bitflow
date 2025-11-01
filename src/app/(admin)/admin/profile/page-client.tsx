@@ -65,6 +65,12 @@ const profileSchema = z.object({
   firstName: z.string().min(2, 'First name must be at least 2 characters'),
   lastName: z.string().min(2, 'Last name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
+  workEmail: z.string().email('Invalid work email address').optional(),
+  jobTitle: z.string().min(2, 'Job title must be at least 2 characters'),
+  department: z.string().optional(),
+  // employeeId is auto-generated and readonly
+  locale: z.enum(['en', 'ru', 'uk', 'pl']).default('en'),
+  timezone: z.string().default('UTC'),
 });
 
 // Security settings schema
@@ -115,6 +121,11 @@ export function AdminProfileClient({
       firstName: '',
       lastName: '',
       email: adminEmail,
+      workEmail: '',
+      jobTitle: '',
+      department: '',
+      locale: 'en',
+      timezone: 'UTC',
     },
   });
 
@@ -143,6 +154,11 @@ export function AdminProfileClient({
             firstName: data.profile.firstName || '',
             lastName: data.profile.lastName || '',
             email: data.profile.email || '',
+            workEmail: data.profile.workEmail || '',
+            jobTitle: data.profile.jobTitle || '',
+            department: data.profile.department || '',
+            locale: data.profile.locale || 'en',
+            timezone: data.profile.timezone || 'UTC',
           });
           
           // Load security settings
@@ -428,6 +444,117 @@ export function AdminProfileClient({
                       </FormItem>
                     )}
                   />
+
+                  <Separator className="my-6" />
+
+                  {/* Professional Information */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Professional Information</h3>
+                    
+                    <FormField
+                      control={profileForm.control}
+                      name="jobTitle"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Job Title</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="e.g., Compliance Officer, Treasury Approver" disabled={isLoading} />
+                          </FormControl>
+                          <FormDescription>
+                            Your role in the organization
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <FormField
+                        control={profileForm.control}
+                        name="department"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Department (Optional)</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="e.g., Compliance, Finance" disabled={isLoading} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormItem>
+                        <FormLabel>Employee ID</FormLabel>
+                        <FormControl>
+                          <Input value={profileData?.employeeId || 'Generating...'} disabled className="bg-muted" />
+                        </FormControl>
+                        <FormDescription>
+                          Auto-generated unique identifier
+                        </FormDescription>
+                      </FormItem>
+                    </div>
+                  </div>
+
+                  <Separator className="my-6" />
+
+                  {/* Localization Settings */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Localization</h3>
+                    
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <FormField
+                        control={profileForm.control}
+                        name="locale"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Language</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value} disabled={isLoading}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select language" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="en">English</SelectItem>
+                                <SelectItem value="ru">Русский</SelectItem>
+                                <SelectItem value="uk">Українська</SelectItem>
+                                <SelectItem value="pl">Polski</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={profileForm.control}
+                        name="timezone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Timezone</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value} disabled={isLoading}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select timezone" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="UTC">UTC</SelectItem>
+                                <SelectItem value="Europe/London">Europe/London (GMT)</SelectItem>
+                                <SelectItem value="Europe/Kiev">Europe/Kiev (EET)</SelectItem>
+                                <SelectItem value="Europe/Warsaw">Europe/Warsaw (CET)</SelectItem>
+                                <SelectItem value="Europe/Moscow">Europe/Moscow (MSK)</SelectItem>
+                                <SelectItem value="America/New_York">America/New York (EST)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <Separator />
 
                   <div className="flex items-center gap-2 pt-4">
                     {getRoleBadge(adminRole)}

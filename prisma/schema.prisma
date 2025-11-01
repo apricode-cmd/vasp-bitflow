@@ -318,8 +318,8 @@ model PlatformWallet {
 }
 
 model PayIn {
-  id                 String             @id @default(cuid())
-  orderId            String             @unique
+  id                 String       @id @default(cuid())
+  orderId            String       @unique
   userId             String
   amount             Float
   fiatCurrencyCode   String?
@@ -334,32 +334,44 @@ model PayIn {
   senderAddress      String?
   transactionHash    String?
   blockNumber        Int?
-  confirmations      Int                @default(0)
-  transactionId      String?            @unique
-  status             PayInStatus        @default(PENDING)
+  confirmations      Int          @default(0)
+  transactionId      String?      @unique
+  status             PayInStatus  @default(PENDING)
   expectedAmount     Float
   receivedAmount     Float?
-  amountMismatch     Boolean            @default(false)
-  verifiedBy         String?
-  verifiedAt         DateTime?
-  verificationNotes  String?
-  reconciledWith     String?
-  reconciledAt       DateTime?
-  reconciledBy       String?
-  proofUrls          String[]
-  explorerUrl        String?
-  paymentDate        DateTime?
-  receivedDate       DateTime?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  cryptocurrency     Currency?          @relation("PayInCrypto", fields: [cryptocurrencyCode], references: [code])
-  fiatCurrency       FiatCurrency?      @relation(fields: [fiatCurrencyCode], references: [code])
-  network            BlockchainNetwork? @relation("PayInNetwork", fields: [networkCode], references: [code])
-  order              Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  paymentMethod      PaymentMethod?     @relation(fields: [paymentMethodCode], references: [code])
-  reconciler         User?              @relation("PayInReconciler", fields: [reconciledBy], references: [id])
-  user               User               @relation("PayInUser", fields: [userId], references: [id])
-  verifier           User?              @relation("PayInVerifier", fields: [verifiedBy], references: [id])
+  amountMismatch     Boolean      @default(false)
+
+  // Separation of Duties (SoD) - 4-eyes principle
+  initiatedBy      String? // Admin ID who initiated
+  initiatedAt      DateTime?
+  approvedBy       String? // Admin ID who approved (must be different from initiatedBy)
+  approvedAt       DateTime?
+  approvalRequired Boolean   @default(true) // Requires approval for large amounts
+
+  verifiedBy        String?
+  verifiedAt        DateTime?
+  verificationNotes String?
+  reconciledWith    String?
+  reconciledAt      DateTime?
+  reconciledBy      String?
+  proofUrls         String[]
+  explorerUrl       String?
+  paymentDate       DateTime?
+  receivedDate      DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  cryptocurrency    Currency?          @relation("PayInCrypto", fields: [cryptocurrencyCode], references: [code])
+  fiatCurrency      FiatCurrency?      @relation(fields: [fiatCurrencyCode], references: [code])
+  network           BlockchainNetwork? @relation("PayInNetwork", fields: [networkCode], references: [code])
+  order             Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentMethod     PaymentMethod?     @relation(fields: [paymentMethodCode], references: [code])
+  reconciler        User?              @relation("PayInReconciler", fields: [reconciledBy], references: [id])
+  user              User               @relation("PayInUser", fields: [userId], references: [id], onDelete: Cascade)
+  verifier          User?              @relation("PayInVerifier", fields: [verifiedBy], references: [id])
+
+  // SoD Relations to Admin
+  initiator Admin? @relation("PayInInitiator", fields: [initiatedBy], references: [id])
+  approver  Admin? @relation("PayInApprover", fields: [approvedBy], references: [id])
 
   @@index([orderId])
   @@index([userId])
@@ -374,8 +386,8 @@ model PayIn {
 }
 
 model PayOut {
-  id                 String             @id @default(cuid())
-  orderId            String             @unique
+  id                 String       @id @default(cuid())
+  orderId            String       @unique
   userId             String
   amount             Float
   fiatCurrencyCode   String?
@@ -385,10 +397,10 @@ model PayOut {
   destinationAddress String?
   destinationTag     String?
   userWalletId       String?
-  transactionHash    String?            @unique
+  transactionHash    String?      @unique
   explorerUrl        String?
   blockNumber        Int?
-  confirmations      Int                @default(0)
+  confirmations      Int          @default(0)
   networkFee         Float?
   networkFeeCurrency String?
   recipientName      String?
@@ -397,29 +409,42 @@ model PayOut {
   paymentReference   String?
   bankTransactionId  String?
   paymentMethodCode  String?
-  status             PayOutStatus       @default(PENDING)
+  status             PayOutStatus @default(PENDING)
   failureReason      String?
-  retryCount         Int                @default(0)
-  processedBy        String?
-  processedAt        DateTime?
-  processingNotes    String?
-  paymentAccountId   String?
-  fromWalletId       String?
-  scheduledFor       DateTime?
-  sentAt             DateTime?
-  confirmedAt        DateTime?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  cryptocurrency     Currency?          @relation(fields: [cryptocurrencyCode], references: [code])
-  fiatCurrency       FiatCurrency?      @relation("PayOutFiat", fields: [fiatCurrencyCode], references: [code])
-  platformWallet     PlatformWallet?    @relation(fields: [fromWalletId], references: [id])
-  network            BlockchainNetwork? @relation(fields: [networkCode], references: [code])
-  order              Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  paymentAccount     PaymentAccount?    @relation("PaymentAccountPayOuts", fields: [paymentAccountId], references: [id])
-  paymentMethod      PaymentMethod?     @relation("PayOutMethod", fields: [paymentMethodCode], references: [code])
-  processor          User?              @relation("PayOutProcessor", fields: [processedBy], references: [id])
-  user               User               @relation("PayOutUser", fields: [userId], references: [id])
-  userWallet         UserWallet?        @relation(fields: [userWalletId], references: [id])
+  retryCount         Int          @default(0)
+
+  // Separation of Duties (SoD) - 4-eyes principle for payouts
+  initiatedBy       String? // Admin ID who initiated payout
+  initiatedAt       DateTime?
+  approvedBy        String? // Admin ID who approved (MUST be different from initiatedBy)
+  approvedAt        DateTime?
+  approvalRequired  Boolean   @default(true) // Requires approval (based on amount threshold)
+  requiresStepUpMfa Boolean   @default(false) // Approval requires step-up MFA
+
+  processedBy      String?
+  processedAt      DateTime?
+  processingNotes  String?
+  paymentAccountId String?
+  fromWalletId     String?
+  scheduledFor     DateTime?
+  sentAt           DateTime?
+  confirmedAt      DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  cryptocurrency   Currency?          @relation(fields: [cryptocurrencyCode], references: [code])
+  fiatCurrency     FiatCurrency?      @relation("PayOutFiat", fields: [fiatCurrencyCode], references: [code])
+  platformWallet   PlatformWallet?    @relation(fields: [fromWalletId], references: [id])
+  network          BlockchainNetwork? @relation(fields: [networkCode], references: [code])
+  order            Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentAccount   PaymentAccount?    @relation("PaymentAccountPayOuts", fields: [paymentAccountId], references: [id])
+  paymentMethod    PaymentMethod?     @relation("PayOutMethod", fields: [paymentMethodCode], references: [code])
+  processor        User?              @relation("PayOutProcessor", fields: [processedBy], references: [id])
+  user             User               @relation("PayOutUser", fields: [userId], references: [id])
+
+  // SoD Relations to Admin
+  initiator  Admin?      @relation("PayOutInitiator", fields: [initiatedBy], references: [id])
+  approver   Admin?      @relation("PayOutApprover", fields: [approvedBy], references: [id])
+  userWallet UserWallet? @relation(fields: [userWalletId], references: [id])
 
   @@index([orderId])
   @@index([userId])
@@ -1397,6 +1422,12 @@ enum AdminRole {
   READ_ONLY
 }
 
+enum AdminStatus {
+  ACTIVE // Активный
+  SUSPENDED // Приостановлен (временно)
+  TERMINATED // Уволен (permanent)
+}
+
 enum AuthMethod {
   PASSWORD
   SSO
@@ -1413,33 +1444,63 @@ enum MfaChallengeStatus {
 
 // Admin Model (separate from User)
 model Admin {
-  id        String    @id @default(cuid())
-  email     String    @unique
-  password  String? // Optional if using SSO/Passkey only
-  firstName String
-  lastName  String
-  role      AdminRole @default(ADMIN)
-  
+  id    String @id @default(cuid())
+  orgId String @default("default") // Tenant/Organization ID
+
+  // Basic Identity (Required)
+  firstName String // Имя
+  lastName  String // Фамилия
+  workEmail String? @unique // Корпоративная почта (уникальный логин) - temporarily optional
+  jobTitle  String? // Должность: Compliance Officer, Treasury Approver, etc. - temporarily optional
+
+  // Optional Identity
+  department String? // Отдел
+  employeeId String? @unique @default(cuid()) // Уникальный табельный номер (автогенерация)
+  managerId  String? // ID руководителя (для заявок/лимитов)
+
+  // Localization
+  locale   String @default("en") // en, ru, uk, etc.
+  timezone String @default("UTC") // Europe/Kiev, UTC, etc.
+
+  // Legacy field (for backward compatibility)
+  email    String? // Deprecated: use workEmail instead
+  password String? // Optional if using SSO/Passkey only
+
+  // Role and Access (RBAC/SoD)
+  role AdminRole @default(ADMIN)
+
+  // Separation of Duties (SoD) flags
+  canInitiatePayout Boolean @default(false) // Может инициировать выплату
+  canApprovePayout  Boolean @default(false) // Может утверждать выплату
+
+  // Scope (JSON: какие подразделения/продукты админ видит)
+  scope Json? // { departments: ["treasury", "compliance"], products: ["crypto", "fiat"] }
+
   // Status
+  status AdminStatus @default(ACTIVE) // ACTIVE, SUSPENDED, TERMINATED
+
+  // Legacy status fields (for backward compatibility)
   isActive       Boolean   @default(true)
   isSuspended    Boolean   @default(false)
   suspendedUntil DateTime?
   lastLogin      DateTime?
-  
+
   // Auth methods
   authMethod  AuthMethod @default(PASSWORD)
   ssoProvider String? // google-workspace, microsoft, okta
   ssoSubject  String? // SSO subject ID
 
-  // First-time setup (for Passkey registration)
-  setupToken       String?   // Hashed token for first-time Passkey setup
+  // First-time setup (for Passkey registration via invite link)
+  setupToken       String?   @unique // Hashed token for invite link
   setupTokenExpiry DateTime? // Token expiration
-  
+  invitedBy        String? // Admin ID who invited
+  invitedAt        DateTime? // Invitation timestamp
+
   // Metadata
   createdAt DateTime @default(now())
   createdBy String? // Admin ID who created
   updatedAt DateTime @updatedAt
-  
+
   // Relations
   twoFactorAuth    AdminTwoFactorAuth?
   sessions         AdminSession[]
@@ -1448,11 +1509,23 @@ model Admin {
   mfaChallenges    MfaChallenge[]
   oneTimeTokens    OneTimeAuthToken[]   @relation("AdminOTAT")
   auditLogsCreated AuditLog[]           @relation("AdminAuditLogs")
-  
+  subordinates     Admin[]              @relation("ManagerSubordinates") // Подчинённые
+  manager          Admin?               @relation("ManagerSubordinates", fields: [managerId], references: [id])
+  payInsInitiated  PayIn[]              @relation("PayInInitiator")
+  payInsApproved   PayIn[]              @relation("PayInApprover")
+  payOutsInitiated PayOut[]             @relation("PayOutInitiator")
+  payOutsApproved  PayOut[]             @relation("PayOutApprover")
+  invitedAdmins    Admin[]              @relation("AdminInviter") // Admins invited by this admin
+  inviter          Admin?               @relation("AdminInviter", fields: [invitedBy], references: [id])
+
   @@unique([ssoProvider, ssoSubject])
-  @@index([email])
+  @@index([workEmail])
+  @@index([orgId])
   @@index([role])
-  @@index([isActive])
+  @@index([status])
+  @@index([managerId])
+  @@index([invitedBy])
+  @@index([setupToken])
 }
 
 // Roles and Permissions
@@ -1465,9 +1538,9 @@ model RoleModel {
   priority    Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   permissions RolePermission[]
-  
+
   @@index([isActive])
   @@map("Role_")
 }
@@ -1481,9 +1554,9 @@ model Permission {
   category    String
   isSystem    Boolean  @default(false)
   createdAt   DateTime @default(now())
-  
+
   roles RolePermission[]
-  
+
   @@unique([resource, action])
   @@index([resource])
   @@index([category])
@@ -1494,10 +1567,10 @@ model RolePermission {
   roleCode       String
   permissionCode String
   createdAt      DateTime @default(now())
-  
+
   role       RoleModel  @relation(fields: [roleCode], references: [code], onDelete: Cascade)
   permission Permission @relation(fields: [permissionCode], references: [code], onDelete: Cascade)
-  
+
   @@unique([roleCode, permissionCode])
   @@index([roleCode])
   @@index([permissionCode])
@@ -1507,30 +1580,30 @@ model RolePermission {
 model WebAuthnCredential {
   id      String @id @default(cuid())
   adminId String
-  
+
   // WebAuthn fields
   credentialId String @unique
   publicKey    String
   counter      Int    @default(0)
-  
+
   // Device info
   deviceName String?
   deviceType String?
   transports String[]
-  
+
   // Attestation
   aaguid      String?
   attestation String?
-  
+
   // Status
   isActive Boolean   @default(true)
   lastUsed DateTime?
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
-  
+
   @@index([adminId])
   @@index([credentialId])
 }
@@ -1539,27 +1612,27 @@ model WebAuthnCredential {
 model AdminTwoFactorAuth {
   id      String @id @default(cuid())
   adminId String @unique
-  
+
   // TOTP
   totpEnabled    Boolean   @default(false)
   totpSecret     String?
   totpVerifiedAt DateTime?
-  
+
   // WebAuthn
   webAuthnEnabled  Boolean @default(false)
   webAuthnRequired Boolean @default(false)
-  
+
   // Backup codes
   backupCodes Json?
-  
+
   // Settings
   preferredMethod String @default("TOTP")
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
-  
+
   @@index([adminId])
 }
 
@@ -1570,26 +1643,26 @@ model MfaChallenge {
   action       String
   resourceType String?
   resourceId   String?
-  
+
   // Challenge details
   challengeType String
   challenge     String
-  
+
   // Status
   status      MfaChallengeStatus @default(PENDING)
   attempts    Int                @default(0)
   maxAttempts Int                @default(3)
-  
+
   // Verification
   verifiedAt   DateTime?
   verifiedWith String?
-  
+
   // Expiration
   expiresAt DateTime
   createdAt DateTime @default(now())
-  
+
   admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
-  
+
   @@index([adminId, status])
   @@index([expiresAt])
 }
@@ -1598,12 +1671,12 @@ model MfaChallenge {
 model AdminSession {
   id      String @id @default(cuid())
   adminId String
-  
+
   // Session identification
   sessionId    String @unique
   sessionToken String @unique
   sessionKey   String
-  
+
   // Device info
   ipAddress      String
   deviceType     String?
@@ -1612,36 +1685,36 @@ model AdminSession {
   os             String?
   osVersion      String?
   userAgent      String
-  
+
   // Location
   country String?
   city    String?
-  
+
   // MFA info
   mfaMethod     String?
   mfaVerifiedAt DateTime?
-  
+
   // Status
   isActive Boolean @default(true)
-  
+
   // Timeouts
   createdAt    DateTime @default(now())
   lastActivity DateTime @default(now())
   expiresAt    DateTime
-  
+
   // Settings
   idleTimeout Int?
   maxDuration Int?
-  
+
   // Termination
   terminatedAt      DateTime?
   terminatedBy      String?
   terminationReason String?
-  
+
   updatedAt DateTime @updatedAt
-  
+
   admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
-  
+
   @@index([adminId, isActive])
   @@index([sessionId])
   @@index([sessionToken])
@@ -1657,65 +1730,65 @@ model BreakGlassUser {
   username     String @unique
   passwordHash String
   totpSecret   String
-  
+
   // Restrictions
   isActive   Boolean   @default(false)
   lastUsed   DateTime?
   usageCount Int       @default(0)
-  
+
   // Access info
   accessInstructions String
-  
+
   // Auto-disable
   autoDisableAfter Int @default(24)
-  
+
   createdAt DateTime @default(now())
 }
 
 // Enhanced Audit Log
 model AuditLogEnhanced {
   id String @id @default(cuid())
-  
+
   // Who
   userId    String?
   userEmail String?
   userRole  String?
-  
+
   // What
   action   String
   entity   String
   entityId String
-  
+
   // Changes
   oldValue Json?
   newValue Json?
   changes  Json?
-  
+
   // Context
   metadata Json?
   reason   String?
-  
+
   // Where & When
   ipAddress String
   userAgent String
   country   String?
   city      String?
-  
+
   // MFA verification
   mfaRequired   Boolean   @default(false)
   mfaMethod     String?
   mfaVerifiedAt DateTime?
-  
+
   // Compliance
   severity     String    @default("INFO")
   isReviewable Boolean   @default(false)
   reviewedAt   DateTime?
   reviewedBy   String?
-  
+
   // Immutability
   createdAt DateTime @default(now())
   hash      String?
-  
+
   @@index([userId])
   @@index([entity, entityId])
   @@index([action])
@@ -1728,16 +1801,16 @@ model AuditLogEnhanced {
 
 // One-Time Authentication Token for secure Passkey session creation
 model OneTimeAuthToken {
-  id        String   @id @default(cuid())
-  token     String   @unique
-  adminId   String
-  admin     Admin    @relation("AdminOTAT", fields: [adminId], references: [id], onDelete: Cascade)
-  
-  createdAt DateTime @default(now())
+  id      String @id @default(cuid())
+  token   String @unique
+  adminId String
+  admin   Admin  @relation("AdminOTAT", fields: [adminId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime  @default(now())
   expiresAt DateTime
   usedAt    DateTime?
-  usedFrom  String?  // IP address
-  
+  usedFrom  String? // IP address
+
   @@index([token, expiresAt])
   @@index([adminId])
   @@map("OneTimeAuthToken")
