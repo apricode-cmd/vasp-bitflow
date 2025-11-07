@@ -99,7 +99,6 @@ model KycSession {
   documents            KycDocument[]
   formData             KycFormData[]
   profile              KycProfile?
-  provider             KycProvider?  @relation(fields: [kycProviderId], references: [id])
   user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([status])
@@ -1353,32 +1352,8 @@ model AdminSettings {
   @@index([adminId])
 }
 
-model KycProvider {
-  id               String       @id @default(cuid())
-  code             String       @unique
-  name             String
-  isActive         Boolean      @default(true)
-  priority         Int          @default(0)
-  apiUrl           String
-  apiKey           String
-  webhookUrl       String?
-  webhookSecret    String?
-  supportsLiveness Boolean      @default(false)
-  supportsAml      Boolean      @default(false)
-  supportsPep      Boolean      @default(false)
-  supportsDocScan  Boolean      @default(true)
-  costPerCheck     Float?
-  monthlyFee       Float?
-  currency         String       @default("EUR")
-  config           Json?
-  metadata         Json?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  kycSessions      KycSession[]
-
-  @@index([code])
-  @@index([isActive])
-}
+// KycProvider model removed - we use Integration table instead for all providers (KYC, Blockchain, Payment, etc.)
+// This follows our modular architecture where all integrations are managed through the Integration system
 
 model KycProfile {
   id                     String     @id @default(cuid())

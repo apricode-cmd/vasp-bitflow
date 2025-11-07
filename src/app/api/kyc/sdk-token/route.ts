@@ -8,15 +8,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/auth';
+import { getClientSession } from '@/auth-client';
 import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
   try {
     // 1. Authenticate user
-    const session = await getServerSession(authOptions);
+    const session = await getClientSession();
     
     if (!session?.user?.id) {
       return NextResponse.json(

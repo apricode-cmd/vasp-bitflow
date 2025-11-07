@@ -22,6 +22,7 @@ import {
   IntegrationMetadata
 } from '../../types';
 import crypto from 'crypto';
+import { normalizeCountryCodeForProvider } from '@/lib/utils/country-codes';
 
 /**
  * Sumsub-specific configuration
@@ -81,14 +82,24 @@ export class SumsubAdapter implements IKycProvider {
   async initialize(config: BaseIntegrationConfig): Promise<void> {
     // Extract Sumsub-specific config
     // Config can come from:
-    // 1. config.metadata (preferred)
-    // 2. config.apiKey (for appToken)
+    // 1. Direct properties (from spread of Integration.config)
+    // 2. config.metadata (legacy)
+    // 3. config.apiKey (for appToken)
+    const configAny = config as any;
+    
     this.config = {
-      appToken: config.metadata?.appToken || config.apiKey,
-      secretKey: config.metadata?.secretKey,
-      levelName: config.metadata?.levelName,
-      baseUrl: config.apiEndpoint || config.metadata?.baseUrl || 'https://api.sumsub.com'
+      appToken: configAny.appToken || config.metadata?.appToken || config.apiKey,
+      secretKey: configAny.secretKey || config.metadata?.secretKey,
+      levelName: configAny.levelName || config.metadata?.levelName,
+      baseUrl: configAny.baseUrl || config.apiEndpoint || config.metadata?.baseUrl || 'https://api.sumsub.com'
     };
+    
+    console.log('🔍 SumsubAdapter extracted config:', {
+      appToken: this.config.appToken ? '✅ present' : '❌ missing',
+      secretKey: this.config.secretKey ? '✅ present' : '❌ missing',
+      levelName: this.config.levelName ? '✅ present' : '❌ missing',
+      baseUrl: this.config.baseUrl
+    });
     
     // Remove trailing slash
     if (this.config.baseUrl) {
@@ -251,6 +262,13 @@ export class SumsubAdapter implements IKycProvider {
     try {
       const path = `/resources/applicants?levelName=${encodeURIComponent(this.config.levelName!)}`;
       
+      // Convert country code from alpha-2 (AS, US, PL) to alpha-3 (ASM, USA, POL) for Sumsub
+      const countryAlpha3 = normalizeCountryCodeForProvider(userData.nationality, 'sumsub');
+      
+      if (!countryAlpha3) {
+        throw new Error(`Invalid or unsupported country code: ${userData.nationality}`);
+      }
+      
       const bodyObj = {
         externalUserId: userData.externalId, // Our internal user ID
         email: userData.email,
@@ -259,7 +277,7 @@ export class SumsubAdapter implements IKycProvider {
           firstName: userData.firstName,
           lastName: userData.lastName,
           dob: userData.dateOfBirth, // YYYY-MM-DD
-          country: userData.nationality // ISO3 code (USA, POL, etc.)
+          country: countryAlpha3 // ISO3 code (USA, POL, ASM, etc.)
         }
       };
 
@@ -268,7 +286,9 @@ export class SumsubAdapter implements IKycProvider {
 
       console.log('📝 Creating Sumsub applicant:', { 
         email: userData.email, 
-        externalId: userData.externalId 
+        externalId: userData.externalId,
+        countryOriginal: userData.nationality,
+        countryConverted: countryAlpha3
       });
 
       const response = await fetch(this.baseUrl + path, {
