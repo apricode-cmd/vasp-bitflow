@@ -134,11 +134,23 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
-    console.log('✅ Mobile link generated:', data.href ? '✅ href present' : '❌ no href');
+    console.log('✅ Mobile link response:', JSON.stringify(data, null, 2));
+    
+    // Sumsub returns 'url' field (not 'href')
+    const mobileUrl = data.url || data.href || data.link;
+    console.log('📱 Mobile URL:', mobileUrl || 'N/A');
+
+    if (!mobileUrl) {
+      console.error('❌ No mobile URL in response:', data);
+      return NextResponse.json(
+        { error: 'Failed to generate mobile link: No URL in response' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
-      mobileUrl: data.href || data.link || data.url,
+      mobileUrl,
       externalActionId: data.externalActionId
     });
 
