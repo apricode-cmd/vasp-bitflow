@@ -113,18 +113,28 @@ export default function KycPage(): React.ReactElement {
   // Fetch Sumsub mobile URL for QR code
   const fetchSumsubMobileUrl = async () => {
     try {
-      const response = await fetch('/api/kyc/sdk-token');
+      console.log('📱 Fetching Sumsub mobile link...');
+      const response = await fetch('/api/kyc/mobile-link');
+      
       if (response.ok) {
         const data = await response.json();
-        console.log('🔗 Sumsub SDK token data:', data);
+        console.log('✅ Sumsub mobile link received:', data);
         
-        // Sumsub mobile URL format: https://cockpit.sumsub.com/idensic/l/#/auth?token=ACCESS_TOKEN
-        const mobileUrl = `https://cockpit.sumsub.com/idensic/l/#/auth?token=${data.token}`;
-        console.log('📱 Generated mobile URL:', mobileUrl);
-        setSumsubMobileUrl(mobileUrl);
+        if (data.mobileUrl) {
+          setSumsubMobileUrl(data.mobileUrl);
+          console.log('🔗 Mobile URL set:', data.mobileUrl);
+        } else {
+          console.error('❌ No mobile URL in response');
+          toast.error('Failed to generate mobile link');
+        }
+      } else {
+        const errorData = await response.json();
+        console.error('❌ Failed to fetch mobile link:', errorData);
+        toast.error('Failed to generate QR code');
       }
     } catch (error) {
-      console.error('Failed to fetch Sumsub mobile URL:', error);
+      console.error('❌ Error fetching Sumsub mobile URL:', error);
+      toast.error('Failed to generate QR code');
     }
   };
 
