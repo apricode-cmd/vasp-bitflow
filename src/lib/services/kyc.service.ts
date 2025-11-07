@@ -113,15 +113,21 @@ export async function startKycVerification(userId: string) {
 
     console.log(`📝 Starting KYC verification for user ${userId} with provider ${provider.providerId}`);
 
-    // Get integration secrets to access formId from config
+    // Get integration secrets
     const secrets = await getIntegrationWithSecrets(provider.providerId);
+    
+    // For KYCAID, formId is required. For Sumsub, it's not needed (uses levelName instead)
     const formId = (secrets?.config as any)?.formId;
     
-    if (!formId) {
-      throw new Error('KYC Form ID not configured. Please set it in admin panel: /admin/integrations');
+    if (provider.providerId === 'kycaid' && !formId) {
+      throw new Error('KYC Form ID not configured for KYCAID. Please set it in admin panel: /admin/integrations');
     }
 
-    console.log(`📋 Using form ID: ${formId}`);
+    if (formId) {
+      console.log(`📋 Using form ID: ${formId}`);
+    } else {
+      console.log(`📋 No form ID needed for ${provider.providerId}`);
+    }
 
     // Prepare user data
     // Note: KYCAID expects ISO2 (2-letter) country codes, but we store Alpha3 (3-letter)
@@ -203,14 +209,25 @@ export async function startKycVerification(userId: string) {
     const applicant = await provider.createApplicant(userData);
     console.log(`✅ Applicant created: ${applicant.applicantId}`);
 
-    // Step 2: Get form URL (documents will be uploaded through the form)
-    console.log('📝 Getting form URL...');
-    const formUrlResult = await provider.getFormUrl(applicant.applicantId, formId);
-    console.log(`✅ Form URL generated: ${formUrlResult.url}`);
+    // Step 2: Get form URL (for KYCAID) or prepare for WebSDK (for Sumsub)
+    let formUrlResult: { url?: string; sessionId?: string } = {};
     
-    // Check if KYCAID returned verificationId in the form URL response
-    if (formUrlResult.sessionId) {
-      console.log(`✅ Verification ID received: ${formUrlResult.sessionId}`);
+    if (provider.providerId === 'sumsub') {
+      // Sumsub uses WebSDK, no form URL needed
+      console.log('📝 Sumsub uses WebSDK - no form URL needed');
+      formUrlResult = {
+        sessionId: applicant.applicantId // Use applicantId as session identifier
+      };
+    } else {
+      // KYCAID and other providers use form URLs
+      console.log('📝 Getting form URL...');
+      formUrlResult = await provider.getFormUrl(applicant.applicantId, formId);
+      console.log(`✅ Form URL generated: ${formUrlResult.url}`);
+      
+      // Check if provider returned verificationId in the form URL response
+      if (formUrlResult.sessionId) {
+        console.log(`✅ Verification ID received: ${formUrlResult.sessionId}`);
+      }
     }
 
     // Step 3: Save session in database (verification will be created via webhook after form submission)
@@ -225,8 +242,8 @@ export async function startKycVerification(userId: string) {
         status: 'PENDING',
         metadata: {
           applicantStatus: applicant.status,
-          formUrl: formUrlResult.url,
-          formId: formId,
+          formUrl: formUrlResult.url || null, // Optional for Sumsub (uses WebSDK)
+          formId: formId || null, // Optional for Sumsub (uses levelName)
           provider: provider.providerId,
           verificationIdFromFormUrl: !!formUrlResult.sessionId // Track if we got it
         },
@@ -244,8 +261,8 @@ export async function startKycVerification(userId: string) {
         status: 'PENDING',
         metadata: {
           applicantStatus: applicant.status,
-          formUrl: formUrlResult.url,
-          formId: formId,
+          formUrl: formUrlResult.url || null, // Optional for Sumsub (uses WebSDK)
+          formId: formId || null, // Optional for Sumsub (uses levelName)
           provider: provider.providerId,
           verificationIdFromFormUrl: !!formUrlResult.sessionId // Track if we got it
         },
@@ -268,9 +285,10 @@ export async function startKycVerification(userId: string) {
     return {
       success: true,
       sessionId: kycSession.id,
-      formUrl: formUrlResult.url,
+      formUrl: formUrlResult.url || null, // Null for Sumsub (uses WebSDK)
       applicantId: applicant.applicantId,
-      provider: provider.providerId
+      provider: provider.providerId,
+      usesWebSDK: provider.providerId === 'sumsub' // Flag to indicate WebSDK usage
     };
   } catch (error: any) {
     console.error('❌ Failed to start KYC verification:', error);
