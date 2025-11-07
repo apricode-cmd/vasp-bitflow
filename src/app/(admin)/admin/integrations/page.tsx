@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useTransition } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -77,6 +77,7 @@ export default function IntegrationsPage(): JSX.Element {
   const [testing, setTesting] = useState<string | null>(null);
   const [configModalOpen, setConfigModalOpen] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
+  const [isPending, startTransition] = useTransition();
   
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -110,16 +111,23 @@ export default function IntegrationsPage(): JSX.Element {
     }
   };
 
-  const updateIntegration = (service: string, updates: Partial<Integration>) => {
-    setIntegrations(prev => ({
-      ...prev,
-      [service]: { ...prev[service], ...updates }
-    }));
-    
-    if (selectedIntegration?.service === service) {
-      setSelectedIntegration(prev => prev ? { ...prev, ...updates } : null);
-    }
-  };
+  const updateIntegration = useCallback((service: string, updates: Partial<Integration>) => {
+    // Use startTransition to mark this as a low-priority update
+    startTransition(() => {
+      setIntegrations(prev => ({
+        ...prev,
+        [service]: { ...prev[service], ...updates }
+      }));
+      
+      // Update selected integration separately to avoid render conflicts
+      setSelectedIntegration(prev => {
+        if (prev?.service === service) {
+          return { ...prev, ...updates };
+        }
+        return prev;
+      });
+    });
+  }, [startTransition]);
 
   const handleToggle = async (service: string, enabled: boolean) => {
     // Temporarily update UI
