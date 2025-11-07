@@ -16,7 +16,7 @@ import {
   TrendingUp, Shield, Database, Activity, Coins,
   Wallet, Globe, Key, User, FileText, Scale,
   ChevronDown, ChevronRight, Search,
-  ArrowDownCircle, ArrowUpCircle, BookOpen
+  ArrowDownCircle, ArrowUpCircle, BookOpen, Plug
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -197,9 +197,8 @@ const navigation = [
       { 
         name: 'Integrations', 
         href: '/admin/integrations', 
-        icon: Globe,
-        description: 'CoinGecko, KYCAID',
-        requiredPermission: 'integrations:read'
+        icon: Plug,
+        description: 'CoinGecko, KYCAID, Sumsub, Tatum'
       },
       { 
         name: 'KYC Form Fields', 
@@ -252,6 +251,11 @@ export function AdminSidebar(): JSX.Element {
   const filteredByRoleAndPermissions = navigation.map(section => ({
     ...section,
     items: section.items.filter(item => {
+      // Super Admin has access to everything
+      if (isSuperAdmin) {
+        return true;
+      }
+      
       // Check superAdminOnly flag
       if (item.superAdminOnly && !isSuperAdmin) {
         return false;
