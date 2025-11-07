@@ -98,6 +98,61 @@ export async function GET(request: NextRequest) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('❌ Sumsub API error:', response.status, errorText);
+      
+      // Special case: Applicant is deactivated (Sumsub-specific)
+      // Need to create a new applicant with a different externalUserId
+      if (response.status === 404 && errorText.includes('deactivated')) {
+        console.log('⚠️ Applicant deactivated, creating new one with suffix...');
+        
+        // Retry with userId + timestamp suffix to create new applicant
+        const newUserId = `${userId}-${Date.now()}`;
+        const newRequestBody = {
+          levelName,
+          userId: newUserId,
+          ttlInSecs: 3600
+        };
+        const newBody = JSON.stringify(newRequestBody);
+        
+        // Build new signature
+        const newTs = Math.floor(Date.now() / 1000).toString();
+        const newPayload = newTs + method.toUpperCase() + path + newBody;
+        const newSignature = crypto
+          .createHmac('sha256', secretKey)
+          .update(newPayload)
+          .digest('hex');
+        
+        console.log('🔄 Retrying with new userId:', newUserId);
+        
+        const retryResponse = await fetch(baseUrl + path, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-App-Token': appToken,
+            'X-App-Access-Ts': newTs,
+            'X-App-Access-Sig': newSignature
+          },
+          body: newBody
+        });
+        
+        if (!retryResponse.ok) {
+          const retryError = await retryResponse.text();
+          console.error('❌ Retry failed:', retryResponse.status, retryError);
+          return NextResponse.json(
+            { error: `Failed to generate mobile link after retry: ${retryError}` },
+            { status: retryResponse.status }
+          );
+        }
+        
+        const retryData = await retryResponse.json();
+        console.log('✅ Mobile link generated with new applicant');
+        
+        return NextResponse.json({
+          success: true,
+          mobileUrl: retryData.href || retryData.link || retryData.url,
+          externalActionId: retryData.externalActionId
+        });
+      }
+      
       return NextResponse.json(
         { error: `Failed to generate mobile link: ${errorText}` },
         { status: response.status }

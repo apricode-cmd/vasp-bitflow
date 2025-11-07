@@ -1382,7 +1382,7 @@ export default function KycPage(): React.ReactElement {
                           }}
                         >
                           <Camera className="h-5 w-5 mr-2" />
-                          Start Verification (Desktop)
+                          Start Verification
                         </Button>
                         <p className="text-xs text-muted-foreground">
                           Opens verification interface in a modal window
