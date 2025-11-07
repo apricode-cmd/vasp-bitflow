@@ -70,8 +70,8 @@ export default function LoginPage(): React.ReactElement {
       const checkData = await checkResponse.json();
       
       console.log('🔐 2FA check result:', checkData);
-      console.log('🔐 requires2FA:', checkData.requires2FA);
-      console.log('🔐 validPassword:', checkData.validPassword);
+      console.log('🔐 requires2FA:', checkData.requires2FA, 'type:', typeof checkData.requires2FA);
+      console.log('🔐 validPassword:', checkData.validPassword, 'type:', typeof checkData.validPassword);
       
       // Step 2: If password is wrong (check failed)
       if (!checkResponse.ok || !checkData.validPassword) {
