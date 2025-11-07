@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getClientSession } from '@/auth-client';
 import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
 import { getIntegrationWithSecrets } from '@/lib/services/integration-management.service';
+import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
 
 export async function GET(request: NextRequest) {
@@ -63,12 +64,27 @@ export async function GET(request: NextRequest) {
 
     console.log('🔧 Config:', { levelName, baseUrl: baseUrl.substring(0, 30) + '...' });
 
-    // 4. Build Sumsub websdkLink request (following SumsubAdapter pattern)
+    // 4. Check if KYC session exists and get applicantId
+    const kycSession = await prisma.kycSession.findUnique({
+      where: { userId }
+    });
+
+    // Use existing applicantId if available, otherwise use userId
+    // (Sumsub will create new applicant if userId doesn't exist)
+    const externalUserId = kycSession?.applicantId || userId;
+    
+    console.log('🔍 KYC Session:', {
+      exists: !!kycSession,
+      applicantId: kycSession?.applicantId || 'N/A',
+      usingId: externalUserId
+    });
+
+    // 5. Build Sumsub websdkLink request (following SumsubAdapter pattern)
     const method = 'POST';
     const path = '/resources/sdkIntegrations/levels/-/websdkLink';
     const requestBody = {
       levelName,
-      userId: userId,
+      userId: externalUserId, // Use applicantId if exists, otherwise userId
       ttlInSecs: 3600 // 1 hour
     };
     const body = JSON.stringify(requestBody);
@@ -100,78 +116,14 @@ export async function GET(request: NextRequest) {
       console.error('❌ Sumsub API error:', response.status, errorText);
       
       // Special case: Applicant is deactivated (Sumsub-specific)
-      // Need to create a new applicant with a different externalUserId
       if (response.status === 404 && errorText.includes('deactivated')) {
-        console.log('⚠️ Applicant deactivated, retrying with new userId...');
-        
-        // Retry up to 3 times with different suffixes
-        let retryCount = 0;
-        const maxRetries = 3;
-        
-        while (retryCount < maxRetries) {
-          retryCount++;
-          
-          // Generate unique userId with timestamp + random number
-          const newUserId = `${userId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-          const newRequestBody = {
-            levelName,
-            userId: newUserId,
-            ttlInSecs: 3600
-          };
-          const newBody = JSON.stringify(newRequestBody);
-          
-          // Build new signature
-          const newTs = Math.floor(Date.now() / 1000).toString();
-          const newPayload = newTs + method.toUpperCase() + path + newBody;
-          const newSignature = crypto
-            .createHmac('sha256', secretKey)
-            .update(newPayload)
-            .digest('hex');
-          
-          console.log(`🔄 Retry ${retryCount}/${maxRetries} with userId:`, newUserId);
-          
-          const retryResponse = await fetch(baseUrl + path, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-App-Token': appToken,
-              'X-App-Access-Ts': newTs,
-              'X-App-Access-Sig': newSignature
-            },
-            body: newBody
-          });
-          
-          if (retryResponse.ok) {
-            const retryData = await retryResponse.json();
-            console.log('✅ Mobile link generated with new applicant');
-            
-            return NextResponse.json({
-              success: true,
-              mobileUrl: retryData.href || retryData.link || retryData.url,
-              externalActionId: retryData.externalActionId
-            });
-          }
-          
-          const retryError = await retryResponse.text();
-          console.error(`❌ Retry ${retryCount} failed:`, retryResponse.status, retryError);
-          
-          // If still deactivated, try again with new suffix
-          if (retryResponse.status === 404 && retryError.includes('deactivated')) {
-            console.log('⚠️ Still deactivated, trying another suffix...');
-            continue;
-          }
-          
-          // Other error - stop retrying
-          return NextResponse.json(
-            { error: `Failed to generate mobile link: ${retryError}` },
-            { status: retryResponse.status }
-          );
-        }
-        
-        // Max retries reached
+        console.error('⚠️ Applicant is deactivated:', externalUserId);
         return NextResponse.json(
-          { error: 'Failed to generate mobile link: All applicants deactivated. Please contact support.' },
-          { status: 500 }
+          { 
+            error: 'Your verification session has been deactivated. Please contact support to restart the verification process.',
+            code: 'APPLICANT_DEACTIVATED'
+          },
+          { status: 400 }
         );
       }
       

@@ -78,14 +78,17 @@ import { MoreHorizontal } from 'lucide-react';
 
 interface KycSession {
   id: string;
-  userId: string; // Added missing field
+  userId: string;
   status: KycStatus;
   submittedAt: Date | null;
   reviewedAt: Date | null;
   rejectionReason: string | null;
-  kycaidVerificationId: string | null;
-  kycaidApplicantId: string | null; // Added missing field
-  metadata?: any; // Added missing field
+  kycProviderId: string | null; // Universal: which KYC provider (kycaid, sumsub, etc)
+  applicantId: string | null; // Universal: applicant ID (works for all providers)
+  verificationId: string | null; // Universal: verification ID (works for all providers)
+  kycaidVerificationId: string | null; // Legacy KYCAID field
+  kycaidApplicantId: string | null; // Legacy KYCAID field
+  metadata?: any;
   user: {
     id: string;
     email: string;
@@ -543,17 +546,19 @@ export default function AdminKycPage(): JSX.Element {
       },
     },
     {
-      accessorKey: 'kycaidVerificationId',
+      accessorKey: 'verificationId',
       header: 'Verification ID',
-      cell: ({ row }) => (
-        row.original.kycaidVerificationId ? (
+      cell: ({ row }) => {
+        // Use universal verificationId, fallback to legacy kycaidVerificationId
+        const verificationId = row.original.verificationId || row.original.kycaidVerificationId;
+        return verificationId ? (
           <Badge variant="outline" className="font-mono text-xs">
-            {row.original.kycaidVerificationId.slice(0, 8)}...
+            {verificationId.slice(0, 8)}...
           </Badge>
         ) : (
           <span className="text-sm text-muted-foreground">—</span>
-        )
-      ),
+        );
+      },
     },
     {
       id: 'actions',
@@ -810,17 +815,33 @@ export default function AdminKycPage(): JSX.Element {
                           </div>
                         </div>
                       </div>
-                      {selectedSession.kycaidVerificationId && (
+                      {(selectedSession.verificationId || selectedSession.kycaidVerificationId) && (
                         <>
                           <Separator className="my-4" />
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <p className="text-muted-foreground">Verification ID</p>
-                              <p className="font-mono text-sm">{selectedSession.kycaidVerificationId}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Applicant ID</p>
-                              <p className="font-mono text-sm">{selectedSession.kycaidApplicantId || 'N/A'}</p>
+                          <div className="space-y-3 text-sm">
+                            {/* KYC Provider */}
+                            {selectedSession.kycProviderId && (
+                              <div>
+                                <p className="text-muted-foreground">KYC Provider</p>
+                                <Badge variant="outline" className="mt-1">
+                                  {selectedSession.kycProviderId.toUpperCase()}
+                                </Badge>
+                              </div>
+                            )}
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <p className="text-muted-foreground">Verification ID</p>
+                                <p className="font-mono text-sm">
+                                  {selectedSession.verificationId || selectedSession.kycaidVerificationId}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Applicant ID</p>
+                                <p className="font-mono text-sm">
+                                  {selectedSession.applicantId || selectedSession.kycaidApplicantId || 'N/A'}
+                                </p>
+                              </div>
                             </div>
                           </div>
                         </>

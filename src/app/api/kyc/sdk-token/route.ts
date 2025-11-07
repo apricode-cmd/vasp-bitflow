@@ -74,12 +74,13 @@ export async function GET(request: NextRequest) {
         externalId: user.id
       });
 
-      // Save KYC session (for Sumsub, applicantId is enough)
+      // Save KYC session (for Sumsub, applicantId === verificationId)
       kycSession = await prisma.kycSession.create({
         data: {
           userId: user.id,
           kycProviderId: provider.providerId,
           applicantId: applicant.applicantId,
+          verificationId: applicant.applicantId, // For Sumsub, they are the same
           status: 'PENDING',
           metadata: {
             applicant: applicant.metadata
@@ -87,7 +88,7 @@ export async function GET(request: NextRequest) {
         }
       });
 
-      console.log('✅ KYC session created:', kycSession.id);
+      console.log('✅ KYC session created:', kycSession.id, 'applicantId:', applicant.applicantId);
     }
 
     // 5. Create access token (Sumsub-specific method)
