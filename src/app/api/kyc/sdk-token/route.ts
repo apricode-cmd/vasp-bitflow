@@ -101,7 +101,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const tokenData = await sumsubAdapter.createAccessToken(session.user.id);
+    // ✅ IMPORTANT: Use applicantId (not userId) to link to existing applicant!
+    // If we pass userId, Sumsub will create a NEW applicant instead of using existing one
+    const userIdForToken = kycSession.applicantId || session.user.id;
+    
+    console.log('🎫 Creating SDK token for:', {
+      userId: session.user.id,
+      applicantId: kycSession.applicantId,
+      usingId: userIdForToken
+    });
+
+    const tokenData = await sumsubAdapter.createAccessToken(userIdForToken);
 
     console.log('✅ SDK token created successfully');
 
