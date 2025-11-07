@@ -370,11 +370,15 @@ export async function startKycVerification(userId: string) {
 
 /**
  * Check KYC status (polling)
+ * Enterprise-level status checking with proper error handling
  */
 export async function checkKycStatus(userId: string) {
+  // Declare session outside try block for access in catch
+  let session: any = null;
+  
   try {
     // Get user's KYC session
-    const session = await prisma.kycSession.findFirst({
+    session = await prisma.kycSession.findFirst({
       where: { userId },
       orderBy: { createdAt: 'desc' }
     });
@@ -576,16 +580,35 @@ export async function checkKycStatus(userId: string) {
   } catch (error: any) {
     console.error('❌ Failed to check KYC status:', error);
     
+    // Enterprise-level error handling:
     // If error is 404 (applicant not found), return current session status
-    // This can happen if applicant was deleted in Sumsub but exists in our DB
-    if (error.message && error.message.includes('404')) {
+    // This can happen if applicant was deleted/deactivated in provider but exists in our DB
+    if (error.message && (error.message.includes('404') || error.message.includes('not found'))) {
       console.warn('⚠️ Applicant not found in provider, returning current DB status');
       if (session) {
+        // Update lastChecked timestamp even if provider returned 404
+        await prisma.kycSession.update({
+          where: { id: session.id },
+          data: {
+            metadata: {
+              ...session.metadata as any,
+              lastChecked: new Date(),
+              lastError: '404 Applicant not found in provider'
+            }
+          }
+        });
+        
         return formatStatusResponse(session);
       }
     }
     
-    throw new Error('Failed to check KYC status');
+    // For other errors, throw with proper context
+    const errorMessage = error.message || 'Failed to check KYC status';
+    const enhancedError: any = new Error(errorMessage);
+    enhancedError.statusCode = error.statusCode || 500;
+    enhancedError.originalError = error;
+    
+    throw enhancedError;
   }
 }
 
