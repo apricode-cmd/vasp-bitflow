@@ -49,11 +49,20 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/api/auth') ||  // Client auth (NextAuth endpoints)
     path.startsWith('/api/admin/')  // Admin API (auth checked in each route)
   ) {
-    return NextResponse.next({
+    const response = NextResponse.next({
       request: {
         headers: requestHeaders,
       },
     });
+    
+    // Add CORS headers for hot-reload in development
+    if (process.env.NODE_ENV === 'development' && path.startsWith('/_next')) {
+      response.headers.set('Access-Control-Allow-Origin', '*');
+      response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+    }
+    
+    return response;
   }
 
   // === PUBLIC ADMIN AUTH ROUTES (MUST BE BEFORE ADMIN CHECK) ===
