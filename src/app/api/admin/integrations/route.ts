@@ -18,9 +18,11 @@ import { decrypt, maskApiKey } from '@/lib/services/encryption.service';
 export async function GET(): Promise<NextResponse> {
   try {
     // Check admin authentication
-    const authResult = await requireAdminRole('ADMIN');
-    if (authResult.error) {
-      return authResult.error;
+    const session = await requireAdminRole('ADMIN');
+    
+    // Check if it's an error response
+    if (session instanceof NextResponse) {
+      return session;
     }
 
     // Get all registered providers from registry
@@ -82,12 +84,13 @@ export async function GET(): Promise<NextResponse> {
 export async function PUT(request: NextRequest): Promise<NextResponse> {
   try {
     // Check admin authentication
-    const authResult = await requireAdminRole('ADMIN');
-    if (authResult.error) {
-      return authResult.error;
+    const session = await requireAdminRole('ADMIN');
+    
+    // Check if it's an error response
+    if (session instanceof NextResponse) {
+      return session;
     }
 
-    const session = authResult.session;
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: 'User ID not found in session' },
