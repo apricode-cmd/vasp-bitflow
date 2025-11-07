@@ -10,7 +10,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getClientSession } from '@/auth-client';
 import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
-import { startKycVerification } from '@/lib/services/kyc.service';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
@@ -48,30 +47,46 @@ export async function GET(request: NextRequest) {
     });
 
     if (!kycSession) {
-      console.log('ℹ️ KYC session not found, starting KYC flow...');
+      console.log('ℹ️ KYC session not found, creating new session');
       
-      // Start KYC verification (creates applicant and session)
-      const kycResult = await startKycVerification(session.user.id);
-      
-      if (!kycResult.success) {
-        return NextResponse.json(
-          { error: kycResult.message || 'Failed to start KYC' },
-          { status: 500 }
-        );
-      }
-      
-      // Fetch newly created session
-      kycSession = await prisma.kycSession.findUnique({
-        where: { userId: session.user.id }
+      // Get user profile
+      const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        include: { profile: true }
       });
-      
-      if (!kycSession) {
+
+      if (!user || !user.profile) {
         return NextResponse.json(
-          { error: 'KYC session creation failed' },
-          { status: 500 }
+          { error: 'User profile not found. Please complete your profile first.' },
+          { status: 404 }
         );
       }
-      
+
+      // Create applicant in Sumsub (no separate verification needed for Sumsub)
+      const applicant = await provider.createApplicant({
+        email: user.email,
+        firstName: user.profile.firstName,
+        lastName: user.profile.lastName,
+        dateOfBirth: user.profile.dateOfBirth?.toISOString().split('T')[0] || '',
+        nationality: user.profile.nationality || user.profile.country,
+        residenceCountry: user.profile.country,
+        phone: user.profile.phoneNumber || '',
+        externalId: user.id
+      });
+
+      // Save KYC session (for Sumsub, applicantId is enough)
+      kycSession = await prisma.kycSession.create({
+        data: {
+          userId: user.id,
+          kycProviderId: provider.providerId,
+          applicantId: applicant.applicantId,
+          status: 'PENDING',
+          metadata: {
+            applicant: applicant.metadata
+          } as any
+        }
+      });
+
       console.log('✅ KYC session created:', kycSession.id);
     }
 
