@@ -453,100 +453,205 @@ export default function IntegrationsPage(): JSX.Element {
             </DialogHeader>
 
             <div className="space-y-4 py-4">
-              {/* API Key */}
-              <div className="space-y-2">
-                <Label htmlFor="modal-api-key">API Key *</Label>
-                <Input
-                  id="modal-api-key"
-                  type="text"
-                  value={selectedIntegration.apiKey || ''}
-                  onChange={(e) => updateIntegration(selectedIntegration.service, { apiKey: e.target.value })}
-                  placeholder="Enter API key"
-                  autoComplete="off"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Your API key will be encrypted before storage
-                </p>
-              </div>
-
-              {/* Form ID (for KYC providers) */}
-              {selectedIntegration.category === 'KYC' && (
-                <div className="space-y-2">
-                  <Label htmlFor="modal-form-id">Form ID *</Label>
-                  <Input
-                    id="modal-form-id"
-                    value={(selectedIntegration.config as any)?.formId || ''}
-                    onChange={(e) => updateIntegration(selectedIntegration.service, { 
-                      config: { ...selectedIntegration.config, formId: e.target.value }
-                    })}
-                    placeholder="form_basic_liveness"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    KYC form ID with liveness check enabled
-                  </p>
-                </div>
-              )}
-
-              {/* Webhook URL (for KYC providers) - Read-only info */}
-              {selectedIntegration.category === 'KYC' && (
-                <div className="space-y-2">
-                  <Label>Webhook URL</Label>
-                  <div className="flex items-center gap-2">
+              {/* Sumsub-specific fields */}
+              {selectedIntegration.service === 'sumsub' ? (
+                <>
+                  {/* App Token */}
+                  <div className="space-y-2">
+                    <Label htmlFor="modal-app-token">App Token *</Label>
                     <Input
-                      readOnly
-                      value={`${typeof window !== 'undefined' ? window.location.origin : ''}/api/kyc/webhook?provider=${selectedIntegration.service}`}
-                      className="font-mono text-xs bg-muted"
+                      id="modal-app-token"
+                      type="text"
+                      value={(selectedIntegration.config as any)?.appToken || selectedIntegration.apiKey || ''}
+                      onChange={(e) => updateIntegration(selectedIntegration.service, { 
+                        apiKey: e.target.value,
+                        config: { ...selectedIntegration.config, appToken: e.target.value }
+                      })}
+                      placeholder="sbx:XXXXXXXX or prd:XXXXXXXX"
+                      autoComplete="off"
                     />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        const webhookUrl = `${window.location.origin}/api/kyc/webhook?provider=${selectedIntegration.service}`;
-                        navigator.clipboard.writeText(webhookUrl);
-                        toast.success('Webhook URL copied to clipboard');
-                      }}
-                    >
-                      Copy
-                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      Your Sumsub App Token (starts with sbx: or prd:)
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Configure this URL in your {selectedIntegration.displayName} dashboard to receive verification updates
-                  </p>
-                </div>
-              )}
 
-              {/* Webhook Secret (for KYC providers) */}
-              {selectedIntegration.category === 'KYC' && (
-                <div className="space-y-2">
-                  <Label htmlFor="modal-webhook-secret">Webhook Secret (optional)</Label>
-                  <Input
-                    id="modal-webhook-secret"
-                    type="password"
-                    value={(selectedIntegration.config as any)?.webhookSecret || ''}
-                    onChange={(e) => updateIntegration(selectedIntegration.service, { 
-                      config: { ...selectedIntegration.config, webhookSecret: e.target.value }
-                    })}
-                    placeholder="Enter webhook secret"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Used to verify webhook signatures from provider
-                  </p>
-                </div>
-              )}
+                  {/* Secret Key */}
+                  <div className="space-y-2">
+                    <Label htmlFor="modal-secret-key">Secret Key *</Label>
+                    <Input
+                      id="modal-secret-key"
+                      type="password"
+                      value={(selectedIntegration.config as any)?.secretKey || ''}
+                      onChange={(e) => updateIntegration(selectedIntegration.service, { 
+                        config: { ...selectedIntegration.config, secretKey: e.target.value }
+                      })}
+                      placeholder="Enter secret key"
+                      autoComplete="off"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Your Sumsub Secret Key (used for HMAC signatures)
+                    </p>
+                  </div>
 
-              {/* API Endpoint */}
-              <div className="space-y-2">
-                <Label htmlFor="modal-api-endpoint">API Endpoint (optional)</Label>
-                <Input
-                  id="modal-api-endpoint"
-                  value={selectedIntegration.apiEndpoint || ''}
-                  onChange={(e) => updateIntegration(selectedIntegration.service, { apiEndpoint: e.target.value })}
-                  placeholder="https://api.example.com"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Leave empty to use default endpoint
-                </p>
-              </div>
+                  {/* Level Name */}
+                  <div className="space-y-2">
+                    <Label htmlFor="modal-level-name">Level Name *</Label>
+                    <Input
+                      id="modal-level-name"
+                      value={(selectedIntegration.config as any)?.levelName || ''}
+                      onChange={(e) => updateIntegration(selectedIntegration.service, { 
+                        config: { ...selectedIntegration.config, levelName: e.target.value }
+                      })}
+                      placeholder="basic-kyc-level"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      KYC level name configured in Sumsub dashboard
+                    </p>
+                  </div>
+
+                  {/* Base URL */}
+                  <div className="space-y-2">
+                    <Label htmlFor="modal-base-url">Base URL</Label>
+                    <Input
+                      id="modal-base-url"
+                      value={(selectedIntegration.config as any)?.baseUrl || selectedIntegration.apiEndpoint || 'https://api.sumsub.com'}
+                      onChange={(e) => updateIntegration(selectedIntegration.service, { 
+                        apiEndpoint: e.target.value,
+                        config: { ...selectedIntegration.config, baseUrl: e.target.value }
+                      })}
+                      placeholder="https://api.sumsub.com"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Use https://api.sumsub.com for production or https://test-api.sumsub.com for sandbox
+                    </p>
+                  </div>
+
+                  {/* Webhook URL Info */}
+                  <div className="space-y-2">
+                    <Label>Webhook URL</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        readOnly
+                        value={`${typeof window !== 'undefined' ? window.location.origin : ''}/api/kyc/webhook/sumsub`}
+                        className="font-mono text-xs bg-muted"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const webhookUrl = `${window.location.origin}/api/kyc/webhook/sumsub`;
+                          navigator.clipboard.writeText(webhookUrl);
+                          toast.success('Webhook URL copied');
+                        }}
+                      >
+                        Copy
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Configure this URL in Sumsub Dashboard → Settings → Webhooks
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* API Key (for non-Sumsub integrations) */}
+                  <div className="space-y-2">
+                    <Label htmlFor="modal-api-key">API Key *</Label>
+                    <Input
+                      id="modal-api-key"
+                      type="text"
+                      value={selectedIntegration.apiKey || ''}
+                      onChange={(e) => updateIntegration(selectedIntegration.service, { apiKey: e.target.value })}
+                      placeholder="Enter API key"
+                      autoComplete="off"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Your API key will be encrypted before storage
+                    </p>
+                  </div>
+
+                  {/* Form ID (for KYCAID) */}
+                  {selectedIntegration.category === 'KYC' && selectedIntegration.service === 'kycaid' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="modal-form-id">Form ID *</Label>
+                      <Input
+                        id="modal-form-id"
+                        value={(selectedIntegration.config as any)?.formId || ''}
+                        onChange={(e) => updateIntegration(selectedIntegration.service, { 
+                          config: { ...selectedIntegration.config, formId: e.target.value }
+                        })}
+                        placeholder="form_basic_liveness"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        KYC form ID with liveness check enabled
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Webhook URL (for KYCAID) */}
+                  {selectedIntegration.category === 'KYC' && selectedIntegration.service === 'kycaid' && (
+                    <div className="space-y-2">
+                      <Label>Webhook URL</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          readOnly
+                          value={`${typeof window !== 'undefined' ? window.location.origin : ''}/api/kyc/webhook?provider=${selectedIntegration.service}`}
+                          className="font-mono text-xs bg-muted"
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            const webhookUrl = `${window.location.origin}/api/kyc/webhook?provider=${selectedIntegration.service}`;
+                            navigator.clipboard.writeText(webhookUrl);
+                            toast.success('Webhook URL copied');
+                          }}
+                        >
+                          Copy
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Configure this URL in KYCAID dashboard to receive verification updates
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Webhook Secret (for KYCAID) */}
+                  {selectedIntegration.category === 'KYC' && selectedIntegration.service === 'kycaid' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="modal-webhook-secret">Webhook Secret (optional)</Label>
+                      <Input
+                        id="modal-webhook-secret"
+                        type="password"
+                        value={(selectedIntegration.config as any)?.webhookSecret || ''}
+                        onChange={(e) => updateIntegration(selectedIntegration.service, { 
+                          config: { ...selectedIntegration.config, webhookSecret: e.target.value }
+                        })}
+                        placeholder="Enter webhook secret"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Used to verify webhook signatures from KYCAID
+                      </p>
+                    </div>
+                  )}
+
+                  {/* API Endpoint (for non-KYC or non-Sumsub) */}
+                  {selectedIntegration.category !== 'KYC' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="modal-api-endpoint">API Endpoint (optional)</Label>
+                      <Input
+                        id="modal-api-endpoint"
+                        value={selectedIntegration.apiEndpoint || ''}
+                        onChange={(e) => updateIntegration(selectedIntegration.service, { apiEndpoint: e.target.value })}
+                        placeholder="https://api.example.com"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Leave empty to use default endpoint
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
 
               {/* Status Display */}
               <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
