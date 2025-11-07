@@ -34,22 +34,22 @@ async function getActiveKycProvider(): Promise<IKycProvider | null> {
   try {
     console.log('🔍 Looking for active KYC provider...');
     
-    // Find active KYC integration (KYCAID for now)
+    // Find any active KYC integration (KYCAID or Sumsub)
     const integration = await prisma.integration.findFirst({
       where: {
-        service: 'kycaid', // We only have KYCAID for now
+        service: { in: ['kycaid', 'sumsub'] }, // Support both providers
         isEnabled: true,
         status: 'active'
       }
     });
 
     if (!integration) {
-      console.warn('⚠️ No active KYCAID integration found');
-      console.log('Check: /admin/integrations - KYCAID should be enabled with API key');
+      console.warn('⚠️ No active KYC integration found');
+      console.log('Check: /admin/integrations - KYCAID or Sumsub should be enabled with credentials');
       return null;
     }
 
-    console.log('✅ Found KYCAID integration:', integration.service);
+    console.log('✅ Found KYC integration:', integration.service);
 
     // Get provider from registry
     const provider = integrationRegistry.getProvider(integration.service) as IKycProvider;
@@ -63,15 +63,15 @@ async function getActiveKycProvider(): Promise<IKycProvider | null> {
 
     // Initialize with secrets
     const secrets = await getIntegrationWithSecrets(integration.service);
-    if (secrets?.apiKey) {
-      console.log('✅ Initializing provider with API key');
+    if (secrets?.apiKey || (secrets?.config as any)?.appToken) {
+      console.log(`✅ Initializing ${integration.service} provider with credentials`);
       await provider.initialize({
         apiKey: secrets.apiKey,
         apiEndpoint: secrets.apiEndpoint || undefined,
         ...(secrets.config as Record<string, any> || {})
       });
     } else {
-      console.warn('⚠️ No API key found for KYCAID');
+      console.warn(`⚠️ No credentials found for ${integration.service}`);
       return null;
     }
 
