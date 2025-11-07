@@ -360,6 +360,8 @@ export class SumsubAdapter implements IKycProvider {
    * 
    * This token is used by frontend to initialize Sumsub WebSDK
    * API: POST /resources/accessTokens?userId={externalUserId}&levelName={levelName}
+   * 
+   * Handles deactivated applicants by retrying with unique userId suffix
    */
   async createAccessToken(externalUserId: string): Promise<{ token: string; expiresAt: Date }> {
     if (!this.isConfigured()) {
@@ -381,6 +383,57 @@ export class SumsubAdapter implements IKycProvider {
       if (!response.ok) {
         const error = await response.text();
         console.error('❌ Sumsub access token creation failed:', error);
+        
+        // Handle deactivated applicant - retry with new userId
+        if (response.status === 404 && error.includes('deactivated')) {
+          console.log('⚠️ Applicant deactivated, retrying with new userId...');
+          
+          // Retry up to 3 times with unique userId
+          let retryCount = 0;
+          const maxRetries = 3;
+          
+          while (retryCount < maxRetries) {
+            retryCount++;
+            
+            // Generate unique userId with timestamp + random
+            const newUserId = `${externalUserId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+            const retryPath = `/resources/accessTokens?userId=${encodeURIComponent(newUserId)}&levelName=${encodeURIComponent(this.config.levelName!)}`;
+            const { headers: retryHeaders } = this.buildRequest('POST', retryPath);
+            
+            console.log(`🔄 Retry ${retryCount}/${maxRetries} with userId:`, newUserId);
+            
+            const retryResponse = await fetch(this.baseUrl + retryPath, {
+              method: 'POST',
+              headers: retryHeaders
+            });
+            
+            if (retryResponse.ok) {
+              const retryData = await retryResponse.json();
+              console.log('✅ Sumsub access token created with new applicant');
+              
+              return {
+                token: retryData.token,
+                expiresAt: new Date(Date.now() + 30 * 60 * 1000)
+              };
+            }
+            
+            const retryError = await retryResponse.text();
+            console.error(`❌ Retry ${retryCount} failed:`, retryResponse.status, retryError);
+            
+            // If still deactivated, try again
+            if (retryResponse.status === 404 && retryError.includes('deactivated')) {
+              console.log('⚠️ Still deactivated, trying another suffix...');
+              continue;
+            }
+            
+            // Other error - stop retrying
+            throw new Error(`Failed to create access token: ${retryError}`);
+          }
+          
+          // Max retries reached
+          throw new Error('Failed to create access token: All applicants deactivated. Please contact support.');
+        }
+        
         throw new Error(`Failed to create access token: ${error}`);
       }
 
