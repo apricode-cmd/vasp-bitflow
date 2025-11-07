@@ -150,10 +150,28 @@ export default function IntegrationsPage(): JSX.Element {
       const data = await response.json();
 
       if (data.success) {
-        toast.success(enabled ? 'Integration enabled' : 'Integration disabled');
-        // Update with response data
-        if (data.integration) {
-          updateIntegration(service, data.integration);
+        // Check if this was a KYC provider and other providers were disabled
+        const provider = integrations[service];
+        const isKycProvider = provider?.category === 'KYC';
+        
+        if (enabled && isKycProvider && data.allIntegrations) {
+          // Update all integrations (other KYC providers were auto-disabled)
+          const integrationsMap: Record<string, Integration> = {};
+          data.allIntegrations.forEach((int: any) => {
+            integrationsMap[int.service] = {
+              ...int,
+              lastTested: int.lastTested ? new Date(int.lastTested) : null
+            };
+          });
+          setIntegrations(integrationsMap);
+          
+          toast.success(`${provider.displayName} enabled. Other KYC providers were disabled.`);
+        } else {
+          toast.success(enabled ? 'Integration enabled' : 'Integration disabled');
+          // Update with response data
+          if (data.integration) {
+            updateIntegration(service, data.integration);
+          }
         }
       } else {
         // Revert on error

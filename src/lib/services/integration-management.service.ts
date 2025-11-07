@@ -242,8 +242,55 @@ export async function updateIntegrationConfig(params: UpdateIntegrationParams) {
 
     if (updates.isEnabled !== undefined) {
       updateData.isEnabled = updates.isEnabled;
-      // Auto-update status based on isEnabled
+      
+      // If enabling a KYC provider, disable all other KYC providers
       if (updates.isEnabled) {
+        const provider = integrationRegistry.getProvider(service);
+        if (provider && provider.category === 'KYC') {
+          console.log('🔄 Enabling KYC provider, disabling others...');
+          
+          // Find all other KYC integrations and disable them
+          const allKycIntegrations = await prisma.integration.findMany({
+            where: {
+              service: { not: service }
+            }
+          });
+          
+          for (const kycInt of allKycIntegrations) {
+            const kycProvider = integrationRegistry.getProvider(kycInt.service);
+            if (kycProvider && kycProvider.category === 'KYC' && kycInt.isEnabled) {
+              await prisma.integration.update({
+                where: { service: kycInt.service },
+                data: {
+                  isEnabled: false,
+                  status: 'inactive',
+                  updatedAt: new Date()
+                }
+              });
+              
+              console.log(`✅ Disabled KYC provider: ${kycInt.service}`);
+              
+              // Log deactivation
+              await prisma.auditLog.create({
+                data: {
+                  actorType: 'ADMIN',
+                  actorId: userId,
+                  action: 'INTEGRATION_AUTO_DEACTIVATED',
+                  entity: 'Integration',
+                  entityType: 'Integration',
+                  entityId: kycInt.id,
+                  oldValue: { isEnabled: true },
+                  newValue: { isEnabled: false },
+                  metadata: {
+                    reason: `Auto-disabled when ${service} was enabled`,
+                    triggeredBy: service
+                  }
+                }
+              });
+            }
+          }
+        }
+        
         // When enabling, set to active if API key exists (including new one)
         if (integration.apiKey || updates.apiKey) {
           updateData.status = 'active';

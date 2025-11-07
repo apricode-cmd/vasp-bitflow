@@ -119,9 +119,48 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
 
     console.log('✅ Integration updated successfully:', service);
 
+    // If this was a KYC provider being enabled, fetch all integrations to return updated state
+    let allIntegrations = null;
+    if (updates.isEnabled) {
+      const provider = integrationRegistry.getProvider(service);
+      if (provider && provider.category === 'KYC') {
+        // Fetch all integrations to return updated state
+        const dbIntegrations = await prisma.integration.findMany();
+        const registeredProviders = integrationRegistry.getAllProviders();
+        
+        allIntegrations = registeredProviders.map(p => {
+          const dbConfig = dbIntegrations.find(db => db.service === p.providerId);
+          let maskedApiKey = null;
+          if (dbConfig?.apiKey) {
+            try {
+              const decrypted = decrypt(dbConfig.apiKey);
+              maskedApiKey = maskApiKey(decrypted);
+            } catch (error) {
+              console.error('Failed to decrypt API key:', error);
+            }
+          }
+          
+          return {
+            service: p.providerId,
+            category: p.category,
+            displayName: p.displayName,
+            description: p.description,
+            icon: p.icon,
+            isEnabled: dbConfig?.isEnabled ?? false,
+            status: dbConfig?.status ?? 'inactive',
+            apiKey: maskedApiKey,
+            apiEndpoint: dbConfig?.apiEndpoint,
+            lastTested: dbConfig?.lastTested,
+            config: dbConfig?.config
+          };
+        });
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      integration: result.integration
+      integration: result.integration,
+      allIntegrations // Will be null unless KYC provider was enabled
     });
   } catch (error: any) {
     console.error('❌ Failed to update integration:', error);
