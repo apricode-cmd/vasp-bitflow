@@ -64,19 +64,21 @@ export async function GET(request: NextRequest) {
 
     console.log('🔧 Config:', { levelName, baseUrl: baseUrl.substring(0, 30) + '...' });
 
-    // 4. Check if KYC session exists and get applicantId
+    // 4. Check if KYC session exists
     const kycSession = await prisma.kycSession.findUnique({
       where: { userId }
     });
 
-    // Use existing applicantId if available, otherwise use userId
-    // (Sumsub will create new applicant if userId doesn't exist)
-    const externalUserId = kycSession?.applicantId || userId;
+    // ✅ IMPORTANT: Always use our internal userId (externalUserId in Sumsub)
+    // Sumsub API: POST /resources/sdkIntegrations/levels/-/websdkLink
+    // The 'userId' parameter should be OUR internal user ID, not Sumsub's applicantId
+    // Sumsub will find the applicant by externalUserId and generate mobile link for it
+    const externalUserId = userId; // Always use our internal user ID
     
     console.log('🔍 KYC Session:', {
       exists: !!kycSession,
       applicantId: kycSession?.applicantId || 'N/A',
-      usingId: externalUserId
+      usingExternalUserId: externalUserId
     });
 
     // 5. Build Sumsub websdkLink request (following SumsubAdapter pattern)
@@ -84,7 +86,7 @@ export async function GET(request: NextRequest) {
     const path = '/resources/sdkIntegrations/levels/-/websdkLink';
     const requestBody = {
       levelName,
-      userId: externalUserId, // Use applicantId if exists, otherwise userId
+      userId: externalUserId, // Our internal user ID (externalUserId)
       ttlInSecs: 3600 // 1 hour
     };
     const body = JSON.stringify(requestBody);
