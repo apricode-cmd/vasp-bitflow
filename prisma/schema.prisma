@@ -70,9 +70,17 @@ model Profile {
 model KycSession {
   id                   String        @id @default(cuid())
   userId               String        @unique
+  
+  // Universal fields (work with any KYC provider)
+  kycProviderId        String?
+  applicantId          String?       // Universal applicant ID (replaces kycaidApplicantId)
+  verificationId       String?       @unique // Universal verification ID (replaces kycaidVerificationId)
+  
+  // Legacy KYCAID-specific fields (deprecated, use universal fields above)
   kycaidVerificationId String?       @unique
   kycaidApplicantId    String?
   kycaidFormId         String?
+  
   status               KycStatus     @default(PENDING)
   submittedAt          DateTime?
   reviewedAt           DateTime?
@@ -87,7 +95,7 @@ model KycSession {
   lastAttemptAt        DateTime?
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
-  kycProviderId        String?
+  
   documents            KycDocument[]
   formData             KycFormData[]
   profile              KycProfile?
@@ -97,6 +105,8 @@ model KycSession {
   @@index([status])
   @@index([kycaidVerificationId])
   @@index([kycProviderId])
+  @@index([applicantId])
+  @@index([verificationId])
 }
 
 model Currency {

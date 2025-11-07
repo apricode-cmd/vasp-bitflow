@@ -219,30 +219,40 @@ export async function startKycVerification(userId: string) {
       where: { userId: userId },
       create: {
         userId: userId,
-        kycaidApplicantId: applicant.applicantId,
-        kycaidVerificationId: formUrlResult.sessionId || null, // Save if available
-        kycaidFormId: formId,
+        kycProviderId: provider.providerId,
+        applicantId: applicant.applicantId,
+        verificationId: formUrlResult.sessionId || null, // Save if available
         status: 'PENDING',
         metadata: {
           applicantStatus: applicant.status,
           formUrl: formUrlResult.url,
+          formId: formId,
           provider: provider.providerId,
           verificationIdFromFormUrl: !!formUrlResult.sessionId // Track if we got it
         },
+        // Legacy fields for backward compatibility with KYCAID
+        kycaidApplicantId: provider.providerId === 'kycaid' ? applicant.applicantId : null,
+        kycaidVerificationId: provider.providerId === 'kycaid' ? (formUrlResult.sessionId || null) : null,
+        kycaidFormId: provider.providerId === 'kycaid' ? formId : null,
         attempts: 1,
         lastAttemptAt: new Date()
       },
       update: {
-        kycaidApplicantId: applicant.applicantId,
-        kycaidVerificationId: formUrlResult.sessionId || null, // Save if available
-        kycaidFormId: formId,
+        kycProviderId: provider.providerId,
+        applicantId: applicant.applicantId,
+        verificationId: formUrlResult.sessionId || null, // Save if available
         status: 'PENDING',
         metadata: {
           applicantStatus: applicant.status,
           formUrl: formUrlResult.url,
+          formId: formId,
           provider: provider.providerId,
           verificationIdFromFormUrl: !!formUrlResult.sessionId // Track if we got it
         },
+        // Legacy fields for backward compatibility with KYCAID
+        kycaidApplicantId: provider.providerId === 'kycaid' ? applicant.applicantId : null,
+        kycaidVerificationId: provider.providerId === 'kycaid' ? (formUrlResult.sessionId || null) : null,
+        kycaidFormId: provider.providerId === 'kycaid' ? formId : null,
         attempts: { increment: 1 },
         lastAttemptAt: new Date()
       }
