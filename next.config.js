@@ -55,6 +55,15 @@ const nextConfig = {
         poll: 1000,
         aggregateTimeout: 300,
       };
+      
+      // Add CORS headers for webpack hot-update files
+      if (config.devServer) {
+        config.devServer.headers = {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        };
+      }
     }
     return config;
   },

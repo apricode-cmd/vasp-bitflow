@@ -115,12 +115,16 @@ export default function LoginPage(): React.ReactElement {
       // Show success message
       toast.success('Login successful! Redirecting...');
       
+      console.log('✅ Login successful, result:', result);
+      
       // Login logging already happens in auth-client.ts via securityAuditService
       // No need to call /api/auth/log-login here
       
       // Wait longer for session cookie to be set and propagated
-      await new Promise(resolve => setTimeout(resolve, 500));
+      console.log('⏳ Waiting for session cookie...');
+      await new Promise(resolve => setTimeout(resolve, 800));
       
+      console.log('🔄 Redirecting to dashboard...');
       // Use router.push with refresh to ensure session is loaded
       router.push('/dashboard');
       router.refresh();
