@@ -449,6 +449,17 @@ export async function checkKycStatus(userId: string) {
         return formatStatusResponse(updatedSession);
       }
 
+      // Even if status unchanged, update lastChecked timestamp
+      await prisma.kycSession.update({
+        where: { id: session.id },
+        data: {
+          metadata: {
+            ...session.metadata as any,
+            lastChecked: new Date()
+          }
+        }
+      });
+
       console.log(`ℹ️ KYC status unchanged: ${session.status}`);
     } else {
       // No verificationId yet - try to create one or check applicant
@@ -564,6 +575,16 @@ export async function checkKycStatus(userId: string) {
     return formatStatusResponse(session);
   } catch (error: any) {
     console.error('❌ Failed to check KYC status:', error);
+    
+    // If error is 404 (applicant not found), return current session status
+    // This can happen if applicant was deleted in Sumsub but exists in our DB
+    if (error.message && error.message.includes('404')) {
+      console.warn('⚠️ Applicant not found in provider, returning current DB status');
+      if (session) {
+        return formatStatusResponse(session);
+      }
+    }
+    
     throw new Error('Failed to check KYC status');
   }
 }
