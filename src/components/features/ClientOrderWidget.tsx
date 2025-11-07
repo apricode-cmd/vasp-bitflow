@@ -141,73 +141,55 @@ export function ClientOrderWidget() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [cryptoRes, fiatRes, blockchainRes, methodsRes, walletsRes, limitRes] = await Promise.all([
-          fetch('/api/admin/resources/currencies?active=true&includeBlockchains=true'),
-          fetch('/api/admin/resources/fiat-currencies?active=true'),
-          fetch('/api/blockchains?active=true'),
-          fetch('/api/admin/payment-methods'),
+        // Use client-friendly endpoint instead of admin endpoints
+        const [configRes, walletsRes, limitRes] = await Promise.all([
+          fetch('/api/buy/config'), // Returns currencies, fiatCurrencies, paymentMethods, platformFee
           fetch('/api/wallets'),
           fetch('/api/orders/limit-check')
         ]);
 
-        const [cryptoData, fiatData, blockchainData, methodsData, walletsData, limitData] = await Promise.all([
-          cryptoRes.json(),
-          fiatRes.json(),
-          blockchainRes.json(),
-          methodsRes.json(),
+        const [configData, walletsData, limitData] = await Promise.all([
+          configRes.json(),
           walletsRes.json(),
           limitRes.json()
         ]);
 
-        // Set cryptocurrencies
-        if (cryptoData.success && Array.isArray(cryptoData.data)) {
-          const currencies = cryptoData.data;
-          setConfig(prev => ({
+        // Parse buy config response
+        if (configData.success) {
+          const currencies = configData.currencies || [];
+          const fiatCurrencies = configData.fiatCurrencies || [];
+          const paymentMethods = configData.paymentMethods || [];
+          const platformFee = configData.platformFee || 1.5;
+
+          setConfig({
             currencies,
-            fiatCurrencies: prev?.fiatCurrencies || [],
-            paymentMethods: prev?.paymentMethods || [],
-            platformFee: prev?.platformFee || 1.5
-          }));
-          
+            fiatCurrencies,
+            paymentMethods,
+            platformFee
+          });
+
+          // Set defaults
           if (currencies.length > 0) {
             setSelectedCrypto(currencies[0].code);
           }
-        }
-
-        // Set fiat currencies
-        if (fiatData.success && Array.isArray(fiatData.data)) {
-          const fiatCurrencies = fiatData.data;
-          setConfig(prev => ({
-            currencies: prev?.currencies || [],
-            fiatCurrencies,
-            paymentMethods: prev?.paymentMethods || [],
-            platformFee: prev?.platformFee || 1.5
-          }));
-          
           if (fiatCurrencies.length > 0) {
             setSelectedFiat(fiatCurrencies[0].code);
           }
-        }
 
-        // Set blockchain networks
-        if (blockchainData.success && Array.isArray(blockchainData.data)) {
-          const activeNetworks = blockchainData.data.filter((n: BlockchainNetwork) => n.isActive);
-          setBlockchainNetworks(activeNetworks);
-        } else {
-          setBlockchainNetworks([]);
-        }
+          // Extract blockchain networks from currencies
+          const networksMap = new Map<string, any>();
+          currencies.forEach((currency: any) => {
+            if (currency.blockchainNetworks && Array.isArray(currency.blockchainNetworks)) {
+              currency.blockchainNetworks.forEach((network: any) => {
+                if (network.blockchain && !networksMap.has(network.blockchain.code)) {
+                  networksMap.set(network.blockchain.code, network.blockchain);
+                }
+              });
+            }
+          });
+          setBlockchainNetworks(Array.from(networksMap.values()));
 
-        // Set payment methods
-        if (Array.isArray(methodsData.methods)) {
-          const paymentMethods = methodsData.methods;
-          setConfig(prev => ({
-            currencies: prev?.currencies || [],
-            fiatCurrencies: prev?.fiatCurrencies || [],
-            paymentMethods,
-            platformFee: prev?.platformFee || 1.5
-          }));
-          
-          // Filter for IN/BOTH and client-available methods
+          // Filter payment methods for IN/BOTH direction
           const availableMethods = paymentMethods.filter((m: any) => 
             m.isActive && 
             m.isAvailableForClients && 
@@ -216,7 +198,9 @@ export function ClientOrderWidget() {
           
           if (availableMethods.length > 0) {
             setSelectedPaymentMethod(availableMethods[0].code);
-            setSelectedFiat(availableMethods[0].currency);
+            if (availableMethods[0].currency) {
+              setSelectedFiat(availableMethods[0].currency);
+            }
           }
         }
 

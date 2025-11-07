@@ -4,13 +4,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/auth';
+import { getClientSession } from '@/auth-client';
 import { getKycFormConfig } from '@/lib/services/kyc.service';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     // Check authentication
-    const session = await auth();
+    const session = await getClientSession();
     
     if (!session?.user?.id) {
       return NextResponse.json(

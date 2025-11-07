@@ -17,6 +17,7 @@ import { IBlockchainProvider } from './categories/IBlockchainProvider';
 
 // Import adapters
 import { kycaidAdapter } from './providers/kyc/KycaidAdapter';
+import { sumsubAdapter } from './providers/kyc/SumsubAdapter';
 import { coinGeckoAdapter } from './providers/rates/CoinGeckoAdapter';
 import { resendAdapter } from './providers/email/ResendAdapter';
 import { tatumAdapter } from './providers/blockchain/TatumAdapter';
@@ -60,6 +61,16 @@ class IntegrationRegistry {
       icon: '🛡️',
       documentationUrl: 'https://kycaid.com/docs',
       instance: kycaidAdapter
+    });
+
+    this.register({
+      providerId: 'sumsub',
+      category: IntegrationCategory.KYC,
+      displayName: 'Sumsub',
+      description: 'AI-powered identity verification with liveness detection',
+      icon: '🤖',
+      documentationUrl: 'https://docs.sumsub.com',
+      instance: sumsubAdapter
     });
 
     // Rate Providers

@@ -5,12 +5,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/auth';
+import { getClientSession } from '@/auth-client';
 import { getTotpStatus } from '@/lib/services/totp.service';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
-    const session = await auth();
+    const session = await getClientSession();
     
     if (!session?.user?.id) {
       return NextResponse.json(

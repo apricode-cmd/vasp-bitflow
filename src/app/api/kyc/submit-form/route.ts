@@ -4,12 +4,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/auth';
+import { getClientSession } from '@/auth-client';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
+    const session = await getClientSession();
     
     if (!session?.user?.id) {
       return NextResponse.json(

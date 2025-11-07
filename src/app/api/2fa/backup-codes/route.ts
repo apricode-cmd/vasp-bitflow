@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/auth';
+import { getClientSession } from '@/auth-client';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { regenerateBackupCodes } from '@/lib/services/totp.service';
@@ -18,7 +18,7 @@ const regenerateSchema = z.object({
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    const session = await auth();
+    const session = await getClientSession();
     
     if (!session?.user?.id || !session?.user?.email) {
       return NextResponse.json(

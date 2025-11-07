@@ -4,7 +4,7 @@
  * Enhanced main dashboard for authenticated clients with modern UI
  */
 
-import { auth } from '@/auth';
+import { getClientSession } from '@/auth-client';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
@@ -24,9 +24,10 @@ import {
 import { formatDateTime, formatFiatCurrency, formatCryptoWithSymbol } from '@/lib/formatters';
 
 export default async function DashboardPage(): Promise<React.ReactElement> {
-  const session = await auth();
+  // Use getClientSession directly for client authentication
+  const session = await getClientSession();
 
-  if (!session) {
+  if (!session?.user) {
     redirect('/login');
   }
 

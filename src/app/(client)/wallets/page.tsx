@@ -4,7 +4,7 @@
  * Manage user's cryptocurrency wallet addresses
  */
 
-import { auth } from '@/auth';
+import { getClientSession } from '@/auth-client';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,9 +20,9 @@ import { CopyButton } from '@/components/ui/copy-button';
 import { KycAlert } from '@/components/features/KycAlert';
 
 export default async function WalletsPage(): Promise<React.ReactElement> {
-  const session = await auth();
+  const session = await getClientSession();
 
-  if (!session) {
+  if (!session?.user) {
     redirect('/login');
   }
 

@@ -93,24 +93,28 @@ export const {
 
           // Check if 2FA is enabled
           const has2FA = user.twoFactorAuth?.totpEnabled === true;
+          console.log('🔐 User 2FA status:', { has2FA, email: user.email });
 
           if (has2FA) {
             const twoFactorCode = credentials.twoFactorCode as string | undefined;
+            console.log('🔐 2FA code provided:', !!twoFactorCode, 'length:', twoFactorCode?.length);
 
             if (!twoFactorCode) {
-              console.log('2FA required for user:', user.email);
+              console.log('❌ 2FA required but no code provided for user:', user.email);
               return null;
             }
 
             // Verify 2FA code
-            const { success } = await verifyUserTotp(
+            console.log('🔐 Verifying 2FA code for user:', user.email);
+            const { success, message } = await verifyUserTotp(
               user.id,
               user.email,
               twoFactorCode
             );
+            console.log('🔐 2FA verification result:', { success, message });
 
             if (!success) {
-              console.log('Invalid 2FA code for user:', user.email);
+              console.log('❌ Invalid 2FA code for user:', user.email);
               await securityAuditService.logFailedLogin(
                 user.email,
                 'INVALID_2FA',
@@ -118,6 +122,7 @@ export const {
               );
               return null;
             }
+            console.log('✅ 2FA code verified successfully');
           }
 
           // Success - log it

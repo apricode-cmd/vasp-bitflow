@@ -39,6 +39,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { KycStatusBadge } from '@/components/features/KycStatusBadge';
+import { SumsubWebSDK } from '@/components/kyc/SumsubWebSDK';
+import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import { 
   Shield, CheckCircle, XCircle, Clock, Loader2, 
@@ -69,6 +71,7 @@ interface KycSession {
   reviewedAt: string | null;
   rejectionReason: string | null;
   formUrl?: string | null;
+  kycProviderId?: string | null;
 }
 
 // Step configuration
@@ -80,6 +83,7 @@ const STEPS = [
 ];
 
 export default function KycPage(): React.ReactElement {
+  const { data: session } = useSession();
   const [kycSession, setKycSession] = useState<KycSession | null>(null);
   const [fields, setFields] = useState<KycField[]>([]);
   const [grouped, setGrouped] = useState<Record<string, KycField[]>>({});
@@ -1234,7 +1238,22 @@ export default function KycPage(): React.ReactElement {
                   </div>
                 </div>
 
-                {kycSession.formUrl ? (
+                {/* Sumsub WebSDK (if Sumsub is active provider) */}
+                {kycSession.kycProviderId === 'sumsub' && session?.user?.id && (
+                  <SumsubWebSDK
+                    userId={session.user.id}
+                    onComplete={() => {
+                      toast.success('Verification submitted! Please wait for review.');
+                      fetchKycStatus(true);
+                    }}
+                    onError={(error) => {
+                      toast.error(`Verification error: ${error}`);
+                    }}
+                  />
+                )}
+
+                {/* KYCAID QR Code (if KYCAID is active provider) */}
+                {kycSession.kycProviderId === 'kycaid' && kycSession.formUrl ? (
                   <>
                     {/* Main action area */}
                     <div className="grid md:grid-cols-[2fr,1fr] gap-8 items-center">

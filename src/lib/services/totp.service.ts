@@ -187,14 +187,17 @@ export async function verifyUserTotp(
     return { success: true, message: 'TOTP code valid' };
   }
   
-  // 2. Try backup code
+  // 2. Try backup code (remove dashes if present)
   if (twoFactorAuth.backupCodes) {
     const backupCodes = JSON.parse(
       decrypt(twoFactorAuth.backupCodes as string)
     ) as Array<{ code: string; used: boolean }>;
     
+    // Normalize code: remove dashes and convert to uppercase
+    const normalizedCode = code.replace(/-/g, '').toUpperCase();
+    
     const backupCodeIndex = backupCodes.findIndex(
-      bc => bc.code === code.toUpperCase() && !bc.used
+      bc => bc.code === normalizedCode && !bc.used
     );
     
     if (backupCodeIndex !== -1) {

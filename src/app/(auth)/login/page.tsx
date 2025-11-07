@@ -100,7 +100,7 @@ export default function LoginPage(): React.ReactElement {
       const result = await signIn('credentials', {
         email: data.email,
         password: data.password,
-        redirect: false
+        redirect: false // Check result first to handle errors
       });
 
       if (result?.error) {
@@ -111,35 +111,18 @@ export default function LoginPage(): React.ReactElement {
 
       // Mark as redirecting to prevent further submissions
       setIsRedirecting(true);
-
-      // Success - get session to determine redirect
-      const sessionResponse = await fetch('/api/auth/session');
-      const session = await sessionResponse.json();
-
-      // Log the login to SystemLog (MUST complete before redirect)
-      try {
-        await fetch('/api/auth/log-login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        console.log('✅ Login logged to SystemLog');
-      } catch (logError) {
-        console.error('❌ Failed to log login:', logError);
-        // Don't block login if logging fails
-      }
-
+      
       // Show success message
       toast.success('Login successful! Redirecting...');
       
-      // Wait for session to be fully established
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      // Redirect based on role (ADMIN → /admin, CLIENT → /dashboard)
-      if (session?.user?.role === 'ADMIN') {
-        window.location.href = '/admin';
-      } else {
-        window.location.href = '/dashboard';
-      }
+      // Login logging already happens in auth-client.ts via securityAuditService
+      // No need to call /api/auth/log-login here
+      
+      // Wait for session cookie to be set
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Hard redirect to ensure cookie is read on next page
+      window.location.href = '/dashboard';
     } catch (error) {
       console.error('❌ Login error:', error);
       setError('An unexpected error occurred. Please try again.');

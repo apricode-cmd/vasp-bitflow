@@ -5,7 +5,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { auth } from '@/auth';
+import { getClientSession } from '@/auth-client';
 import bcrypt from 'bcryptjs';
 import { Role } from '@prisma/client';
 
@@ -26,10 +26,11 @@ export async function verifyPassword(password: string, hashedPassword: string): 
 }
 
 /**
- * Gets the current session or returns an unauthorized response
+ * Gets the current CLIENT session or returns an unauthorized response
+ * For client API endpoints, use this function
  */
 export async function requireAuth() {
-  const session = await auth();
+  const session = await getClientSession();
 
   if (!session?.user) {
     return {
@@ -45,7 +46,7 @@ export async function requireAuth() {
  * Checks if the user has a specific role
  */
 export async function requireRole(role: Role) {
-  const session = await auth();
+  const session = await getClientSession();
 
   if (!session?.user) {
     return {
@@ -68,7 +69,7 @@ export async function requireRole(role: Role) {
  * Checks if the user owns a resource or is an admin
  */
 export async function requireResourceOwnership(resourceUserId: string) {
-  const session = await auth();
+  const session = await getClientSession();
 
   if (!session?.user) {
     return {
@@ -97,7 +98,7 @@ export async function requireResourceOwnership(resourceUserId: string) {
  * Checks if the current user is an admin
  */
 export async function isAdmin(): Promise<boolean> {
-  const session = await auth();
+  const session = await getClientSession();
   return session?.user?.role === Role.ADMIN;
 }
 
@@ -105,7 +106,7 @@ export async function isAdmin(): Promise<boolean> {
  * Gets the current user ID or throws an error
  */
 export async function getCurrentUserId(): Promise<string> {
-  const session = await auth();
+  const session = await getClientSession();
   
   if (!session?.user?.id) {
     throw new Error('Not authenticated');
@@ -118,7 +119,7 @@ export async function getCurrentUserId(): Promise<string> {
  * Gets the current user or null
  */
 export async function getCurrentUser() {
-  const session = await auth();
+  const session = await getClientSession();
   return session?.user || null;
 }
 

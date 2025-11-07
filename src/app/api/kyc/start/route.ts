@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/auth';
+import { getClientSession } from '@/auth-client';
 import { startKycVerification } from '@/lib/services/kyc.service';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     console.log('🚀 Starting KYC verification request...');
     
     // Check authentication
-    const session = await auth();
+    const session = await getClientSession();
     
     if (!session?.user?.id) {
       console.log('❌ Unauthorized - no session');

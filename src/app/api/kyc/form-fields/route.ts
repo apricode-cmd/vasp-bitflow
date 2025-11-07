@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/auth';
+import { getClientSession } from '@/auth-client';
 
 /**
  * GET /api/kyc/form-fields
@@ -8,7 +8,7 @@ import { auth } from '@/auth';
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
+    const session = await getClientSession();
     
     if (!session?.user?.id) {
       return NextResponse.json(

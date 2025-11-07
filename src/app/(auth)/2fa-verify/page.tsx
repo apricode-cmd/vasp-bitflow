@@ -54,6 +54,9 @@ export default function TwoFactorVerifyPage(): React.ReactElement {
       }
 
       // Sign in with email, password, and 2FA code
+      console.log('🔐 Attempting 2FA login with code length:', value.length);
+      
+      // First try with redirect: false to check for errors
       const result = await signIn('credentials', {
         email,
         password,
@@ -61,49 +64,33 @@ export default function TwoFactorVerifyPage(): React.ReactElement {
         redirect: false
       });
 
+      console.log('🔐 SignIn result:', result);
+
       if (result?.error) {
+        console.error('🔐 SignIn error:', result.error);
         setError('Invalid code. Please try again.');
         setCode('');
         setIsVerifying(false);
         return;
       }
-      
-      if (result?.ok) {
-        // Clear sessionStorage after successful login
+
+      // If successful, clear sessionStorage and redirect
+      if (result?.ok || !result?.error) {
         sessionStorage.removeItem('2fa_email');
         sessionStorage.removeItem('2fa_password');
         
         toast.success('Login successful! Redirecting...');
         
-        // Log the login to SystemLog
-        try {
-          await fetch('/api/auth/log-login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-          });
-          console.log('✅ Login logged to SystemLog');
-        } catch (logError) {
-          console.error('❌ Failed to log login:', logError);
-          // Don't block login if logging fails
-        }
+        // Login logging already happens in auth-client.ts via securityAuditService
+        // No need to call /api/auth/log-login here
         
-        // Wait a bit for session to be fully established
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Wait for session cookie to be set
+        await new Promise(resolve => setTimeout(resolve, 150));
         
-        // Get session to determine redirect
-        const sessionResponse = await fetch('/api/auth/session');
-        const session = await sessionResponse.json();
-        
-        console.log('✅ Session retrieved:', session?.user?.role);
-        
-        // Redirect based on role using window.location for hard redirect
-        if (session?.user?.role === 'ADMIN') {
-          console.log('🔄 Redirecting to /admin');
-          window.location.href = '/admin';
-        } else {
-          console.log('🔄 Redirecting to /dashboard');
-          window.location.href = '/dashboard';
-        }
+        // Use window.location for hard redirect to ensure full page reload
+        // This ensures the session cookie is read properly on the next page
+        console.log('✅ 2FA login successful, redirecting to /dashboard');
+        window.location.href = '/dashboard';
       }
     } catch (error) {
       console.error('❌ 2FA verification error:', error);

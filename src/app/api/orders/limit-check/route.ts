@@ -6,14 +6,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/auth';
+import { getClientSession } from '@/auth-client';
 import { orderLimitService } from '@/lib/services/order-limit.service';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     console.log('🔍 [limit-check] Starting...');
     
-    const session = await auth();
+    const session = await getClientSession();
     console.log('🔍 [limit-check] Session:', session?.user?.id);
 
     if (!session?.user?.id) {

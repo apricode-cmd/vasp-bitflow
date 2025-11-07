@@ -4,7 +4,7 @@
  * Detailed view of a specific order with payment information.
  */
 
-import { auth } from '@/auth';
+import { getClientSession } from '@/auth-client';
 import { redirect, notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
@@ -23,9 +23,9 @@ interface OrderDetailPageProps {
 }
 
 export default async function OrderDetailPage({ params }: OrderDetailPageProps): Promise<React.ReactElement> {
-  const session = await auth();
+  const session = await getClientSession();
 
-  if (!session) {
+  if (!session?.user) {
     redirect('/login');
   }
 
