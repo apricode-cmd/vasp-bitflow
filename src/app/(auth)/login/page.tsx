@@ -118,11 +118,12 @@ export default function LoginPage(): React.ReactElement {
       // Login logging already happens in auth-client.ts via securityAuditService
       // No need to call /api/auth/log-login here
       
-      // Wait for session cookie to be set
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Wait longer for session cookie to be set and propagated
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Hard redirect to ensure cookie is read on next page
-      window.location.href = '/dashboard';
+      // Use router.push with refresh to ensure session is loaded
+      router.push('/dashboard');
+      router.refresh();
     } catch (error) {
       console.error('❌ Login error:', error);
       setError('An unexpected error occurred. Please try again.');
