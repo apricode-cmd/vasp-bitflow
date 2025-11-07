@@ -67,9 +67,11 @@ export async function activateIntegration(params: ActivateIntegrationParams) {
     // Log activation
     await prisma.auditLog.create({
       data: {
-        userId,
+        actorType: 'ADMIN',
+        actorId: userId,
         action: 'INTEGRATION_ACTIVATED',
         entity: 'Integration',
+        entityType: 'Integration',
         entityId: integration.id,
         newValue: {
           service,
@@ -121,9 +123,11 @@ export async function deactivateIntegration(service: string, userId: string) {
     // Log deactivation
     await prisma.auditLog.create({
       data: {
-        userId,
+        actorType: 'ADMIN',
+        actorId: userId,
         action: 'INTEGRATION_DEACTIVATED',
         entity: 'Integration',
+        entityType: 'Integration',
         entityId: integration.id,
         oldValue: {
           isEnabled: integration.isEnabled,
@@ -177,9 +181,11 @@ export async function updateIntegrationConfig(params: UpdateIntegrationParams) {
       // Log creation
       await prisma.auditLog.create({
         data: {
-          userId,
+          actorType: 'ADMIN',
+          actorId: userId,
           action: 'INTEGRATION_CREATED',
           entity: 'Integration',
+          entityType: 'Integration',
           entityId: created.id,
           newValue: {
             service,
@@ -259,9 +265,11 @@ export async function updateIntegrationConfig(params: UpdateIntegrationParams) {
     // Log update
     await prisma.auditLog.create({
       data: {
-        userId,
+        actorType: 'ADMIN',
+        actorId: userId,
         action: 'INTEGRATION_UPDATED',
         entity: 'Integration',
+        entityType: 'Integration',
         entityId: integration.id,
         oldValue: {
           isEnabled: integration.isEnabled,
@@ -385,9 +393,11 @@ export async function testIntegrationConnection(service: string, userId: string)
     // Log test
     await prisma.auditLog.create({
       data: {
-        userId,
+        actorType: 'ADMIN',
+        actorId: userId,
         action: 'INTEGRATION_TESTED',
         entity: 'Integration',
+        entityType: 'Integration',
         entityId: integration.id,
         newValue: {
           success: testResult.success,
