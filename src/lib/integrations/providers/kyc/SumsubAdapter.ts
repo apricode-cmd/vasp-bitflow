@@ -701,8 +701,11 @@ export class SumsubAdapter implements IKycProvider {
    * Format: "HMAC-SHA256=<hex>" or "SHA1=<hex>" or just "<hex>"
    */
   verifyWebhookSignature(payload: string, signature: string): boolean {
-    if (!this.config.secretKey) {
-      console.warn('⚠️ Sumsub secret key not configured, skipping webhook verification');
+    // Use webhookSecret if available, fallback to secretKey for backward compatibility
+    const secretKey = (this.config as any).webhookSecret || this.config.secretKey;
+    
+    if (!secretKey) {
+      console.warn('⚠️ Sumsub webhook secret key not configured, skipping webhook verification');
       return true; // Allow in development
     }
 
@@ -724,11 +727,12 @@ export class SumsubAdapter implements IKycProvider {
       console.log('🔐 Verifying webhook signature:', {
         algorithm,
         signatureLength: signatureValue.length,
-        payloadLength: payload.length
+        payloadLength: payload.length,
+        usingWebhookSecret: !!(this.config as any).webhookSecret
       });
 
       const expectedSignature = crypto
-        .createHmac(algorithm, this.config.secretKey)
+        .createHmac(algorithm, secretKey)
         .update(payload)
         .digest('hex');
 

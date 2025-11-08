@@ -552,24 +552,38 @@ export default function IntegrationsPage(): JSX.Element {
                     </p>
                   </div>
 
-                  {/* Webhook URL (editable for ngrok/custom domain) */}
+                  {/* Webhook Secret Key */}
                   <div className="space-y-2">
-                    <Label htmlFor="modal-webhook-url">Webhook URL</Label>
+                    <Label htmlFor="modal-webhook-secret">Webhook Secret Key</Label>
+                    <Input
+                      id="modal-webhook-secret"
+                      type="password"
+                      value={(selectedIntegration.config as any)?.webhookSecret || ''}
+                      onChange={(e) => updateIntegration(selectedIntegration.service, { 
+                        config: { ...selectedIntegration.config, webhookSecret: e.target.value }
+                      })}
+                      placeholder="NMk2BLNarvAWMgHHSkn23aM3Gr9"
+                      autoComplete="off"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Secret key from Sumsub Dashboard → Settings → Webhooks (used for signature verification)
+                    </p>
+                  </div>
+
+                  {/* Webhook URL Info (read-only) */}
+                  <div className="space-y-2">
+                    <Label>Webhook URL</Label>
                     <div className="flex items-center gap-2">
                       <Input
-                        id="modal-webhook-url"
-                        value={(selectedIntegration.config as any)?.webhookUrl || `${typeof window !== 'undefined' ? window.location.origin : ''}/api/kyc/webhook/sumsub`}
-                        onChange={(e) => updateIntegration(selectedIntegration.service, { 
-                          config: { ...selectedIntegration.config, webhookUrl: e.target.value }
-                        })}
-                        placeholder="https://your-domain.com/api/kyc/webhook/sumsub"
-                        className="font-mono text-xs"
+                        readOnly
+                        value={`${typeof window !== 'undefined' ? window.location.origin : ''}/api/kyc/webhook/sumsub`}
+                        className="font-mono text-xs bg-muted"
                       />
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => {
-                          const webhookUrl = (selectedIntegration.config as any)?.webhookUrl || `${window.location.origin}/api/kyc/webhook/sumsub`;
+                          const webhookUrl = `${window.location.origin}/api/kyc/webhook/sumsub`;
                           navigator.clipboard.writeText(webhookUrl);
                           toast.success('Webhook URL copied');
                         }}
@@ -578,8 +592,6 @@ export default function IntegrationsPage(): JSX.Element {
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      For local testing use ngrok URL (e.g. https://abc123.ngrok-free.dev/api/kyc/webhook/sumsub)
-                      <br />
                       Configure this URL in Sumsub Dashboard → Settings → Webhooks
                     </p>
                   </div>
