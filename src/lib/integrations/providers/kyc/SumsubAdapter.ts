@@ -697,7 +697,8 @@ export class SumsubAdapter implements IKycProvider {
   /**
    * Verify webhook signature
    * 
-   * Sumsub sends X-Payload-Digest header with HMAC signature
+   * Sumsub sends X-Payload-Digest header with HMAC-SHA256 or HMAC-SHA1 signature
+   * Format: "HMAC-SHA256=<hex>" or "SHA1=<hex>" or just "<hex>"
    */
   verifyWebhookSignature(payload: string, signature: string): boolean {
     if (!this.config.secretKey) {
@@ -706,18 +707,41 @@ export class SumsubAdapter implements IKycProvider {
     }
 
     try {
+      // Parse signature format
+      let algorithm = 'sha256';
+      let signatureValue = signature;
+
+      if (signature.includes('=')) {
+        const [algo, value] = signature.split('=');
+        if (algo.includes('SHA256')) {
+          algorithm = 'sha256';
+        } else if (algo.includes('SHA1')) {
+          algorithm = 'sha1';
+        }
+        signatureValue = value;
+      }
+
+      console.log('🔐 Verifying webhook signature:', {
+        algorithm,
+        signatureLength: signatureValue.length,
+        payloadLength: payload.length
+      });
+
       const expectedSignature = crypto
-        .createHmac('sha256', this.config.secretKey)
+        .createHmac(algorithm, this.config.secretKey)
         .update(payload)
         .digest('hex');
 
-      const isValid = crypto.timingSafeEqual(
-        Buffer.from(signature),
-        Buffer.from(expectedSignature)
-      );
+      // Case-insensitive comparison
+      const isValid = expectedSignature.toLowerCase() === signatureValue.toLowerCase();
 
       if (!isValid) {
-        console.error('❌ Webhook signature mismatch');
+        console.error('❌ Webhook signature mismatch:', {
+          expected: expectedSignature.substring(0, 20) + '...',
+          received: signatureValue.substring(0, 20) + '...'
+        });
+      } else {
+        console.log('✅ Webhook signature valid');
       }
 
       return isValid;
