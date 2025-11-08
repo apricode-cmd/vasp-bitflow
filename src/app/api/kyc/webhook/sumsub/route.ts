@@ -98,64 +98,82 @@ export async function POST(request: NextRequest) {
     });
 
     // 7. Update KycSession in database
-    const updated = await prisma.kycSession.updateMany({
+    // Find the session first to preserve metadata
+    const session = await prisma.kycSession.findFirst({
       where: {
         kycProviderId: 'sumsub',
         OR: [
           { verificationId: event.verificationId },
           { applicantId: event.applicantId }
         ]
-      },
+      }
+    });
+
+    if (!session) {
+      console.warn('⚠️ No KYC session found for webhook event');
+      return NextResponse.json({
+        success: false,
+        error: 'Session not found'
+      }, { status: 404 });
+    }
+
+    // Helper: Merge metadata safely
+    function mergeMetadata(existingMetadata: any, newMetadata: any): any {
+      if (!existingMetadata || Object.keys(existingMetadata).length === 0) {
+        return newMetadata;
+      }
+      return {
+        ...existingMetadata,
+        ...newMetadata,
+        applicant: {
+          ...(existingMetadata.applicant || {}),
+          ...(newMetadata.applicant || {})
+        }
+      };
+    }
+
+    // Update with metadata preservation
+    const updated = await prisma.kycSession.update({
+      where: { id: session.id },
       data: {
         status: event.status.toUpperCase() as any, // PENDING, APPROVED, REJECTED
         rejectionReason: event.reason || null,
         webhookData: event.metadata as any,
         completedAt: event.status === 'approved' ? new Date() : null,
+        metadata: mergeMetadata(session.metadata, {
+          lastWebhook: new Date(),
+          webhookStatus: event.status,
+          webhookReason: event.reason
+        }),
         updatedAt: new Date()
       }
     });
 
-    console.log(`✅ Updated ${updated.count} KYC session(s)`);
+    console.log(`✅ Updated KYC session: ${updated.id}`);
 
-    // 8. Log to audit (optional)
-    if (updated.count > 0) {
-      // Find the session to get userId for audit log
-      const session = await prisma.kycSession.findFirst({
-        where: {
-          kycProviderId: 'sumsub',
-          OR: [
-            { verificationId: event.verificationId },
-            { applicantId: event.applicantId }
-          ]
+    // 8. Log to audit (optional - uncomment if you have audit logging)
+    /*
+    await prisma.auditLog.create({
+      data: {
+        userId: session.userId,
+        action: 'KYC_STATUS_UPDATED',
+        entity: 'KYC_SESSION',
+        entityId: session.id,
+        oldValue: session.status,
+        newValue: event.status.toUpperCase(),
+        metadata: {
+          provider: 'sumsub',
+          applicantId: event.applicantId,
+          reason: event.reason
         }
-      });
-
-      if (session) {
-        // Log audit event (optional - uncomment if you have audit logging)
-        /*
-        await prisma.auditLog.create({
-          data: {
-            userId: session.userId,
-            action: 'KYC_STATUS_UPDATED',
-            entity: 'KYC_SESSION',
-            entityId: session.id,
-            oldValue: session.status,
-            newValue: event.status.toUpperCase(),
-            metadata: {
-              provider: 'sumsub',
-              applicantId: event.applicantId,
-              reason: event.reason
-            }
-          }
-        });
-        */
       }
-    }
+    });
+    */
 
     // 9. Return success response
     return NextResponse.json({
       success: true,
-      processed: updated.count,
+      sessionId: updated.id,
       status: event.status
     });
   } catch (error: any) {
