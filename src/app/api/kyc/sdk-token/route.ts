@@ -101,19 +101,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // ✅ IMPORTANT: Use our internal userId (externalUserId in Sumsub) to link to existing applicant!
-    // Sumsub API: POST /resources/accessTokens?userId={externalUserId}
-    // The 'userId' parameter should be OUR internal user ID, not Sumsub's applicantId
-    // Sumsub will find the applicant by externalUserId and generate token for it
-    const userIdForToken = session.user.id; // Always use our internal user ID
+    // ✅ IMPORTANT: Use the ACTUAL externalUserId that was used to create the applicant
+    // This may be different from session.user.id if there was a 409 conflict and retry
+    // The correct externalUserId is stored in kycSession.metadata.applicant.externalUserId
+    const metadata = kycSession.metadata as any;
+    const externalUserIdForToken = metadata?.applicant?.externalUserId || session.user.id;
     
     console.log('🎫 Creating SDK token for:', {
       userId: session.user.id,
       applicantId: kycSession.applicantId,
-      usingExternalUserId: userIdForToken
+      externalUserId: externalUserIdForToken,
+      isRetried: externalUserIdForToken !== session.user.id
     });
 
-    const tokenData = await sumsubAdapter.createAccessToken(userIdForToken);
+    const tokenData = await sumsubAdapter.createAccessToken(externalUserIdForToken);
 
     console.log('✅ SDK token created successfully');
 

@@ -69,16 +69,17 @@ export async function GET(request: NextRequest) {
       where: { userId }
     });
 
-    // ✅ IMPORTANT: Always use our internal userId (externalUserId in Sumsub)
-    // Sumsub API: POST /resources/sdkIntegrations/levels/-/websdkLink
-    // The 'userId' parameter should be OUR internal user ID, not Sumsub's applicantId
-    // Sumsub will find the applicant by externalUserId and generate mobile link for it
-    const externalUserId = userId; // Always use our internal user ID
+    // ✅ IMPORTANT: Use the ACTUAL externalUserId that was used to create the applicant
+    // This may be different from userId if there was a 409 conflict and retry
+    // The correct externalUserId is stored in kycSession.metadata.applicant.externalUserId
+    const metadata = kycSession?.metadata as any;
+    const externalUserId = metadata?.applicant?.externalUserId || userId;
     
     console.log('🔍 KYC Session:', {
       exists: !!kycSession,
       applicantId: kycSession?.applicantId || 'N/A',
-      usingExternalUserId: externalUserId
+      externalUserId: externalUserId,
+      isRetried: externalUserId !== userId
     });
 
     // 5. Build Sumsub websdkLink request (following SumsubAdapter pattern)

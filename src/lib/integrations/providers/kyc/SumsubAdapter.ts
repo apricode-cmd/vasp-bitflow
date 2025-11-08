@@ -259,6 +259,20 @@ export class SumsubAdapter implements IKycProvider {
       throw new Error('Sumsub provider not configured');
     }
 
+    return this.createApplicantWithRetry(userData, userData.externalId, 0);
+  }
+
+  /**
+   * Create applicant with smart conflict resolution
+   * Handles 409 Conflict when externalUserId is already taken
+   */
+  private async createApplicantWithRetry(
+    userData: KycUserData, 
+    externalUserId: string,
+    attempt: number
+  ): Promise<KycApplicant> {
+    const MAX_ATTEMPTS = 3;
+
     try {
       const path = `/resources/applicants?levelName=${encodeURIComponent(this.config.levelName!)}`;
       
@@ -270,7 +284,7 @@ export class SumsubAdapter implements IKycProvider {
       }
       
       const bodyObj = {
-        externalUserId: userData.externalId, // Our internal user ID
+        externalUserId: externalUserId, // May have suffix on retry
         email: userData.email,
         phone: userData.phone,
         fixedInfo: {
@@ -286,7 +300,8 @@ export class SumsubAdapter implements IKycProvider {
 
       console.log('📝 Creating Sumsub applicant:', { 
         email: userData.email, 
-        externalId: userData.externalId,
+        externalId: externalUserId,
+        attempt: attempt + 1,
         countryOriginal: userData.nationality,
         countryConverted: countryAlpha3
       });
@@ -297,15 +312,101 @@ export class SumsubAdapter implements IKycProvider {
         body
       });
 
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Sumsub applicant created:', data.id, 'externalUserId:', externalUserId);
+
+        return {
+          applicantId: data.id,
+          status: data.review?.reviewStatus || 'init',
+          metadata: {
+            externalUserId: externalUserId, // ✅ Use the actual externalUserId we sent (may have suffix)
+            sumsubExternalUserId: data.externalUserId, // What Sumsub returned
+            levelName: data.levelName,
+            createdAt: data.createdAt,
+            email: data.email
+          }
+        };
+      }
+
+      // Handle 409 Conflict - applicant already exists
+      if (response.status === 409) {
+        const errorText = await response.text();
+        console.log('⚠️  409 Conflict - applicant already exists:', errorText);
+
+        // Try to extract applicant ID from error message
+        // Example: "Applicant with external user id 'xxx' already exists: 690e7f5976808036b2e8fa38"
+        const match = errorText.match(/already exists: ([a-f0-9]{24})/i);
+        
+        if (match && match[1]) {
+          const existingApplicantId = match[1];
+          console.log('🔍 Found existing applicant ID:', existingApplicantId);
+
+          // Try to access existing applicant
+          try {
+            const existingApplicant = await this.getApplicantById(existingApplicantId);
+            
+            if (existingApplicant) {
+              console.log('✅ Using existing applicant:', existingApplicantId);
+              // Update metadata to include the correct externalUserId
+              existingApplicant.metadata = {
+                ...existingApplicant.metadata,
+                externalUserId: externalUserId // The one we tried to use
+              };
+              return existingApplicant;
+            }
+          } catch (accessError: any) {
+            console.log('❌ Cannot access existing applicant:', accessError.message);
+            
+            // Applicant exists but not accessible with current token
+            // Create new one with unique externalUserId
+            if (attempt < MAX_ATTEMPTS) {
+              const newExternalUserId = `${userData.externalId}-${Date.now()}`;
+              console.log(`🔄 Retry ${attempt + 1}/${MAX_ATTEMPTS} with new externalUserId:`, newExternalUserId);
+              
+              return this.createApplicantWithRetry(userData, newExternalUserId, attempt + 1);
+            }
+          }
+        }
+
+        // If we couldn't extract ID or max attempts reached
+        if (attempt < MAX_ATTEMPTS) {
+          const newExternalUserId = `${userData.externalId}-${Date.now()}`;
+          console.log(`🔄 Retry ${attempt + 1}/${MAX_ATTEMPTS} with new externalUserId:`, newExternalUserId);
+          
+          return this.createApplicantWithRetry(userData, newExternalUserId, attempt + 1);
+        }
+      }
+
+      // Other errors
+      const error = await response.text();
+      console.error('❌ Sumsub applicant creation failed:', error);
+      throw new Error(`Failed to create applicant: ${error}`);
+
+    } catch (error: any) {
+      console.error('❌ Sumsub applicant creation error:', error);
+      throw new Error(`Failed to create Sumsub applicant: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get applicant by ID (helper method)
+   */
+  private async getApplicantById(applicantId: string): Promise<KycApplicant | null> {
+    try {
+      const path = `/resources/applicants/${applicantId}/one`;
+      const { headers } = this.buildRequest('GET', path);
+
+      const response = await fetch(this.baseUrl + path, {
+        method: 'GET',
+        headers
+      });
+
       if (!response.ok) {
-        const error = await response.text();
-        console.error('❌ Sumsub applicant creation failed:', error);
-        throw new Error(`Failed to create applicant: ${error}`);
+        return null;
       }
 
       const data = await response.json();
-
-      console.log('✅ Sumsub applicant created:', data.id);
 
       return {
         applicantId: data.id,
@@ -317,9 +418,8 @@ export class SumsubAdapter implements IKycProvider {
           email: data.email
         }
       };
-    } catch (error: any) {
-      console.error('❌ Sumsub applicant creation failed:', error);
-      throw new Error(`Failed to create Sumsub applicant: ${error.message}`);
+    } catch (error) {
+      return null;
     }
   }
 

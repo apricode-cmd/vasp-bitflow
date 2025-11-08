@@ -304,6 +304,11 @@ export async function startKycVerification(userId: string) {
 
     // Step 3: Save session in database (verification will be created via webhook after form submission)
     // Create or update KYC session in database
+    // First, get existing session to preserve metadata
+    const existingSession = await prisma.kycSession.findUnique({
+      where: { userId: userId }
+    });
+
     const kycSession = await prisma.kycSession.upsert({
       where: { userId: userId },
       create: {
@@ -313,11 +318,13 @@ export async function startKycVerification(userId: string) {
         verificationId: formUrlResult.sessionId || null, // Save if available
         status: 'PENDING',
         metadata: {
+          applicant: applicant.metadata || {}, // ✅ Save full applicant metadata (including externalUserId)
           applicantStatus: applicant.status,
           formUrl: formUrlResult.url || null, // Optional for Sumsub (uses WebSDK)
           formId: formId || null, // Optional for Sumsub (uses levelName)
           provider: provider.providerId,
-          verificationIdFromFormUrl: !!formUrlResult.sessionId // Track if we got it
+          verificationIdFromFormUrl: !!formUrlResult.sessionId, // Track if we got it
+          lastFormUpdate: new Date()
         },
         // Legacy fields for backward compatibility with KYCAID
         kycaidApplicantId: provider.providerId === 'kycaid' ? applicant.applicantId : null,
@@ -332,11 +339,17 @@ export async function startKycVerification(userId: string) {
         verificationId: formUrlResult.sessionId || null, // Save if available
         status: 'PENDING',
         metadata: {
+          ...(existingSession?.metadata || {}), // ✅ Сохраняем ВСЕ старые данные
+          applicant: {
+            ...(existingSession?.metadata?.applicant || {}), // ✅ Сохраняем старый applicant
+            ...(applicant.metadata || {}) // ✅ Добавляем новые поля
+          },
           applicantStatus: applicant.status,
-          formUrl: formUrlResult.url || null, // Optional for Sumsub (uses WebSDK)
-          formId: formId || null, // Optional for Sumsub (uses levelName)
+          formUrl: formUrlResult.url || null,
+          formId: formId || null,
           provider: provider.providerId,
-          verificationIdFromFormUrl: !!formUrlResult.sessionId // Track if we got it
+          verificationIdFromFormUrl: !!formUrlResult.sessionId,
+          lastFormUpdate: new Date()
         },
         // Legacy fields for backward compatibility with KYCAID
         kycaidApplicantId: provider.providerId === 'kycaid' ? applicant.applicantId : null,
@@ -366,6 +379,32 @@ export async function startKycVerification(userId: string) {
     console.error('❌ Failed to start KYC verification:', error);
     throw new Error(error.message || 'Failed to start KYC verification');
   }
+}
+
+/**
+ * Helper: Merge metadata safely
+ * Preserves existing metadata while adding/updating new fields
+ * Critical for maintaining applicant data across updates
+ */
+function mergeMetadata(
+  existingMetadata: any,
+  newMetadata: any
+): any {
+  // If no existing metadata, return new metadata
+  if (!existingMetadata || Object.keys(existingMetadata).length === 0) {
+    return newMetadata;
+  }
+
+  // Deep merge: preserve existing, add new, update changed
+  return {
+    ...existingMetadata,
+    ...newMetadata,
+    // Special handling for nested 'applicant' object - preserve it!
+    applicant: {
+      ...(existingMetadata.applicant || {}),
+      ...(newMetadata.applicant || {})
+    }
+  };
 }
 
 /**
@@ -430,41 +469,65 @@ export async function checkKycStatus(userId: string) {
     if (verificationId) {
       // Poll provider for verification status
       console.log(`📊 Checking verification: ${verificationId}`);
-      const result = await provider.getVerificationStatus(verificationId);
+      
+      try {
+        const result = await provider.getVerificationStatus(verificationId);
 
-      // Update session if status changed
-      if (result.status !== session.status.toLowerCase()) {
-        const updatedSession = await prisma.kycSession.update({
+        // Update session if status changed
+        if (result.status !== session.status.toLowerCase()) {
+          const updatedSession = await prisma.kycSession.update({
+            where: { id: session.id },
+            data: {
+              status: result.status.toUpperCase() as any,
+              completedAt: result.completedAt || new Date(),
+              rejectionReason: result.rejectionReason || undefined,
+              metadata: mergeMetadata(session.metadata, {
+                lastChecked: new Date(),
+                providerResponse: result.metadata
+              })
+            }
+          });
+
+          console.log(`✅ KYC status updated from ${session.status} to ${result.status.toUpperCase()}`);
+
+          return formatStatusResponse(updatedSession);
+        }
+
+        // Even if status unchanged, update lastChecked timestamp
+        await prisma.kycSession.update({
           where: { id: session.id },
           data: {
-            status: result.status.toUpperCase() as any,
-            completedAt: result.completedAt || new Date(),
-            rejectionReason: result.rejectionReason || undefined,
-            metadata: {
-              ...session.metadata as any,
-              lastChecked: new Date(),
-              providerResponse: result.metadata
-            }
+            metadata: mergeMetadata(session.metadata, {
+              lastChecked: new Date()
+            })
           }
         });
 
-        console.log(`✅ KYC status updated from ${session.status} to ${result.status.toUpperCase()}`);
-
-        return formatStatusResponse(updatedSession);
-      }
-
-      // Even if status unchanged, update lastChecked timestamp
-      await prisma.kycSession.update({
-        where: { id: session.id },
-        data: {
-          metadata: {
-            ...session.metadata as any,
-            lastChecked: new Date()
-          }
+        console.log(`ℹ️ KYC status unchanged: ${session.status}`);
+      } catch (statusError: any) {
+        // Handle 404 - applicant not found in provider
+        if (statusError.message && (statusError.message.includes('404') || statusError.message.includes('not found'))) {
+          console.warn(`⚠️ Applicant ${verificationId} not found in provider, returning DB status`);
+          
+          // Update metadata to mark this issue
+          await prisma.kycSession.update({
+            where: { id: session.id },
+            data: {
+              metadata: mergeMetadata(session.metadata, {
+                lastChecked: new Date(),
+                lastError: 'Applicant not found in provider',
+                errorTimestamp: new Date().toISOString()
+              })
+            }
+          });
+          
+          // Return current status from DB
+          return formatStatusResponse(session, 'Status check unavailable - using cached status');
         }
-      });
-
-      console.log(`ℹ️ KYC status unchanged: ${session.status}`);
+        
+        // Re-throw other errors
+        throw statusError;
+      }
     } else {
       // No verificationId yet - try to create one or check applicant
       console.log(`📊 No verificationId found - attempting to create verification`);
@@ -484,11 +547,10 @@ export async function checkKycStatus(userId: string) {
             where: { id: session.id },
             data: {
               kycaidVerificationId: verification.verificationId,
-              metadata: {
-                ...session.metadata as any,
+              metadata: mergeMetadata(session.metadata, {
                 verificationCreatedOnRefresh: new Date().toISOString(),
                 verificationData: verification.metadata
-              }
+              })
             }
           });
           
@@ -504,11 +566,10 @@ export async function checkKycStatus(userId: string) {
                 status: result.status.toUpperCase() as any,
                 completedAt: result.completedAt || new Date(),
                 rejectionReason: result.rejectionReason || undefined,
-                metadata: {
-                  ...session.metadata as any,
+                metadata: mergeMetadata(session.metadata, {
                   lastChecked: new Date(),
                   providerResponse: result.metadata
-                }
+                })
               }
             });
 
@@ -543,11 +604,10 @@ export async function checkKycStatus(userId: string) {
             data: {
               status: 'APPROVED',
               completedAt: new Date(),
-              metadata: {
-                ...session.metadata as any,
+              metadata: mergeMetadata(session.metadata, {
                 lastChecked: new Date(),
                 applicantResponse: applicant.metadata
-              }
+              })
             }
           });
 
@@ -561,11 +621,10 @@ export async function checkKycStatus(userId: string) {
               status: 'REJECTED',
               completedAt: new Date(),
               rejectionReason: 'Verification declined',
-              metadata: {
-                ...session.metadata as any,
+              metadata: mergeMetadata(session.metadata, {
                 lastChecked: new Date(),
                 applicantResponse: applicant.metadata
-              }
+              })
             }
           });
 
@@ -590,11 +649,10 @@ export async function checkKycStatus(userId: string) {
         await prisma.kycSession.update({
           where: { id: session.id },
           data: {
-            metadata: {
-              ...session.metadata as any,
+            metadata: mergeMetadata(session.metadata, {
               lastChecked: new Date(),
               lastError: '404 Applicant not found in provider'
-            }
+            })
           }
         });
         
@@ -684,11 +742,10 @@ export async function processKycWebhook(
           : undefined,
         rejectionReason: webhookData.reason || undefined,
         webhookData: webhookData.metadata,
-        metadata: {
-          ...session.metadata as any,
+        metadata: mergeMetadata(session.metadata, {
           lastWebhook: new Date(),
           webhookStatus: webhookData.status
-        }
+        })
       }
     });
 
@@ -812,11 +869,10 @@ export async function syncKycDocuments(sessionId: string): Promise<{ documentsCo
       await prisma.kycSession.update({
         where: { id: sessionId },
         data: {
-          metadata: {
-            ...(session.metadata as any || {}),
+          metadata: mergeMetadata(session.metadata, {
             lastDocumentSyncAttempt: new Date().toISOString(),
             documentSyncAttempts: ((session.metadata as any)?.documentSyncAttempts || 0) + 1
-          }
+          })
         }
       });
       
@@ -916,11 +972,10 @@ export async function syncKycDocuments(sessionId: string): Promise<{ documentsCo
     await prisma.kycSession.update({
       where: { id: sessionId },
       data: {
-        metadata: {
-          ...(session.metadata as any || {}),
+        metadata: mergeMetadata(session.metadata, {
           documentsSynced: new Date().toISOString(),
           documentsCount: syncedCount
-        }
+        })
       }
     });
 
@@ -989,4 +1044,3 @@ export async function getKycFormConfig() {
     return null;
   }
 }
-
