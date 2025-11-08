@@ -552,20 +552,24 @@ export default function IntegrationsPage(): JSX.Element {
                     </p>
                   </div>
 
-                  {/* Webhook URL Info */}
+                  {/* Webhook URL (editable for ngrok/custom domain) */}
                   <div className="space-y-2">
-                    <Label>Webhook URL</Label>
+                    <Label htmlFor="modal-webhook-url">Webhook URL</Label>
                     <div className="flex items-center gap-2">
                       <Input
-                        readOnly
-                        value={`${typeof window !== 'undefined' ? window.location.origin : ''}/api/kyc/webhook/sumsub`}
-                        className="font-mono text-xs bg-muted"
+                        id="modal-webhook-url"
+                        value={(selectedIntegration.config as any)?.webhookUrl || `${typeof window !== 'undefined' ? window.location.origin : ''}/api/kyc/webhook/sumsub`}
+                        onChange={(e) => updateIntegration(selectedIntegration.service, { 
+                          config: { ...selectedIntegration.config, webhookUrl: e.target.value }
+                        })}
+                        placeholder="https://your-domain.com/api/kyc/webhook/sumsub"
+                        className="font-mono text-xs"
                       />
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => {
-                          const webhookUrl = `${window.location.origin}/api/kyc/webhook/sumsub`;
+                          const webhookUrl = (selectedIntegration.config as any)?.webhookUrl || `${window.location.origin}/api/kyc/webhook/sumsub`;
                           navigator.clipboard.writeText(webhookUrl);
                           toast.success('Webhook URL copied');
                         }}
@@ -574,6 +578,8 @@ export default function IntegrationsPage(): JSX.Element {
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
+                      For local testing use ngrok URL (e.g. https://abc123.ngrok-free.dev/api/kyc/webhook/sumsub)
+                      <br />
                       Configure this URL in Sumsub Dashboard → Settings → Webhooks
                     </p>
                   </div>
