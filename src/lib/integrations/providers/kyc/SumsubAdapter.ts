@@ -130,31 +130,35 @@ export class SumsubAdapter implements IKycProvider {
         };
       }
 
-      // Simple test: GET /resources/sdkIntegrations/levels
-      // This endpoint returns available KYC levels and validates auth
-      const path = '/resources/sdkIntegrations/levels';
+      // Simple test: GET /resources/status/api
+      // This is the simplest endpoint to check API availability
+      const path = '/resources/status/api';
       
       const { headers } = this.buildRequest('GET', path);
 
-      console.log('🧪 Testing Sumsub connection with levels endpoint...');
+      console.log('🧪 Testing Sumsub API status...');
+      console.log('📍 URL:', this.baseUrl + path);
+      console.log('🔑 App Token:', this.config.appToken?.substring(0, 10) + '...');
 
       const response = await fetch(this.baseUrl + path, {
         method: 'GET',
         headers
       });
 
-      // 200 = success, credentials are valid
+      console.log('📊 Response status:', response.status);
+
+      // 200 = success, API is available and credentials are valid
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Sumsub connection test passed');
+        console.log('✅ Sumsub API status:', data);
         return {
           success: true,
-          message: `Sumsub connection successful - Found ${data.list?.length || 0} KYC levels`,
+          message: `Sumsub API is available - Status: ${data.status || 'OK'}`,
           timestamp: new Date(),
           metadata: {
             status: response.status,
             levelName: this.config.levelName,
-            availableLevels: data.list?.length || 0
+            apiStatus: data
           }
         };
       }
