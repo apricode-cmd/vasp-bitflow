@@ -55,12 +55,15 @@ import { toast } from 'sonner';
 
 interface Notification {
   id: string;
-  type: 'ORDER' | 'KYC' | 'PAYMENT' | 'SYSTEM';
+  eventKey: string;
+  channel: string;
   title: string;
   message: string;
+  data?: any;
+  actionUrl?: string | null;
   isRead: boolean;
+  readAt?: string | null;
   createdAt: string;
-  link?: string;
 }
 
 export function ClientHeader(): React.ReactElement {
@@ -113,7 +116,8 @@ export function ClientHeader(): React.ReactElement {
     { href: '/buy', label: 'Buy Crypto', icon: CreditCard },
     { href: '/orders', label: 'Orders', icon: Package },
     { href: '/wallets', label: 'Wallets', icon: Wallet },
-    { href: '/kyc', label: 'KYC', icon: Shield }
+    { href: '/kyc', label: 'KYC', icon: Shield },
+    { href: '/notifications', label: 'Notifications', icon: Bell }
   ];
 
   // Get user initials for avatar
@@ -126,12 +130,12 @@ export function ClientHeader(): React.ReactElement {
   const markAsRead = async (notificationId: string) => {
     try {
       const response = await fetch(`/api/notifications/${notificationId}/read`, {
-        method: 'PATCH'
+        method: 'POST'
       });
       
       if (response.ok) {
         setNotifications(prev => 
-          prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n)
+          prev.map(n => n.id === notificationId ? { ...n, isRead: true, readAt: new Date().toISOString() } : n)
         );
       }
     } catch (error) {
@@ -142,12 +146,12 @@ export function ClientHeader(): React.ReactElement {
   // Mark all as read
   const markAllAsRead = async () => {
     try {
-      const response = await fetch('/api/notifications/read-all', {
-        method: 'PATCH'
+      const response = await fetch('/api/notifications/mark-all-read', {
+        method: 'POST'
       });
       
       if (response.ok) {
-        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true, readAt: new Date().toISOString() })));
         toast.success('All notifications marked as read');
       }
     } catch (error) {
@@ -158,43 +162,43 @@ export function ClientHeader(): React.ReactElement {
   // Handle notification click
   const handleNotificationClick = (notification: Notification) => {
     markAsRead(notification.id);
-    if (notification.link) {
-      router.push(notification.link);
+    if (notification.actionUrl) {
+      router.push(notification.actionUrl);
       setNotificationsOpen(false);
     }
   };
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
-  // Get notification icon
-  const getNotificationIcon = (type: Notification['type']) => {
-    switch (type) {
-      case 'ORDER':
-        return <CreditCard className="h-4 w-4" />;
-      case 'KYC':
-        return <Shield className="h-4 w-4" />;
-      case 'PAYMENT':
-        return <Wallet className="h-4 w-4" />;
-      case 'SYSTEM':
-        return <AlertCircle className="h-4 w-4" />;
-      default:
-        return <Bell className="h-4 w-4" />;
+  // Get notification icon based on eventKey
+  const getNotificationIcon = (eventKey: string) => {
+    if (eventKey.startsWith('ORDER_')) {
+      return <Package className="h-4 w-4" />;
+    } else if (eventKey.startsWith('KYC_')) {
+      return <Shield className="h-4 w-4" />;
+    } else if (eventKey.startsWith('PAYMENT_')) {
+      return <Wallet className="h-4 w-4" />;
+    } else if (eventKey.startsWith('SECURITY_')) {
+      return <AlertCircle className="h-4 w-4" />;
+    } else if (eventKey.startsWith('SYSTEM_')) {
+      return <AlertCircle className="h-4 w-4" />;
     }
+    return <Bell className="h-4 w-4" />;
   };
 
-  const getNotificationColor = (type: Notification['type']) => {
-    switch (type) {
-      case 'ORDER':
-        return 'text-blue-500';
-      case 'KYC':
-        return 'text-amber-500';
-      case 'PAYMENT':
-        return 'text-green-500';
-      case 'SYSTEM':
-        return 'text-purple-500';
-      default:
-        return 'text-muted-foreground';
+  const getNotificationColor = (eventKey: string) => {
+    if (eventKey.startsWith('ORDER_')) {
+      return 'text-blue-500';
+    } else if (eventKey.startsWith('KYC_')) {
+      return 'text-amber-500';
+    } else if (eventKey.startsWith('PAYMENT_')) {
+      return 'text-green-500';
+    } else if (eventKey.startsWith('SECURITY_')) {
+      return 'text-red-500';
+    } else if (eventKey.startsWith('SYSTEM_')) {
+      return 'text-purple-500';
     }
+    return 'text-muted-foreground';
   };
 
   return (
@@ -301,8 +305,8 @@ export function ClientHeader(): React.ReactElement {
                             }`}
                           >
                             <div className="flex gap-3">
-                              <div className={`flex-shrink-0 mt-1 ${getNotificationColor(notification.type)}`}>
-                                {getNotificationIcon(notification.type)}
+                              <div className={`flex-shrink-0 mt-1 ${getNotificationColor(notification.eventKey)}`}>
+                                {getNotificationIcon(notification.eventKey)}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-start justify-between gap-2">
@@ -324,6 +328,17 @@ export function ClientHeader(): React.ReactElement {
                       </div>
                     )}
                   </ScrollArea>
+                  
+                  {/* Footer with View All link */}
+                  {notifications.length > 0 && (
+                    <div className="p-3 border-t">
+                      <Link href="/notifications" onClick={() => setNotificationsOpen(false)}>
+                        <Button variant="ghost" className="w-full text-primary hover:text-primary/80">
+                          View All Notifications
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
                 </PopoverContent>
               </Popover>
 
