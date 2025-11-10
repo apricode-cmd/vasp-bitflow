@@ -18,8 +18,16 @@ const updateEventSchema = z.object({
   channels: z.array(z.enum(['EMAIL', 'IN_APP', 'SMS', 'PUSH'])).optional(),
   priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'URGENT']).optional(),
   isActive: z.boolean().optional(),
-  templateId: z.string().nullable().optional(), // NEW: FK to EmailTemplate (nullable to allow removal)
+  templateId: z.string().nullable().optional(),
   templateKey: z.string().optional(), // Deprecated
+  
+  // Variable Schema (Phase 1.2)
+  variableSchema: z.any().optional(),
+  requiredVariables: z.array(z.string()).optional(),
+  optionalVariables: z.array(z.string()).optional(),
+  examplePayload: z.any().optional(),
+  developerNotes: z.string().optional(),
+  usageExamples: z.any().optional(),
 });
 
 export async function GET(

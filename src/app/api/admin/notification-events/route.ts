@@ -18,8 +18,16 @@ const createEventSchema = z.object({
   channels: z.array(z.enum(['EMAIL', 'IN_APP', 'SMS', 'PUSH'])),
   priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'URGENT']).default('NORMAL'),
   isActive: z.boolean().default(true),
-  templateId: z.string().optional(), // NEW: FK to EmailTemplate
-  templateKey: z.string().optional(), // Deprecated: kept for backward compatibility
+  templateId: z.string().optional(),
+  templateKey: z.string().optional(), // Deprecated
+  
+  // Variable Schema (Phase 1.2)
+  variableSchema: z.any().optional(), // JSON Schema
+  requiredVariables: z.array(z.string()).default([]),
+  optionalVariables: z.array(z.string()).default([]),
+  examplePayload: z.any().optional(), // JSON object
+  developerNotes: z.string().optional(),
+  usageExamples: z.any().optional(), // JSON object
 });
 
 export async function GET(request: NextRequest) {

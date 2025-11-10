@@ -2029,6 +2029,16 @@ model NotificationEvent {
   emailTemplate EmailTemplate? @relation("EventEmailTemplate", fields: [templateId], references: [id], onDelete: SetNull)
   templateKey   String? // Deprecated: use templateId instead (kept for backward compatibility)
   
+  // Variable Schema (Payload Documentation)
+  variableSchema    Json?     // JSON Schema for payload validation
+  requiredVariables String[]  @default([]) // ['orderId', 'amount', 'currency']
+  optionalVariables String[]  @default([]) // ['couponCode', 'note']
+  examplePayload    Json?     // Example data for developers
+  
+  // Documentation
+  developerNotes    String?   @db.Text // Technical notes for developers
+  usageExamples     Json?     // Code examples: { javascript: '...', curl: '...' }
+  
   // Timestamps
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
