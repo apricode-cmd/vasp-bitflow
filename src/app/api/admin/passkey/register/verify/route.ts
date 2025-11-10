@@ -36,19 +36,43 @@ export async function POST(request: NextRequest) {
       // First-time setup - no session yet
       const admin = await prisma.admin.findUnique({
         where: { email },
-        select: { id: true, isActive: true }
+        select: { 
+          id: true, 
+          isActive: true,
+          status: true,
+          setupToken: true 
+        }
       });
 
-      if (!admin || !admin.isActive) {
+      if (!admin) {
         console.error('❌ Admin not found:', email);
         return NextResponse.json(
-          { error: 'Admin not found or inactive' },
+          { error: 'Admin not found' },
           { status: 404 }
         );
       }
 
+      // Allow SUSPENDED admins with setupToken (invite flow)
+      // Block TERMINATED admins
+      if (admin.status === 'TERMINATED') {
+        console.error('❌ Admin is terminated:', email);
+        return NextResponse.json(
+          { error: 'Admin account is terminated' },
+          { status: 403 }
+        );
+      }
+
+      // For first-time setup, admin can be SUSPENDED with setupToken
+      if (!admin.isActive && !admin.setupToken) {
+        console.error('❌ Admin is inactive and has no setup token:', email);
+        return NextResponse.json(
+          { error: 'Admin account is inactive' },
+          { status: 403 }
+        );
+      }
+
       adminId = admin.id;
-      console.log('✅ Found admin by email:', adminId);
+      console.log('✅ Found admin by email:', adminId, 'status:', admin.status);
     } else {
       console.error('❌ No email and no session');
       return NextResponse.json(
