@@ -1,7 +1,12 @@
 /**
  * Email Templates Management Page
  * 
- * Manage email templates with white-label support
+ * Features:
+ * - Visual email editor with live preview
+ * - White-label integration
+ * - Preset templates library
+ * - Test send functionality
+ * - Template versioning
  */
 
 'use client';
@@ -13,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Select,
   SelectContent,
@@ -37,6 +43,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Mail, 
   Plus, 
@@ -50,10 +57,15 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Archive
+  Archive,
+  Send,
+  Sparkles,
+  Download,
+  Palette
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
+import { EmailEditor } from '@/components/email/EmailEditor';
 
 interface EmailTemplate {
   id: string;
@@ -63,6 +75,8 @@ interface EmailTemplate {
   category: string;
   subject: string;
   preheader?: string;
+  htmlContent?: string;
+  textContent?: string;
   layout: string;
   variables: string[];
   version: number;
@@ -78,16 +92,38 @@ interface EmailTemplate {
   lastUsed?: string | null;
 }
 
+interface PresetTemplate {
+  key: string;
+  name: string;
+  description: string;
+  category: string;
+  variables: string[];
+  layout: string;
+}
+
+interface WhiteLabelSettings {
+  brandName: string;
+  brandLogo: string;
+  primaryColor: string;
+  supportEmail: string;
+  supportPhone?: string;
+}
+
 export default function EmailTemplatesPage(): React.ReactElement {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [presets, setPresets] = useState<PresetTemplate[]>([]);
+  const [whiteLabelSettings, setWhiteLabelSettings] = useState<WhiteLabelSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [presetsDialogOpen, setPresetsDialogOpen] = useState(false);
+  const [testSendDialogOpen, setTestSendDialogOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [testEmail, setTestEmail] = useState('');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -120,8 +156,44 @@ export default function EmailTemplatesPage(): React.ReactElement {
     }
   };
 
+  // Fetch presets
+  const fetchPresets = async () => {
+    try {
+      const response = await fetch('/api/admin/email-templates/presets');
+      if (response.ok) {
+        const data = await response.json();
+        setPresets(data.presets || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch presets:', error);
+    }
+  };
+
+  // Fetch white-label settings
+  const fetchWhiteLabelSettings = async () => {
+    try {
+      const response = await fetch('/api/admin/settings/public');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setWhiteLabelSettings({
+            brandName: data.settings.brandName || 'Apricode Exchange',
+            brandLogo: data.settings.brandLogo || '',
+            primaryColor: data.settings.primaryColor || '#06b6d4',
+            supportEmail: data.settings.supportEmail || '',
+            supportPhone: data.settings.supportPhone || '',
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch white-label settings:', error);
+    }
+  };
+
   useEffect(() => {
     fetchTemplates();
+    fetchPresets();
+    fetchWhiteLabelSettings();
   }, []);
 
   // Filter templates
@@ -148,7 +220,7 @@ export default function EmailTemplatesPage(): React.ReactElement {
       });
 
       const data = await response.json();
-
+      
       if (data.success) {
         toast.success('Template created successfully');
         setCreateDialogOpen(false);
@@ -158,23 +230,54 @@ export default function EmailTemplatesPage(): React.ReactElement {
         toast.error(data.error || 'Failed to create template');
       }
     } catch (error) {
+      console.error('Failed to create template:', error);
       toast.error('Failed to create template');
     } finally {
       setActionLoading(false);
     }
   };
 
-  // Delete template
-  const handleDelete = async (templateId: string) => {
-    if (!confirm('Are you sure you want to delete this template?')) return;
-
+  // Update template
+  const handleUpdate = async () => {
+    if (!selectedTemplate) return;
+    
     try {
-      const response = await fetch(`/api/admin/email-templates/${templateId}`, {
+      setActionLoading(true);
+      const response = await fetch(`/api/admin/email-templates/${selectedTemplate.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        toast.success('Template updated successfully');
+        setEditDialogOpen(false);
+        fetchTemplates();
+        resetForm();
+      } else {
+        toast.error(data.error || 'Failed to update template');
+      }
+    } catch (error) {
+      console.error('Failed to update template:', error);
+      toast.error('Failed to update template');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Delete template
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this template?')) return;
+    
+    try {
+      const response = await fetch(`/api/admin/email-templates/${id}`, {
         method: 'DELETE'
       });
 
       const data = await response.json();
-
+      
       if (data.success) {
         toast.success('Template deleted successfully');
         fetchTemplates();
@@ -182,29 +285,64 @@ export default function EmailTemplatesPage(): React.ReactElement {
         toast.error(data.error || 'Failed to delete template');
       }
     } catch (error) {
+      console.error('Failed to delete template:', error);
       toast.error('Failed to delete template');
     }
   };
 
-  // Toggle active status
-  const handleToggleActive = async (template: EmailTemplate) => {
+  // Import preset
+  const handleImportPreset = async (presetKey: string) => {
     try {
-      const response = await fetch(`/api/admin/email-templates/${template.id}`, {
-        method: 'PATCH',
+      setActionLoading(true);
+      const response = await fetch('/api/admin/email-templates/presets', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: !template.isActive })
+        body: JSON.stringify({ presetKey })
       });
 
       const data = await response.json();
-
+      
       if (data.success) {
-        toast.success(`Template ${template.isActive ? 'deactivated' : 'activated'}`);
+        toast.success('Template imported successfully');
+        setPresetsDialogOpen(false);
         fetchTemplates();
       } else {
-        toast.error(data.error || 'Failed to update template');
+        toast.error(data.error || 'Failed to import template');
       }
     } catch (error) {
-      toast.error('Failed to update template');
+      console.error('Failed to import preset:', error);
+      toast.error('Failed to import template');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Test send
+  const handleTestSend = async () => {
+    if (!selectedTemplate || !testEmail) return;
+    
+    try {
+      setActionLoading(true);
+      const response = await fetch(`/api/admin/email-templates/${selectedTemplate.id}/test-send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipientEmail: testEmail })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        toast.success(`Test email sent to ${testEmail}`);
+        setTestSendDialogOpen(false);
+        setTestEmail('');
+      } else {
+        toast.error(data.error || 'Failed to send test email');
+      }
+    } catch (error) {
+      console.error('Failed to send test email:', error);
+      toast.error('Failed to send test email');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -222,18 +360,37 @@ export default function EmailTemplatesPage(): React.ReactElement {
       layout: 'default',
       variables: [],
     });
+    setSelectedTemplate(null);
+  };
+
+  // Open edit dialog
+  const handleOpenEdit = (template: EmailTemplate) => {
+    setSelectedTemplate(template);
+    setFormData({
+      key: template.key,
+      name: template.name,
+      description: template.description || '',
+      category: template.category,
+      subject: template.subject,
+      htmlContent: template.htmlContent || '',
+      textContent: template.textContent || '',
+      preheader: template.preheader || '',
+      layout: template.layout,
+      variables: template.variables,
+    });
+    setEditDialogOpen(true);
   };
 
   // Get status badge
   const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { variant: any; icon: any }> = {
-      DRAFT: { variant: 'secondary', icon: Clock },
-      REVIEW: { variant: 'default', icon: Clock },
+    const variants: Record<string, { variant: any; icon: any }> = {
       PUBLISHED: { variant: 'default', icon: CheckCircle },
-      ARCHIVED: { variant: 'secondary', icon: Archive },
+      DRAFT: { variant: 'secondary', icon: Clock },
+      REVIEW: { variant: 'outline', icon: Eye },
+      ARCHIVED: { variant: 'destructive', icon: Archive },
     };
 
-    const config = statusConfig[status] || { variant: 'secondary', icon: Clock };
+    const config = variants[status] || variants.DRAFT;
     const Icon = config.icon;
 
     return (
@@ -244,21 +401,16 @@ export default function EmailTemplatesPage(): React.ReactElement {
     );
   };
 
-  // Get category badge
-  const getCategoryBadge = (category: string) => {
+  // Get category badge color
+  const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
-      TRANSACTIONAL: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200',
-      NOTIFICATION: 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-200',
-      MARKETING: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200',
-      SYSTEM: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
-      COMPLIANCE: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200',
+      TRANSACTIONAL: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+      NOTIFICATION: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
+      MARKETING: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+      SYSTEM: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300',
+      COMPLIANCE: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
     };
-
-    return (
-      <Badge variant="outline" className={colors[category] || ''}>
-        {category}
-      </Badge>
-    );
+    return colors[category] || colors.SYSTEM;
   };
 
   // Stats
@@ -274,12 +426,22 @@ export default function EmailTemplatesPage(): React.ReactElement {
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Email Templates</h1>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Mail className="h-8 w-8" />
+            Email Templates
+          </h1>
           <p className="text-muted-foreground mt-1">
-            Manage email templates with white-label support
+            Create and manage beautiful email templates with white-label support
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button 
+            variant="outline"
+            onClick={() => setPresetsDialogOpen(true)}
+          >
+            <Sparkles className="h-4 w-4 mr-2" />
+            Preset Library
+          </Button>
           <Button 
             variant="outline" 
             size="icon"
@@ -298,77 +460,93 @@ export default function EmailTemplatesPage(): React.ReactElement {
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
-          <CardHeader className="pb-3">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Templates</CardTitle>
+            <Mail className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-3">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Published</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.published}</div>
+            <div className="text-2xl font-bold">{stats.published}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-3">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Draft</CardTitle>
+            <Clock className="h-4 w-4 text-yellow-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-600">{stats.draft}</div>
+            <div className="text-2xl font-bold">{stats.draft}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-3">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active</CardTitle>
+            <CheckCircle className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{stats.active}</div>
+            <div className="text-2xl font-bold">{stats.active}</div>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search templates..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+        <CardHeader>
+          <CardTitle>Filters</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label>Search</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search templates..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
             </div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-full md:w-[200px]">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="TRANSACTIONAL">Transactional</SelectItem>
-                <SelectItem value="NOTIFICATION">Notification</SelectItem>
-                <SelectItem value="MARKETING">Marketing</SelectItem>
-                <SelectItem value="SYSTEM">System</SelectItem>
-                <SelectItem value="COMPLIANCE">Compliance</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-[200px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="DRAFT">Draft</SelectItem>
-                <SelectItem value="REVIEW">Review</SelectItem>
-                <SelectItem value="PUBLISHED">Published</SelectItem>
-                <SelectItem value="ARCHIVED">Archived</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="TRANSACTIONAL">Transactional</SelectItem>
+                  <SelectItem value="NOTIFICATION">Notification</SelectItem>
+                  <SelectItem value="MARKETING">Marketing</SelectItem>
+                  <SelectItem value="SYSTEM">System</SelectItem>
+                  <SelectItem value="COMPLIANCE">Compliance</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="PUBLISHED">Published</SelectItem>
+                  <SelectItem value="DRAFT">Draft</SelectItem>
+                  <SelectItem value="REVIEW">Review</SelectItem>
+                  <SelectItem value="ARCHIVED">Archived</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -376,187 +554,154 @@ export default function EmailTemplatesPage(): React.ReactElement {
       {/* Templates List */}
       <Card>
         <CardHeader>
-          <CardTitle>Templates ({filteredTemplates.length})</CardTitle>
+          <CardTitle>Templates</CardTitle>
           <CardDescription>
-            Manage and customize email templates for your platform
+            {filteredTemplates.length} template{filteredTemplates.length !== 1 ? 's' : ''} found
           </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="space-y-4">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="flex items-center gap-4 p-4 border rounded-lg">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4">
                   <Skeleton className="h-12 w-12 rounded" />
                   <div className="space-y-2 flex-1">
-                    <Skeleton className="h-4 w-1/3" />
-                    <Skeleton className="h-3 w-2/3" />
+                    <Skeleton className="h-4 w-[250px]" />
+                    <Skeleton className="h-3 w-[200px]" />
                   </div>
                 </div>
               ))}
             </div>
           ) : filteredTemplates.length === 0 ? (
             <div className="text-center py-12">
-              <Mail className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h3 className="text-lg font-semibold mb-2">No templates found</h3>
-              <p className="text-muted-foreground mb-4">
-                {searchQuery || categoryFilter !== 'all' || statusFilter !== 'all'
-                  ? 'Try adjusting your filters'
-                  : 'Create your first email template to get started'}
-              </p>
-              {!searchQuery && categoryFilter === 'all' && statusFilter === 'all' && (
-                <Button onClick={() => setCreateDialogOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Template
-                </Button>
-              )}
+              <Mail className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">No templates found</p>
+              <Button 
+                variant="outline" 
+                className="mt-4"
+                onClick={() => setPresetsDialogOpen(true)}
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Browse Preset Library
+              </Button>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {filteredTemplates.map((template) => (
-                <div
-                  key={template.id}
-                  className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition"
-                >
-                  <div className="flex-shrink-0 h-12 w-12 rounded bg-primary/10 flex items-center justify-center">
-                    <Mail className="h-6 w-6 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold">{template.name}</h3>
-                      {getCategoryBadge(template.category)}
-                      {getStatusBadge(template.status)}
-                      {template.isDefault && (
-                        <Badge variant="outline" className="gap-1">
-                          <CheckCircle className="h-3 w-3" />
-                          Default
-                        </Badge>
-                      )}
-                      {!template.isActive && (
-                        <Badge variant="secondary" className="gap-1">
-                          <XCircle className="h-3 w-3" />
-                          Inactive
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      {template.description || template.subject}
-                    </p>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <span>Key: <code className="bg-muted px-1 rounded">{template.key}</code></span>
-                      <span>Version: {template.version}</span>
-                      {template.usageCount !== undefined && (
-                        <span>Used: {template.usageCount} times</span>
-                      )}
-                      {template.lastUsed && (
-                        <span>Last used: {formatDistanceToNow(new Date(template.lastUsed), { addSuffix: true })}</span>
-                      )}
-                    </div>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setSelectedTemplate(template);
-                          setViewDialogOpen(true);
-                        }}
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit Template
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Copy className="h-4 w-4 mr-2" />
-                        Duplicate
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleToggleActive(template)}
-                      >
-                        {template.isActive ? (
-                          <>
-                            <XCircle className="h-4 w-4 mr-2" />
-                            Deactivate
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            Activate
-                          </>
-                        )}
-                      </DropdownMenuItem>
-                      {!template.isDefault && (
-                        <>
+                <Card key={template.id} className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className="font-semibold text-lg">{template.name}</h3>
+                          {getStatusBadge(template.status)}
+                          <Badge className={getCategoryColor(template.category)}>
+                            {template.category}
+                          </Badge>
+                          {template.isDefault && (
+                            <Badge variant="outline">
+                              <Sparkles className="h-3 w-3 mr-1" />
+                              Default
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          {template.description || 'No description'}
+                        </p>
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <span>Key: <code className="bg-muted px-1 py-0.5 rounded">{template.key}</code></span>
+                          <span>Version: {template.version}</span>
+                          {template.usageCount !== undefined && (
+                            <span>Used: {template.usageCount} times</span>
+                          )}
+                          {template.lastUsed && (
+                            <span>Last used: {formatDistanceToNow(new Date(template.lastUsed), { addSuffix: true })}</span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {template.variables.map((variable) => (
+                            <Badge key={variable} variant="secondary" className="text-xs">
+                              {`{{${variable}}}`}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => handleOpenEdit(template)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => {
+                            setSelectedTemplate(template);
+                            setTestSendDialogOpen(true);
+                          }}>
+                            <Send className="h-4 w-4 mr-2" />
+                            Test Send
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => {
+                            navigator.clipboard.writeText(template.key);
+                            toast.success('Template key copied');
+                          }}>
+                            <Copy className="h-4 w-4 mr-2" />
+                            Copy Key
+                          </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive"
+                          <DropdownMenuItem 
                             onClick={() => handleDelete(template.id)}
+                            className="text-destructive"
+                            disabled={template.isDefault}
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
                             Delete
                           </DropdownMenuItem>
-                        </>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Create Template Dialog */}
+      {/* Create Dialog */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle>Create Email Template</DialogTitle>
             <DialogDescription>
-              Create a new email template with custom content and variables
+              Create a new email template with visual editor and live preview
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Basic Info */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="key">Template Key *</Label>
                 <Input
                   id="key"
-                  placeholder="ORDER_CREATED"
                   value={formData.key}
-                  onChange={(e) => setFormData({ ...formData, key: e.target.value.toUpperCase().replace(/\s/g, '_') })}
+                  onChange={(e) => setFormData({ ...formData, key: e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '_') })}
+                  placeholder="ORDER_CREATED"
                 />
-                <p className="text-xs text-muted-foreground">
-                  Unique identifier (e.g., ORDER_CREATED)
-                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="name">Template Name *</Label>
                 <Input
                   id="name"
-                  placeholder="Order Created Email"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Order Created Email"
                 />
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                placeholder="Email sent when a new order is created"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={2}
-              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -584,60 +729,35 @@ export default function EmailTemplatesPage(): React.ReactElement {
                   <SelectContent>
                     <SelectItem value="default">Default</SelectItem>
                     <SelectItem value="minimal">Minimal</SelectItem>
-                    <SelectItem value="marketing">Marketing</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="subject">Email Subject *</Label>
-              <Input
-                id="subject"
-                placeholder="Your order #{{orderId}} has been created"
-                value={formData.subject}
-                onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-              />
-              <p className="text-xs text-muted-foreground">
-                Use {`{{variableName}}`} for dynamic content
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="preheader">Preheader (Preview Text)</Label>
-              <Input
-                id="preheader"
-                placeholder="Thank you for your order!"
-                value={formData.preheader}
-                onChange={(e) => setFormData({ ...formData, preheader: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="htmlContent">HTML Content *</Label>
+              <Label htmlFor="description">Description</Label>
               <Textarea
-                id="htmlContent"
-                placeholder="<h1>Order Created</h1><p>Your order #{{orderId}} has been created.</p>"
-                value={formData.htmlContent}
-                onChange={(e) => setFormData({ ...formData, htmlContent: e.target.value })}
-                rows={8}
-                className="font-mono text-sm"
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Brief description of this template..."
               />
-              <p className="text-xs text-muted-foreground">
-                Use {`{{variableName}}`} for dynamic content
-              </p>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="textContent">Plain Text Content</Label>
-              <Textarea
-                id="textContent"
-                placeholder="Order Created\n\nYour order #{{orderId}} has been created."
-                value={formData.textContent}
-                onChange={(e) => setFormData({ ...formData, textContent: e.target.value })}
-                rows={4}
-              />
-            </div>
+            {/* Email Editor */}
+            <EmailEditor
+              htmlContent={formData.htmlContent}
+              textContent={formData.textContent}
+              subject={formData.subject}
+              preheader={formData.preheader}
+              variables={formData.variables}
+              onHtmlChange={(html) => setFormData({ ...formData, htmlContent: html })}
+              onTextChange={(text) => setFormData({ ...formData, textContent: text })}
+              onSubjectChange={(subject) => setFormData({ ...formData, subject })}
+              onPreheaderChange={(preheader) => setFormData({ ...formData, preheader })}
+              onVariablesChange={(variables) => setFormData({ ...formData, variables })}
+              whiteLabelSettings={whiteLabelSettings || undefined}
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
@@ -650,97 +770,188 @@ export default function EmailTemplatesPage(): React.ReactElement {
         </DialogContent>
       </Dialog>
 
-      {/* View Template Dialog */}
-      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
           <DialogHeader>
-            <DialogTitle>{selectedTemplate?.name}</DialogTitle>
+            <DialogTitle>Edit Email Template</DialogTitle>
             <DialogDescription>
-              Template details and preview
+              Update your email template with visual editor and live preview
             </DialogDescription>
           </DialogHeader>
-          {selectedTemplate && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-xs text-muted-foreground">Key</Label>
-                  <code className="block mt-1 bg-muted px-2 py-1 rounded text-sm">
-                    {selectedTemplate.key}
-                  </code>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Category</Label>
-                  <div className="mt-1">
-                    {getCategoryBadge(selectedTemplate.category)}
-                  </div>
-                </div>
+          <div className="space-y-4">
+            {/* Basic Info */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-key">Template Key *</Label>
+                <Input
+                  id="edit-key"
+                  value={formData.key}
+                  disabled
+                  className="bg-muted"
+                />
               </div>
-
-              <div>
-                <Label className="text-xs text-muted-foreground">Subject</Label>
-                <p className="mt-1 text-sm">{selectedTemplate.subject}</p>
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Template Name *</Label>
+                <Input
+                  id="edit-name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Order Created Email"
+                />
               </div>
-
-              {selectedTemplate.preheader && (
-                <div>
-                  <Label className="text-xs text-muted-foreground">Preheader</Label>
-                  <p className="mt-1 text-sm text-muted-foreground">{selectedTemplate.preheader}</p>
-                </div>
-              )}
-
-              <div>
-                <Label className="text-xs text-muted-foreground">Variables</Label>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {selectedTemplate.variables.length > 0 ? (
-                    selectedTemplate.variables.map((variable) => (
-                      <Badge key={variable} variant="secondary">
-                        {`{{${variable}}}`}
-                      </Badge>
-                    ))
-                  ) : (
-                    <span className="text-sm text-muted-foreground">No variables</span>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-xs text-muted-foreground">HTML Preview</Label>
-                <div className="mt-1 border rounded-lg p-4 bg-muted/50 max-h-[300px] overflow-auto">
-                  <pre className="text-xs whitespace-pre-wrap font-mono">
-                    {selectedTemplate.htmlContent}
-                  </pre>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <Label className="text-xs text-muted-foreground">Status</Label>
-                  <div className="mt-1">
-                    {getStatusBadge(selectedTemplate.status)}
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Version</Label>
-                  <p className="mt-1">{selectedTemplate.version}</p>
-                </div>
-              </div>
-
-              {selectedTemplate.usageCount !== undefined && (
-                <div>
-                  <Label className="text-xs text-muted-foreground">Usage Statistics</Label>
-                  <p className="mt-1 text-sm">
-                    Used {selectedTemplate.usageCount} times
-                    {selectedTemplate.lastUsed && (
-                      <> • Last used {formatDistanceToNow(new Date(selectedTemplate.lastUsed), { addSuffix: true })}</>
-                    )}
-                  </p>
-                </div>
-              )}
             </div>
-          )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-category">Category *</Label>
+                <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="TRANSACTIONAL">Transactional</SelectItem>
+                    <SelectItem value="NOTIFICATION">Notification</SelectItem>
+                    <SelectItem value="MARKETING">Marketing</SelectItem>
+                    <SelectItem value="SYSTEM">System</SelectItem>
+                    <SelectItem value="COMPLIANCE">Compliance</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-layout">Layout</Label>
+                <Select value={formData.layout} onValueChange={(v) => setFormData({ ...formData, layout: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">Default</SelectItem>
+                    <SelectItem value="minimal">Minimal</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Brief description of this template..."
+              />
+            </div>
+
+            {/* Email Editor */}
+            <EmailEditor
+              htmlContent={formData.htmlContent}
+              textContent={formData.textContent}
+              subject={formData.subject}
+              preheader={formData.preheader}
+              variables={formData.variables}
+              onHtmlChange={(html) => setFormData({ ...formData, htmlContent: html })}
+              onTextChange={(text) => setFormData({ ...formData, textContent: text })}
+              onSubjectChange={(subject) => setFormData({ ...formData, subject })}
+              onPreheaderChange={(preheader) => setFormData({ ...formData, preheader })}
+              onVariablesChange={(variables) => setFormData({ ...formData, variables })}
+              whiteLabelSettings={whiteLabelSettings || undefined}
+            />
+          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setViewDialogOpen(false)}>
-              Close
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdate} disabled={actionLoading}>
+              {actionLoading ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Presets Dialog */}
+      <Dialog open={presetsDialogOpen} onOpenChange={setPresetsDialogOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5" />
+              Template Library
+            </DialogTitle>
+            <DialogDescription>
+              Choose from our collection of professionally designed email templates
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[500px] pr-4">
+            <div className="grid gap-4">
+              {presets.map((preset) => (
+                <Card key={preset.key} className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h4 className="font-semibold">{preset.name}</h4>
+                          <Badge className={getCategoryColor(preset.category)}>
+                            {preset.category}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          {preset.description}
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {preset.variables.map((variable) => (
+                            <Badge key={variable} variant="secondary" className="text-xs">
+                              {`{{${variable}}}`}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => handleImportPreset(preset.key)}
+                        disabled={actionLoading || templates.some(t => t.key === preset.key)}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        {templates.some(t => t.key === preset.key) ? 'Imported' : 'Import'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Test Send Dialog */}
+      <Dialog open={testSendDialogOpen} onOpenChange={setTestSendDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Test Email</DialogTitle>
+            <DialogDescription>
+              Send a test email to verify how your template looks in an inbox
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="test-email">Recipient Email *</Label>
+              <Input
+                id="test-email"
+                type="email"
+                value={testEmail}
+                onChange={(e) => setTestEmail(e.target.value)}
+                placeholder="your.email@example.com"
+              />
+              <p className="text-xs text-muted-foreground">
+                The email will be sent with test data for all variables
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTestSendDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleTestSend} disabled={actionLoading || !testEmail}>
+              <Send className="h-4 w-4 mr-2" />
+              {actionLoading ? 'Sending...' : 'Send Test Email'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -748,4 +959,3 @@ export default function EmailTemplatesPage(): React.ReactElement {
     </div>
   );
 }
-

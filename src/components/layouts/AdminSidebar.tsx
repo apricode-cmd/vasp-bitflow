@@ -387,7 +387,10 @@ export function AdminSidebar(): JSX.Element {
               <p className="text-xs text-muted-foreground">Admin CRM</p>
             </div>
           </div>
-          <NotificationBell />
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <ThemeToggle />
+          </div>
         </div>
       </div>
 
