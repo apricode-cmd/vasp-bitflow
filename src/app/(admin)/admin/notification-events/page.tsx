@@ -85,7 +85,22 @@ export default function NotificationEventsPage(): React.ReactElement {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<NotificationEvent | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    eventKey: '',
+    name: '',
+    description: '',
+    category: 'ORDER' as const,
+    channels: ['EMAIL', 'IN_APP'] as string[],
+    priority: 'NORMAL' as const,
+    isActive: true,
+    templateKey: '',
+  });
 
   // Fetch events
   const fetchEvents = async () => {
@@ -120,6 +135,84 @@ export default function NotificationEventsPage(): React.ReactElement {
     return matchesSearch && matchesCategory;
   });
 
+  // Create event
+  const handleCreate = async () => {
+    try {
+      setActionLoading(true);
+      const response = await fetch('/api/admin/notification-events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Event created successfully');
+        setCreateDialogOpen(false);
+        fetchEvents();
+        resetForm();
+      } else {
+        toast.error(data.error || 'Failed to create event');
+      }
+    } catch (error) {
+      toast.error('Failed to create event');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Update event
+  const handleUpdate = async () => {
+    if (!selectedEvent) return;
+
+    try {
+      setActionLoading(true);
+      const response = await fetch(`/api/admin/notification-events/${selectedEvent.eventKey}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Event updated successfully');
+        setEditDialogOpen(false);
+        fetchEvents();
+        resetForm();
+      } else {
+        toast.error(data.error || 'Failed to update event');
+      }
+    } catch (error) {
+      toast.error('Failed to update event');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Delete event
+  const handleDelete = async (eventKey: string) => {
+    if (!confirm('Are you sure you want to delete this event? This action cannot be undone.')) return;
+
+    try {
+      const response = await fetch(`/api/admin/notification-events/${eventKey}`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Event deleted successfully');
+        fetchEvents();
+      } else {
+        toast.error(data.error || 'Failed to delete event');
+      }
+    } catch (error) {
+      toast.error('Failed to delete event');
+    }
+  };
+
   // Toggle active status
   const handleToggleActive = async (event: NotificationEvent) => {
     try {
@@ -140,6 +233,47 @@ export default function NotificationEventsPage(): React.ReactElement {
     } catch (error) {
       toast.error('Failed to update event');
     }
+  };
+
+  // Reset form
+  const resetForm = () => {
+    setFormData({
+      eventKey: '',
+      name: '',
+      description: '',
+      category: 'ORDER',
+      channels: ['EMAIL', 'IN_APP'],
+      priority: 'NORMAL',
+      isActive: true,
+      templateKey: '',
+    });
+    setSelectedEvent(null);
+  };
+
+  // Open edit dialog
+  const handleOpenEdit = (event: NotificationEvent) => {
+    setSelectedEvent(event);
+    setFormData({
+      eventKey: event.eventKey,
+      name: event.name,
+      description: event.description || '',
+      category: event.category as any,
+      channels: event.channels,
+      priority: event.priority as any,
+      isActive: event.isActive,
+      templateKey: event.templateKey || '',
+    });
+    setEditDialogOpen(true);
+  };
+
+  // Toggle channel
+  const toggleChannel = (channel: string) => {
+    setFormData(prev => ({
+      ...prev,
+      channels: prev.channels.includes(channel)
+        ? prev.channels.filter(c => c !== channel)
+        : [...prev.channels, channel]
+    }));
   };
 
   // Get category badge
@@ -219,6 +353,10 @@ export default function NotificationEventsPage(): React.ReactElement {
             disabled={loading}
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+          <Button onClick={() => setCreateDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Event
           </Button>
         </div>
       </div>
@@ -394,7 +532,7 @@ export default function NotificationEventsPage(): React.ReactElement {
                       </DropdownMenuItem>
                       {!event.isSystem && (
                         <>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleOpenEdit(event)}>
                             <Edit className="h-4 w-4 mr-2" />
                             Edit Event
                           </DropdownMenuItem>
@@ -412,6 +550,14 @@ export default function NotificationEventsPage(): React.ReactElement {
                                 Activate
                               </>
                             )}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => handleDelete(event.eventKey)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
                           </DropdownMenuItem>
                         </>
                       )}
@@ -536,6 +682,269 @@ export default function NotificationEventsPage(): React.ReactElement {
           <DialogFooter>
             <Button variant="outline" onClick={() => setViewDialogOpen(false)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Event Dialog */}
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create Notification Event</DialogTitle>
+            <DialogDescription>
+              Create a new notification event with custom settings
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="eventKey">Event Key *</Label>
+                <Input
+                  id="eventKey"
+                  placeholder="ORDER_CREATED"
+                  value={formData.eventKey}
+                  onChange={(e) => setFormData({ ...formData, eventKey: e.target.value.toUpperCase().replace(/\s/g, '_') })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Unique identifier (e.g., ORDER_CREATED)
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="name">Event Name *</Label>
+                <Input
+                  id="name"
+                  placeholder="Order Created"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                placeholder="Triggered when a new order is created"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                rows={2}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="category">Category *</Label>
+                <Select value={formData.category} onValueChange={(v: any) => setFormData({ ...formData, category: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ORDER">Order</SelectItem>
+                    <SelectItem value="KYC">KYC</SelectItem>
+                    <SelectItem value="PAYMENT">Payment</SelectItem>
+                    <SelectItem value="SECURITY">Security</SelectItem>
+                    <SelectItem value="SYSTEM">System</SelectItem>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
+                    <SelectItem value="MARKETING">Marketing</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="priority">Priority</Label>
+                <Select value={formData.priority} onValueChange={(v: any) => setFormData({ ...formData, priority: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="LOW">Low</SelectItem>
+                    <SelectItem value="NORMAL">Normal</SelectItem>
+                    <SelectItem value="HIGH">High</SelectItem>
+                    <SelectItem value="URGENT">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Channels *</Label>
+              <div className="flex flex-wrap gap-3">
+                {['EMAIL', 'IN_APP', 'SMS', 'PUSH'].map((channel) => (
+                  <div key={channel} className="flex items-center space-x-2">
+                    <Switch
+                      id={`channel-${channel}`}
+                      checked={formData.channels.includes(channel)}
+                      onCheckedChange={() => toggleChannel(channel)}
+                    />
+                    <Label htmlFor={`channel-${channel}`} className="cursor-pointer">
+                      {channel}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Select at least one delivery channel
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="templateKey">Email Template Key (Optional)</Label>
+              <Input
+                id="templateKey"
+                placeholder="ORDER_CREATED"
+                value={formData.templateKey}
+                onChange={(e) => setFormData({ ...formData, templateKey: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Link to an email template for this event
+              </p>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="isActive"
+                checked={formData.isActive}
+                onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+              />
+              <Label htmlFor="isActive" className="cursor-pointer">
+                Active (event will trigger notifications)
+              </Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setCreateDialogOpen(false);
+              resetForm();
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreate} disabled={actionLoading || !formData.eventKey || !formData.name || formData.channels.length === 0}>
+              {actionLoading ? 'Creating...' : 'Create Event'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Event Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Notification Event</DialogTitle>
+            <DialogDescription>
+              Update event settings and configuration
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Event Key (Read-only)</Label>
+              <code className="block bg-muted px-3 py-2 rounded text-sm">
+                {formData.eventKey}
+              </code>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Event Name *</Label>
+              <Input
+                id="edit-name"
+                placeholder="Order Created"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                placeholder="Triggered when a new order is created"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                rows={2}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-category">Category *</Label>
+                <Select value={formData.category} onValueChange={(v: any) => setFormData({ ...formData, category: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ORDER">Order</SelectItem>
+                    <SelectItem value="KYC">KYC</SelectItem>
+                    <SelectItem value="PAYMENT">Payment</SelectItem>
+                    <SelectItem value="SECURITY">Security</SelectItem>
+                    <SelectItem value="SYSTEM">System</SelectItem>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
+                    <SelectItem value="MARKETING">Marketing</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-priority">Priority</Label>
+                <Select value={formData.priority} onValueChange={(v: any) => setFormData({ ...formData, priority: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="LOW">Low</SelectItem>
+                    <SelectItem value="NORMAL">Normal</SelectItem>
+                    <SelectItem value="HIGH">High</SelectItem>
+                    <SelectItem value="URGENT">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Channels *</Label>
+              <div className="flex flex-wrap gap-3">
+                {['EMAIL', 'IN_APP', 'SMS', 'PUSH'].map((channel) => (
+                  <div key={channel} className="flex items-center space-x-2">
+                    <Switch
+                      id={`edit-channel-${channel}`}
+                      checked={formData.channels.includes(channel)}
+                      onCheckedChange={() => toggleChannel(channel)}
+                    />
+                    <Label htmlFor={`edit-channel-${channel}`} className="cursor-pointer">
+                      {channel}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-templateKey">Email Template Key (Optional)</Label>
+              <Input
+                id="edit-templateKey"
+                placeholder="ORDER_CREATED"
+                value={formData.templateKey}
+                onChange={(e) => setFormData({ ...formData, templateKey: e.target.value })}
+              />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="edit-isActive"
+                checked={formData.isActive}
+                onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+              />
+              <Label htmlFor="edit-isActive" className="cursor-pointer">
+                Active (event will trigger notifications)
+              </Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setEditDialogOpen(false);
+              resetForm();
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdate} disabled={actionLoading || !formData.name || formData.channels.length === 0}>
+              {actionLoading ? 'Updating...' : 'Update Event'}
             </Button>
           </DialogFooter>
         </DialogContent>
