@@ -13,14 +13,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await auth();
-    
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const session = await requireAdminAuth();
+    if (session instanceof NextResponse) return session;
 
     const document = await prisma.legalDocument.findUnique({
       where: { id: params.id },
@@ -55,14 +49,8 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await auth();
-    
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const session = await requireAdminAuth();
+    if (session instanceof NextResponse) return session;
 
     // Check if document exists
     const existing = await prisma.legalDocument.findUnique({
@@ -152,14 +140,8 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await auth();
-    
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const session = await requireAdminAuth();
+    if (session instanceof NextResponse) return session;
 
     // Check if document exists
     const existing = await prisma.legalDocument.findUnique({

@@ -27,7 +27,7 @@ export const STEP_UP_REQUIRED_ACTIONS = [
   
   // Access management
   'CREATE_ADMIN', // Invite new admin
-  'CHANGE_ADMIN_ROLE',
+  'CHANGE_ADMIN_ROLE', // Change admin role
   'CREATE_SUPER_ADMIN',
   'SUSPEND_ADMIN',
   'UNSUSPEND_ADMIN', // Reactivate suspended admin

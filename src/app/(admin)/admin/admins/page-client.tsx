@@ -171,6 +171,15 @@ export function AdminManagementClient({
   // Alert dialogs
   const [suspendAlertOpen, setSuspendAlertOpen] = useState(false);
   const [terminateAlertOpen, setTerminateAlertOpen] = useState(false);
+  const [changeRoleDialogOpen, setChangeRoleDialogOpen] = useState(false);
+  
+  // Change role state
+  const [roles, setRoles] = useState<any[]>([]);
+  const [selectedNewRole, setSelectedNewRole] = useState('');
+  const [changeRoleReason, setChangeRoleReason] = useState('');
+  
+  // Edit admin state
+  const [editAdminDialogOpen, setEditAdminDialogOpen] = useState(false);
 
   // Invite form
   const inviteForm = useForm<InviteAdminFormData>({
@@ -225,6 +234,150 @@ export function AdminManagementClient({
       toast.error('Failed to load admins');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Load roles for change role dialog
+  const loadRoles = async () => {
+    try {
+      const response = await fetch('/api/admin/roles');
+      const data = await response.json();
+      
+      if (data.success) {
+        // Filter out SUPER_ADMIN role (cannot assign)
+        setRoles(data.roles.filter((r: any) => r.code !== 'SUPER_ADMIN' && r.isActive));
+      }
+    } catch (error) {
+      console.error('Failed to load roles:', error);
+      toast.error('Failed to load roles');
+    }
+  };
+
+  // Open change role dialog
+  const handleOpenChangeRole = (admin: Admin) => {
+    setSelectedAdmin(admin);
+    setSelectedNewRole('');
+    setChangeRoleReason('');
+    loadRoles();
+    setChangeRoleDialogOpen(true);
+  };
+
+  // Open edit admin dialog
+  const handleOpenEditAdmin = (admin: Admin) => {
+    setSelectedAdmin(admin);
+    // Pre-fill form with admin data
+    inviteForm.reset({
+      email: admin.workEmail || admin.email,
+      firstName: admin.firstName,
+      lastName: admin.lastName,
+      jobTitle: admin.jobTitle || '',
+      role: admin.role as any,
+      department: admin.department || '',
+    });
+    setEditAdminDialogOpen(true);
+  };
+
+  // Update admin details
+  const handleUpdateAdmin = async (data: InviteAdminFormData) => {
+    if (!selectedAdmin) return;
+    
+    setActionLoading(true);
+    try {
+      const response = await fetch(`/api/admin/admins/${selectedAdmin.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: data.firstName,
+          lastName: data.lastName,
+          jobTitle: data.jobTitle,
+          department: data.department,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success('Admin details updated successfully!');
+        setEditAdminDialogOpen(false);
+        loadAdmins();
+      } else {
+        toast.error(result.error || 'Failed to update admin');
+      }
+    } catch (error) {
+      console.error('Update admin error:', error);
+      toast.error('Failed to update admin');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Change admin role (with Step-up MFA)
+  const handleChangeRole = async () => {
+    if (!selectedAdmin || !selectedNewRole) return;
+    
+    setActionLoading(true);
+    try {
+      // First request - will trigger MFA challenge
+      const response = await fetch(`/api/admin/admins/${selectedAdmin.id}/change-role`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          newRoleCode: selectedNewRole,
+          reason: changeRoleReason || undefined,
+        }),
+      });
+
+      const result = await response.json();
+
+      // If MFA is required, handle it
+      if (result.requiresMfa) {
+        toast.info('MFA verification required');
+        
+        // Import startAuthentication dynamically
+        const { startAuthentication } = await import('@simplewebauthn/browser');
+        
+        try {
+          // Prompt for MFA
+          const mfaResponse = await startAuthentication(result.options);
+          
+          // Retry with MFA response
+          const mfaVerifyResponse = await fetch(`/api/admin/admins/${selectedAdmin.id}/change-role`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              newRoleCode: selectedNewRole,
+              reason: changeRoleReason || undefined,
+              mfaChallengeId: result.challengeId,
+              mfaResponse,
+            }),
+          });
+
+          const mfaResult = await mfaVerifyResponse.json();
+
+          if (mfaResult.success) {
+            toast.success('Admin role changed successfully! (MFA verified)');
+            setChangeRoleDialogOpen(false);
+            loadAdmins();
+          } else {
+            toast.error(mfaResult.error || 'MFA verification failed');
+          }
+        } catch (mfaError) {
+          console.error('MFA error:', mfaError);
+          toast.error('MFA verification cancelled or failed');
+        }
+      } else if (result.success) {
+        // Success without MFA (shouldn't happen, but handle it)
+        toast.success('Admin role changed successfully!');
+        setChangeRoleDialogOpen(false);
+        loadAdmins();
+      } else {
+        toast.error(result.error || 'Failed to change role');
+      }
+    } catch (error) {
+      console.error('Change role error:', error);
+      toast.error('Failed to change role');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -742,11 +895,11 @@ export function AdminManagementClient({
                                 {/* Self-admin actions */}
                                 {admin.id === currentAdminId ? (
                                   <>
-                                    <DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => window.location.href = '/admin/profile'}>
                                       <Edit className="w-4 h-4 mr-2" />
                                       Edit Profile
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => window.location.href = '/admin/profile?tab=security'}>
                                       <Shield className="w-4 h-4 mr-2" />
                                       Security Settings
                                     </DropdownMenuItem>
@@ -754,11 +907,13 @@ export function AdminManagementClient({
                                 ) : (
                                   <>
                                     {/* Other admins - SUPER_ADMIN has all permissions */}
-                                    <DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleOpenEditAdmin(admin)}>
                                       <Edit className="w-4 h-4 mr-2" />
                                       Edit Details
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => handleOpenChangeRole(admin)}
+                                    >
                                       <UserCog className="w-4 h-4 mr-2" />
                                       Change Role
                                     </DropdownMenuItem>
@@ -977,6 +1132,184 @@ export function AdminManagementClient({
           <DialogFooter>
             <Button onClick={() => setInviteLinkDialogOpen(false)}>
               Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Admin Dialog */}
+      <Dialog open={editAdminDialogOpen} onOpenChange={setEditAdminDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Administrator Details</DialogTitle>
+            <DialogDescription>
+              Update details for <strong>{selectedAdmin?.firstName} {selectedAdmin?.lastName}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...inviteForm}>
+            <form onSubmit={inviteForm.handleSubmit(handleUpdateAdmin)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={inviteForm.control}
+                  name="firstName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="John" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={inviteForm.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Last Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Doe" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={inviteForm.control}
+                name="jobTitle"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Job Title</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="e.g., Compliance Officer" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={inviteForm.control}
+                name="department"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Department (Optional)</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="e.g., Compliance" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="p-3 bg-muted rounded-lg text-sm">
+                <div className="font-medium mb-1">Email (read-only)</div>
+                <div className="text-muted-foreground">{selectedAdmin?.workEmail || selectedAdmin?.email}</div>
+              </div>
+
+              <div className="p-3 bg-muted rounded-lg text-sm">
+                <div className="font-medium mb-1">Role (read-only)</div>
+                <div className="text-muted-foreground">{selectedAdmin?.role}</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Use "Change Role" action to modify role
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setEditAdminDialogOpen(false)}
+                  disabled={actionLoading}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={actionLoading}>
+                  {actionLoading ? 'Updating...' : 'Update Details'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Role Dialog */}
+      <Dialog open={changeRoleDialogOpen} onOpenChange={setChangeRoleDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Change Administrator Role</DialogTitle>
+            <DialogDescription>
+              Change role for <strong>{selectedAdmin?.firstName} {selectedAdmin?.lastName}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Current Role */}
+            <div className="p-3 bg-muted rounded-lg">
+              <div className="text-sm text-muted-foreground">Current Role</div>
+              <div className="font-semibold">{selectedAdmin?.role}</div>
+            </div>
+
+            {/* New Role Selection */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">New Role</label>
+              <Select value={selectedNewRole} onValueChange={setSelectedNewRole}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select new role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map((role) => (
+                    <SelectItem 
+                      key={role.code} 
+                      value={role.code}
+                      disabled={role.code === selectedAdmin?.role}
+                    >
+                      {role.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Reason (Optional) */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Reason (Optional)</label>
+              <Input
+                placeholder="e.g., Promotion to Compliance Officer"
+                value={changeRoleReason}
+                onChange={(e) => setChangeRoleReason(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                This will be logged in the audit trail
+              </p>
+            </div>
+
+            {/* Warning */}
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <div className="flex gap-2">
+                <Shield className="w-4 h-4 text-amber-600 dark:text-amber-500 mt-0.5" />
+                <div className="text-sm text-amber-800 dark:text-amber-200">
+                  <strong>MFA Required:</strong> You will need to verify your identity with your Passkey to complete this action.
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => setChangeRoleDialogOpen(false)}
+              disabled={actionLoading}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleChangeRole} 
+              disabled={actionLoading || !selectedNewRole}
+            >
+              {actionLoading ? 'Changing Role...' : 'Change Role'}
             </Button>
           </DialogFooter>
         </DialogContent>
