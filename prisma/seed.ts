@@ -621,15 +621,42 @@ async function main(): Promise<void> {
         baseUrl: 'https://api.coingecko.com/api/v3',
         cacheDuration: 60000
       }
+    },
+    {
+      service: 'tatum',
+      isEnabled: true,
+      status: 'active',
+      config: {
+        apiKey: process.env.TATUM_API_KEY || 'test-key',
+        network: 'mainnet'
+      }
     }
   ];
 
   for (const integration of integrations) {
+    // Create in IntegrationSetting (old table)
     await prisma.integrationSetting.upsert({
       where: { service: integration.service },
       update: {},
       create: integration
     });
+    
+    // Also create in Integration (new table for IntegrationFactory)
+    await prisma.integration.upsert({
+      where: { service: integration.service },
+      update: {
+        isEnabled: integration.isEnabled,
+        status: integration.status,
+        config: integration.config
+      },
+      create: {
+        service: integration.service,
+        isEnabled: integration.isEnabled,
+        status: integration.status,
+        config: integration.config
+      }
+    });
+    
     console.log(`  ✓ ${integration.service}`);
   }
   console.log('');
@@ -869,7 +896,7 @@ async function main(): Promise<void> {
   console.log(`   - 3 Payment Methods`);
   console.log(`   - 14 KYC Form Fields`);
   console.log(`   - 2 User Wallets`);
-  console.log(`   - 3 Integration Settings`);
+  console.log(`   - 4 Integration Settings (kycaid, resend, coingecko, tatum)`);
   console.log('\n📋 CRM Reference Tables:');
   console.log(`   - 3 Rate Providers`);
   console.log(`   - 2 Fee Profiles`);

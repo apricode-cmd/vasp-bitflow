@@ -14,9 +14,21 @@ import { encryptionService } from './encryption.service';
  * Get active blockchain provider
  */
 export async function getActiveBlockchainProvider(): Promise<IBlockchainProvider> {
-  // Find active blockchain integration in database
+  // Get all BLOCKCHAIN providers from registry (similar to rate-provider.service.ts)
+  const blockchainProviders = integrationRegistry.getProvidersByCategory('BLOCKCHAIN' as any);
+  
+  if (blockchainProviders.length === 0) {
+    throw new Error('No BLOCKCHAIN providers registered in IntegrationRegistry');
+  }
+
+  // Get provider IDs from registry (e.g., ['tatum'])
+  const providerIds = blockchainProviders.map(p => p.providerId);
+  console.log('🔍 Looking for blockchain provider from:', providerIds);
+
+  // Find active provider in database
   const integration = await prisma.integration.findFirst({
     where: {
+      service: { in: providerIds }, // Only check registered BLOCKCHAIN providers
       isEnabled: true,
       status: 'active'
     },
@@ -26,14 +38,16 @@ export async function getActiveBlockchainProvider(): Promise<IBlockchainProvider
   });
 
   if (!integration) {
-    throw new Error('No active blockchain provider configured. Please enable Tatum or another provider in admin settings.');
+    throw new Error(`No active blockchain provider configured. Available providers: ${providerIds.join(', ')}. Please enable one in admin settings (Integrations).`);
   }
+
+  console.log('✅ Active blockchain provider:', integration.service);
 
   // Get provider from registry
   const provider = integrationRegistry.getBlockchainProvider(integration.service);
 
   if (!provider) {
-    throw new Error(`Blockchain provider "${integration.service}" not found in registry`);
+    throw new Error(`Blockchain provider "${integration.service}" not found in registry. Available: ${providerIds.join(', ')}`);
   }
 
   // Decrypt config
@@ -151,12 +165,12 @@ export async function syncWalletBalance(walletId: string): Promise<{
     // Log sync event
     await prisma.systemLog.create({
       data: {
-        action: 'WALLET_BALANCE_SYNC',
-        path: `/api/admin/wallets/${walletId}/sync`,
+        source: 'TATUM_API',
+        level: 'INFO',
+        eventType: 'WALLET_BALANCE_SYNC',
+        endpoint: `/api/admin/wallets/${walletId}/sync`,
         method: 'POST',
         statusCode: 200,
-        ipAddress: 'system',
-        userAgent: 'blockchain-provider-service',
         metadata: {
           walletId,
           walletCode: wallet.code,
