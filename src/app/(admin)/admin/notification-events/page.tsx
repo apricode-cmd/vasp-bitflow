@@ -185,10 +185,26 @@ export default function NotificationEventsPage(): React.ReactElement {
   const handleCreate = async () => {
     try {
       setActionLoading(true);
+      
+      // Parse example payload if provided
+      let examplePayloadJson = null;
+      if (formData.examplePayload.trim()) {
+        try {
+          examplePayloadJson = JSON.parse(formData.examplePayload);
+        } catch (e) {
+          toast.error('Invalid JSON in example payload');
+          setActionLoading(false);
+          return;
+        }
+      }
+      
       const response = await fetch('/api/admin/notification-events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          ...formData,
+          examplePayload: examplePayloadJson
+        })
       });
 
       const data = await response.json();
@@ -214,10 +230,26 @@ export default function NotificationEventsPage(): React.ReactElement {
 
     try {
       setActionLoading(true);
+      
+      // Parse example payload if provided
+      let examplePayloadJson = null;
+      if (formData.examplePayload.trim()) {
+        try {
+          examplePayloadJson = JSON.parse(formData.examplePayload);
+        } catch (e) {
+          toast.error('Invalid JSON in example payload');
+          setActionLoading(false);
+          return;
+        }
+      }
+      
       const response = await fetch(`/api/admin/notification-events/${selectedEvent.eventKey}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          ...formData,
+          examplePayload: examplePayloadJson
+        })
       });
 
       const data = await response.json();
@@ -317,6 +349,10 @@ export default function NotificationEventsPage(): React.ReactElement {
       isActive: event.isActive,
       templateId: (event as any).templateId || '',
       templateKey: event.templateKey || '',
+      requiredVariables: (event as any).requiredVariables || [],
+      optionalVariables: (event as any).optionalVariables || [],
+      examplePayload: (event as any).examplePayload ? JSON.stringify((event as any).examplePayload, null, 2) : '',
+      developerNotes: (event as any).developerNotes || '',
     });
     // Load templates for this category
     fetchTemplates(event.category);
@@ -330,6 +366,50 @@ export default function NotificationEventsPage(): React.ReactElement {
       channels: prev.channels.includes(channel)
         ? prev.channels.filter(c => c !== channel)
         : [...prev.channels, channel]
+    }));
+  };
+
+  // Add required variable
+  const addRequiredVariable = () => {
+    if (!newRequiredVar.trim()) return;
+    if (formData.requiredVariables.includes(newRequiredVar.trim())) {
+      toast.error('Variable already exists');
+      return;
+    }
+    setFormData(prev => ({
+      ...prev,
+      requiredVariables: [...prev.requiredVariables, newRequiredVar.trim()]
+    }));
+    setNewRequiredVar('');
+  };
+
+  // Remove required variable
+  const removeRequiredVariable = (variable: string) => {
+    setFormData(prev => ({
+      ...prev,
+      requiredVariables: prev.requiredVariables.filter(v => v !== variable)
+    }));
+  };
+
+  // Add optional variable
+  const addOptionalVariable = () => {
+    if (!newOptionalVar.trim()) return;
+    if (formData.optionalVariables.includes(newOptionalVar.trim())) {
+      toast.error('Variable already exists');
+      return;
+    }
+    setFormData(prev => ({
+      ...prev,
+      optionalVariables: [...prev.optionalVariables, newOptionalVar.trim()]
+    }));
+    setNewOptionalVar('');
+  };
+
+  // Remove optional variable
+  const removeOptionalVariable = (variable: string) => {
+    setFormData(prev => ({
+      ...prev,
+      optionalVariables: prev.optionalVariables.filter(v => v !== variable)
     }));
   };
 
@@ -847,8 +927,8 @@ export default function NotificationEventsPage(): React.ReactElement {
             <div className="space-y-2">
               <Label htmlFor="templateId">Email Template (Optional)</Label>
               <Select 
-                value={formData.templateId} 
-                onValueChange={(v) => setFormData({ ...formData, templateId: v })}
+                value={formData.templateId || undefined} 
+                onValueChange={(v) => setFormData({ ...formData, templateId: v === 'none' ? '' : v })}
                 disabled={templatesLoading || templates.length === 0}
               >
                 <SelectTrigger>
@@ -859,7 +939,7 @@ export default function NotificationEventsPage(): React.ReactElement {
                   } />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None (no email template)</SelectItem>
+                  <SelectItem value="none">None (no email template)</SelectItem>
                   {templates.map((template) => (
                     <SelectItem key={template.id} value={template.id}>
                       <div className="flex flex-col">
@@ -875,6 +955,108 @@ export default function NotificationEventsPage(): React.ReactElement {
               <p className="text-xs text-muted-foreground">
                 Choose an email template for this event. Templates are filtered by category.
               </p>
+            </div>
+
+            {/* Variables Section */}
+            <div className="space-y-4 pt-4 border-t">
+              <div>
+                <Label className="text-base font-semibold">Variables (Payload Schema)</Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Define variables that this event expects in its payload
+                </p>
+              </div>
+
+              {/* Required Variables */}
+              <div className="space-y-2">
+                <Label>Required Variables</Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="e.g., orderId"
+                    value={newRequiredVar}
+                    onChange={(e) => setNewRequiredVar(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && addRequiredVariable()}
+                  />
+                  <Button type="button" size="sm" onClick={addRequiredVariable}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                {formData.requiredVariables.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {formData.requiredVariables.map((variable) => (
+                      <Badge key={variable} variant="secondary" className="gap-1">
+                        {variable}
+                        <button
+                          type="button"
+                          onClick={() => removeRequiredVariable(variable)}
+                          className="ml-1 hover:text-destructive"
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Optional Variables */}
+              <div className="space-y-2">
+                <Label>Optional Variables</Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="e.g., couponCode"
+                    value={newOptionalVar}
+                    onChange={(e) => setNewOptionalVar(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && addOptionalVariable()}
+                  />
+                  <Button type="button" size="sm" onClick={addOptionalVariable}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                {formData.optionalVariables.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {formData.optionalVariables.map((variable) => (
+                      <Badge key={variable} variant="outline" className="gap-1">
+                        {variable}
+                        <button
+                          type="button"
+                          onClick={() => removeOptionalVariable(variable)}
+                          className="ml-1 hover:text-destructive"
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Example Payload */}
+              <div className="space-y-2">
+                <Label htmlFor="examplePayload">Example Payload (JSON)</Label>
+                <Textarea
+                  id="examplePayload"
+                  placeholder='{\n  "orderId": "12345",\n  "amount": 100.50,\n  "currency": "EUR"\n}'
+                  value={formData.examplePayload}
+                  onChange={(e) => setFormData({ ...formData, examplePayload: e.target.value })}
+                  rows={5}
+                  className="font-mono text-sm"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Provide an example payload for developers
+                </p>
+              </div>
+
+              {/* Developer Notes */}
+              <div className="space-y-2">
+                <Label htmlFor="developerNotes">Developer Notes (Optional)</Label>
+                <Textarea
+                  id="developerNotes"
+                  placeholder="Technical notes for developers using this event..."
+                  value={formData.developerNotes}
+                  onChange={(e) => setFormData({ ...formData, developerNotes: e.target.value })}
+                  rows={3}
+                />
+              </div>
             </div>
 
             <div className="flex items-center space-x-2">
@@ -995,8 +1177,8 @@ export default function NotificationEventsPage(): React.ReactElement {
             <div className="space-y-2">
               <Label htmlFor="edit-templateId">Email Template (Optional)</Label>
               <Select 
-                value={formData.templateId} 
-                onValueChange={(v) => setFormData({ ...formData, templateId: v })}
+                value={formData.templateId || undefined} 
+                onValueChange={(v) => setFormData({ ...formData, templateId: v === 'none' ? '' : v })}
                 disabled={templatesLoading || templates.length === 0}
               >
                 <SelectTrigger>
@@ -1007,7 +1189,7 @@ export default function NotificationEventsPage(): React.ReactElement {
                   } />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None (no email template)</SelectItem>
+                  <SelectItem value="none">None (no email template)</SelectItem>
                   {templates.map((template) => (
                     <SelectItem key={template.id} value={template.id}>
                       <div className="flex flex-col">
@@ -1023,6 +1205,108 @@ export default function NotificationEventsPage(): React.ReactElement {
               <p className="text-xs text-muted-foreground">
                 Choose an email template for this event. Templates are filtered by category.
               </p>
+            </div>
+
+            {/* Variables Section */}
+            <div className="space-y-4 pt-4 border-t">
+              <div>
+                <Label className="text-base font-semibold">Variables (Payload Schema)</Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Define variables that this event expects in its payload
+                </p>
+              </div>
+
+              {/* Required Variables */}
+              <div className="space-y-2">
+                <Label>Required Variables</Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="e.g., orderId"
+                    value={newRequiredVar}
+                    onChange={(e) => setNewRequiredVar(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && addRequiredVariable()}
+                  />
+                  <Button type="button" size="sm" onClick={addRequiredVariable}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                {formData.requiredVariables.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {formData.requiredVariables.map((variable) => (
+                      <Badge key={variable} variant="secondary" className="gap-1">
+                        {variable}
+                        <button
+                          type="button"
+                          onClick={() => removeRequiredVariable(variable)}
+                          className="ml-1 hover:text-destructive"
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Optional Variables */}
+              <div className="space-y-2">
+                <Label>Optional Variables</Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="e.g., couponCode"
+                    value={newOptionalVar}
+                    onChange={(e) => setNewOptionalVar(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && addOptionalVariable()}
+                  />
+                  <Button type="button" size="sm" onClick={addOptionalVariable}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                {formData.optionalVariables.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {formData.optionalVariables.map((variable) => (
+                      <Badge key={variable} variant="outline" className="gap-1">
+                        {variable}
+                        <button
+                          type="button"
+                          onClick={() => removeOptionalVariable(variable)}
+                          className="ml-1 hover:text-destructive"
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Example Payload */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-examplePayload">Example Payload (JSON)</Label>
+                <Textarea
+                  id="edit-examplePayload"
+                  placeholder='{\n  "orderId": "12345",\n  "amount": 100.50,\n  "currency": "EUR"\n}'
+                  value={formData.examplePayload}
+                  onChange={(e) => setFormData({ ...formData, examplePayload: e.target.value })}
+                  rows={5}
+                  className="font-mono text-sm"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Provide an example payload for developers
+                </p>
+              </div>
+
+              {/* Developer Notes */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-developerNotes">Developer Notes (Optional)</Label>
+                <Textarea
+                  id="edit-developerNotes"
+                  placeholder="Technical notes for developers using this event..."
+                  value={formData.developerNotes}
+                  onChange={(e) => setFormData({ ...formData, developerNotes: e.target.value })}
+                  rows={3}
+                />
+              </div>
             </div>
 
             <div className="flex items-center space-x-2">
