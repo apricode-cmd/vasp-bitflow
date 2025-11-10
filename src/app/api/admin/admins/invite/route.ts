@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     if (!validatedData.mfaChallengeId || !validatedData.mfaResponse) {
       // First call - request MFA challenge
       const challenge = await stepUpMfaService.requestChallenge(
-        session.adminId,
+        session.user.id, // ✅ Correct: session.user.id, not session.adminId
         'CREATE_ADMIN',
         'Admin',
         'invite',
@@ -109,9 +109,9 @@ export async function POST(request: NextRequest) {
         authMethod: 'PASSKEY', // Force Passkey authentication
         setupToken: hashedToken,
         setupTokenExpiry,
-        invitedBy: session.adminId,
+        invitedBy: session.user.id,
         invitedAt: new Date(),
-        createdBy: session.adminId,
+        createdBy: session.user.id,
       },
     });
 
@@ -122,9 +122,9 @@ export async function POST(request: NextRequest) {
     // Log to AdminAuditLog
     await prisma.adminAuditLog.create({
       data: {
-        adminId: session.adminId,
-        adminEmail: session.email,
-        adminRole: session.roleCode,
+        adminId: session.user.id,
+        adminEmail: session.user.email,
+        adminRole: session.user.role,
         action: 'ADMIN_INVITED',
         entityType: 'Admin',
         entityId: newAdmin.id,
