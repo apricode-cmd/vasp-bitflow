@@ -754,7 +754,7 @@ model EmailLog {
   userId      String?
   recipient   String
   subject     String
-  template    String
+  template    String      // Template key (e.g., 'ORDER_CREATED')
   status      EmailStatus @default(PENDING)
   sentAt      DateTime?
   deliveredAt DateTime?
@@ -762,11 +762,16 @@ model EmailLog {
   error       String?
   metadata    Json?
   createdAt   DateTime    @default(now())
-  user        User?       @relation(fields: [userId], references: [id])
+  
+  // Relations
+  user            User?          @relation(fields: [userId], references: [id])
+  emailTemplate   EmailTemplate? @relation("TemplateUsed", fields: [templateId], references: [id])
+  templateId      String?
 
   @@index([userId])
   @@index([status])
   @@index([template])
+  @@index([templateId])
   @@index([createdAt])
 }
 
@@ -2207,5 +2212,76 @@ enum NotificationFrequency {
   HOURLY      // Раз в час (digest)
   DAILY       // Раз в день (digest)
   WEEKLY      // Раз в неделю (digest)
+}
+
+// ============================================================================
+// EMAIL TEMPLATES (White-Label Support)
+// ============================================================================
+
+// Email Template - шаблоны писем с white-label поддержкой
+model EmailTemplate {
+  id          String   @id @default(cuid())
+  
+  // Organization (white-label) - null = global template
+  orgId       String?
+  
+  // Template identification
+  key         String   // 'ORDER_CREATED', 'KYC_APPROVED', etc.
+  name        String   // "Order Created Email"
+  description String?
+  category    EmailCategory
+  
+  // Content
+  subject     String   // "Your order #{{orderId}} has been created"
+  htmlContent String   @db.Text // HTML template with {{variables}}
+  textContent String?  @db.Text // Plain text fallback
+  
+  // Design
+  preheader   String?  // Email preview text
+  layout      String   @default("default") // 'default', 'minimal', 'marketing'
+  
+  // Variables & Metadata
+  variables   Json     // Required variables: ['orderId', 'amount', etc.]
+  metadata    Json?    // Custom metadata
+  
+  // Versioning
+  version     Int      @default(1)
+  isActive    Boolean  @default(true)
+  isDefault   Boolean  @default(false) // System default template
+  
+  // Status
+  status      TemplateStatus @default(DRAFT)
+  publishedAt DateTime?
+  publishedBy String?
+  
+  // Audit
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  emailLogs   EmailLog[] @relation("TemplateUsed")
+  
+  @@unique([orgId, key, version])
+  @@index([orgId, key])
+  @@index([category])
+  @@index([status])
+  @@index([isActive])
+}
+
+enum EmailCategory {
+  TRANSACTIONAL  // Order confirmations, receipts
+  NOTIFICATION   // Status updates, alerts
+  MARKETING      // Newsletters, promotions
+  SYSTEM         // Password reset, email verification
+  COMPLIANCE     // KYC updates, AML alerts
+}
+
+enum TemplateStatus {
+  DRAFT
+  REVIEW
+  PUBLISHED
+  ARCHIVED
 }
 

@@ -512,23 +512,60 @@ class NotificationService {
     error?: string;
   }> {
     try {
-      // TODO: Integrate with email provider (Resend)
-      // For now, log and return success
-      console.log('📧 Sending email:', {
-        to: notification.recipientEmail,
-        subject: notification.subject,
+      // Get recipient email
+      const recipientEmail = notification.recipientEmail || 
+        (notification.userId ? await this.getUserEmail(notification.userId) : null);
+
+      if (!recipientEmail) {
+        return {
+          success: false,
+          error: 'No recipient email available',
+        };
+      }
+
+      // Import email service dynamically
+      const { sendNotificationEmail } = await import('./email-notification.service');
+
+      // Send email
+      const result = await sendNotificationEmail({
+        to: recipientEmail,
+        subject: notification.subject || 'Notification',
         message: notification.message,
+        data: notification.data as any,
       });
 
-      return {
-        success: true,
-        messageId: `email_${Date.now()}`,
-      };
+      if (result.success) {
+        return {
+          success: true,
+          messageId: result.messageId,
+        };
+      } else {
+        return {
+          success: false,
+          error: result.error || 'Email send failed',
+        };
+      }
     } catch (error) {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Email send failed',
       };
+    }
+  }
+
+  /**
+   * Get user email by userId
+   */
+  private async getUserEmail(userId: string): Promise<string | null> {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true },
+      });
+      return user?.email || null;
+    } catch (error) {
+      console.error('❌ getUserEmail error:', error);
+      return null;
     }
   }
 
