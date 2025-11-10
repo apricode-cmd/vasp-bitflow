@@ -610,7 +610,7 @@ async function main(): Promise<void> {
       status: 'active',
       config: {
         apiKey: process.env.RESEND_API_KEY || 'test-key',
-        from: process.env.EMAIL_FROM || 'noreply@apricode.io'
+        fromEmail: process.env.EMAIL_FROM || 'noreply@apricode.io'
       }
     },
     {

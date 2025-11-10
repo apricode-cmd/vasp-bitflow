@@ -1,20 +1,17 @@
 /**
  * Email Notification Service
  * 
- * Sends emails using templates and Resend provider.
+ * Sends emails using templates and email provider from IntegrationFactory.
  * Integrates with:
  * - EmailTemplateService (white-label templates)
- * - Resend (email provider)
+ * - IntegrationFactory (email provider - Resend, SendGrid, etc.)
  * - EmailLog (tracking)
  */
 
-import { Resend } from 'resend';
-import { config } from '@/lib/config';
 import { prisma } from '@/lib/prisma';
 import { emailTemplateService } from './email-template.service';
+import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
 import type { TemplateVariables } from './email-template.service';
-
-const resend = new Resend(config.email.apiKey);
 
 export interface SendNotificationEmailOptions {
   to: string;
@@ -40,7 +37,14 @@ export async function sendNotificationEmail(
   const { to, subject, message, data, templateKey, orgId = null } = options;
 
   try {
-    // 1. Render template
+    // 1. Get email provider from IntegrationFactory
+    const emailProvider = await integrationFactory.getEmailProvider();
+
+    if (!emailProvider) {
+      throw new Error('No email provider configured');
+    }
+
+    // 2. Render template
     const rendered = await emailTemplateService.render({
       templateKey: templateKey || 'GENERIC',
       variables: {
@@ -50,16 +54,19 @@ export async function sendNotificationEmail(
       orgId,
     });
 
-    // 2. Send email via Resend
-    const response = await resend.emails.send({
-      from: config.email.from,
+    // 3. Send email via provider (Resend, SendGrid, etc.)
+    const result = await emailProvider.sendEmail({
       to,
       subject: subject || rendered.subject,
       html: rendered.html,
       text: rendered.text,
     });
 
-    // 3. Log email
+    if (!result.success) {
+      throw new Error(result.error || 'Email send failed');
+    }
+
+    // 4. Log email
     await prisma.emailLog.create({
       data: {
         userId: data.userId as string | undefined,
@@ -70,18 +77,19 @@ export async function sendNotificationEmail(
         status: 'SENT',
         sentAt: new Date(),
         metadata: {
-          resendId: response.data?.id,
+          messageId: result.messageId,
+          provider: emailProvider.providerId,
           templateKey,
           variables: data,
         },
       },
     });
 
-    console.log(`✅ Email sent to ${to}: ${subject || rendered.subject}`);
+    console.log(`✅ Email sent to ${to} via ${emailProvider.providerId}: ${subject || rendered.subject}`);
 
     return {
       success: true,
-      messageId: response.data?.id,
+      messageId: result.messageId,
     };
   } catch (error: any) {
     console.error('❌ sendNotificationEmail error:', error);
