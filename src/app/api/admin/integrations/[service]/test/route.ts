@@ -13,19 +13,17 @@ export async function POST(
   context: { params: Promise<{ service: string }> }
 ): Promise<NextResponse> {
   try {
-    // Check admin authentication
-    const authResult = await requireAdminRole('ADMIN');
-    if (authResult.error) {
-      return authResult.error;
+    // Check admin authentication (custom JWT-based auth)
+    console.log('🔐 Checking admin auth for integration test...');
+    const session = await requireAdminRole('ADMIN');
+    
+    // If session is NextResponse, it's an error (401/403)
+    if (session instanceof NextResponse) {
+      console.error('❌ Admin auth failed');
+      return session;
     }
 
-    const session = authResult.session;
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'User ID not found in session' },
-        { status: 401 }
-      );
-    }
+    console.log('✅ Admin auth passed, user:', session.user.email, 'id:', session.user.id);
 
     const params = await context.params;
     const { service } = params;
