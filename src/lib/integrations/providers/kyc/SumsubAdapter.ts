@@ -130,31 +130,31 @@ export class SumsubAdapter implements IKycProvider {
         };
       }
 
-      // Test with GET /resources/applicants/-;externalUserId=test-connection
-      // This will return 404 (applicant not found) but validates auth
-      const externalUserId = 'test-connection-' + Date.now();
-      const path = `/resources/applicants/-;externalUserId=${encodeURIComponent(externalUserId)}`;
+      // Simple test: GET /resources/sdkIntegrations/levels
+      // This endpoint returns available KYC levels and validates auth
+      const path = '/resources/sdkIntegrations/levels';
       
       const { headers } = this.buildRequest('GET', path);
 
-      console.log('🧪 Testing Sumsub connection...');
+      console.log('🧪 Testing Sumsub connection with levels endpoint...');
 
       const response = await fetch(this.baseUrl + path, {
         method: 'GET',
         headers
       });
 
-      // 404 is OK (applicant not found, but auth works!)
-      // 200 is also OK (somehow applicant exists)
-      if (response.ok || response.status === 404) {
+      // 200 = success, credentials are valid
+      if (response.ok) {
+        const data = await response.json();
         console.log('✅ Sumsub connection test passed');
         return {
           success: true,
-          message: 'Sumsub connection successful - API credentials are valid',
+          message: `Sumsub connection successful - Found ${data.list?.length || 0} KYC levels`,
           timestamp: new Date(),
           metadata: {
             status: response.status,
-            levelName: this.config.levelName
+            levelName: this.config.levelName,
+            availableLevels: data.list?.length || 0
           }
         };
       }
