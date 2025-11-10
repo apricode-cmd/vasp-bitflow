@@ -915,6 +915,199 @@ async function main(): Promise<void> {
   await seedKycFormFields();
   console.log(`   - 37+ KYC Form Fields`);
   
+  // NEW: Seed Notification Events
+  console.log('\n📬 Seeding notification events...');
+  const notificationEvents = [
+    // ORDER EVENTS
+    {
+      eventKey: 'ORDER_CREATED',
+      name: 'Order Created',
+      description: 'New order has been created',
+      category: 'ORDER' as const,
+      channels: ['EMAIL', 'IN_APP'] as const,
+      priority: 'NORMAL' as const,
+      isSystem: true,
+      isActive: true,
+    },
+    {
+      eventKey: 'ORDER_PAYMENT_RECEIVED',
+      name: 'Payment Received',
+      description: 'Payment for order has been received',
+      category: 'ORDER' as const,
+      channels: ['EMAIL', 'IN_APP'] as const,
+      priority: 'HIGH' as const,
+      isSystem: true,
+      isActive: true,
+    },
+    {
+      eventKey: 'ORDER_COMPLETED',
+      name: 'Order Completed',
+      description: 'Order has been completed successfully',
+      category: 'ORDER' as const,
+      channels: ['EMAIL', 'IN_APP'] as const,
+      priority: 'HIGH' as const,
+      isSystem: true,
+      isActive: true,
+    },
+    {
+      eventKey: 'ORDER_CANCELLED',
+      name: 'Order Cancelled',
+      description: 'Order has been cancelled',
+      category: 'ORDER' as const,
+      channels: ['EMAIL', 'IN_APP'] as const,
+      priority: 'NORMAL' as const,
+      isSystem: true,
+      isActive: true,
+    },
+    
+    // KYC EVENTS
+    {
+      eventKey: 'KYC_SUBMITTED',
+      name: 'KYC Submitted',
+      description: 'KYC verification has been submitted',
+      category: 'KYC' as const,
+      channels: ['EMAIL', 'IN_APP'] as const,
+      priority: 'NORMAL' as const,
+      isSystem: true,
+      isActive: true,
+    },
+    {
+      eventKey: 'KYC_APPROVED',
+      name: 'KYC Approved',
+      description: 'KYC verification has been approved',
+      category: 'KYC' as const,
+      channels: ['EMAIL', 'IN_APP'] as const,
+      priority: 'HIGH' as const,
+      isSystem: true,
+      isActive: true,
+    },
+    {
+      eventKey: 'KYC_REJECTED',
+      name: 'KYC Rejected',
+      description: 'KYC verification has been rejected',
+      category: 'KYC' as const,
+      channels: ['EMAIL', 'IN_APP'] as const,
+      priority: 'HIGH' as const,
+      isSystem: true,
+      isActive: true,
+    },
+    {
+      eventKey: 'KYC_DOCUMENTS_REQUIRED',
+      name: 'KYC Documents Required',
+      description: 'Additional documents are required for KYC',
+      category: 'KYC' as const,
+      channels: ['EMAIL', 'IN_APP'] as const,
+      priority: 'HIGH' as const,
+      isSystem: true,
+      isActive: true,
+    },
+    
+    // PAYMENT EVENTS
+    {
+      eventKey: 'PAYMENT_PENDING',
+      name: 'Payment Pending',
+      description: 'Payment is pending confirmation',
+      category: 'PAYMENT' as const,
+      channels: ['EMAIL', 'IN_APP'] as const,
+      priority: 'NORMAL' as const,
+      isSystem: true,
+      isActive: true,
+    },
+    {
+      eventKey: 'PAYMENT_CONFIRMED',
+      name: 'Payment Confirmed',
+      description: 'Payment has been confirmed',
+      category: 'PAYMENT' as const,
+      channels: ['EMAIL', 'IN_APP'] as const,
+      priority: 'HIGH' as const,
+      isSystem: true,
+      isActive: true,
+    },
+    {
+      eventKey: 'PAYMENT_FAILED',
+      name: 'Payment Failed',
+      description: 'Payment has failed',
+      category: 'PAYMENT' as const,
+      channels: ['EMAIL', 'IN_APP'] as const,
+      priority: 'URGENT' as const,
+      isSystem: true,
+      isActive: true,
+    },
+    
+    // SECURITY EVENTS
+    {
+      eventKey: 'SECURITY_LOGIN',
+      name: 'New Login',
+      description: 'New login detected from a new device or location',
+      category: 'SECURITY' as const,
+      channels: ['EMAIL', 'IN_APP'] as const,
+      priority: 'HIGH' as const,
+      isSystem: true,
+      isActive: true,
+    },
+    {
+      eventKey: 'SECURITY_PASSWORD_CHANGED',
+      name: 'Password Changed',
+      description: 'Password has been changed',
+      category: 'SECURITY' as const,
+      channels: ['EMAIL', 'IN_APP'] as const,
+      priority: 'URGENT' as const,
+      isSystem: true,
+      isActive: true,
+    },
+    {
+      eventKey: 'SECURITY_2FA_ENABLED',
+      name: '2FA Enabled',
+      description: 'Two-factor authentication has been enabled',
+      category: 'SECURITY' as const,
+      channels: ['EMAIL', 'IN_APP'] as const,
+      priority: 'HIGH' as const,
+      isSystem: true,
+      isActive: true,
+    },
+    {
+      eventKey: 'SECURITY_SUSPICIOUS_ACTIVITY',
+      name: 'Suspicious Activity',
+      description: 'Suspicious activity detected on your account',
+      category: 'SECURITY' as const,
+      channels: ['EMAIL', 'IN_APP', 'SMS'] as const,
+      priority: 'URGENT' as const,
+      isSystem: true,
+      isActive: true,
+    },
+    
+    // SYSTEM EVENTS
+    {
+      eventKey: 'SYSTEM_MAINTENANCE',
+      name: 'System Maintenance',
+      description: 'System maintenance scheduled',
+      category: 'SYSTEM' as const,
+      channels: ['EMAIL', 'IN_APP'] as const,
+      priority: 'NORMAL' as const,
+      isSystem: true,
+      isActive: true,
+    },
+    {
+      eventKey: 'SYSTEM_UPDATE',
+      name: 'System Update',
+      description: 'New system features or updates available',
+      category: 'SYSTEM' as const,
+      channels: ['IN_APP'] as const,
+      priority: 'LOW' as const,
+      isSystem: true,
+      isActive: true,
+    },
+  ];
+
+  for (const event of notificationEvents) {
+    await prisma.notificationEvent.upsert({
+      where: { eventKey: event.eventKey },
+      update: {},
+      create: event,
+    });
+  }
+  console.log(`  ✓ ${notificationEvents.length} notification events created\n`);
+  
   console.log('\n✅ Database seeding completed successfully!\n');
 }
 

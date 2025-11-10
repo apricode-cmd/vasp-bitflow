@@ -1,141 +1,58 @@
 /**
- * Notifications API Route
+ * Notifications API
  * 
- * GET /api/notifications - Get user notifications (from orders, KYC, etc.)
+ * GET: Get user's notifications
  */
 
-import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth-utils';
-import { prisma } from '@/lib/prisma';
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/auth';
+import { notificationService } from '@/lib/services/notification.service';
 
-interface Notification {
-  id: string;
-  type: 'ORDER' | 'KYC' | 'PAYMENT' | 'SYSTEM';
-  title: string;
-  message: string;
-  isRead: boolean;
-  createdAt: string;
-  link?: string;
-}
-
-export async function GET(): Promise<NextResponse> {
+export async function GET(request: NextRequest) {
   try {
-    const { error, session } = await requireAuth();
-    if (error) return error;
-
-    const userId = session.user.id;
-    const notifications: Notification[] = [];
-
-    // Get recent orders
-    const recentOrders = await prisma.order.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 10,
-      include: {
-        currency: { select: { symbol: true } },
-        fiatCurrency: { select: { symbol: true } }
-      }
-    });
-
-    // Convert orders to notifications
-    for (const order of recentOrders) {
-      let title = '';
-      let message = '';
-      let type: Notification['type'] = 'ORDER';
-
-      switch (order.status) {
-        case 'PENDING':
-          title = 'Order Created';
-          message = `Your order for ${order.cryptoAmount} ${order.currency.symbol} is awaiting payment`;
-          break;
-        case 'PAYMENT_PENDING':
-          title = 'Payment Received';
-          message = `Payment proof received for order ${order.paymentReference}. Awaiting verification`;
-          type = 'PAYMENT';
-          break;
-        case 'PROCESSING':
-          title = 'Order Processing';
-          message = `Your order ${order.paymentReference} is being processed`;
-          break;
-        case 'COMPLETED':
-          title = 'Order Completed';
-          message = `${order.cryptoAmount} ${order.currency.symbol} has been sent to your wallet`;
-          break;
-        case 'EXPIRED':
-          title = 'Order Expired';
-          message = `Order ${order.paymentReference} has expired`;
-          break;
-        case 'CANCELLED':
-          title = 'Order Cancelled';
-          message = `Order ${order.paymentReference} has been cancelled`;
-          break;
-        default:
-          continue;
-      }
-
-      notifications.push({
-        id: order.id,
-        type,
-        title,
-        message,
-        isRead: false, // All notifications are unread for now (no read tracking without DB)
-        createdAt: order.updatedAt.toISOString(),
-        link: `/orders/${order.id}`
-      });
+    const session = await auth();
+    
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
     }
 
-    // Get KYC session status
-    const kycSession = await prisma.kycSession.findUnique({
-      where: { userId }
-    });
+    const { searchParams } = new URL(request.url);
+    const limit = parseInt(searchParams.get('limit') || '50');
+    const offset = parseInt(searchParams.get('offset') || '0');
+    const eventKey = searchParams.get('eventKey') || undefined;
+    const isRead = searchParams.get('isRead') === 'true' ? true : 
+                   searchParams.get('isRead') === 'false' ? false : undefined;
 
-    if (kycSession) {
-      let title = '';
-      let message = '';
-
-      switch (kycSession.status) {
-        case 'PENDING':
-          title = 'KYC Verification Pending';
-          message = 'Your KYC verification is being reviewed';
-          break;
-        case 'APPROVED':
-          title = 'KYC Approved';
-          message = 'Your KYC verification has been approved. You can now trade!';
-          break;
-        case 'REJECTED':
-          title = 'KYC Rejected';
-          message = 'Your KYC verification was rejected. Please contact support';
-          break;
+    const notifications = await notificationService.getNotificationHistory(
+      session.user.id,
+      {
+        limit,
+        offset,
+        eventKey,
+        isRead,
       }
-
-      if (title) {
-        notifications.push({
-          id: kycSession.id,
-          type: 'KYC',
-          title,
-          message,
-          isRead: false,
-          createdAt: kycSession.updatedAt.toISOString(),
-          link: '/kyc'
-        });
-      }
-    }
-
-    // Sort by date (newest first)
-    notifications.sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
+
+    const unreadCount = await notificationService.getUnreadCount(session.user.id);
 
     return NextResponse.json({
       success: true,
-      notifications
+      notifications,
+      unreadCount,
+      pagination: {
+        limit,
+        offset,
+        hasMore: notifications.length === limit,
+      },
     });
   } catch (error) {
+    console.error('❌ GET /api/notifications error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to load notifications' },
+      { error: 'Failed to fetch notifications' },
       { status: 500 }
     );
   }
 }
-
-

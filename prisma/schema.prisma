@@ -41,6 +41,11 @@ model User {
   twoFactorAuth        TwoFactorAuth?
   kycLevelData         UserKycLevel?       @relation("UserKycLevelRelation")
   userWallets          UserWallet[]
+  
+  // Notification System
+  notificationQueue         NotificationQueue[]
+  notificationHistory       NotificationHistory[]
+  notificationSubscriptions NotificationSubscription[]
 
   @@index([email])
   @@index([role])
@@ -1990,5 +1995,217 @@ model OneTimeAuthToken {
   @@index([token, expiresAt])
   @@index([adminId])
   @@map("OneTimeAuthToken")
+}
+
+// ============================================================================
+// NOTIFICATION SYSTEM
+// ============================================================================
+
+// Notification Events - система событий для уведомлений
+model NotificationEvent {
+  id          String   @id @default(cuid())
+  eventKey    String   @unique // 'ORDER_CREATED', 'KYC_APPROVED', etc.
+  name        String   // "Order Created"
+  description String?
+  category    EventCategory // ORDER, KYC, PAYMENT, SECURITY, SYSTEM
+  
+  // Channels - какие каналы поддерживает это событие
+  channels    NotificationChannel[] // ['EMAIL', 'IN_APP', 'SMS']
+  
+  // Priority
+  priority    EventPriority @default(NORMAL)
+  
+  // Status
+  isActive    Boolean  @default(true)
+  isSystem    Boolean  @default(false) // System events cannot be deleted
+  
+  // Template (optional - для будущей интеграции с шаблонами)
+  templateKey String?
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  subscriptions NotificationSubscription[]
+  queue         NotificationQueue[]
+  
+  @@index([eventKey])
+  @@index([category])
+  @@index([isActive])
+}
+
+// Notification Queue - очередь для асинхронной отправки
+model NotificationQueue {
+  id            String   @id @default(cuid())
+  
+  // Event
+  eventKey      String
+  event         NotificationEvent @relation(fields: [eventKey], references: [eventKey])
+  
+  // Recipient
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipientEmail String? // For non-users or explicit email
+  recipientPhone String? // For SMS
+  
+  // Channel
+  channel       NotificationChannel
+  
+  // Content
+  subject       String?  // For email
+  message       String   @db.Text
+  data          Json     // Event data for rendering
+  
+  // Template
+  templateKey   String?
+  
+  // Status
+  status        QueueStatus @default(PENDING)
+  attempts      Int         @default(0)
+  maxAttempts   Int         @default(3)
+  
+  // Scheduling
+  scheduledFor  DateTime    @default(now())
+  processedAt   DateTime?
+  sentAt        DateTime?
+  failedAt      DateTime?
+  
+  // Result
+  messageId     String?     // Provider's message ID
+  error         String?
+  errorDetails  Json?
+  
+  // Provider
+  providerId    String?     // Which provider was used (resend, twilio, etc.)
+  
+  // Metadata
+  metadata      Json?
+  
+  // Timestamps
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  @@index([status, scheduledFor])
+  @@index([userId])
+  @@index([channel])
+  @@index([eventKey])
+  @@index([createdAt])
+}
+
+// Notification History - история уведомлений (для in-app)
+model NotificationHistory {
+  id          String   @id @default(cuid())
+  
+  // User
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Event
+  eventKey    String
+  
+  // Channel
+  channel     NotificationChannel
+  
+  // Content
+  title       String
+  message     String   @db.Text
+  data        Json?
+  
+  // Status
+  isRead      Boolean  @default(false)
+  readAt      DateTime?
+  
+  // Actions
+  isClicked   Boolean  @default(false)
+  clickedAt   DateTime?
+  
+  // Link
+  actionUrl   String?
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@index([eventKey])
+}
+
+// Notification Subscription - настройки пользователя
+model NotificationSubscription {
+  id          String   @id @default(cuid())
+  
+  // User
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Event
+  eventKey    String
+  event       NotificationEvent @relation(fields: [eventKey], references: [eventKey])
+  
+  // Channels (какие каналы включены для этого события)
+  emailEnabled   Boolean @default(true)
+  inAppEnabled   Boolean @default(true)
+  smsEnabled     Boolean @default(false)
+  pushEnabled    Boolean @default(false)
+  
+  // Preferences
+  frequency   NotificationFrequency @default(INSTANT)
+  quietHours  Json? // { start: "22:00", end: "08:00", timezone: "Europe/Warsaw" }
+  
+  // Status
+  isActive    Boolean  @default(true)
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([userId, eventKey])
+  @@index([userId])
+  @@index([eventKey])
+}
+
+// ============================================================================
+// ENUMS FOR NOTIFICATION SYSTEM
+// ============================================================================
+
+enum EventCategory {
+  ORDER
+  KYC
+  PAYMENT
+  SECURITY
+  SYSTEM
+  ADMIN
+  MARKETING
+}
+
+enum EventPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum NotificationChannel {
+  EMAIL
+  IN_APP
+  SMS
+  PUSH
+}
+
+enum QueueStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+  CANCELLED
+  SKIPPED  // User unsubscribed or quiet hours
+}
+
+enum NotificationFrequency {
+  INSTANT     // Сразу
+  HOURLY      // Раз в час (digest)
+  DAILY       // Раз в день (digest)
+  WEEKLY      // Раз в неделю (digest)
 }
 

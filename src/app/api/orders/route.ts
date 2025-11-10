@@ -14,6 +14,7 @@ import { calculateOrderTotal, validateOrderLimits } from '@/lib/utils/order-calc
 import { orderLimitService } from '@/lib/services/order-limit.service';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 import { userActivityService } from '@/lib/services/user-activity.service';
+import { eventEmitter } from '@/lib/services/event-emitter.service';
 import { z } from 'zod';
 
 /**
@@ -164,7 +165,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     );
 
-    // TODO: Send email notification with bank details
+    // Emit ORDER_CREATED event for notifications
+    await eventEmitter.emit('ORDER_CREATED', {
+      userId,
+      orderId: order.id,
+      amount: order.totalFiat,
+      currency: order.fiatCurrencyCode,
+    });
 
     return NextResponse.json(order, { status: 201 });
   } catch (error) {

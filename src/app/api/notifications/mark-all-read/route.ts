@@ -1,17 +1,14 @@
 /**
- * Mark Notification as Read API
+ * Mark All Notifications as Read API
  * 
- * POST: Mark notification as read
+ * POST: Mark all notifications as read
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { notificationService } from '@/lib/services/notification.service';
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest) {
   try {
     const session = await auth();
     
@@ -22,17 +19,18 @@ export async function POST(
       );
     }
 
-    await notificationService.markAsRead(params.id, session.user.id);
+    await notificationService.markAllAsRead(session.user.id);
 
     return NextResponse.json({
       success: true,
-      message: 'Notification marked as read',
+      message: 'All notifications marked as read',
     });
   } catch (error) {
-    console.error('❌ POST /api/notifications/[id]/read error:', error);
+    console.error('❌ POST /api/notifications/mark-all-read error:', error);
     return NextResponse.json(
-      { error: 'Failed to mark notification as read' },
+      { error: 'Failed to mark all notifications as read' },
       { status: 500 }
     );
   }
 }
+
