@@ -387,7 +387,7 @@ export function AdminManagementClient({
 
   // Get status badge
   const getStatusBadge = (admin: Admin) => {
-    if (admin.status === 'TERMINATED' || !admin.isActive) {
+    if (admin.status === 'TERMINATED') {
       return (
         <Badge variant="destructive" className="gap-1">
           <XCircle className="w-3 h-3" />
@@ -400,6 +400,14 @@ export function AdminManagementClient({
         <Badge variant="secondary" className="gap-1">
           <Ban className="w-3 h-3" />
           Suspended
+        </Badge>
+      );
+    }
+    if (admin.status === 'INVITED') {
+      return (
+        <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200 gap-1">
+          <Mail className="w-3 h-3" />
+          Invited
         </Badge>
       );
     }
@@ -448,7 +456,7 @@ export function AdminManagementClient({
         {/* Administrators Tab */}
         <TabsContent value="admins" className="space-y-6">
           {/* Stats */}
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">Total Admins</CardTitle>
@@ -469,6 +477,16 @@ export function AdminManagementClient({
         </Card>
         <Card>
           <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Invited</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">
+              {admins.filter(a => a.status === 'INVITED').length}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">Suspended</CardTitle>
           </CardHeader>
           <CardContent>
@@ -483,7 +501,7 @@ export function AdminManagementClient({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              {admins.filter(a => a.status === 'TERMINATED' || !a.isActive).length}
+              {admins.filter(a => a.status === 'TERMINATED').length}
             </div>
           </CardContent>
         </Card>

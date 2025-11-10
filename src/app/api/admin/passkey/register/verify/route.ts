@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Allow SUSPENDED admins with setupToken (invite flow)
+      // Allow INVITED admins with setupToken (invite flow)
       // Block TERMINATED admins
       if (admin.status === 'TERMINATED') {
         console.error('❌ Admin is terminated:', email);
@@ -62,11 +62,11 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // For first-time setup, admin can be SUSPENDED with setupToken
-      if (!admin.isActive && !admin.setupToken) {
-        console.error('❌ Admin is inactive and has no setup token:', email);
+      // For first-time setup, admin must be INVITED with setupToken
+      if (admin.status !== 'INVITED' && !admin.isActive && !admin.setupToken) {
+        console.error('❌ Admin is not invited or has no setup token:', email);
         return NextResponse.json(
-          { error: 'Admin account is inactive' },
+          { error: 'Admin account is not in invited status' },
           { status: 403 }
         );
       }

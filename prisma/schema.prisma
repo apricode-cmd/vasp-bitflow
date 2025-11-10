@@ -1590,6 +1590,7 @@ enum AdminRole {
 }
 
 enum AdminStatus {
+  INVITED // Приглашён, ожидает регистрации Passkey (15 минут)
   ACTIVE // Активный
   SUSPENDED // Приостановлен (временно)
   TERMINATED // Уволен (permanent)

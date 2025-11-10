@@ -88,7 +88,8 @@ export async function POST(request: NextRequest) {
     // Token is valid
     return NextResponse.json({
       valid: true,
-      email: admin.email
+      email: admin.email,
+      expiresAt: admin.setupTokenExpiry?.toISOString()
     });
 
   } catch (error) {

@@ -24,6 +24,8 @@ function SetupPasskeyContent() {
   const [isRegistered, setIsRegistered] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isValidating, setIsValidating] = useState(true);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  const [timeRemaining, setTimeRemaining] = useState<string>('');
 
   // Validate token on mount
   useEffect(() => {
@@ -53,6 +55,11 @@ function SetupPasskeyContent() {
             return;
           }
           setError(result.error || 'Invalid setup link');
+        } else {
+          // Set expiration time
+          if (result.expiresAt) {
+            setExpiresAt(result.expiresAt);
+          }
         }
 
         setIsValidating(false);
@@ -65,6 +72,32 @@ function SetupPasskeyContent() {
 
     validateToken();
   }, [email, token]);
+
+  // Update time remaining every second
+  useEffect(() => {
+    if (!expiresAt) return;
+
+    const updateTimeRemaining = () => {
+      const now = new Date();
+      const expires = new Date(expiresAt);
+      const diff = expires.getTime() - now.getTime();
+
+      if (diff <= 0) {
+        setTimeRemaining('Expired');
+        setError('Setup link has expired. Please request a new invitation.');
+        return;
+      }
+
+      const minutes = Math.floor(diff / 60000);
+      const seconds = Math.floor((diff % 60000) / 1000);
+      setTimeRemaining(`${minutes}:${seconds.toString().padStart(2, '0')}`);
+    };
+
+    updateTimeRemaining();
+    const interval = setInterval(updateTimeRemaining, 1000);
+
+    return () => clearInterval(interval);
+  }, [expiresAt]);
 
   const handleRegisterPasskey = async () => {
     if (!email) return;
@@ -211,8 +244,13 @@ function SetupPasskeyContent() {
         <Card className="border-blue-500/20 bg-slate-900/80 backdrop-blur">
           <CardHeader>
             <CardTitle className="text-white">Register Your Device</CardTitle>
-            <CardDescription className="text-blue-200/60">
-              Email: <span className="font-semibold text-blue-300">{email}</span>
+            <CardDescription className="text-blue-200/60 space-y-1">
+              <div>Email: <span className="font-semibold text-blue-300">{email}</span></div>
+              {timeRemaining && (
+                <div className="text-xs">
+                  Link expires in: <span className={`font-mono font-semibold ${timeRemaining === 'Expired' ? 'text-red-400' : 'text-amber-400'}`}>{timeRemaining}</span>
+                </div>
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

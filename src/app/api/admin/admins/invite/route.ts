@@ -89,11 +89,11 @@ export async function POST(request: NextRequest) {
     const setupToken = crypto.randomBytes(64).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(setupToken).digest('hex');
 
-    // Token expires in 7 days
+    // Token expires in 15 minutes (security requirement)
     const setupTokenExpiry = new Date();
-    setupTokenExpiry.setDate(setupTokenExpiry.getDate() + 7);
+    setupTokenExpiry.setMinutes(setupTokenExpiry.getMinutes() + 15);
 
-    // Create admin with SUSPENDED status (until Passkey setup)
+    // Create admin with INVITED status (awaiting Passkey registration)
     const newAdmin = await prisma.admin.create({
       data: {
         email: validatedData.email,
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
         department: validatedData.department,
         role: validatedData.role,
         roleCode: validatedData.role,
-        status: 'SUSPENDED', // Will be activated after Passkey setup
+        status: 'INVITED', // ✅ Invited admin awaiting Passkey registration (15 min)
         isActive: false,
         authMethod: 'PASSKEY', // Force Passkey authentication
         setupToken: hashedToken,

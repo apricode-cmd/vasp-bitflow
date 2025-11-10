@@ -144,10 +144,23 @@ export async function verifyPasskeyRegistration(
 
     console.log('✅ Credential saved:', credential.id);
 
-    // Update admin's 2FA settings
+    // Get admin to check if this is first-time setup
+    const admin = await prisma.admin.findUnique({
+      where: { id: adminId },
+      select: { status: true, setupToken: true }
+    });
+
+    // Update admin's 2FA settings and activate if INVITED
     await prisma.admin.update({
       where: { id: adminId },
       data: {
+        // Activate admin if they were INVITED (first-time setup)
+        ...(admin?.status === 'INVITED' && admin?.setupToken ? {
+          status: 'ACTIVE',
+          isActive: true,
+          setupToken: null, // Clear setup token after successful registration
+          setupTokenExpiry: null,
+        } : {}),
         twoFactorAuth: {
           upsert: {
             create: {
@@ -162,6 +175,8 @@ export async function verifyPasskeyRegistration(
         },
       },
     });
+
+    console.log('✅ Admin activated and 2FA configured:', adminId);
 
     // Clean up challenge
     await prisma.mfaChallenge.delete({
