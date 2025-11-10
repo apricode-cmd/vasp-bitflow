@@ -530,6 +530,24 @@ model AdminAuditLog {
   @@index([severity])
   @@index([isReviewable])
   @@index([mfaEventId])
+  
+  // Relations for read status
+  readBy AdminNotificationRead[]
+}
+
+// Admin Notification Read Status
+model AdminNotificationRead {
+  id             String   @id @default(cuid())
+  adminId        String
+  auditLogId     String
+  readAt         DateTime @default(now())
+  
+  // Relations
+  admin          Admin           @relation("AdminNotificationReads", fields: [adminId], references: [id], onDelete: Cascade)
+  auditLog       AdminAuditLog   @relation(fields: [auditLogId], references: [id], onDelete: Cascade)
+  
+  @@unique([adminId, auditLogId])
+  @@index([adminId, readAt])
 }
 
 // User Audit Log - только действия клиентов
@@ -1693,6 +1711,7 @@ model Admin {
   auditLogs           AdminAuditLog[]      @relation("AdminAuditLogs") // NEW: отдельная таблица для админов
   auditLogsCreated    AuditLog[]           // LEGACY: старая таблица
   mfaEvents           MfaEvent[]           @relation("AdminMfaEvents")
+  notificationReads   AdminNotificationRead[] @relation("AdminNotificationReads") // Read status for notifications
   
   subordinates        Admin[]              @relation("ManagerSubordinates") // Подчинённые
   manager             Admin?               @relation("ManagerSubordinates", fields: [managerId], references: [id])

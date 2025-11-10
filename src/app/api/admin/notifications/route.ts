@@ -42,13 +42,27 @@ export async function GET(request: NextRequest) {
           adminRole: true,
           context: true,
           createdAt: true,
+          readBy: {
+            where: {
+              adminId: session.user.id
+            },
+            select: {
+              readAt: true
+            }
+          }
         }
       }),
+      // Count unread notifications (not in readBy for current admin)
       prisma.adminAuditLog.count({
         where: {
           severity: { in: ['WARNING', 'CRITICAL'] },
           createdAt: {
             gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Last 24 hours
+          },
+          readBy: {
+            none: {
+              adminId: session.user.id
+            }
           }
         }
       })
@@ -65,7 +79,9 @@ export async function GET(request: NextRequest) {
       adminEmail: log.adminEmail,
       adminRole: log.adminRole,
       createdAt: log.createdAt,
-      metadata: log.context
+      metadata: log.context,
+      isRead: log.readBy.length > 0,
+      readAt: log.readBy[0]?.readAt || null
     }));
 
     return NextResponse.json({
