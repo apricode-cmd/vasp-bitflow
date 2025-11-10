@@ -9,8 +9,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { AdminSidebar } from '@/components/layouts/AdminSidebar';
 import { AdminFooter } from '@/components/layouts/AdminFooter';
-import { NotificationBell } from '@/components/admin/NotificationBell';
-import { ThemeToggle } from '@/components/ui/theme-toggle';
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -64,18 +62,8 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps): React.R
           <ResizableHandle className="w-px bg-transparent hover:bg-primary/30 transition-all duration-200 group relative">
             <div className="absolute inset-y-0 -left-px w-[3px] bg-gradient-to-r from-transparent via-border/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           </ResizableHandle>
-          <ResizablePanel defaultSize={82} minSize={50}> {/* Changed from 91 to 82 (100-18) */}
+          <ResizablePanel defaultSize={82} minSize={50}>
             <div className="flex flex-col h-full overflow-auto">
-              {/* Header with Notifications */}
-              <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <div className="container mx-auto px-6 py-3 max-w-[1600px]">
-                  <div className="flex items-center justify-end gap-2">
-                    <ThemeToggle />
-                    <NotificationBell />
-                  </div>
-                </div>
-              </header>
-              
               <main className="flex-1">
                 <div className="container mx-auto p-6 max-w-[1600px]">
                   {children}
@@ -117,18 +105,8 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps): React.R
         </ResizableHandle>
 
         {/* Main Content Panel */}
-        <ResizablePanel defaultSize={82} minSize={50}> {/* Changed from 100 - sidebarSize to static 82 */}
+        <ResizablePanel defaultSize={82} minSize={50}>
           <div className="flex flex-col h-full overflow-auto">
-            {/* Header with Notifications */}
-            <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-              <div className="container mx-auto px-6 py-3 max-w-[1600px]">
-                <div className="flex items-center justify-end gap-2">
-                  <ThemeToggle />
-                  <NotificationBell />
-                </div>
-              </div>
-            </header>
-            
             <main className="flex-1">
               <div className="container mx-auto p-6 max-w-[1600px]">
                 {children}

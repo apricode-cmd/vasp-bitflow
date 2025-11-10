@@ -71,12 +71,14 @@ export async function GET(request: NextRequest) {
     // Transform audit logs to notification format
     const formattedNotifications = notifications.map(log => ({
       id: log.id,
-      eventKey: log.action,
+      action: log.action,
+      entityType: log.entityType,
+      entityId: log.entityId,
       title: formatNotificationTitle(log.action, log.entityType),
       message: formatNotificationMessage(log),
       severity: log.severity,
       actionUrl: getActionUrl(log.entityType, log.entityId),
-      adminEmail: log.adminEmail,
+      performedBy: log.adminEmail ? { email: log.adminEmail } : null,
       adminRole: log.adminRole,
       createdAt: log.createdAt,
       metadata: log.context,

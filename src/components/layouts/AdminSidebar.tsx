@@ -32,6 +32,7 @@ import {
 import { ApricodeLogo } from '@/components/icons/ApricodeLogo';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { UserMenu } from '@/components/layouts/UserMenu';
+import { NotificationBell } from '@/components/admin/NotificationBell';
 
 interface NavigationItem {
   name: string;
@@ -374,16 +375,19 @@ export function AdminSidebar(): JSX.Element {
     )}>
       {/* Logo/Header */}
       <div className="p-4 border-b border-border/50">
-        <div className="flex items-center gap-2">
-          <div className="h-8 w-8 flex items-center justify-center">
-            <ApricodeLogo className="text-primary w-full h-full" />
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 flex-1">
+            <div className="h-8 w-8 flex items-center justify-center">
+              <ApricodeLogo className="text-primary w-full h-full" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-primary">
+                CryptoExchange
+              </h2>
+              <p className="text-xs text-muted-foreground">Admin CRM</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-base font-bold text-primary">
-              CryptoExchange
-            </h2>
-            <p className="text-xs text-muted-foreground">Admin CRM</p>
-          </div>
+          <NotificationBell />
         </div>
       </div>
 

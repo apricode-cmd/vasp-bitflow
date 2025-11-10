@@ -30,7 +30,7 @@ import { formatDistanceToNow } from 'date-fns';
 
 interface AdminNotification {
   id: string;
-  eventKey: string;
+  action: string;
   title: string;
   message: string;
   severity: 'INFO' | 'WARNING' | 'CRITICAL';
@@ -98,18 +98,18 @@ export default function AdminNotificationsPage(): React.ReactElement {
   };
 
   // Get notification icon
-  const getNotificationIcon = (eventKey: string) => {
-    if (eventKey.includes('ADMIN_')) {
+  const getNotificationIcon = (action: string) => {
+    if (action.includes('ADMIN_')) {
       return <Shield className="h-5 w-5" />;
-    } else if (eventKey.includes('ORDER_')) {
+    } else if (action.includes('ORDER_')) {
       return <ShoppingCart className="h-5 w-5" />;
-    } else if (eventKey.includes('USER_')) {
+    } else if (action.includes('USER_')) {
       return <User className="h-5 w-5" />;
-    } else if (eventKey.includes('API_KEY_')) {
+    } else if (action.includes('API_KEY_')) {
       return <Key className="h-5 w-5" />;
-    } else if (eventKey.includes('PAYMENT_')) {
+    } else if (action.includes('PAYMENT_')) {
       return <CreditCard className="h-5 w-5" />;
-    } else if (eventKey.includes('SETTINGS_') || eventKey.includes('INTEGRATION_')) {
+    } else if (action.includes('SETTINGS_') || action.includes('INTEGRATION_')) {
       return <Settings className="h-5 w-5" />;
     }
     return <Bell className="h-5 w-5" />;
@@ -280,7 +280,7 @@ export default function AdminNotificationsPage(): React.ReactElement {
                     <div className="flex gap-4">
                       {/* Icon */}
                       <div className={`flex-shrink-0 h-12 w-12 rounded-full flex items-center justify-center ${getSeverityColor(notification.severity)}`}>
-                        {getNotificationIcon(notification.eventKey)}
+                        {getNotificationIcon(notification.action)}
                       </div>
 
                       {/* Content */}
