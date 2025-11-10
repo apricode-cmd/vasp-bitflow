@@ -28,28 +28,26 @@ export async function GET(request: NextRequest) {
       prisma.adminAuditLog.findMany({
         where,
         orderBy: {
-          timestamp: 'desc'
+          createdAt: 'desc'
         },
         take: limit,
         skip: offset,
         select: {
           id: true,
           action: true,
-          entity: true,
+          entityType: true,
           entityId: true,
           severity: true,
           adminEmail: true,
           adminRole: true,
-          ipAddress: true,
-          userAgent: true,
-          metadata: true,
-          timestamp: true,
+          context: true,
+          createdAt: true,
         }
       }),
       prisma.adminAuditLog.count({
         where: {
           severity: { in: ['WARNING', 'CRITICAL'] },
-          timestamp: {
+          createdAt: {
             gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Last 24 hours
           }
         }
@@ -60,14 +58,14 @@ export async function GET(request: NextRequest) {
     const formattedNotifications = notifications.map(log => ({
       id: log.id,
       eventKey: log.action,
-      title: formatNotificationTitle(log.action, log.entity),
+      title: formatNotificationTitle(log.action, log.entityType),
       message: formatNotificationMessage(log),
       severity: log.severity,
-      actionUrl: getActionUrl(log.entity, log.entityId),
+      actionUrl: getActionUrl(log.entityType, log.entityId),
       adminEmail: log.adminEmail,
       adminRole: log.adminRole,
-      createdAt: log.timestamp,
-      metadata: log.metadata
+      createdAt: log.createdAt,
+      metadata: log.context
     }));
 
     return NextResponse.json({
@@ -109,7 +107,8 @@ function formatNotificationTitle(action: string, entity: string): string {
 }
 
 function formatNotificationMessage(log: any): string {
-  const { action, entity, adminEmail, metadata } = log;
+  const { action, entityType, adminEmail, context } = log;
+  const metadata = context || {};
 
   if (action === 'ADMIN_INVITED') {
     return `${adminEmail} invited a new administrator: ${metadata?.targetAdmin || 'Unknown'}`;
@@ -155,7 +154,7 @@ function formatNotificationMessage(log: any): string {
     return `${adminEmail} blocked user account: ${metadata?.userEmail || 'Unknown'}`;
   }
 
-  return `${adminEmail} performed ${action.replace(/_/g, ' ').toLowerCase()} on ${entity}`;
+  return `${adminEmail} performed ${action.replace(/_/g, ' ').toLowerCase()} on ${entityType}`;
 }
 
 function getActionUrl(entity: string, entityId: string | null): string | null {

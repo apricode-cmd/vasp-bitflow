@@ -101,7 +101,16 @@ export default function NotificationEventsPage(): React.ReactElement {
     isActive: true,
     templateId: '',
     templateKey: '', // Deprecated
+    // Phase 1.2: Variable Schema
+    requiredVariables: [] as string[],
+    optionalVariables: [] as string[],
+    examplePayload: '',
+    developerNotes: '',
   });
+
+  // Variable input state
+  const [newRequiredVar, setNewRequiredVar] = useState('');
+  const [newOptionalVar, setNewOptionalVar] = useState('');
 
   // Templates state
   const [templates, setTemplates] = useState<any[]>([]);
@@ -284,9 +293,15 @@ export default function NotificationEventsPage(): React.ReactElement {
       isActive: true,
       templateId: '',
       templateKey: '',
+      requiredVariables: [],
+      optionalVariables: [],
+      examplePayload: '',
+      developerNotes: '',
     });
     setSelectedEvent(null);
     setTemplates([]);
+    setNewRequiredVar('');
+    setNewOptionalVar('');
   };
 
   // Open edit dialog
