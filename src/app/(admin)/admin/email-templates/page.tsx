@@ -2,11 +2,11 @@
  * Email Templates Management Page
  * 
  * Features:
- * - Visual email editor with live preview
- * - White-label integration
- * - Preset templates library
+ * - List all email templates
+ * - Filter and search
+ * - Navigate to create/edit pages
  * - Test send functionality
- * - Template versioning
+ * - Preset templates library
  */
 
 'use client';
@@ -17,8 +17,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Select,
   SelectContent,
@@ -52,20 +50,17 @@ import {
   MoreVertical,
   Edit,
   Trash2,
-  Eye,
   Copy,
   CheckCircle,
-  XCircle,
   Clock,
   Archive,
   Send,
   Sparkles,
   Download,
-  Palette
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
-import { EmailEditor } from '@/components/email/EmailEditor';
+import { useRouter } from 'next/navigation';
 
 interface EmailTemplate {
   id: string;
@@ -101,43 +96,19 @@ interface PresetTemplate {
   layout: string;
 }
 
-interface WhiteLabelSettings {
-  brandName: string;
-  brandLogo: string;
-  primaryColor: string;
-  supportEmail: string;
-  supportPhone?: string;
-}
-
 export default function EmailTemplatesPage(): React.ReactElement {
+  const router = useRouter();
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [presets, setPresets] = useState<PresetTemplate[]>([]);
-  const [whiteLabelSettings, setWhiteLabelSettings] = useState<WhiteLabelSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [presetsDialogOpen, setPresetsDialogOpen] = useState(false);
   const [testSendDialogOpen, setTestSendDialogOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [testEmail, setTestEmail] = useState('');
-
-  // Form state
-  const [formData, setFormData] = useState({
-    key: '',
-    name: '',
-    description: '',
-    category: 'TRANSACTIONAL',
-    subject: '',
-    htmlContent: '',
-    textContent: '',
-    preheader: '',
-    layout: 'default',
-    variables: [] as string[],
-  });
 
   // Fetch templates
   const fetchTemplates = async () => {
@@ -169,31 +140,9 @@ export default function EmailTemplatesPage(): React.ReactElement {
     }
   };
 
-  // Fetch white-label settings
-  const fetchWhiteLabelSettings = async () => {
-    try {
-      const response = await fetch('/api/admin/settings/public');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setWhiteLabelSettings({
-            brandName: data.settings.brandName || 'Apricode Exchange',
-            brandLogo: data.settings.brandLogo || '',
-            primaryColor: data.settings.primaryColor || '#06b6d4',
-            supportEmail: data.settings.supportEmail || '',
-            supportPhone: data.settings.supportPhone || '',
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch white-label settings:', error);
-    }
-  };
-
   useEffect(() => {
     fetchTemplates();
     fetchPresets();
-    fetchWhiteLabelSettings();
   }, []);
 
   // Filter templates
@@ -208,64 +157,6 @@ export default function EmailTemplatesPage(): React.ReactElement {
 
     return matchesSearch && matchesCategory && matchesStatus;
   });
-
-  // Create template
-  const handleCreate = async () => {
-    try {
-      setActionLoading(true);
-      const response = await fetch('/api/admin/email-templates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        toast.success('Template created successfully');
-        setCreateDialogOpen(false);
-        fetchTemplates();
-        resetForm();
-      } else {
-        toast.error(data.error || 'Failed to create template');
-      }
-    } catch (error) {
-      console.error('Failed to create template:', error);
-      toast.error('Failed to create template');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // Update template
-  const handleUpdate = async () => {
-    if (!selectedTemplate) return;
-    
-    try {
-      setActionLoading(true);
-      const response = await fetch(`/api/admin/email-templates/${selectedTemplate.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        toast.success('Template updated successfully');
-        setEditDialogOpen(false);
-        fetchTemplates();
-        resetForm();
-      } else {
-        toast.error(data.error || 'Failed to update template');
-      }
-    } catch (error) {
-      console.error('Failed to update template:', error);
-      toast.error('Failed to update template');
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   // Delete template
   const handleDelete = async (id: string) => {
@@ -346,47 +237,12 @@ export default function EmailTemplatesPage(): React.ReactElement {
     }
   };
 
-  // Reset form
-  const resetForm = () => {
-    setFormData({
-      key: '',
-      name: '',
-      description: '',
-      category: 'TRANSACTIONAL',
-      subject: '',
-      htmlContent: '',
-      textContent: '',
-      preheader: '',
-      layout: 'default',
-      variables: [],
-    });
-    setSelectedTemplate(null);
-  };
-
-  // Open edit dialog
-  const handleOpenEdit = (template: EmailTemplate) => {
-    setSelectedTemplate(template);
-    setFormData({
-      key: template.key,
-      name: template.name,
-      description: template.description || '',
-      category: template.category,
-      subject: template.subject,
-      htmlContent: template.htmlContent || '',
-      textContent: template.textContent || '',
-      preheader: template.preheader || '',
-      layout: template.layout,
-      variables: template.variables,
-    });
-    setEditDialogOpen(true);
-  };
-
   // Get status badge
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: any; icon: any }> = {
       PUBLISHED: { variant: 'default', icon: CheckCircle },
       DRAFT: { variant: 'secondary', icon: Clock },
-      REVIEW: { variant: 'outline', icon: Eye },
+      REVIEW: { variant: 'outline', icon: CheckCircle },
       ARCHIVED: { variant: 'destructive', icon: Archive },
     };
 
@@ -450,7 +306,7 @@ export default function EmailTemplatesPage(): React.ReactElement {
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
-          <Button onClick={() => setCreateDialogOpen(true)}>
+          <Button onClick={() => router.push('/admin/email-templates/create')}>
             <Plus className="h-4 w-4 mr-2" />
             Create Template
           </Button>
@@ -634,7 +490,7 @@ export default function EmailTemplatesPage(): React.ReactElement {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => handleOpenEdit(template)}>
+                          <DropdownMenuItem onClick={() => router.push(`/admin/email-templates/${template.id}/edit`)}>
                             <Edit className="h-4 w-4 mr-2" />
                             Edit
                           </DropdownMenuItem>
@@ -671,202 +527,6 @@ export default function EmailTemplatesPage(): React.ReactElement {
           )}
         </CardContent>
       </Card>
-
-      {/* Create Dialog */}
-      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
-          <DialogHeader>
-            <DialogTitle>Create Email Template</DialogTitle>
-            <DialogDescription>
-              Create a new email template with visual editor and live preview
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {/* Basic Info */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="key">Template Key *</Label>
-                <Input
-                  id="key"
-                  value={formData.key}
-                  onChange={(e) => setFormData({ ...formData, key: e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '_') })}
-                  placeholder="ORDER_CREATED"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="name">Template Name *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Order Created Email"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="category">Category *</Label>
-                <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="TRANSACTIONAL">Transactional</SelectItem>
-                    <SelectItem value="NOTIFICATION">Notification</SelectItem>
-                    <SelectItem value="MARKETING">Marketing</SelectItem>
-                    <SelectItem value="SYSTEM">System</SelectItem>
-                    <SelectItem value="COMPLIANCE">Compliance</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="layout">Layout</Label>
-                <Select value={formData.layout} onValueChange={(v) => setFormData({ ...formData, layout: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="default">Default</SelectItem>
-                    <SelectItem value="minimal">Minimal</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Brief description of this template..."
-              />
-            </div>
-
-            {/* Email Editor */}
-            <EmailEditor
-              htmlContent={formData.htmlContent}
-              textContent={formData.textContent}
-              subject={formData.subject}
-              preheader={formData.preheader}
-              variables={formData.variables}
-              onHtmlChange={(html) => setFormData({ ...formData, htmlContent: html })}
-              onTextChange={(text) => setFormData({ ...formData, textContent: text })}
-              onSubjectChange={(subject) => setFormData({ ...formData, subject })}
-              onPreheaderChange={(preheader) => setFormData({ ...formData, preheader })}
-              onVariablesChange={(variables) => setFormData({ ...formData, variables })}
-              whiteLabelSettings={whiteLabelSettings || undefined}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreate} disabled={actionLoading}>
-              {actionLoading ? 'Creating...' : 'Create Template'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Dialog */}
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
-          <DialogHeader>
-            <DialogTitle>Edit Email Template</DialogTitle>
-            <DialogDescription>
-              Update your email template with visual editor and live preview
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {/* Basic Info */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-key">Template Key *</Label>
-                <Input
-                  id="edit-key"
-                  value={formData.key}
-                  disabled
-                  className="bg-muted"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-name">Template Name *</Label>
-                <Input
-                  id="edit-name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Order Created Email"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-category">Category *</Label>
-                <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="TRANSACTIONAL">Transactional</SelectItem>
-                    <SelectItem value="NOTIFICATION">Notification</SelectItem>
-                    <SelectItem value="MARKETING">Marketing</SelectItem>
-                    <SelectItem value="SYSTEM">System</SelectItem>
-                    <SelectItem value="COMPLIANCE">Compliance</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-layout">Layout</Label>
-                <Select value={formData.layout} onValueChange={(v) => setFormData({ ...formData, layout: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="default">Default</SelectItem>
-                    <SelectItem value="minimal">Minimal</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-description">Description</Label>
-              <Textarea
-                id="edit-description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Brief description of this template..."
-              />
-            </div>
-
-            {/* Email Editor */}
-            <EmailEditor
-              htmlContent={formData.htmlContent}
-              textContent={formData.textContent}
-              subject={formData.subject}
-              preheader={formData.preheader}
-              variables={formData.variables}
-              onHtmlChange={(html) => setFormData({ ...formData, htmlContent: html })}
-              onTextChange={(text) => setFormData({ ...formData, textContent: text })}
-              onSubjectChange={(subject) => setFormData({ ...formData, subject })}
-              onPreheaderChange={(preheader) => setFormData({ ...formData, preheader })}
-              onVariablesChange={(variables) => setFormData({ ...formData, variables })}
-              whiteLabelSettings={whiteLabelSettings || undefined}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleUpdate} disabled={actionLoading}>
-              {actionLoading ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Presets Dialog */}
       <Dialog open={presetsDialogOpen} onOpenChange={setPresetsDialogOpen}>

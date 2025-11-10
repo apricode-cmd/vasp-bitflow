@@ -1194,6 +1194,52 @@ async function main(): Promise<void> {
   }
   console.log(`  ✓ ${notificationEvents.length} notification events created\n`);
   
+  // Seed Email Templates
+  console.log('\n📧 Seeding email templates...');
+  const fs = await import('fs/promises');
+  const path = await import('path');
+  const { fileURLToPath } = await import('url');
+  
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  
+  const presetsPath = path.join(__dirname, '../src/lib/email-templates/presets.json');
+  const presetsData = await fs.readFile(presetsPath, 'utf-8');
+  const emailTemplates = JSON.parse(presetsData);
+  
+  for (const template of emailTemplates) {
+    // Check if template already exists
+    const existing = await prisma.emailTemplate.findFirst({
+      where: { 
+        key: template.key,
+        orgId: null,
+      },
+    });
+
+    if (!existing) {
+      await prisma.emailTemplate.create({
+        data: {
+          key: template.key,
+          name: template.name,
+          description: template.description,
+          category: template.category,
+          subject: template.subject,
+          preheader: template.preheader,
+          htmlContent: template.htmlContent,
+          textContent: '', // Will be generated from HTML
+          layout: template.layout,
+          variables: template.variables,
+          version: 1,
+          isActive: true,
+          isDefault: true,
+          status: 'PUBLISHED',
+          publishedAt: new Date(),
+        },
+      });
+    }
+  }
+  console.log(`  ✓ ${emailTemplates.length} email templates created\n`);
+  
   console.log('\n✅ Database seeding completed successfully!\n');
 }
 

@@ -1,30 +1,37 @@
 /**
  * Email Template Presets API
  * 
- * GET: List all available preset templates
+ * GET: List available preset templates
  * POST: Import a preset template into database
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
-import { emailTemplatePresets } from '@/lib/email-templates/presets';
+import { readFile } from 'fs/promises';
+import { join } from 'path';
 
+// GET /api/admin/email-templates/presets - List presets
 export async function GET(request: NextRequest) {
   try {
     const session = await requireAdminRole('ADMIN');
     if (session instanceof NextResponse) return session;
 
+    // Read presets from JSON file
+    const presetsPath = join(process.cwd(), 'src/lib/email-templates/presets.json');
+    const presetsData = await readFile(presetsPath, 'utf-8');
+    const presets = JSON.parse(presetsData);
+
     return NextResponse.json({
       success: true,
-      presets: emailTemplatePresets.map(preset => ({
+      presets: presets.map((preset: any) => ({
         key: preset.key,
         name: preset.name,
         description: preset.description,
         category: preset.category,
         variables: preset.variables,
-        layout: preset.layout
-      }))
+        layout: preset.layout,
+      })),
     });
   } catch (error: any) {
     console.error('❌ GET /api/admin/email-templates/presets error:', error);
@@ -35,12 +42,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// POST /api/admin/email-templates/presets - Import preset
 export async function POST(request: NextRequest) {
   try {
     const session = await requireAdminRole('ADMIN');
     if (session instanceof NextResponse) return session;
 
-    const { presetKey } = await request.json();
+    const body = await request.json();
+    const { presetKey } = body;
 
     if (!presetKey) {
       return NextResponse.json(
@@ -49,8 +58,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find preset
-    const preset = emailTemplatePresets.find(p => p.key === presetKey);
+    // Read presets from JSON file
+    const presetsPath = join(process.cwd(), 'src/lib/email-templates/presets.json');
+    const presetsData = await readFile(presetsPath, 'utf-8');
+    const presets = JSON.parse(presetsData);
+
+    // Find the preset
+    const preset = presets.find((p: any) => p.key === presetKey);
     if (!preset) {
       return NextResponse.json(
         { success: false, error: 'Preset not found' },
@@ -59,11 +73,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if template already exists
-    const existing = await prisma.emailTemplate.findFirst({
-      where: {
-        key: preset.key,
-        orgId: null // Global template
-      }
+    const existing = await prisma.emailTemplate.findUnique({
+      where: { key: preset.key },
     });
 
     if (existing) {
@@ -81,24 +92,21 @@ export async function POST(request: NextRequest) {
         description: preset.description,
         category: preset.category,
         subject: preset.subject,
-        htmlContent: preset.htmlContent,
-        textContent: '', // Optional
         preheader: preset.preheader,
+        htmlContent: preset.htmlContent,
+        textContent: '', // Will be generated from HTML
         layout: preset.layout,
         variables: preset.variables,
-        isDefault: true,
-        status: 'PUBLISHED',
-        publishedAt: new Date(),
-        publishedBy: session.user.id,
-        createdBy: session.user.id,
-        updatedBy: session.user.id,
-      }
+        version: 1,
+        isActive: true,
+        isDefault: false, // Imported templates are not default
+        status: 'DRAFT', // Start as draft for review
+      },
     });
 
     return NextResponse.json({
       success: true,
-      message: 'Template imported successfully',
-      template
+      template,
     });
   } catch (error: any) {
     console.error('❌ POST /api/admin/email-templates/presets error:', error);
@@ -108,4 +116,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
