@@ -26,11 +26,15 @@ export const STEP_UP_REQUIRED_ACTIONS = [
   'MODIFY_BANK_ACCOUNT',
   
   // Access management
+  'CREATE_ADMIN', // Invite new admin
   'CHANGE_ADMIN_ROLE',
   'CREATE_SUPER_ADMIN',
   'SUSPEND_ADMIN',
+  'UNSUSPEND_ADMIN', // Reactivate suspended admin
+  'TERMINATE_ADMIN', // Permanently terminate admin
   'DELETE_ADMIN',
   'REVOKE_ADMIN_SESSION',
+  'CANCEL_ADMIN_INVITE',
   
   // API & Integrations
   'GENERATE_API_KEY',
@@ -182,9 +186,21 @@ export class StepUpMfaService {
     }
 
     // Find the credential being used
-    const credentialId = response.id;
+    // Convert response.id from base64url to base64 (as stored in DB)
+    const credentialIdBase64url = response.id;
+    const credentialIdBase64 = Buffer.from(credentialIdBase64url, 'base64url').toString('base64');
+    
+    console.log('🔍 Looking for credential:', {
+      responseId: credentialIdBase64url.substring(0, 20) + '...',
+      convertedToBase64: credentialIdBase64.substring(0, 20) + '...',
+      availableCredentials: challenge.admin.webAuthnCreds.map(c => ({
+        id: c.credentialId.substring(0, 20) + '...',
+        deviceName: c.deviceName
+      }))
+    });
+    
     const credential = challenge.admin.webAuthnCreds.find(
-      (c) => c.credentialId === credentialId
+      (c) => c.credentialId === credentialIdBase64
     );
 
     if (!credential) {
@@ -193,6 +209,7 @@ export class StepUpMfaService {
         where: { id: challengeId },
         data: { attempts: { increment: 1 } },
       });
+      console.error('❌ Credential not found! Available:', challenge.admin.webAuthnCreds.length);
       throw new Error('Credential not found');
     }
 
@@ -233,7 +250,7 @@ export class StepUpMfaService {
         // Log successful Step-up MFA
         await prisma.auditLog.create({
           data: {
-            userId: challenge.adminId,
+            adminId: challenge.adminId, // ✅ Use adminId for admin actions
             userEmail: challenge.admin.workEmail || challenge.admin.email,
             userRole: challenge.admin.roleCode || 'ADMIN',
             action: 'STEP_UP_MFA_VERIFIED',

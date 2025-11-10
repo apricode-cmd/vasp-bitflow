@@ -138,11 +138,12 @@ export async function POST(request: NextRequest) {
         context: {
           ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
           userAgent: request.headers.get('user-agent') || 'unknown',
+          mfaChallengeId: validatedData.mfaChallengeId, // Store challenge ID in context
         },
         mfaRequired: true,
         mfaMethod: 'WEBAUTHN',
         mfaVerifiedAt: new Date(),
-        mfaEventId: validatedData.mfaChallengeId,
+        // mfaEventId: null, // Optional: link to MfaEvent if needed
         severity: 'WARNING', // Creating admin is important action
       },
     });

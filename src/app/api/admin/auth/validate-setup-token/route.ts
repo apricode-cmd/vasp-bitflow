@@ -19,12 +19,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find admin by email
-    const admin = await prisma.admin.findUnique({
-      where: { email },
+    // Find admin by workEmail (unique field) or email
+    const admin = await prisma.admin.findFirst({
+      where: { 
+        OR: [
+          { workEmail: email },
+          { email: email }
+        ]
+      },
       select: {
         id: true,
         email: true,
+        workEmail: true,
         setupToken: true,
         setupTokenExpiry: true,
         isActive: true,

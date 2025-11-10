@@ -1,7 +1,7 @@
 /**
- * Admin Terminate API
+ * Admin Unsuspend (Reactivate) API
  * 
- * POST: Terminate admin account permanently (SUPER_ADMIN only, REQUIRES STEP-UP MFA)
+ * POST: Unsuspend admin account (SUPER_ADMIN only, REQUIRES STEP-UP MFA)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -20,18 +20,18 @@ export async function POST(
 
     const adminId = params.id;
 
-    // Cannot terminate yourself
-    if (adminId === session.user.id) {
-      return NextResponse.json(
-        { success: false, error: 'Cannot terminate your own account' },
-        { status: 400 }
-      );
-    }
-
     // Get admin
     const admin = await prisma.admin.findUnique({
       where: { id: adminId },
-      select: { id: true, email: true, firstName: true, lastName: true, role: true },
+      select: { 
+        id: true, 
+        email: true, 
+        firstName: true, 
+        lastName: true, 
+        role: true,
+        status: true,
+        isSuspended: true
+      },
     });
 
     if (!admin) {
@@ -41,22 +41,22 @@ export async function POST(
       );
     }
 
-    // Cannot terminate another SUPER_ADMIN
-    if (admin.role === 'SUPER_ADMIN') {
+    // Check if admin is actually suspended
+    if (admin.status !== 'SUSPENDED' && !admin.isSuspended) {
       return NextResponse.json(
-        { success: false, error: 'Cannot terminate another Super Admin' },
-        { status: 403 }
+        { success: false, error: 'Admin is not suspended' },
+        { status: 400 }
       );
     }
 
     // Read body (might contain MFA data)
     const body = await request.json().catch(() => ({}));
 
-    // 🔐 STEP-UP MFA REQUIRED FOR TERMINATING ADMIN
+    // 🔐 STEP-UP MFA REQUIRED FOR UNSUSPENDING ADMIN
     const mfaResult = await handleStepUpMfa(
       body,
       session.user.id,
-      'DELETE_ADMIN',
+      'UNSUSPEND_ADMIN',
       'Admin',
       adminId
     );
@@ -82,44 +82,24 @@ export async function POST(
       );
     }
 
-    // Terminate admin
+    // Unsuspend (reactivate) admin
     await prisma.admin.update({
       where: { id: adminId },
       data: {
-        status: 'TERMINATED',
-        isActive: false,
+        status: 'ACTIVE',
         isSuspended: false,
+        suspendedUntil: null,
       },
-    });
-
-    // Terminate all active sessions
-    await prisma.adminSession.updateMany({
-      where: {
-        adminId,
-        isActive: true,
-      },
-      data: {
-        isActive: false,
-        terminatedAt: new Date(),
-        terminatedBy: session.user.id,
-        terminationReason: 'ADMIN_TERMINATED',
-      },
-    });
-
-    // Deactivate all WebAuthn credentials
-    await prisma.webAuthnCredential.updateMany({
-      where: { adminId },
-      data: { isActive: false },
     });
 
     // Log to audit with MFA verification
     await auditService.logAdminAction(
       session.user.id,
-      AUDIT_ACTIONS.ADMIN_TERMINATED,
+      AUDIT_ACTIONS.ADMIN_UNSUSPENDED,
       AUDIT_ENTITIES.ADMIN,
       adminId,
-      { status: 'ACTIVE' },
-      { status: 'TERMINATED' },
+      { status: 'SUSPENDED', isSuspended: true },
+      { status: 'ACTIVE', isSuspended: false },
       {
         targetAdmin: admin.email,
         targetRole: admin.role,
@@ -129,12 +109,12 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      message: 'Admin terminated successfully',
+      message: 'Admin unsuspended successfully',
     });
   } catch (error) {
-    console.error('❌ Terminate admin error:', error);
+    console.error('❌ Unsuspend admin error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to terminate admin' },
+      { success: false, error: 'Failed to unsuspend admin' },
       { status: 500 }
     );
   }

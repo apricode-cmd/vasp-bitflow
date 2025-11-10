@@ -31,7 +31,9 @@ import {
   Clock,
   Copy,
   Send,
-  Scale
+  Scale,
+  UserCog,
+  Info
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -147,6 +149,17 @@ export function AdminManagementClient({
   const canSuspend = hasPermission('admins', 'suspend');
   const canDelete = hasPermission('admins', 'delete');
   const canChangeRole = hasPermission('admins', 'change_role');
+  
+  // Debug permissions
+  console.log('🔐 Admin Permissions:', {
+    canCreate,
+    canUpdate,
+    canSuspend,
+    canDelete,
+    canChangeRole,
+    currentAdminRole,
+    currentAdminId
+  });
   
   // Dialogs
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -291,20 +304,58 @@ export function AdminManagementClient({
     toast.success('Invite link copied to clipboard!');
   };
 
-  // Suspend admin
+  // Suspend admin (with Step-up MFA)
   const handleSuspend = async () => {
     if (!selectedAdmin) return;
     
     setActionLoading(true);
     try {
+      // First request - will trigger MFA challenge
       const response = await fetch(`/api/admin/admins/${selectedAdmin.id}/suspend`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
       });
 
       const result = await response.json();
 
-      if (result.success) {
-        toast.success('Admin suspended successfully');
+      // If MFA is required, handle it
+      if (result.requiresMfa) {
+        toast.info('MFA verification required');
+        
+        // Import startAuthentication dynamically
+        const { startAuthentication } = await import('@simplewebauthn/browser');
+        
+        try {
+          // Prompt for MFA
+          const mfaResponse = await startAuthentication(result.options);
+          
+          // Retry with MFA response
+          const mfaVerifyResponse = await fetch(`/api/admin/admins/${selectedAdmin.id}/suspend`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              mfaChallengeId: result.challengeId,
+              mfaResponse,
+            }),
+          });
+
+          const mfaResult = await mfaVerifyResponse.json();
+
+          if (mfaResult.success) {
+            toast.success('Admin suspended successfully! (MFA verified)');
+            setSuspendAlertOpen(false);
+            loadAdmins();
+          } else {
+            toast.error(mfaResult.error || 'MFA verification failed');
+          }
+        } catch (mfaError) {
+          console.error('MFA error:', mfaError);
+          toast.error('MFA verification cancelled or failed');
+        }
+      } else if (result.success) {
+        // Success without MFA (shouldn't happen, but handle it)
+        toast.success('Admin suspended successfully!');
         setSuspendAlertOpen(false);
         loadAdmins();
       } else {
@@ -318,20 +369,58 @@ export function AdminManagementClient({
     }
   };
 
-  // Terminate admin
+  // Terminate admin (with Step-up MFA)
   const handleTerminate = async () => {
     if (!selectedAdmin) return;
     
     setActionLoading(true);
     try {
+      // First request - will trigger MFA challenge
       const response = await fetch(`/api/admin/admins/${selectedAdmin.id}/terminate`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
       });
 
       const result = await response.json();
 
-      if (result.success) {
-        toast.success('Admin terminated successfully');
+      // If MFA is required, handle it
+      if (result.requiresMfa) {
+        toast.info('MFA verification required');
+        
+        // Import startAuthentication dynamically
+        const { startAuthentication } = await import('@simplewebauthn/browser');
+        
+        try {
+          // Prompt for MFA
+          const mfaResponse = await startAuthentication(result.options);
+          
+          // Retry with MFA response
+          const mfaVerifyResponse = await fetch(`/api/admin/admins/${selectedAdmin.id}/terminate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              mfaChallengeId: result.challengeId,
+              mfaResponse,
+            }),
+          });
+
+          const mfaResult = await mfaVerifyResponse.json();
+
+          if (mfaResult.success) {
+            toast.success('Admin terminated successfully! (MFA verified)');
+            setTerminateAlertOpen(false);
+            loadAdmins();
+          } else {
+            toast.error(mfaResult.error || 'MFA verification failed');
+          }
+        } catch (mfaError) {
+          console.error('MFA error:', mfaError);
+          toast.error('MFA verification cancelled or failed');
+        }
+      } else if (result.success) {
+        // Success without MFA (shouldn't happen, but handle it)
+        toast.success('Admin terminated successfully!');
         setTerminateAlertOpen(false);
         loadAdmins();
       } else {
@@ -345,18 +434,55 @@ export function AdminManagementClient({
     }
   };
 
-  // Reactivate admin
+  // Reactivate (unsuspend) admin (with Step-up MFA)
   const handleReactivate = async (admin: Admin) => {
     setActionLoading(true);
     try {
-      const response = await fetch(`/api/admin/admins/${admin.id}/reactivate`, {
+      // First request - will trigger MFA challenge
+      const response = await fetch(`/api/admin/admins/${admin.id}/unsuspend`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
       });
 
       const result = await response.json();
 
-      if (result.success) {
-        toast.success('Admin reactivated successfully');
+      // If MFA is required, handle it
+      if (result.requiresMfa) {
+        toast.info('MFA verification required');
+        
+        // Import startAuthentication dynamically
+        const { startAuthentication } = await import('@simplewebauthn/browser');
+        
+        try {
+          // Prompt for MFA
+          const mfaResponse = await startAuthentication(result.options);
+          
+          // Retry with MFA response
+          const mfaVerifyResponse = await fetch(`/api/admin/admins/${admin.id}/unsuspend`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              mfaChallengeId: result.challengeId,
+              mfaResponse,
+            }),
+          });
+
+          const mfaResult = await mfaVerifyResponse.json();
+
+          if (mfaResult.success) {
+            toast.success('Admin unsuspended successfully! (MFA verified)');
+            loadAdmins();
+          } else {
+            toast.error(mfaResult.error || 'MFA verification failed');
+          }
+        } catch (mfaError) {
+          console.error('MFA error:', mfaError);
+          toast.error('MFA verification cancelled or failed');
+        }
+      } else if (result.success) {
+        // Success without MFA (shouldn't happen, but handle it)
+        toast.success('Admin unsuspended successfully');
         loadAdmins();
       } else {
         toast.error(result.error || 'Failed to reactivate admin');
@@ -589,54 +715,107 @@ export function AdminManagementClient({
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            {canUpdate && (
-                              <DropdownMenuItem>
-                                <Edit className="w-4 h-4 mr-2" />
-                                Edit Details
-                              </DropdownMenuItem>
-                            )}
-                            {canCreate && (
-                              <DropdownMenuItem>
-                                <Mail className="w-4 h-4 mr-2" />
-                                Resend Invite
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuSeparator />
-                            {(admin.status === 'ACTIVE' && admin.isActive) && admin.id !== currentAdminId && (
+                            
+                            {/* INVITED Status - Resend or Cancel */}
+                            {admin.status === 'INVITED' && (
                               <>
-                                {canSuspend && (
-                                  <DropdownMenuItem
-                                    className="text-amber-600"
-                                    onClick={() => {
-                                      setSelectedAdmin(admin);
-                                      setSuspendAlertOpen(true);
-                                    }}
-                                  >
-                                    <Ban className="w-4 h-4 mr-2" />
-                                    Suspend
-                                  </DropdownMenuItem>
-                                )}
-                                {canDelete && (
-                                  <DropdownMenuItem
-                                    className="text-destructive"
-                                    onClick={() => {
-                                      setSelectedAdmin(admin);
-                                      setTerminateAlertOpen(true);
-                                    }}
-                                  >
-                                    <Trash2 className="w-4 h-4 mr-2" />
-                                    Terminate
-                                  </DropdownMenuItem>
+                                <DropdownMenuItem className="text-blue-600">
+                                  <Mail className="w-4 h-4 mr-2" />
+                                  Resend Invite
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-destructive"
+                                  onClick={() => {
+                                    setSelectedAdmin(admin);
+                                    setTerminateAlertOpen(true);
+                                  }}
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Cancel Invitation
+                                </DropdownMenuItem>
+                              </>
+                            )}
+
+                            {/* ACTIVE Status */}
+                            {admin.status === 'ACTIVE' && admin.isActive && (
+                              <>
+                                {/* Self-admin actions */}
+                                {admin.id === currentAdminId ? (
+                                  <>
+                                    <DropdownMenuItem>
+                                      <Edit className="w-4 h-4 mr-2" />
+                                      Edit Profile
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem>
+                                      <Shield className="w-4 h-4 mr-2" />
+                                      Security Settings
+                                    </DropdownMenuItem>
+                                  </>
+                                ) : (
+                                  <>
+                                    {/* Other admins - SUPER_ADMIN has all permissions */}
+                                    <DropdownMenuItem>
+                                      <Edit className="w-4 h-4 mr-2" />
+                                      Edit Details
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem>
+                                      <UserCog className="w-4 h-4 mr-2" />
+                                      Change Role
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="text-amber-600"
+                                      onClick={() => {
+                                        setSelectedAdmin(admin);
+                                        setSuspendAlertOpen(true);
+                                      }}
+                                    >
+                                      <Ban className="w-4 h-4 mr-2" />
+                                      Suspend
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      className="text-destructive"
+                                      onClick={() => {
+                                        setSelectedAdmin(admin);
+                                        setTerminateAlertOpen(true);
+                                      }}
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Terminate
+                                    </DropdownMenuItem>
+                                  </>
                                 )}
                               </>
                             )}
-                            {(admin.status === 'SUSPENDED' || admin.isSuspended) && canUpdate && (
-                              <DropdownMenuItem
-                                className="text-green-600"
-                                onClick={() => handleReactivate(admin)}
-                              >
-                                <CheckCircle className="w-4 h-4 mr-2" />
-                                Reactivate
+
+                            {/* SUSPENDED Status - Reactivate or Terminate */}
+                            {(admin.status === 'SUSPENDED' || admin.isSuspended) && (
+                              <>
+                                <DropdownMenuItem
+                                  className="text-green-600"
+                                  onClick={() => handleReactivate(admin)}
+                                >
+                                  <CheckCircle className="w-4 h-4 mr-2" />
+                                  Reactivate
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-destructive"
+                                  onClick={() => {
+                                    setSelectedAdmin(admin);
+                                    setTerminateAlertOpen(true);
+                                  }}
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Terminate Permanently
+                                </DropdownMenuItem>
+                              </>
+                            )}
+
+                            {/* TERMINATED Status - View only */}
+                            {admin.status === 'TERMINATED' && (
+                              <DropdownMenuItem disabled className="text-muted-foreground">
+                                <Info className="w-4 h-4 mr-2" />
+                                No actions available
                               </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>
@@ -792,7 +971,7 @@ export function AdminManagementClient({
               </Button>
             </div>
             <div className="text-sm text-muted-foreground">
-              ⚠️ This link expires in 7 days and can only be used once.
+              ⚠️ This link expires in 15 minutes and can only be used once for security.
             </div>
           </div>
           <DialogFooter>
