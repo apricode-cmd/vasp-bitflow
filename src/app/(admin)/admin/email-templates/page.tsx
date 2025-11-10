@@ -599,7 +599,7 @@ export default function EmailTemplatesPage(): React.ReactElement {
                 onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
               />
               <p className="text-xs text-muted-foreground">
-                Use {{`{{variableName}}`}} for dynamic content
+                Use {`{{variableName}}`} for dynamic content
               </p>
             </div>
 
@@ -624,7 +624,7 @@ export default function EmailTemplatesPage(): React.ReactElement {
                 className="font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground">
-                Use {{`{{variableName}}`}} for dynamic content
+                Use {`{{variableName}}`} for dynamic content
               </p>
             </div>
 
@@ -694,7 +694,7 @@ export default function EmailTemplatesPage(): React.ReactElement {
                   {selectedTemplate.variables.length > 0 ? (
                     selectedTemplate.variables.map((variable) => (
                       <Badge key={variable} variant="secondary">
-                        {{`{{${variable}}}`}}
+                        {`{{${variable}}}`}
                       </Badge>
                     ))
                   ) : (
