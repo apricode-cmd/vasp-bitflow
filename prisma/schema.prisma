@@ -2025,13 +2025,57 @@ model OneTimeAuthToken {
 // NOTIFICATION SYSTEM
 // ============================================================================
 
+// ============================================================================
+// NOTIFICATION EVENT CATEGORIES - Dynamic categories
+// ============================================================================
+
+model NotificationEventCategory {
+  id          String   @id @default(cuid())
+  code        String   @unique // 'ORDER', 'KYC', 'PAYMENT'
+  name        String   // "Order Management"
+  description String?
+  
+  // Visual
+  icon        String?  // 'ShoppingCart', 'Shield', 'CreditCard' (Lucide icon names)
+  color       String?  // '#3B82F6', '#10B981' (hex color)
+  
+  // Hierarchy (optional - for nested categories)
+  parentId    String?
+  parent      NotificationEventCategory? @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    NotificationEventCategory[] @relation("CategoryHierarchy")
+  
+  // Settings
+  isSystem    Boolean  @default(false) // System categories cannot be deleted
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  
+  // Relations
+  events      NotificationEvent[] @relation("EventCategoryToEvent")
+  
+  // Audit
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?
+  
+  @@index([code])
+  @@index([parentId])
+  @@index([isActive])
+  @@index([sortOrder])
+}
+
 // Notification Events - система событий для уведомлений
 model NotificationEvent {
   id          String   @id @default(cuid())
   eventKey    String   @unique // 'ORDER_CREATED', 'KYC_APPROVED', etc.
   name        String   // "Order Created"
   description String?
-  category    EventCategory // ORDER, KYC, PAYMENT, SECURITY, SYSTEM
+  
+  // Category (NEW: relation to NotificationEventCategory model)
+  categoryId  String?
+  eventCategory NotificationEventCategory? @relation("EventCategoryToEvent", fields: [categoryId], references: [id], onDelete: SetNull)
+  
+  // DEPRECATED: Old enum-based category (kept for backward compatibility)
+  category    EventCategory @default(SYSTEM)
   
   // Channels - какие каналы поддерживает это событие
   channels    NotificationChannel[] // ['EMAIL', 'IN_APP', 'SMS']

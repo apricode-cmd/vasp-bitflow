@@ -915,6 +915,92 @@ async function main(): Promise<void> {
   await seedKycFormFields();
   console.log(`   - 37+ KYC Form Fields`);
   
+  // NEW: Seed Event Categories
+  console.log('\n📂 Seeding event categories...');
+  const eventCategories = [
+    {
+      code: 'ORDER',
+      name: 'Order Management',
+      description: 'Events related to order lifecycle',
+      icon: 'ShoppingCart',
+      color: '#3B82F6', // blue-500
+      isSystem: true,
+      isActive: true,
+      sortOrder: 1,
+    },
+    {
+      code: 'KYC',
+      name: 'KYC & Verification',
+      description: 'Events related to identity verification',
+      icon: 'Shield',
+      color: '#10B981', // green-500
+      isSystem: true,
+      isActive: true,
+      sortOrder: 2,
+    },
+    {
+      code: 'PAYMENT',
+      name: 'Payments',
+      description: 'Events related to payment processing',
+      icon: 'CreditCard',
+      color: '#8B5CF6', // violet-500
+      isSystem: true,
+      isActive: true,
+      sortOrder: 3,
+    },
+    {
+      code: 'SECURITY',
+      name: 'Security & Auth',
+      description: 'Events related to security and authentication',
+      icon: 'Lock',
+      color: '#EF4444', // red-500
+      isSystem: true,
+      isActive: true,
+      sortOrder: 4,
+    },
+    {
+      code: 'SYSTEM',
+      name: 'System Events',
+      description: 'Internal system events and maintenance',
+      icon: 'Settings',
+      color: '#6B7280', // gray-500
+      isSystem: true,
+      isActive: true,
+      sortOrder: 5,
+    },
+    {
+      code: 'ADMIN',
+      name: 'Admin Actions',
+      description: 'Events related to admin panel actions',
+      icon: 'UserCog',
+      color: '#F59E0B', // amber-500
+      isSystem: true,
+      isActive: true,
+      sortOrder: 6,
+    },
+    {
+      code: 'MARKETING',
+      name: 'Marketing & Promo',
+      description: 'Events related to marketing campaigns',
+      icon: 'Megaphone',
+      color: '#EC4899', // pink-500
+      isSystem: true,
+      isActive: true,
+      sortOrder: 7,
+    },
+  ];
+
+  const categoryMap: Record<string, string> = {};
+  for (const category of eventCategories) {
+    const created = await prisma.notificationEventCategory.upsert({
+      where: { code: category.code },
+      update: {},
+      create: category,
+    });
+    categoryMap[category.code] = created.id;
+  }
+  console.log(`  ✓ ${eventCategories.length} event categories created\n`);
+  
   // NEW: Seed Notification Events
   console.log('\n📬 Seeding notification events...');
   const notificationEvents = [
