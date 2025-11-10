@@ -2024,8 +2024,10 @@ model NotificationEvent {
   isActive    Boolean  @default(true)
   isSystem    Boolean  @default(false) // System events cannot be deleted
   
-  // Template (optional - для будущей интеграции с шаблонами)
-  templateKey String?
+  // Template integration
+  templateId    String?
+  emailTemplate EmailTemplate? @relation("EventEmailTemplate", fields: [templateId], references: [id], onDelete: SetNull)
+  templateKey   String? // Deprecated: use templateId instead (kept for backward compatibility)
   
   // Timestamps
   createdAt   DateTime @default(now())
@@ -2038,6 +2040,7 @@ model NotificationEvent {
   @@index([eventKey])
   @@index([category])
   @@index([isActive])
+  @@index([templateId])
 }
 
 // Notification Queue - очередь для асинхронной отправки
@@ -2261,7 +2264,8 @@ model EmailTemplate {
   updatedAt   DateTime @updatedAt
   
   // Relations
-  emailLogs   EmailLog[] @relation("TemplateUsed")
+  emailLogs          EmailLog[] @relation("TemplateUsed")
+  notificationEvents NotificationEvent[] @relation("EventEmailTemplate")
   
   @@unique([orgId, key, version])
   @@index([orgId, key])

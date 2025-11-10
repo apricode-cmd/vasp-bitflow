@@ -18,7 +18,8 @@ const updateEventSchema = z.object({
   channels: z.array(z.enum(['EMAIL', 'IN_APP', 'SMS', 'PUSH'])).optional(),
   priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'URGENT']).optional(),
   isActive: z.boolean().optional(),
-  templateKey: z.string().optional(),
+  templateId: z.string().nullable().optional(), // NEW: FK to EmailTemplate (nullable to allow removal)
+  templateKey: z.string().optional(), // Deprecated
 });
 
 export async function GET(
@@ -115,6 +116,33 @@ export async function PATCH(
         { success: false, error: 'Cannot modify system events' },
         { status: 400 }
       );
+    }
+
+    // Validate templateId if provided
+    if (validatedData.templateId !== undefined && validatedData.templateId !== null) {
+      const template = await prisma.emailTemplate.findUnique({
+        where: { id: validatedData.templateId },
+        select: { id: true, name: true, status: true, isActive: true }
+      });
+
+      if (!template) {
+        return NextResponse.json(
+          { success: false, error: 'Email template not found' },
+          { status: 400 }
+        );
+      }
+
+      if (!template.isActive) {
+        return NextResponse.json(
+          { success: false, error: 'Selected email template is not active' },
+          { status: 400 }
+        );
+      }
+
+      // Warn if template is not published
+      if (template.status !== 'PUBLISHED') {
+        console.warn(`⚠️ Event "${params.eventKey}" linked to non-published template "${template.name}"`);
+      }
     }
 
     // Update event

@@ -18,7 +18,8 @@ const createEventSchema = z.object({
   channels: z.array(z.enum(['EMAIL', 'IN_APP', 'SMS', 'PUSH'])),
   priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'URGENT']).default('NORMAL'),
   isActive: z.boolean().default(true),
-  templateKey: z.string().optional(),
+  templateId: z.string().optional(), // NEW: FK to EmailTemplate
+  templateKey: z.string().optional(), // Deprecated: kept for backward compatibility
 });
 
 export async function GET(request: NextRequest) {
@@ -40,6 +41,16 @@ export async function GET(request: NextRequest) {
         category: 'asc'
       },
       include: {
+        emailTemplate: {
+          select: {
+            id: true,
+            key: true,
+            name: true,
+            category: true,
+            status: true,
+            isActive: true,
+          }
+        },
         _count: {
           select: {
             subscriptions: true,
@@ -123,6 +134,33 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Event with this key already exists' },
         { status: 400 }
       );
+    }
+
+    // Validate templateId if provided
+    if (validatedData.templateId) {
+      const template = await prisma.emailTemplate.findUnique({
+        where: { id: validatedData.templateId },
+        select: { id: true, name: true, status: true, isActive: true }
+      });
+
+      if (!template) {
+        return NextResponse.json(
+          { success: false, error: 'Email template not found' },
+          { status: 400 }
+        );
+      }
+
+      if (!template.isActive) {
+        return NextResponse.json(
+          { success: false, error: 'Selected email template is not active' },
+          { status: 400 }
+        );
+      }
+
+      // Warn if template is not published (but allow it)
+      if (template.status !== 'PUBLISHED') {
+        console.warn(`⚠️ Event "${validatedData.eventKey}" linked to non-published template "${template.name}"`);
+      }
     }
 
     // Create event

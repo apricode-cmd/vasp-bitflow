@@ -99,8 +99,13 @@ export default function NotificationEventsPage(): React.ReactElement {
     channels: ['EMAIL', 'IN_APP'] as string[],
     priority: 'NORMAL' as const,
     isActive: true,
-    templateKey: '',
+    templateId: '',
+    templateKey: '', // Deprecated
   });
+
+  // Templates state
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
 
   // Fetch events
   const fetchEvents = async () => {
@@ -119,9 +124,41 @@ export default function NotificationEventsPage(): React.ReactElement {
     }
   };
 
+  // Fetch email templates
+  const fetchTemplates = async (category?: string) => {
+    try {
+      setTemplatesLoading(true);
+      const url = category 
+        ? `/api/admin/notification-events/templates?category=${category}&onlyPublished=true`
+        : '/api/admin/notification-events/templates?onlyPublished=true';
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.success) {
+        setTemplates(data.templates || []);
+      } else {
+        console.error('Failed to fetch templates:', data.error);
+        setTemplates([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch templates:', error);
+      setTemplates([]);
+    } finally {
+      setTemplatesLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchEvents();
   }, []);
+
+  // Load templates when category changes (for create/edit dialogs)
+  useEffect(() => {
+    if (createDialogOpen || editDialogOpen) {
+      fetchTemplates(formData.category);
+    }
+  }, [formData.category, createDialogOpen, editDialogOpen]);
 
   // Filter events
   const filteredEvents = events.filter(event => {
@@ -245,9 +282,11 @@ export default function NotificationEventsPage(): React.ReactElement {
       channels: ['EMAIL', 'IN_APP'],
       priority: 'NORMAL',
       isActive: true,
+      templateId: '',
       templateKey: '',
     });
     setSelectedEvent(null);
+    setTemplates([]);
   };
 
   // Open edit dialog
@@ -261,8 +300,11 @@ export default function NotificationEventsPage(): React.ReactElement {
       channels: event.channels,
       priority: event.priority as any,
       isActive: event.isActive,
+      templateId: (event as any).templateId || '',
       templateKey: event.templateKey || '',
     });
+    // Load templates for this category
+    fetchTemplates(event.category);
     setEditDialogOpen(true);
   };
 
@@ -788,15 +830,35 @@ export default function NotificationEventsPage(): React.ReactElement {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="templateKey">Email Template Key (Optional)</Label>
-              <Input
-                id="templateKey"
-                placeholder="ORDER_CREATED"
-                value={formData.templateKey}
-                onChange={(e) => setFormData({ ...formData, templateKey: e.target.value })}
-              />
+              <Label htmlFor="templateId">Email Template (Optional)</Label>
+              <Select 
+                value={formData.templateId} 
+                onValueChange={(v) => setFormData({ ...formData, templateId: v })}
+                disabled={templatesLoading || templates.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={
+                    templatesLoading ? 'Loading templates...' : 
+                    templates.length === 0 ? 'No templates available' :
+                    'Select email template'
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None (no email template)</SelectItem>
+                  {templates.map((template) => (
+                    <SelectItem key={template.id} value={template.id}>
+                      <div className="flex flex-col">
+                        <span>{template.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {template.category} • {template.status}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <p className="text-xs text-muted-foreground">
-                Link to an email template for this event
+                Choose an email template for this event. Templates are filtered by category.
               </p>
             </div>
 
@@ -916,13 +978,36 @@ export default function NotificationEventsPage(): React.ReactElement {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-templateKey">Email Template Key (Optional)</Label>
-              <Input
-                id="edit-templateKey"
-                placeholder="ORDER_CREATED"
-                value={formData.templateKey}
-                onChange={(e) => setFormData({ ...formData, templateKey: e.target.value })}
-              />
+              <Label htmlFor="edit-templateId">Email Template (Optional)</Label>
+              <Select 
+                value={formData.templateId} 
+                onValueChange={(v) => setFormData({ ...formData, templateId: v })}
+                disabled={templatesLoading || templates.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={
+                    templatesLoading ? 'Loading templates...' : 
+                    templates.length === 0 ? 'No templates available' :
+                    'Select email template'
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None (no email template)</SelectItem>
+                  {templates.map((template) => (
+                    <SelectItem key={template.id} value={template.id}>
+                      <div className="flex flex-col">
+                        <span>{template.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {template.category} • {template.status}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Choose an email template for this event. Templates are filtered by category.
+              </p>
             </div>
 
             <div className="flex items-center space-x-2">
