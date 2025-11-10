@@ -153,9 +153,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const authResult = await requireAdminRole('ADMIN');
-  if (authResult instanceof NextResponse) return authResult;
-  const { session } = authResult;
+  const session = await requireAdminRole('ADMIN');
+  if (session instanceof NextResponse) return session;
 
   try {
     // Check if account exists
