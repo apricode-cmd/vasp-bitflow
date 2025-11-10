@@ -16,7 +16,8 @@ import {
   TrendingUp, Shield, Database, Activity, Coins,
   Wallet, Globe, Key, User, FileText, Scale,
   ChevronDown, ChevronRight, Search,
-  ArrowDownCircle, ArrowUpCircle, BookOpen, Plug
+  ArrowDownCircle, ArrowUpCircle, BookOpen, Plug,
+  Bell, Mail, MessageSquare, Send
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -177,6 +178,41 @@ const navigation = [
     priority: 'medium'
   },
   {
+    section: 'Communications',
+    items: [
+      { 
+        name: 'Notifications', 
+        href: '/admin/notifications', 
+        icon: Bell,
+        description: 'Admin notifications & alerts',
+        badge: 'unread'
+      },
+      { 
+        name: 'Email Templates', 
+        href: '/admin/email-templates', 
+        icon: Mail,
+        description: 'Manage email templates',
+        requiredPermission: 'settings:read'
+      },
+      { 
+        name: 'Notification Events', 
+        href: '/admin/notification-events', 
+        icon: MessageSquare,
+        description: 'Configure notification events',
+        requiredPermission: 'settings:system'
+      },
+      { 
+        name: 'Notification Queue', 
+        href: '/admin/notification-queue', 
+        icon: Send,
+        description: 'Monitor notification delivery',
+        requiredPermission: 'settings:system'
+      },
+    ],
+    defaultOpen: false,
+    priority: 'medium'
+  },
+  {
     section: 'System & Settings',
     items: [
       { 
@@ -243,6 +279,7 @@ export function AdminSidebar(): JSX.Element {
     pendingKyc: number;
     pendingPayIn: number;
     pendingPayOut: number;
+    unreadNotifications: number;
   } | null>(null);
 
   const isSuperAdmin = session?.role === 'SUPER_ADMIN' || session?.roleCode === 'SUPER_ADMIN';
@@ -275,14 +312,21 @@ export function AdminSidebar(): JSX.Element {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch('/api/admin/stats?quick=true');
-        const data = await response.json();
-        if (data.success) {
+        const [statsResponse, notificationsResponse] = await Promise.all([
+          fetch('/api/admin/stats?quick=true'),
+          fetch('/api/admin/notifications?limit=1') // Just get count
+        ]);
+        
+        const statsData = await statsResponse.json();
+        const notificationsData = await notificationsResponse.json();
+        
+        if (statsData.success) {
           setStats({
-            pendingOrders: data.data.orders?.pending || 0,
-            pendingKyc: data.data.kyc?.pending || 0,
-            pendingPayIn: data.data.payIn?.pending || 0,
-            pendingPayOut: data.data.payOut?.pending || 0
+            pendingOrders: statsData.data.orders?.pending || 0,
+            pendingKyc: statsData.data.kyc?.pending || 0,
+            pendingPayIn: statsData.data.payIn?.pending || 0,
+            pendingPayOut: statsData.data.payOut?.pending || 0,
+            unreadNotifications: notificationsData.unreadCount || 0
           });
         }
       } catch (error) {
@@ -319,6 +363,7 @@ export function AdminSidebar(): JSX.Element {
     if (itemName === 'KYC Reviews') return stats.pendingKyc;
     if (itemName === 'Pay In') return stats.pendingPayIn;
     if (itemName === 'Pay Out') return stats.pendingPayOut;
+    if (itemName === 'Notifications') return stats.unreadNotifications;
     return null;
   };
 
