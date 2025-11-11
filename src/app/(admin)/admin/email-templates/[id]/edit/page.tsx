@@ -189,18 +189,33 @@ export default function EmailTemplateEditorPage({ params }: { params: { id: stri
           .replace(/\{\{supportPhone\}\}/g, whiteLabelSettings.supportPhone || '');
       }
 
-      // Replace other variables with highlighted placeholders
+      // Replace other variables with sample data (not HTML tags to avoid breaking attributes)
       formData.variables.forEach(variable => {
         // Skip white-label variables
         if (['brandName', 'brandLogo', 'primaryColor', 'supportEmail', 'supportPhone'].includes(variable)) {
           return;
         }
         const regex = new RegExp(`\\{\\{${variable}\\}\\}`, 'g');
-        html = html.replace(regex, `<span style="background: #fef3c7; padding: 2px 6px; border-radius: 4px; font-weight: 600;">${variable}</span>`);
+        // Use simple text replacement to avoid breaking HTML structure
+        const sampleValues: Record<string, string> = {
+          'userName': 'John Doe',
+          'orderId': 'ORD-12345',
+          'amount': '0.5',
+          'currency': 'BTC',
+          'cryptoCurrency': 'Bitcoin',
+          'walletAddress': 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
+          'orderUrl': '#',
+          'resetUrl': '#',
+          'expiresIn': '15 minutes',
+          'txHash': '0x1234...abcd',
+          'rate': '50000',
+          'total': '25000',
+        };
+        html = html.replace(regex, sampleValues[variable] || `[${variable}]`);
       });
 
       // Replace preheader
-      html = html.replace(/\{\{preheader\}\}/g, formData.preheader);
+      html = html.replace(/\{\{preheader\}\}/g, formData.preheader || '');
 
       return html;
     } else {
@@ -462,21 +477,53 @@ export default function EmailTemplateEditorPage({ params }: { params: { id: stri
                           Code
                         </TabsTrigger>
                       </TabsList>
+                      {/* Visual Editor - User-friendly with tips */}
                       <TabsContent value="visual" className="mt-4">
-                        <Textarea
-                          id="html-editor"
-                          value={formData.htmlContent}
-                          onChange={(e) => setFormData({ ...formData, htmlContent: e.target.value })}
-                          className="font-mono text-sm min-h-[400px]"
-                          placeholder="<div>Your email HTML here...</div>"
-                        />
+                        <div className="space-y-3">
+                          {/* Email Best Practices */}
+                          <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950 p-3">
+                            <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
+                              <span>📧</span> Email Best Practices
+                            </h4>
+                            <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1 ml-4">
+                              <li>• Use <strong>inline styles</strong> (style="...") instead of CSS classes</li>
+                              <li>• Use <strong>tables</strong> for layout, not divs</li>
+                              <li>• Keep width <strong>max 600px</strong> for desktop compatibility</li>
+                              <li>• Use merge tags: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">{'{{userName}}'}</code>, <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">{'{{orderId}}'}</code></li>
+                              <li>• Test in Gmail, Outlook, and Apple Mail</li>
+                            </ul>
+                          </div>
+
+                          <div className="border rounded-lg p-4 bg-white dark:bg-slate-950">
+                            <Textarea
+                              id="html-editor"
+                              value={formData.htmlContent}
+                              onChange={(e) => setFormData({ ...formData, htmlContent: e.target.value })}
+                              className="font-sans text-base min-h-[500px] border-0 focus-visible:ring-0 resize-none"
+                              placeholder="Edit your email HTML here..."
+                            />
+                          </div>
+                          
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>💡 Use variables panel on the right to insert dynamic content</span>
+                            <span className="font-mono">{formData.htmlContent.length} chars</span>
+                          </div>
+                        </div>
                       </TabsContent>
+                      
+                      {/* Code Editor - Developer mode */}
                       <TabsContent value="code" className="mt-4">
-                        <Textarea
-                          value={formData.htmlContent}
-                          onChange={(e) => setFormData({ ...formData, htmlContent: e.target.value })}
-                          className="font-mono text-xs min-h-[400px]"
-                        />
+                        <div className="border rounded-lg bg-slate-950 p-4">
+                          <Textarea
+                            value={formData.htmlContent}
+                            onChange={(e) => setFormData({ ...formData, htmlContent: e.target.value })}
+                            className="font-mono text-xs min-h-[500px] bg-slate-950 text-green-400 border-0 focus-visible:ring-0 resize-none"
+                            placeholder="<!DOCTYPE html>..."
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          💡 Raw HTML mode - edit the complete email template
+                        </p>
                       </TabsContent>
                     </Tabs>
                   </CardContent>
