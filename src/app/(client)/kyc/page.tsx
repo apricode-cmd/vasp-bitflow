@@ -79,7 +79,7 @@ const STEPS = [
   { id: 1, title: 'Personal Info', categories: ['personal'] },
   { id: 2, title: 'Contact & Address', categories: ['contact', 'address'] },
   { id: 3, title: 'Compliance Profile', categories: ['documents', 'employment', 'pep_sanctions'] },
-  { id: 4, title: 'Intended Use & Funds', categories: ['purpose', 'funds', 'activity'] },
+  // Step 4 'Intended Use & Funds' disabled - fields not needed for MVP
 ];
 
 export default function KycPage(): React.ReactElement {
