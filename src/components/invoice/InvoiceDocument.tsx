@@ -233,7 +233,8 @@ const styles = StyleSheet.create({
 // Types
 export interface InvoiceData {
   // Order info
-  orderId: string;
+  orderId: string; // Internal ID (for filename)
+  paymentReference: string; // Display reference (APR-XXX-YYY)
   orderDate: string;
   status: string;
   
@@ -329,7 +330,7 @@ export const InvoiceDocument: React.FC<{ data: InvoiceData }> = ({ data }) => {
             {/* Invoice Title */}
             <View style={styles.invoiceTitle}>
               <Text style={styles.invoiceTitleText}>INVOICE</Text>
-              <Text style={styles.invoiceNumber}>#{data.orderId}</Text>
+              <Text style={styles.invoiceNumber}>{data.paymentReference}</Text>
               <Text style={styles.invoiceDate}>
                 Date: {new Date(data.orderDate).toLocaleDateString('en-GB')}
               </Text>

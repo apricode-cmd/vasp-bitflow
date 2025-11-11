@@ -80,7 +80,8 @@ export async function generateInvoicePDF(orderId: string): Promise<Buffer> {
   // 4. Build invoice data
   const invoiceData: InvoiceData = {
     // Order info
-    orderId: order.id,
+    orderId: order.id, // Internal ID (for filename)
+    paymentReference: order.paymentReference, // Display reference (APR-XXX-YYY)
     orderDate: order.createdAt.toISOString(),
     status: order.status,
 
