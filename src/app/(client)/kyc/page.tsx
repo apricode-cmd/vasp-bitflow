@@ -109,6 +109,42 @@ export default function KycPage(): React.ReactElement {
     pep_additional_info: '',
   });
 
+  // Fetch user profile and auto-fill email and phone
+  const fetchUserProfile = async () => {
+    try {
+      const response = await fetch('/api/profile');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.user) {
+          console.log('👤 User profile loaded:', data.user);
+          
+          // Auto-fill email and phone from profile
+          setFormData(prev => ({
+            ...prev,
+            email: data.user.email || prev.email || '',
+            phone: data.user.profile?.phoneNumber || prev.phone || '',
+            phone_country: data.user.profile?.phoneCountry || prev.phone_country || '',
+            // Also pre-fill other profile fields if they exist
+            first_name: data.user.profile?.firstName || prev.first_name || '',
+            last_name: data.user.profile?.lastName || prev.last_name || '',
+            date_of_birth: data.user.profile?.dateOfBirth || prev.date_of_birth || '',
+            nationality: data.user.profile?.nationality || prev.nationality || '',
+            address_country: data.user.profile?.country || prev.address_country || '',
+            address_city: data.user.profile?.city || prev.address_city || '',
+            address_street: data.user.profile?.address || prev.address_street || '',
+            address_postal: data.user.profile?.postalCode || prev.address_postal || '',
+            place_of_birth: data.user.profile?.placeOfBirth || prev.place_of_birth || '',
+          }));
+          
+          console.log('✅ Form auto-filled from profile');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch user profile:', error);
+      // Don't show error toast - this is optional enhancement
+    }
+  };
+
   // Fetch KYC status and fields
   // Fetch Sumsub mobile URL for QR code
   const fetchSumsubMobileUrl = async () => {
@@ -141,7 +177,8 @@ export default function KycPage(): React.ReactElement {
   useEffect(() => {
     Promise.all([
       fetchKycStatus(),
-      fetchKycFields()
+      fetchKycFields(),
+      fetchUserProfile() // ✅ Загружаем профиль для автозаполнения
     ]);
   }, []);
   
