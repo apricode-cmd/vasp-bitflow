@@ -294,6 +294,7 @@ export default function NotificationEventsPage(): React.ReactElement {
   // Toggle active status
   const handleToggleActive = async (event: NotificationEvent) => {
     try {
+      setActionLoading(true);
       const response = await fetch(`/api/admin/notification-events/${event.eventKey}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -310,6 +311,92 @@ export default function NotificationEventsPage(): React.ReactElement {
       }
     } catch (error) {
       toast.error('Failed to update event');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Enable all events
+  const handleEnableAll = async () => {
+    try {
+      setActionLoading(true);
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const event of events) {
+        if (!event.isActive) {
+          try {
+            const response = await fetch(`/api/admin/notification-events/${event.eventKey}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ isActive: true })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+              successCount++;
+            } else {
+              errorCount++;
+            }
+          } catch {
+            errorCount++;
+          }
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`Enabled ${successCount} event(s)`);
+        fetchEvents();
+      }
+      if (errorCount > 0) {
+        toast.error(`Failed to enable ${errorCount} event(s)`);
+      }
+    } catch (error) {
+      toast.error('Failed to enable events');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Disable all events
+  const handleDisableAll = async () => {
+    try {
+      setActionLoading(true);
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const event of events) {
+        if (event.isActive) {
+          try {
+            const response = await fetch(`/api/admin/notification-events/${event.eventKey}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ isActive: false })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+              successCount++;
+            } else {
+              errorCount++;
+            }
+          } catch {
+            errorCount++;
+          }
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`Disabled ${successCount} event(s)`);
+        fetchEvents();
+      }
+      if (errorCount > 0) {
+        toast.error(`Failed to disable ${errorCount} event(s)`);
+      }
+    } catch (error) {
+      toast.error('Failed to disable events');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -534,34 +621,58 @@ export default function NotificationEventsPage(): React.ReactElement {
         </Card>
       </div>
 
-      {/* Filters */}
+      {/* Filters & Bulk Actions */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search events..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search events..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-full md:w-[200px]">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="ORDER">Order</SelectItem>
+                  <SelectItem value="KYC">KYC</SelectItem>
+                  <SelectItem value="PAYMENT">Payment</SelectItem>
+                  <SelectItem value="SECURITY">Security</SelectItem>
+                  <SelectItem value="SYSTEM">System</SelectItem>
+                  <SelectItem value="ADMIN">Admin</SelectItem>
+                  <SelectItem value="MARKETING">Marketing</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-full md:w-[200px]">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="ORDER">Order</SelectItem>
-                <SelectItem value="KYC">KYC</SelectItem>
-                <SelectItem value="PAYMENT">Payment</SelectItem>
-                <SelectItem value="SECURITY">Security</SelectItem>
-                <SelectItem value="SYSTEM">System</SelectItem>
-                <SelectItem value="ADMIN">Admin</SelectItem>
-                <SelectItem value="MARKETING">Marketing</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Bulk Actions */}
+            <div className="flex items-center gap-2 pt-2 border-t">
+              <span className="text-sm text-muted-foreground">Bulk Actions:</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleEnableAll}
+                disabled={actionLoading}
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Enable All
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDisableAll}
+                disabled={actionLoading}
+              >
+                <XCircle className="h-4 w-4 mr-2" />
+                Disable All
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -618,12 +729,6 @@ export default function NotificationEventsPage(): React.ReactElement {
                           System
                         </Badge>
                       )}
-                      {!event.isActive && (
-                        <Badge variant="secondary" className="gap-1">
-                          <XCircle className="h-3 w-3" />
-                          Inactive
-                        </Badge>
-                      )}
                     </div>
                     <p className="text-sm text-muted-foreground mb-2">
                       {event.description || event.eventKey}
@@ -649,6 +754,17 @@ export default function NotificationEventsPage(): React.ReactElement {
                       )}
                     </div>
                   </div>
+                  {/* Quick Toggle Switch */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-xs text-muted-foreground">
+                      {event.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                    <Switch
+                      checked={event.isActive}
+                      onCheckedChange={() => handleToggleActive(event)}
+                      disabled={actionLoading}
+                    />
+                  </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon">
@@ -667,26 +783,11 @@ export default function NotificationEventsPage(): React.ReactElement {
                         <Eye className="h-4 w-4 mr-2" />
                         View Details
                       </DropdownMenuItem>
-                      {!event.isSystem && (
+                      {!event.isSystem ? (
                         <>
                           <DropdownMenuItem onClick={() => handleOpenEdit(event)}>
                             <Edit className="h-4 w-4 mr-2" />
                             Edit Event
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleToggleActive(event)}
-                          >
-                            {event.isActive ? (
-                              <>
-                                <XCircle className="h-4 w-4 mr-2" />
-                                Deactivate
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle className="h-4 w-4 mr-2" />
-                                Activate
-                              </>
-                            )}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
@@ -697,6 +798,10 @@ export default function NotificationEventsPage(): React.ReactElement {
                             Delete
                           </DropdownMenuItem>
                         </>
+                      ) : (
+                        <DropdownMenuItem disabled className="text-muted-foreground text-xs">
+                          System events cannot be edited or deleted
+                        </DropdownMenuItem>
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>

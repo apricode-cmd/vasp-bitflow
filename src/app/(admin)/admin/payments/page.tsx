@@ -154,10 +154,10 @@ export default function PaymentsPage(): JSX.Element {
       }
 
       // Fetch PSP connectors
-      const pspRes = await fetch('/api/admin/resources?type=psp_connector');
+      const pspRes = await fetch('/api/admin/resources/psp-connectors');
       if (pspRes.ok) {
         const data = await pspRes.json();
-        setPspConnectors(data.resources || []);
+        setPspConnectors(data.data || []);
       } else {
         console.error('❌ PSP Connectors API failed:', pspRes.status);
       }

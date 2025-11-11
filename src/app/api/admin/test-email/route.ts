@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { sendNotificationEmail } from '@/lib/services/email-notification.service';
 import { prisma } from '@/lib/prisma';
+import { getEmailUrls } from '@/lib/utils/email-urls';
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,7 +33,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Default test data
+    // Get proper URLs
+    const emailUrls = getEmailUrls();
+
+    // Default test data with proper URLs
     const defaultTestData = {
       userName: 'Test User',
       orderId: 'TEST-12345',
@@ -40,8 +44,10 @@ export async function POST(request: NextRequest) {
       currency: 'BTC',
       cryptoCurrency: 'Bitcoin',
       walletAddress: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
-      orderUrl: 'https://example.com/orders/TEST-12345',
-      resetUrl: 'https://example.com/reset-password',
+      orderUrl: emailUrls.order('TEST-12345'),
+      resetUrl: emailUrls.resetPassword('test-token-123'),
+      dashboardUrl: emailUrls.dashboard,
+      loginUrl: emailUrls.login,
       expiresIn: '15 minutes',
       txHash: '0x1234...abcd',
       rate: '50000',

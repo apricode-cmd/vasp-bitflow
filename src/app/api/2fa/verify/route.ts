@@ -12,6 +12,7 @@ import {
   enableTotp
 } from '@/lib/services/totp.service';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
+import { eventEmitter } from '@/lib/services/event-emitter.service';
 
 const verifySchema = z.object({
   secret: z.string().min(1, 'Secret is required'),
@@ -49,16 +50,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Enable TOTP and generate backup codes
     const { backupCodes } = await enableTotp(session.user.id, validated.secret);
     
-    // Audit log
-    await auditService.logAdminAction(
+    // Audit log (для клиента используем logUserAction)
+    await auditService.logUserAction(
       session.user.id,
       AUDIT_ACTIONS.SETTINGS_UPDATED,
       AUDIT_ENTITIES.USER,
       session.user.id,
-      { twoFactorEnabled: false },
-      { twoFactorEnabled: true },
-      { method: 'TOTP' }
+      { 
+        twoFactorEnabled: true,
+        method: 'TOTP' 
+      }
     );
+    
+    // Emit event for notification and email
+    await eventEmitter.emit('SECURITY_2FA_ENABLED', {
+      userId: session.user.id,
+      recipientEmail: session.user.email,
+      method: 'TOTP',
+    });
     
     console.log('✅ 2FA enabled for user:', session.user.email);
     

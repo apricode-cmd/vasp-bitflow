@@ -9,43 +9,37 @@ datasource db {
 }
 
 model User {
-  id                   String              @id @default(cuid())
-  email                String              @unique
-  password             String
-  role                 Role                @default(CLIENT)
-  isActive             Boolean             @default(true)
-  lastLogin            DateTime?
-  createdAt            DateTime            @default(now())
-  updatedAt            DateTime            @updatedAt
-  
-  adminSettings        AdminSettings?      @relation("AdminSettings")
-  apiKeys              ApiKey[]
-  
-  // Audit Logs
-  userAuditLogs        UserAuditLog[]      @relation("UserAuditLogs") // NEW: отдельная таблица для клиентов
-  auditLogs            AuditLog[]          // LEGACY: старая таблица
-  
-  emailLogs            EmailLog[]
-  blockedIPs           IPBlacklist[]       @relation("BlockedBy")
-  kycSession           KycSession?
-  orders               Order[]
-  payInsReconciled     PayIn[]             @relation("PayInReconciler")
-  payInsAsUser         PayIn[]             @relation("PayInUser")
-  payInsVerified       PayIn[]             @relation("PayInVerifier")
-  payOutsProcessed     PayOut[]            @relation("PayOutProcessor")
-  payOutsAsUser        PayOut[]            @relation("PayOutUser")
-  paymentProofs        PaymentProof[]
-  profile              Profile?
-  sessionRevocationsBy SessionRevocation[] @relation("RevokedBy")
-  revokedSessions      SessionRevocation[] @relation("RevokedSessions")
-  twoFactorAuth        TwoFactorAuth?
-  kycLevelData         UserKycLevel?       @relation("UserKycLevelRelation")
-  userWallets          UserWallet[]
-  
-  // Notification System
-  notificationQueue         NotificationQueue[]
+  id                        String                     @id @default(cuid())
+  email                     String                     @unique
+  password                  String
+  role                      Role                       @default(CLIENT)
+  isActive                  Boolean                    @default(true)
+  lastLogin                 DateTime?
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  adminSettings             AdminSettings?             @relation("AdminSettings")
+  apiKeys                   ApiKey[]
+  auditLogs                 AuditLog[]
+  emailLogs                 EmailLog[]
+  blockedIPs                IPBlacklist[]              @relation("BlockedBy")
+  kycSession                KycSession?
   notificationHistory       NotificationHistory[]
+  notificationQueue         NotificationQueue[]
   notificationSubscriptions NotificationSubscription[]
+  orders                    Order[]
+  payInsReconciled          PayIn[]                    @relation("PayInReconciler")
+  payInsAsUser              PayIn[]                    @relation("PayInUser")
+  payInsVerified            PayIn[]                    @relation("PayInVerifier")
+  payOutsProcessed          PayOut[]                   @relation("PayOutProcessor")
+  payOutsAsUser             PayOut[]                   @relation("PayOutUser")
+  paymentProofs             PaymentProof[]
+  profile                   Profile?
+  sessionRevocationsBy      SessionRevocation[]        @relation("RevokedBy")
+  revokedSessions           SessionRevocation[]        @relation("RevokedSessions")
+  twoFactorAuth             TwoFactorAuth?
+  userAuditLogs             UserAuditLog[]             @relation("UserAuditLogs")
+  kycLevelData              UserKycLevel?              @relation("UserKycLevelRelation")
+  userWallets               UserWallet[]
 
   @@index([email])
   @@index([role])
@@ -75,17 +69,9 @@ model Profile {
 model KycSession {
   id                   String        @id @default(cuid())
   userId               String        @unique
-  
-  // Universal fields (work with any KYC provider)
-  kycProviderId        String?
-  applicantId          String?       // Universal applicant ID (replaces kycaidApplicantId)
-  verificationId       String?       @unique // Universal verification ID (replaces kycaidVerificationId)
-  
-  // Legacy KYCAID-specific fields (deprecated, use universal fields above)
   kycaidVerificationId String?       @unique
   kycaidApplicantId    String?
   kycaidFormId         String?
-  
   status               KycStatus     @default(PENDING)
   submittedAt          DateTime?
   reviewedAt           DateTime?
@@ -100,7 +86,9 @@ model KycSession {
   lastAttemptAt        DateTime?
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
-  
+  kycProviderId        String?
+  applicantId          String?
+  verificationId       String?       @unique
   documents            KycDocument[]
   formData             KycFormData[]
   profile              KycProfile?
@@ -336,8 +324,8 @@ model PlatformWallet {
 }
 
 model PayIn {
-  id                 String       @id @default(cuid())
-  orderId            String       @unique
+  id                 String             @id @default(cuid())
+  orderId            String             @unique
   userId             String
   amount             Float
   fiatCurrencyCode   String?
@@ -352,44 +340,39 @@ model PayIn {
   senderAddress      String?
   transactionHash    String?
   blockNumber        Int?
-  confirmations      Int          @default(0)
-  transactionId      String?      @unique
-  status             PayInStatus  @default(PENDING)
+  confirmations      Int                @default(0)
+  transactionId      String?            @unique
+  status             PayInStatus        @default(PENDING)
   expectedAmount     Float
   receivedAmount     Float?
-  amountMismatch     Boolean      @default(false)
-
-  // Separation of Duties (SoD) - 4-eyes principle
-  initiatedBy      String? // Admin ID who initiated
-  initiatedAt      DateTime?
-  approvedBy       String? // Admin ID who approved (must be different from initiatedBy)
-  approvedAt       DateTime?
-  approvalRequired Boolean   @default(true) // Requires approval for large amounts
-
-  verifiedBy        String?
-  verifiedAt        DateTime?
-  verificationNotes String?
-  reconciledWith    String?
-  reconciledAt      DateTime?
-  reconciledBy      String?
-  proofUrls         String[]
-  explorerUrl       String?
-  paymentDate       DateTime?
-  receivedDate      DateTime?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  cryptocurrency    Currency?          @relation("PayInCrypto", fields: [cryptocurrencyCode], references: [code])
-  fiatCurrency      FiatCurrency?      @relation(fields: [fiatCurrencyCode], references: [code])
-  network           BlockchainNetwork? @relation("PayInNetwork", fields: [networkCode], references: [code])
-  order             Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  paymentMethod     PaymentMethod?     @relation(fields: [paymentMethodCode], references: [code])
-  reconciler        User?              @relation("PayInReconciler", fields: [reconciledBy], references: [id])
-  user              User               @relation("PayInUser", fields: [userId], references: [id], onDelete: Cascade)
-  verifier          User?              @relation("PayInVerifier", fields: [verifiedBy], references: [id])
-
-  // SoD Relations to Admin
-  initiator Admin? @relation("PayInInitiator", fields: [initiatedBy], references: [id])
-  approver  Admin? @relation("PayInApprover", fields: [approvedBy], references: [id])
+  amountMismatch     Boolean            @default(false)
+  verifiedBy         String?
+  verifiedAt         DateTime?
+  verificationNotes  String?
+  reconciledWith     String?
+  reconciledAt       DateTime?
+  reconciledBy       String?
+  proofUrls          String[]
+  explorerUrl        String?
+  paymentDate        DateTime?
+  receivedDate       DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  approvalRequired   Boolean            @default(true)
+  approvedAt         DateTime?
+  approvedBy         String?
+  initiatedAt        DateTime?
+  initiatedBy        String?
+  approver           Admin?             @relation("PayInApprover", fields: [approvedBy], references: [id])
+  cryptocurrency     Currency?          @relation("PayInCrypto", fields: [cryptocurrencyCode], references: [code])
+  fiatCurrency       FiatCurrency?      @relation(fields: [fiatCurrencyCode], references: [code])
+  initiator          Admin?             @relation("PayInInitiator", fields: [initiatedBy], references: [id])
+  network            BlockchainNetwork? @relation("PayInNetwork", fields: [networkCode], references: [code])
+  order              Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentMethod      PaymentMethod?     @relation(fields: [paymentMethodCode], references: [code])
+  reconciler         User?              @relation("PayInReconciler", fields: [reconciledBy], references: [id])
+  user               User               @relation("PayInUser", fields: [userId], references: [id], onDelete: Cascade)
+  verifier           User?              @relation("PayInVerifier", fields: [verifiedBy], references: [id])
 
   @@index([orderId])
   @@index([userId])
@@ -404,8 +387,8 @@ model PayIn {
 }
 
 model PayOut {
-  id                 String       @id @default(cuid())
-  orderId            String       @unique
+  id                 String             @id @default(cuid())
+  orderId            String             @unique
   userId             String
   amount             Float
   fiatCurrencyCode   String?
@@ -415,10 +398,10 @@ model PayOut {
   destinationAddress String?
   destinationTag     String?
   userWalletId       String?
-  transactionHash    String?      @unique
+  transactionHash    String?            @unique
   explorerUrl        String?
   blockNumber        Int?
-  confirmations      Int          @default(0)
+  confirmations      Int                @default(0)
   networkFee         Float?
   networkFeeCurrency String?
   recipientName      String?
@@ -427,42 +410,37 @@ model PayOut {
   paymentReference   String?
   bankTransactionId  String?
   paymentMethodCode  String?
-  status             PayOutStatus @default(PENDING)
+  status             PayOutStatus       @default(PENDING)
   failureReason      String?
-  retryCount         Int          @default(0)
-
-  // Separation of Duties (SoD) - 4-eyes principle for payouts
-  initiatedBy       String? // Admin ID who initiated payout
-  initiatedAt       DateTime?
-  approvedBy        String? // Admin ID who approved (MUST be different from initiatedBy)
-  approvedAt        DateTime?
-  approvalRequired  Boolean   @default(true) // Requires approval (based on amount threshold)
-  requiresStepUpMfa Boolean   @default(false) // Approval requires step-up MFA
-
-  processedBy      String?
-  processedAt      DateTime?
-  processingNotes  String?
-  paymentAccountId String?
-  fromWalletId     String?
-  scheduledFor     DateTime?
-  sentAt           DateTime?
-  confirmedAt      DateTime?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  cryptocurrency   Currency?          @relation(fields: [cryptocurrencyCode], references: [code])
-  fiatCurrency     FiatCurrency?      @relation("PayOutFiat", fields: [fiatCurrencyCode], references: [code])
-  platformWallet   PlatformWallet?    @relation(fields: [fromWalletId], references: [id])
-  network          BlockchainNetwork? @relation(fields: [networkCode], references: [code])
-  order            Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  paymentAccount   PaymentAccount?    @relation("PaymentAccountPayOuts", fields: [paymentAccountId], references: [id])
-  paymentMethod    PaymentMethod?     @relation("PayOutMethod", fields: [paymentMethodCode], references: [code])
-  processor        User?              @relation("PayOutProcessor", fields: [processedBy], references: [id])
-  user             User               @relation("PayOutUser", fields: [userId], references: [id])
-
-  // SoD Relations to Admin
-  initiator  Admin?      @relation("PayOutInitiator", fields: [initiatedBy], references: [id])
-  approver   Admin?      @relation("PayOutApprover", fields: [approvedBy], references: [id])
-  userWallet UserWallet? @relation(fields: [userWalletId], references: [id])
+  retryCount         Int                @default(0)
+  processedBy        String?
+  processedAt        DateTime?
+  processingNotes    String?
+  paymentAccountId   String?
+  fromWalletId       String?
+  scheduledFor       DateTime?
+  sentAt             DateTime?
+  confirmedAt        DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  approvalRequired   Boolean            @default(true)
+  approvedAt         DateTime?
+  approvedBy         String?
+  initiatedAt        DateTime?
+  initiatedBy        String?
+  requiresStepUpMfa  Boolean            @default(false)
+  approver           Admin?             @relation("PayOutApprover", fields: [approvedBy], references: [id])
+  cryptocurrency     Currency?          @relation(fields: [cryptocurrencyCode], references: [code])
+  fiatCurrency       FiatCurrency?      @relation("PayOutFiat", fields: [fiatCurrencyCode], references: [code])
+  platformWallet     PlatformWallet?    @relation(fields: [fromWalletId], references: [id])
+  initiator          Admin?             @relation("PayOutInitiator", fields: [initiatedBy], references: [id])
+  network            BlockchainNetwork? @relation(fields: [networkCode], references: [code])
+  order              Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentAccount     PaymentAccount?    @relation("PaymentAccountPayOuts", fields: [paymentAccountId], references: [id])
+  paymentMethod      PaymentMethod?     @relation("PayOutMethod", fields: [paymentMethodCode], references: [code])
+  processor          User?              @relation("PayOutProcessor", fields: [processedBy], references: [id])
+  user               User               @relation("PayOutUser", fields: [userId], references: [id])
+  userWallet         UserWallet?        @relation(fields: [userWalletId], references: [id])
 
   @@index([orderId])
   @@index([userId])
@@ -476,52 +454,34 @@ model PayOut {
   @@index([createdAt])
 }
 
-// Admin Audit Log - только действия администраторов
 model AdminAuditLog {
-  id String @id @default(cuid())
-
-  // Organization
-  orgId String?
-
-  // Actor (Admin)
-  adminId    String
-  adminEmail String? // Snapshot
-  adminRole  String? // Snapshot
-
-  // Action
-  action     String
-  entityType String
-  entityId   String
-
-  // Changes (diff)
-  diffBefore Json?
-  diffAfter  Json?
-  changes    Json? // Detailed diff
-
-  // Context
-  context Json? // { ip, ua, device, location, risk, etc }
-  reason  String? // For critical actions
-
-  // MFA verification
-  mfaRequired   Boolean   @default(false)
-  mfaMethod     String?
-  mfaVerifiedAt DateTime?
-  mfaEventId    String? // Link to MfaEvent
-
-  // Compliance
-  severity     String  @default("INFO") // INFO, WARNING, CRITICAL
-  isReviewable Boolean @default(false)
-  reviewedAt   DateTime?
-  reviewedBy   String?
-  reviewNotes  String?
-
-  // Immutability
-  createdAt      DateTime @default(now())
-  freezeChecksum String? // SHA-256 for integrity
-
-  // Relations
-  admin    Admin     @relation("AdminAuditLogs", fields: [adminId], references: [id], onDelete: Cascade)
-  mfaEvent MfaEvent? @relation("AdminMfaLogs", fields: [mfaEventId], references: [id], onDelete: SetNull)
+  id             String                  @id @default(cuid())
+  orgId          String?
+  adminId        String
+  adminEmail     String?
+  adminRole      String?
+  action         String
+  entityType     String
+  entityId       String
+  diffBefore     Json?
+  diffAfter      Json?
+  changes        Json?
+  context        Json?
+  reason         String?
+  mfaRequired    Boolean                 @default(false)
+  mfaMethod      String?
+  mfaVerifiedAt  DateTime?
+  mfaEventId     String?
+  severity       String                  @default("INFO")
+  isReviewable   Boolean                 @default(false)
+  reviewedAt     DateTime?
+  reviewedBy     String?
+  createdAt      DateTime                @default(now())
+  freezeChecksum String?
+  reviewNotes    String?
+  admin          Admin                   @relation("AdminAuditLogs", fields: [adminId], references: [id], onDelete: Cascade)
+  mfaEvent       MfaEvent?               @relation("AdminMfaLogs", fields: [mfaEventId], references: [id])
+  readBy         AdminNotificationRead[]
 
   @@index([orgId, createdAt(sort: Desc)])
   @@index([adminId, createdAt(sort: Desc)])
@@ -530,64 +490,41 @@ model AdminAuditLog {
   @@index([severity])
   @@index([isReviewable])
   @@index([mfaEventId])
-  
-  // Relations for read status
-  readBy AdminNotificationRead[]
 }
 
-// Admin Notification Read Status
 model AdminNotificationRead {
-  id             String   @id @default(cuid())
-  adminId        String
-  auditLogId     String
-  readAt         DateTime @default(now())
-  
-  // Relations
-  admin          Admin           @relation("AdminNotificationReads", fields: [adminId], references: [id], onDelete: Cascade)
-  auditLog       AdminAuditLog   @relation(fields: [auditLogId], references: [id], onDelete: Cascade)
-  
+  id         String        @id @default(cuid())
+  adminId    String
+  auditLogId String
+  readAt     DateTime      @default(now())
+  admin      Admin         @relation("AdminNotificationReads", fields: [adminId], references: [id], onDelete: Cascade)
+  auditLog   AdminAuditLog @relation(fields: [auditLogId], references: [id], onDelete: Cascade)
+
   @@unique([adminId, auditLogId])
   @@index([adminId, readAt])
 }
 
-// User Audit Log - только действия клиентов
 model UserAuditLog {
-  id String @id @default(cuid())
-
-  // Organization
-  orgId String?
-
-  // Actor (User/Client)
-  userId    String
-  userEmail String? // Snapshot
-  userRole  String? // Snapshot (CLIENT)
-
-  // Action
-  action     String
-  entityType String
-  entityId   String
-
-  // Changes (diff)
-  diffBefore Json?
-  diffAfter  Json?
-  changes    Json?
-
-  // Context
-  context Json? // { ip, ua, device, location, risk, etc }
-
-  // MFA verification
-  mfaRequired   Boolean   @default(false)
-  mfaMethod     String?
-  mfaVerifiedAt DateTime?
-  mfaEventId    String?
-
-  // Timestamps
-  createdAt      DateTime @default(now())
+  id             String    @id @default(cuid())
+  orgId          String?
+  userId         String
+  userEmail      String?
+  userRole       String?
+  action         String
+  entityType     String
+  entityId       String
+  diffBefore     Json?
+  diffAfter      Json?
+  changes        Json?
+  context        Json?
+  mfaRequired    Boolean   @default(false)
+  mfaMethod      String?
+  mfaVerifiedAt  DateTime?
+  mfaEventId     String?
+  createdAt      DateTime  @default(now())
   freezeChecksum String?
-
-  // Relations
-  user     User      @relation("UserAuditLogs", fields: [userId], references: [id], onDelete: Cascade)
-  mfaEvent MfaEvent? @relation("UserMfaLogs", fields: [mfaEventId], references: [id], onDelete: SetNull)
+  mfaEvent       MfaEvent? @relation("UserMfaLogs", fields: [mfaEventId], references: [id])
+  user           User      @relation("UserAuditLogs", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([orgId, createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
@@ -596,128 +533,86 @@ model UserAuditLog {
   @@index([mfaEventId])
 }
 
-// Legacy AuditLog (keep for backward compatibility, will be removed later)
 model AuditLog {
-  id String @id @default(cuid())
-
-  // Organization (for multi-tenancy)
-  orgId String?
-
-  // Actor (unified for User and Admin)
-  actorType  String?  // 'USER' | 'ADMIN' | 'SYSTEM' (nullable for legacy data)
-  actorId    String? // userId OR adminId (universal)
-  actorRole  String? // Role snapshot
-  actorEmail String? // Email snapshot
-
-  // Legacy fields (deprecated, use actorType/actorId instead)
-  userId    String? // DEPRECATED: use actorId with actorType='USER'
-  adminId   String? // DEPRECATED: use actorId with actorType='ADMIN'
-  userEmail String? // DEPRECATED: use actorEmail
-  userRole  String? // DEPRECATED: use actorRole
-
-  // What (Action)
-  action     String
-  entity     String  // DEPRECATED: use entityType
-  entityType String? // New: clearer naming
-  entityId   String
-
-  // Changes (diff)
-  oldValue   Json? // DEPRECATED: use diffBefore
-  newValue   Json? // DEPRECATED: use diffAfter
-  diffBefore Json? // New: before state
-  diffAfter  Json? // New: after state
-  changes    Json? // Detailed diff
-
-  // Context (consolidated)
-  context  Json? // New: { ip, ua, device, location, risk, etc }
-  metadata Json? // Additional metadata
-  reason   String? // For critical actions
-
-  // Legacy context fields (deprecated)
-  ipAddress String?
-  userAgent String?
-  country   String?
-  city      String?
-
-  // MFA verification
-  mfaRequired   Boolean   @default(false)
-  mfaMethod     String?
-  mfaVerifiedAt DateTime?
-  mfaEventId    String? // Link to MfaEvent table
-
-  // Compliance
-  severity     String  @default("INFO") // INFO, WARNING, CRITICAL
-  isReviewable Boolean @default(false)
-  reviewedAt   DateTime?
-  reviewedBy   String?
-
-  // Immutability
-  createdAt      DateTime @default(now())
-  hash           String? // DEPRECATED: use freezeChecksum
-  freezeChecksum String? // New: SHA-256 for integrity
-
-  // Relations
-  user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  admin    Admin?    @relation(fields: [adminId], references: [id], onDelete: SetNull)
-  mfaEvent MfaEvent? @relation("LegacyMfaLogs", fields: [mfaEventId], references: [id], onDelete: SetNull)
+  id             String    @id @default(cuid())
+  userId         String?
+  action         String
+  entity         String
+  entityId       String
+  oldValue       Json?
+  newValue       Json?
+  metadata       Json?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime  @default(now())
+  adminId        String?
+  changes        Json?
+  city           String?
+  country        String?
+  hash           String?
+  isReviewable   Boolean   @default(false)
+  mfaMethod      String?
+  mfaRequired    Boolean   @default(false)
+  mfaVerifiedAt  DateTime?
+  reason         String?
+  reviewedAt     DateTime?
+  reviewedBy     String?
+  severity       String    @default("INFO")
+  userEmail      String?
+  userRole       String?
+  actorEmail     String?
+  actorId        String?
+  actorRole      String?
+  actorType      String?
+  context        Json?
+  diffAfter      Json?
+  diffBefore     Json?
+  entityType     String?
+  freezeChecksum String?
+  mfaEventId     String?
+  orgId          String?
+  admin          Admin?    @relation(fields: [adminId], references: [id])
+  mfaEvent       MfaEvent? @relation("LegacyMfaLogs", fields: [mfaEventId], references: [id])
+  user           User?     @relation(fields: [userId], references: [id])
 
   @@index([orgId, createdAt(sort: Desc)])
   @@index([actorType, actorId])
-  @@index([userId]) // Legacy
-  @@index([adminId]) // Legacy
-  @@index([entity, entityId]) // Legacy
+  @@index([userId])
+  @@index([adminId])
+  @@index([entity, entityId])
   @@index([entityType, entityId])
   @@index([action])
   @@index([createdAt])
   @@index([severity])
   @@index([isReviewable])
-  @@index([userRole]) // Legacy
+  @@index([userRole])
   @@index([mfaEventId])
 }
 
-// MFA Events - общая таблица для User и Admin
 model MfaEvent {
-  id String @id @default(cuid())
-
-  // Organization
-  orgId String?
-
-  // Actor
-  actorId   String
-  actorType String // 'USER' | 'ADMIN'
-  actorRole String?
-
-  // Event details
-  actionType String // 'STEPUP' | 'LOGIN' | 'REGISTER'
-  method     String // 'WEBAUTHN' | 'TOTP' | 'BACKUP_CODE'
-
-  // WebAuthn specific
-  userVerification Boolean? // UV flag
-  credentialIdHash String? // Hashed credential ID (not full ID!)
-  aaguid           String? // Authenticator AAGUID
-  signCount        Int? // Signature counter
-
-  // Challenge
-  challengeId String?
-
-  // Result
-  result       String // 'SUCCESS' | 'FAILED' | 'EXPIRED'
-  errorCode    String?
-  errorMessage String?
-
-  // Context
-  ipAddress  String
-  userAgent  String?
-  deviceInfo Json? // Browser, OS, device type
-
-  // Timestamps
-  createdAt DateTime @default(now())
-
-  // Relations
-  admin          Admin?           @relation("AdminMfaEvents", fields: [actorId], references: [id], onDelete: SetNull)
-  adminAuditLogs AdminAuditLog[]  @relation("AdminMfaLogs")
-  userAuditLogs  UserAuditLog[]   @relation("UserMfaLogs")
-  legacyLogs     AuditLog[]       @relation("LegacyMfaLogs")
+  id               String          @id @default(cuid())
+  orgId            String?
+  actorId          String
+  actorType        String
+  actorRole        String?
+  actionType       String
+  method           String
+  userVerification Boolean?
+  credentialIdHash String?
+  aaguid           String?
+  signCount        Int?
+  challengeId      String?
+  result           String
+  errorCode        String?
+  errorMessage     String?
+  ipAddress        String
+  userAgent        String?
+  deviceInfo       Json?
+  createdAt        DateTime        @default(now())
+  adminAuditLogs   AdminAuditLog[] @relation("AdminMfaLogs")
+  legacyLogs       AuditLog[]      @relation("LegacyMfaLogs")
+  admin            Admin           @relation("AdminMfaEvents", fields: [actorId], references: [id], onDelete: SetNull)
+  userAuditLogs    UserAuditLog[]  @relation("UserMfaLogs")
 
   @@index([actorId, createdAt(sort: Desc)])
   @@index([orgId, createdAt(sort: Desc)])
@@ -726,40 +621,23 @@ model MfaEvent {
   @@index([actionType])
 }
 
-// System Logs - технические события
 model SystemLog {
-  id String @id @default(cuid())
-
-  // Organization
-  orgId String?
-
-  // Source
-  source String? // 'KYCAID_WEBHOOK' | 'RAPYD_WEBHOOK' | 'TATUM_API' | 'NODE' (nullable for legacy)
-  level  String? // 'INFO' | 'WARN' | 'ERROR' | 'CRITICAL' (nullable for legacy)
-
-  // Event details
-  eventType   String? // 'WEBHOOK_RECEIVED' | 'API_CALL' | 'INTEGRATION_SYNC' (nullable for legacy)
-  endpoint    String?
-  method      String?
-  statusCode  Int?
-
-  // Payload (sanitized - no secrets!)
+  id           String   @id @default(cuid())
+  method       String?
+  statusCode   Int?
+  responseTime Int?
+  errorMessage String?
+  errorStack   String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  endpoint     String?
+  eventType    String?
+  level        String?
+  orgId        String?
   payload      Json?
   requestBody  Json?
   responseBody Json?
-
-  // Error details
-  errorMessage String?
-  errorStack   String? @db.Text
-
-  // Performance
-  responseTime Int? // milliseconds
-
-  // Context
-  metadata Json?
-
-  // Timestamps
-  createdAt DateTime @default(now())
+  source       String?
 
   @@index([source, createdAt(sort: Desc)])
   @@index([level, createdAt(sort: Desc)])
@@ -768,23 +646,21 @@ model SystemLog {
 }
 
 model EmailLog {
-  id          String      @id @default(cuid())
-  userId      String?
-  recipient   String
-  subject     String
-  template    String      // Template key (e.g., 'ORDER_CREATED')
-  status      EmailStatus @default(PENDING)
-  sentAt      DateTime?
-  deliveredAt DateTime?
-  failedAt    DateTime?
-  error       String?
-  metadata    Json?
-  createdAt   DateTime    @default(now())
-  
-  // Relations
-  user            User?          @relation(fields: [userId], references: [id])
-  emailTemplate   EmailTemplate? @relation("TemplateUsed", fields: [templateId], references: [id])
-  templateId      String?
+  id            String         @id @default(cuid())
+  userId        String?
+  recipient     String
+  subject       String
+  template      String
+  status        EmailStatus    @default(PENDING)
+  sentAt        DateTime?
+  deliveredAt   DateTime?
+  failedAt      DateTime?
+  error         String?
+  metadata      Json?
+  createdAt     DateTime       @default(now())
+  templateId    String?
+  emailTemplate EmailTemplate? @relation("TemplateUsed", fields: [templateId], references: [id])
+  user          User?          @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([status])
@@ -1342,46 +1218,32 @@ model SessionRevocation {
 }
 
 model AdminSettings {
-  id      String  @id @default(cuid())
-  userId  String? @unique // Optional - for backward compatibility with User
-  adminId String? @unique // New - for Admin model
-
-  // Session Management
-  idleTimeout        Int     @default(15)
-  maxSessionDuration Int     @default(8)
-  sessionTimeout     Int     @default(30) // Deprecated, use idleTimeout
-  rememberDevice     Boolean @default(false)
-
-  // MFA Settings
-  twoFactorEnabled Boolean  @default(false)
-  twoFactorMethod  String?
-  requireMfaAlways Boolean  @default(false)
-  requireStepUpFor String[] @default([])
-
-  // Security
+  id                  String   @id @default(cuid())
+  userId              String?  @unique
+  sessionTimeout      Int      @default(30)
+  twoFactorEnabled    Boolean  @default(false)
+  twoFactorMethod     String?
   loginNotifications  Boolean  @default(true)
   activityDigest      Boolean  @default(false)
   securityAlerts      Boolean  @default(true)
   allowedIPs          String[] @default([])
   blockUnknownDevices Boolean  @default(false)
-
-  // Audit
-  logAllActions Boolean @default(true)
-  retainLogsFor Int     @default(90)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations (one will be null)
-  user  User?  @relation("AdminSettings", fields: [userId], references: [id], onDelete: Cascade)
-  admin Admin? @relation("AdminToSettings", fields: [adminId], references: [id], onDelete: Cascade)
+  logAllActions       Boolean  @default(true)
+  retainLogsFor       Int      @default(90)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  adminId             String?  @unique
+  idleTimeout         Int      @default(15)
+  maxSessionDuration  Int      @default(8)
+  rememberDevice      Boolean  @default(false)
+  requireMfaAlways    Boolean  @default(false)
+  requireStepUpFor    String[] @default([])
+  admin               Admin?   @relation("AdminToSettings", fields: [adminId], references: [id], onDelete: Cascade)
+  user                User?    @relation("AdminSettings", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([adminId])
 }
-
-// KycProvider model removed - we use Integration table instead for all providers (KYC, Blockchain, Payment, etc.)
-// This follows our modular architecture where all integrations are managed through the Integration system
 
 model KycProfile {
   id                     String     @id @default(cuid())
@@ -1498,6 +1360,445 @@ model DocumentTemplate {
   @@index([category])
 }
 
+model Admin {
+  id                String                  @id @default(cuid())
+  email             String?
+  password          String?
+  firstName         String
+  lastName          String
+  role              AdminRole               @default(ADMIN)
+  isActive          Boolean                 @default(true)
+  isSuspended       Boolean                 @default(false)
+  suspendedUntil    DateTime?
+  lastLogin         DateTime?
+  authMethod        AuthMethod              @default(PASSWORD)
+  ssoProvider       String?
+  ssoSubject        String?
+  createdAt         DateTime                @default(now())
+  createdBy         String?
+  updatedAt         DateTime                @updatedAt
+  setupToken        String?                 @unique
+  setupTokenExpiry  DateTime?
+  canApprovePayout  Boolean                 @default(false)
+  canInitiatePayout Boolean                 @default(false)
+  department        String?
+  employeeId        String?                 @unique @default(cuid())
+  invitedAt         DateTime?
+  invitedBy         String?
+  jobTitle          String?
+  locale            String                  @default("en")
+  managerId         String?
+  orgId             String                  @default("default")
+  scope             Json?
+  status            AdminStatus             @default(ACTIVE)
+  timezone          String                  @default("UTC")
+  workEmail         String?                 @unique
+  roleCode          String?                 @default("ADMIN")
+  inviter           Admin?                  @relation("AdminInviter", fields: [invitedBy], references: [id])
+  invitedAdmins     Admin[]                 @relation("AdminInviter")
+  manager           Admin?                  @relation("ManagerSubordinates", fields: [managerId], references: [id])
+  subordinates      Admin[]                 @relation("ManagerSubordinates")
+  roleModel         RoleModel?              @relation("AdminRole", fields: [roleCode], references: [code])
+  auditLogs         AdminAuditLog[]         @relation("AdminAuditLogs")
+  notificationReads AdminNotificationRead[] @relation("AdminNotificationReads")
+  sessions          AdminSession[]
+  settings          AdminSettings?          @relation("AdminToSettings")
+  twoFactorAuth     AdminTwoFactorAuth?
+  auditLogsCreated  AuditLog[]
+  mfaChallenges     MfaChallenge[]
+  mfaEvents         MfaEvent[]              @relation("AdminMfaEvents")
+  oneTimeTokens     OneTimeAuthToken[]      @relation("AdminOTAT")
+  payInsApproved    PayIn[]                 @relation("PayInApprover")
+  payInsInitiated   PayIn[]                 @relation("PayInInitiator")
+  payOutsApproved   PayOut[]                @relation("PayOutApprover")
+  payOutsInitiated  PayOut[]                @relation("PayOutInitiator")
+  webAuthnCreds     WebAuthnCredential[]
+
+  @@unique([ssoProvider, ssoSubject])
+  @@index([workEmail])
+  @@index([orgId])
+  @@index([role])
+  @@index([status])
+  @@index([managerId])
+  @@index([invitedBy])
+  @@index([setupToken])
+}
+
+model RoleModel {
+  code        String           @id @unique
+  name        String
+  description String?
+  isSystem    Boolean          @default(false)
+  isActive    Boolean          @default(true)
+  priority    Int              @default(0)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  admins      Admin[]          @relation("AdminRole")
+  permissions RolePermission[]
+
+  @@index([isActive])
+  @@map("Role_")
+}
+
+model Permission {
+  code        String           @id @unique
+  name        String
+  resource    String
+  action      String
+  description String?
+  category    String
+  isSystem    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  roles       RolePermission[]
+
+  @@unique([resource, action])
+  @@index([resource])
+  @@index([category])
+}
+
+model RolePermission {
+  id             String     @id @default(cuid())
+  roleCode       String
+  permissionCode String
+  createdAt      DateTime   @default(now())
+  permission     Permission @relation(fields: [permissionCode], references: [code], onDelete: Cascade)
+  role           RoleModel  @relation(fields: [roleCode], references: [code], onDelete: Cascade)
+
+  @@unique([roleCode, permissionCode])
+  @@index([roleCode])
+  @@index([permissionCode])
+}
+
+model WebAuthnCredential {
+  id           String    @id @default(cuid())
+  adminId      String
+  credentialId String    @unique
+  publicKey    String
+  counter      Int       @default(0)
+  deviceName   String?
+  deviceType   String?
+  transports   String[]
+  aaguid       String?
+  attestation  String?
+  isActive     Boolean   @default(true)
+  lastUsed     DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  admin        Admin     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([credentialId])
+}
+
+model AdminTwoFactorAuth {
+  id               String    @id @default(cuid())
+  adminId          String    @unique
+  totpEnabled      Boolean   @default(false)
+  totpSecret       String?
+  totpVerifiedAt   DateTime?
+  webAuthnEnabled  Boolean   @default(false)
+  webAuthnRequired Boolean   @default(false)
+  backupCodes      Json?
+  preferredMethod  String    @default("TOTP")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  admin            Admin     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+}
+
+model MfaChallenge {
+  id            String             @id @default(cuid())
+  adminId       String
+  action        String
+  resourceType  String?
+  resourceId    String?
+  challengeType String
+  challenge     String
+  status        MfaChallengeStatus @default(PENDING)
+  attempts      Int                @default(0)
+  maxAttempts   Int                @default(3)
+  verifiedAt    DateTime?
+  verifiedWith  String?
+  expiresAt     DateTime
+  createdAt     DateTime           @default(now())
+  admin         Admin              @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId, status])
+  @@index([expiresAt])
+}
+
+model AdminSession {
+  id                String    @id @default(cuid())
+  adminId           String
+  sessionId         String    @unique
+  sessionToken      String    @unique
+  sessionKey        String
+  ipAddress         String
+  deviceType        String?
+  browser           String?
+  browserVersion    String?
+  os                String?
+  osVersion         String?
+  userAgent         String
+  country           String?
+  city              String?
+  mfaMethod         String?
+  mfaVerifiedAt     DateTime?
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  lastActivity      DateTime  @default(now())
+  expiresAt         DateTime
+  idleTimeout       Int?
+  maxDuration       Int?
+  terminatedAt      DateTime?
+  terminatedBy      String?
+  terminationReason String?
+  updatedAt         DateTime  @updatedAt
+  admin             Admin     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId, isActive])
+  @@index([sessionId])
+  @@index([sessionToken])
+  @@index([sessionKey])
+  @@index([lastActivity])
+  @@index([expiresAt])
+  @@index([ipAddress])
+}
+
+model BreakGlassUser {
+  id                 String    @id @default(cuid())
+  username           String    @unique
+  passwordHash       String
+  totpSecret         String
+  isActive           Boolean   @default(false)
+  lastUsed           DateTime?
+  usageCount         Int       @default(0)
+  accessInstructions String
+  autoDisableAfter   Int       @default(24)
+  createdAt          DateTime  @default(now())
+}
+
+model AuditLogEnhanced {
+  id            String    @id @default(cuid())
+  userId        String?
+  userEmail     String?
+  userRole      String?
+  action        String
+  entity        String
+  entityId      String
+  oldValue      Json?
+  newValue      Json?
+  changes       Json?
+  metadata      Json?
+  reason        String?
+  ipAddress     String
+  userAgent     String
+  country       String?
+  city          String?
+  mfaRequired   Boolean   @default(false)
+  mfaMethod     String?
+  mfaVerifiedAt DateTime?
+  severity      String    @default("INFO")
+  isReviewable  Boolean   @default(false)
+  reviewedAt    DateTime?
+  reviewedBy    String?
+  createdAt     DateTime  @default(now())
+  hash          String?
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([severity])
+  @@index([isReviewable])
+  @@index([userRole])
+  @@map("AuditLog_Enhanced")
+}
+
+model OneTimeAuthToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  adminId   String
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  usedAt    DateTime?
+  usedFrom  String?
+  admin     Admin     @relation("AdminOTAT", fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([token, expiresAt])
+  @@index([adminId])
+  @@map("OneTimeAuthToken")
+}
+
+model NotificationEventCategory {
+  id          String                      @id @default(cuid())
+  code        String                      @unique
+  name        String
+  description String?
+  icon        String?
+  color       String?
+  parentId    String?
+  isSystem    Boolean                     @default(false)
+  isActive    Boolean                     @default(true)
+  sortOrder   Int                         @default(0)
+  createdAt   DateTime                    @default(now())
+  updatedAt   DateTime                    @updatedAt
+  createdBy   String?
+  events      NotificationEvent[]         @relation("EventCategoryToEvent")
+  parent      NotificationEventCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    NotificationEventCategory[] @relation("CategoryHierarchy")
+
+  @@index([code])
+  @@index([parentId])
+  @@index([isActive])
+  @@index([sortOrder])
+}
+
+model NotificationEvent {
+  id                String                     @id @default(cuid())
+  eventKey          String                     @unique
+  name              String
+  description       String?
+  category          EventCategory              @default(SYSTEM)
+  channels          NotificationChannel[]
+  priority          EventPriority              @default(NORMAL)
+  isActive          Boolean                    @default(true)
+  isSystem          Boolean                    @default(false)
+  templateKey       String?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  categoryId        String?
+  developerNotes    String?
+  examplePayload    Json?
+  optionalVariables String[]                   @default([])
+  requiredVariables String[]                   @default([])
+  templateId        String?
+  usageExamples     Json?
+  variableSchema    Json?
+  eventCategory     NotificationEventCategory? @relation("EventCategoryToEvent", fields: [categoryId], references: [id])
+  emailTemplate     EmailTemplate?             @relation("EventEmailTemplate", fields: [templateId], references: [id])
+  queue             NotificationQueue[]
+  subscriptions     NotificationSubscription[]
+
+  @@index([eventKey])
+  @@index([category])
+  @@index([isActive])
+  @@index([templateId])
+}
+
+model NotificationQueue {
+  id             String              @id @default(cuid())
+  eventKey       String
+  userId         String?
+  recipientEmail String?
+  recipientPhone String?
+  channel        NotificationChannel
+  subject        String?
+  message        String
+  data           Json
+  templateKey    String?
+  status         QueueStatus         @default(PENDING)
+  attempts       Int                 @default(0)
+  maxAttempts    Int                 @default(3)
+  scheduledFor   DateTime            @default(now())
+  processedAt    DateTime?
+  sentAt         DateTime?
+  failedAt       DateTime?
+  messageId      String?
+  error          String?
+  errorDetails   Json?
+  providerId     String?
+  metadata       Json?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  event          NotificationEvent   @relation(fields: [eventKey], references: [eventKey])
+  user           User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, scheduledFor])
+  @@index([userId])
+  @@index([channel])
+  @@index([eventKey])
+  @@index([createdAt])
+}
+
+model NotificationHistory {
+  id        String              @id @default(cuid())
+  userId    String
+  eventKey  String
+  channel   NotificationChannel
+  title     String
+  message   String
+  data      Json?
+  isRead    Boolean             @default(false)
+  readAt    DateTime?
+  isClicked Boolean             @default(false)
+  clickedAt DateTime?
+  actionUrl String?
+  createdAt DateTime            @default(now())
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@index([eventKey])
+}
+
+model NotificationSubscription {
+  id           String                @id @default(cuid())
+  userId       String
+  eventKey     String
+  emailEnabled Boolean               @default(true)
+  inAppEnabled Boolean               @default(true)
+  smsEnabled   Boolean               @default(false)
+  pushEnabled  Boolean               @default(false)
+  frequency    NotificationFrequency @default(INSTANT)
+  quietHours   Json?
+  isActive     Boolean               @default(true)
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  event        NotificationEvent     @relation(fields: [eventKey], references: [eventKey])
+  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventKey])
+  @@index([userId])
+  @@index([eventKey])
+}
+
+model EmailTemplate {
+  id                 String              @id @default(cuid())
+  orgId              String?
+  key                String
+  name               String
+  description        String?
+  category           EmailCategory
+  subject            String
+  htmlContent        String
+  textContent        String?
+  preheader          String?
+  layout             String              @default("default")
+  variables          Json
+  metadata           Json?
+  version            Int                 @default(1)
+  isActive           Boolean             @default(true)
+  isDefault          Boolean             @default(false)
+  status             TemplateStatus      @default(DRAFT)
+  publishedAt        DateTime?
+  publishedBy        String?
+  createdBy          String?
+  updatedBy          String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  editorContent      Json?
+  emailLogs          EmailLog[]          @relation("TemplateUsed")
+  notificationEvents NotificationEvent[] @relation("EventEmailTemplate")
+
+  @@unique([orgId, key, version])
+  @@index([orgId, key])
+  @@index([category])
+  @@index([status])
+  @@index([isActive])
+}
+
 enum Role {
   CLIENT
   ADMIN
@@ -1602,11 +1903,6 @@ enum DocumentStatus {
   ARCHIVED
 }
 
-//  ==========================================
-// IDENTITY & ACCESS MANAGEMENT - NEW MODELS
-// ==========================================
-
-// New Enums
 enum AdminRole {
   SUPER_ADMIN
   ADMIN
@@ -1618,10 +1914,10 @@ enum AdminRole {
 }
 
 enum AdminStatus {
-  INVITED // Приглашён, ожидает регистрации Passkey (15 минут)
-  ACTIVE // Активный
-  SUSPENDED // Приостановлен (временно)
-  TERMINATED // Уволен (permanent)
+  INVITED
+  ACTIVE
+  SUSPENDED
+  TERMINATED
 }
 
 enum AuthMethod {
@@ -1637,618 +1933,6 @@ enum MfaChallengeStatus {
   EXPIRED
   FAILED
 }
-
-// Admin Model (separate from User)
-model Admin {
-  id    String @id @default(cuid())
-  orgId String @default("default") // Tenant/Organization ID
-
-  // Basic Identity (Required)
-  firstName String // Имя
-  lastName  String // Фамилия
-  workEmail String? @unique // Корпоративная почта (уникальный логин) - temporarily optional
-  jobTitle  String? // Должность: Compliance Officer, Treasury Approver, etc. - temporarily optional
-
-  // Optional Identity
-  department String? // Отдел
-  employeeId String? @unique @default(cuid()) // Уникальный табельный номер (автогенерация)
-  managerId  String? // ID руководителя (для заявок/лимитов)
-
-  // Localization
-  locale   String @default("en") // en, ru, uk, etc.
-  timezone String @default("UTC") // Europe/Kiev, UTC, etc.
-
-  // Legacy field (for backward compatibility)
-  email    String? // Deprecated: use workEmail instead
-  password String? // Optional if using SSO/Passkey only
-
-  // Role and Access (RBAC/SoD)
-  role     AdminRole  @default(ADMIN) // Legacy enum (deprecated, use roleCode)
-  roleCode String?    @default("ADMIN") // New: reference to RoleModel table
-  roleModel RoleModel? @relation("AdminRole", fields: [roleCode], references: [code], onDelete: SetNull)
-
-  // Separation of Duties (SoD) flags
-  canInitiatePayout Boolean @default(false) // Может инициировать выплату
-  canApprovePayout  Boolean @default(false) // Может утверждать выплату
-
-  // Scope (JSON: какие подразделения/продукты админ видит)
-  scope Json? // { departments: ["treasury", "compliance"], products: ["crypto", "fiat"] }
-
-  // Status
-  status AdminStatus @default(ACTIVE) // ACTIVE, SUSPENDED, TERMINATED
-
-  // Legacy status fields (for backward compatibility)
-  isActive       Boolean   @default(true)
-  isSuspended    Boolean   @default(false)
-  suspendedUntil DateTime?
-  lastLogin      DateTime?
-
-  // Auth methods
-  authMethod  AuthMethod @default(PASSWORD)
-  ssoProvider String? // google-workspace, microsoft, okta
-  ssoSubject  String? // SSO subject ID
-
-  // First-time setup (for Passkey registration via invite link)
-  setupToken       String?   @unique // Hashed token for invite link
-  setupTokenExpiry DateTime? // Token expiration
-  invitedBy        String? // Admin ID who invited
-  invitedAt        DateTime? // Invitation timestamp
-
-  // Metadata
-  createdAt DateTime @default(now())
-  createdBy String? // Admin ID who created
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  twoFactorAuth       AdminTwoFactorAuth?
-  sessions            AdminSession[]
-  settings            AdminSettings?       @relation("AdminToSettings")
-  webAuthnCreds       WebAuthnCredential[]
-  mfaChallenges       MfaChallenge[]
-  oneTimeTokens       OneTimeAuthToken[]   @relation("AdminOTAT")
-  
-  // Audit Logs
-  auditLogs           AdminAuditLog[]      @relation("AdminAuditLogs") // NEW: отдельная таблица для админов
-  auditLogsCreated    AuditLog[]           // LEGACY: старая таблица
-  mfaEvents           MfaEvent[]           @relation("AdminMfaEvents")
-  notificationReads   AdminNotificationRead[] @relation("AdminNotificationReads") // Read status for notifications
-  
-  subordinates        Admin[]              @relation("ManagerSubordinates") // Подчинённые
-  manager             Admin?               @relation("ManagerSubordinates", fields: [managerId], references: [id])
-  payInsInitiated     PayIn[]              @relation("PayInInitiator")
-  payInsApproved      PayIn[]              @relation("PayInApprover")
-  payOutsInitiated    PayOut[]             @relation("PayOutInitiator")
-  payOutsApproved     PayOut[]             @relation("PayOutApprover")
-  invitedAdmins       Admin[]              @relation("AdminInviter") // Admins invited by this admin
-  inviter             Admin?               @relation("AdminInviter", fields: [invitedBy], references: [id])
-
-  @@unique([ssoProvider, ssoSubject])
-  @@index([workEmail])
-  @@index([orgId])
-  @@index([role])
-  @@index([status])
-  @@index([managerId])
-  @@index([invitedBy])
-  @@index([setupToken])
-}
-
-// Roles and Permissions
-model RoleModel {
-  code        String   @id @unique
-  name        String
-  description String?
-  isSystem    Boolean  @default(false)
-  isActive    Boolean  @default(true)
-  priority    Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  permissions RolePermission[]
-  admins      Admin[]          @relation("AdminRole")
-
-  @@index([isActive])
-  @@map("Role_")
-}
-
-model Permission {
-  code        String   @id @unique
-  name        String
-  resource    String
-  action      String
-  description String?
-  category    String
-  isSystem    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-
-  roles RolePermission[]
-
-  @@unique([resource, action])
-  @@index([resource])
-  @@index([category])
-}
-
-model RolePermission {
-  id             String   @id @default(cuid())
-  roleCode       String
-  permissionCode String
-  createdAt      DateTime @default(now())
-
-  role       RoleModel  @relation(fields: [roleCode], references: [code], onDelete: Cascade)
-  permission Permission @relation(fields: [permissionCode], references: [code], onDelete: Cascade)
-
-  @@unique([roleCode, permissionCode])
-  @@index([roleCode])
-  @@index([permissionCode])
-}
-
-// WebAuthn Credentials (Passkeys)
-model WebAuthnCredential {
-  id      String @id @default(cuid())
-  adminId String
-
-  // WebAuthn fields
-  credentialId String @unique
-  publicKey    String
-  counter      Int    @default(0)
-
-  // Device info
-  deviceName String?
-  deviceType String?
-  transports String[]
-
-  // Attestation
-  aaguid      String?
-  attestation String?
-
-  // Status
-  isActive Boolean   @default(true)
-  lastUsed DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
-
-  @@index([adminId])
-  @@index([credentialId])
-}
-
-// Admin 2FA (TOTP + WebAuthn)
-model AdminTwoFactorAuth {
-  id      String @id @default(cuid())
-  adminId String @unique
-
-  // TOTP
-  totpEnabled    Boolean   @default(false)
-  totpSecret     String?
-  totpVerifiedAt DateTime?
-
-  // WebAuthn
-  webAuthnEnabled  Boolean @default(false)
-  webAuthnRequired Boolean @default(false)
-
-  // Backup codes
-  backupCodes Json?
-
-  // Settings
-  preferredMethod String @default("TOTP")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
-
-  @@index([adminId])
-}
-
-// MFA Challenges (Step-up MFA)
-model MfaChallenge {
-  id           String  @id @default(cuid())
-  adminId      String
-  action       String
-  resourceType String?
-  resourceId   String?
-
-  // Challenge details
-  challengeType String
-  challenge     String
-
-  // Status
-  status      MfaChallengeStatus @default(PENDING)
-  attempts    Int                @default(0)
-  maxAttempts Int                @default(3)
-
-  // Verification
-  verifiedAt   DateTime?
-  verifiedWith String?
-
-  // Expiration
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
-
-  @@index([adminId, status])
-  @@index([expiresAt])
-}
-
-// Admin Sessions (Enhanced)
-model AdminSession {
-  id      String @id @default(cuid())
-  adminId String
-
-  // Session identification
-  sessionId    String @unique
-  sessionToken String @unique
-  sessionKey   String
-
-  // Device info
-  ipAddress      String
-  deviceType     String?
-  browser        String?
-  browserVersion String?
-  os             String?
-  osVersion      String?
-  userAgent      String
-
-  // Location
-  country String?
-  city    String?
-
-  // MFA info
-  mfaMethod     String?
-  mfaVerifiedAt DateTime?
-
-  // Status
-  isActive Boolean @default(true)
-
-  // Timeouts
-  createdAt    DateTime @default(now())
-  lastActivity DateTime @default(now())
-  expiresAt    DateTime
-
-  // Settings
-  idleTimeout Int?
-  maxDuration Int?
-
-  // Termination
-  terminatedAt      DateTime?
-  terminatedBy      String?
-  terminationReason String?
-
-  updatedAt DateTime @updatedAt
-
-  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
-
-  @@index([adminId, isActive])
-  @@index([sessionId])
-  @@index([sessionToken])
-  @@index([sessionKey])
-  @@index([lastActivity])
-  @@index([expiresAt])
-  @@index([ipAddress])
-}
-
-// Break-glass Emergency Access
-model BreakGlassUser {
-  id           String @id @default(cuid())
-  username     String @unique
-  passwordHash String
-  totpSecret   String
-
-  // Restrictions
-  isActive   Boolean   @default(false)
-  lastUsed   DateTime?
-  usageCount Int       @default(0)
-
-  // Access info
-  accessInstructions String
-
-  // Auto-disable
-  autoDisableAfter Int @default(24)
-
-  createdAt DateTime @default(now())
-}
-
-// Enhanced Audit Log
-model AuditLogEnhanced {
-  id String @id @default(cuid())
-
-  // Who
-  userId    String?
-  userEmail String?
-  userRole  String?
-
-  // What
-  action   String
-  entity   String
-  entityId String
-
-  // Changes
-  oldValue Json?
-  newValue Json?
-  changes  Json?
-
-  // Context
-  metadata Json?
-  reason   String?
-
-  // Where & When
-  ipAddress String
-  userAgent String
-  country   String?
-  city      String?
-
-  // MFA verification
-  mfaRequired   Boolean   @default(false)
-  mfaMethod     String?
-  mfaVerifiedAt DateTime?
-
-  // Compliance
-  severity     String    @default("INFO")
-  isReviewable Boolean   @default(false)
-  reviewedAt   DateTime?
-  reviewedBy   String?
-
-  // Immutability
-  createdAt DateTime @default(now())
-  hash      String?
-
-  @@index([userId])
-  @@index([entity, entityId])
-  @@index([action])
-  @@index([createdAt])
-  @@index([severity])
-  @@index([isReviewable])
-  @@index([userRole])
-  @@map("AuditLog_Enhanced")
-}
-
-// One-Time Authentication Token for secure Passkey session creation
-model OneTimeAuthToken {
-  id      String @id @default(cuid())
-  token   String @unique
-  adminId String
-  admin   Admin  @relation("AdminOTAT", fields: [adminId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime  @default(now())
-  expiresAt DateTime
-  usedAt    DateTime?
-  usedFrom  String? // IP address
-
-  @@index([token, expiresAt])
-  @@index([adminId])
-  @@map("OneTimeAuthToken")
-}
-
-// ============================================================================
-// NOTIFICATION SYSTEM
-// ============================================================================
-
-// ============================================================================
-// NOTIFICATION EVENT CATEGORIES - Dynamic categories
-// ============================================================================
-
-model NotificationEventCategory {
-  id          String   @id @default(cuid())
-  code        String   @unique // 'ORDER', 'KYC', 'PAYMENT'
-  name        String   // "Order Management"
-  description String?
-  
-  // Visual
-  icon        String?  // 'ShoppingCart', 'Shield', 'CreditCard' (Lucide icon names)
-  color       String?  // '#3B82F6', '#10B981' (hex color)
-  
-  // Hierarchy (optional - for nested categories)
-  parentId    String?
-  parent      NotificationEventCategory? @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children    NotificationEventCategory[] @relation("CategoryHierarchy")
-  
-  // Settings
-  isSystem    Boolean  @default(false) // System categories cannot be deleted
-  isActive    Boolean  @default(true)
-  sortOrder   Int      @default(0)
-  
-  // Relations
-  events      NotificationEvent[] @relation("EventCategoryToEvent")
-  
-  // Audit
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  createdBy   String?
-  
-  @@index([code])
-  @@index([parentId])
-  @@index([isActive])
-  @@index([sortOrder])
-}
-
-// Notification Events - система событий для уведомлений
-model NotificationEvent {
-  id          String   @id @default(cuid())
-  eventKey    String   @unique // 'ORDER_CREATED', 'KYC_APPROVED', etc.
-  name        String   // "Order Created"
-  description String?
-  
-  // Category (NEW: relation to NotificationEventCategory model)
-  categoryId  String?
-  eventCategory NotificationEventCategory? @relation("EventCategoryToEvent", fields: [categoryId], references: [id], onDelete: SetNull)
-  
-  // DEPRECATED: Old enum-based category (kept for backward compatibility)
-  category    EventCategory @default(SYSTEM)
-  
-  // Channels - какие каналы поддерживает это событие
-  channels    NotificationChannel[] // ['EMAIL', 'IN_APP', 'SMS']
-  
-  // Priority
-  priority    EventPriority @default(NORMAL)
-  
-  // Status
-  isActive    Boolean  @default(true)
-  isSystem    Boolean  @default(false) // System events cannot be deleted
-  
-  // Template integration
-  templateId    String?
-  emailTemplate EmailTemplate? @relation("EventEmailTemplate", fields: [templateId], references: [id], onDelete: SetNull)
-  templateKey   String? // Deprecated: use templateId instead (kept for backward compatibility)
-  
-  // Variable Schema (Payload Documentation)
-  variableSchema    Json?     // JSON Schema for payload validation
-  requiredVariables String[]  @default([]) // ['orderId', 'amount', 'currency']
-  optionalVariables String[]  @default([]) // ['couponCode', 'note']
-  examplePayload    Json?     // Example data for developers
-  
-  // Documentation
-  developerNotes    String?   @db.Text // Technical notes for developers
-  usageExamples     Json?     // Code examples: { javascript: '...', curl: '...' }
-  
-  // Timestamps
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // Relations
-  subscriptions NotificationSubscription[]
-  queue         NotificationQueue[]
-  
-  @@index([eventKey])
-  @@index([category])
-  @@index([isActive])
-  @@index([templateId])
-}
-
-// Notification Queue - очередь для асинхронной отправки
-model NotificationQueue {
-  id            String   @id @default(cuid())
-  
-  // Event
-  eventKey      String
-  event         NotificationEvent @relation(fields: [eventKey], references: [eventKey])
-  
-  // Recipient
-  userId        String?
-  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  recipientEmail String? // For non-users or explicit email
-  recipientPhone String? // For SMS
-  
-  // Channel
-  channel       NotificationChannel
-  
-  // Content
-  subject       String?  // For email
-  message       String   @db.Text
-  data          Json     // Event data for rendering
-  
-  // Template
-  templateKey   String?
-  
-  // Status
-  status        QueueStatus @default(PENDING)
-  attempts      Int         @default(0)
-  maxAttempts   Int         @default(3)
-  
-  // Scheduling
-  scheduledFor  DateTime    @default(now())
-  processedAt   DateTime?
-  sentAt        DateTime?
-  failedAt      DateTime?
-  
-  // Result
-  messageId     String?     // Provider's message ID
-  error         String?
-  errorDetails  Json?
-  
-  // Provider
-  providerId    String?     // Which provider was used (resend, twilio, etc.)
-  
-  // Metadata
-  metadata      Json?
-  
-  // Timestamps
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  
-  @@index([status, scheduledFor])
-  @@index([userId])
-  @@index([channel])
-  @@index([eventKey])
-  @@index([createdAt])
-}
-
-// Notification History - история уведомлений (для in-app)
-model NotificationHistory {
-  id          String   @id @default(cuid())
-  
-  // User
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // Event
-  eventKey    String
-  
-  // Channel
-  channel     NotificationChannel
-  
-  // Content
-  title       String
-  message     String   @db.Text
-  data        Json?
-  
-  // Status
-  isRead      Boolean  @default(false)
-  readAt      DateTime?
-  
-  // Actions
-  isClicked   Boolean  @default(false)
-  clickedAt   DateTime?
-  
-  // Link
-  actionUrl   String?
-  
-  // Timestamps
-  createdAt   DateTime @default(now())
-  
-  @@index([userId, isRead])
-  @@index([userId, createdAt])
-  @@index([eventKey])
-}
-
-// Notification Subscription - настройки пользователя
-model NotificationSubscription {
-  id          String   @id @default(cuid())
-  
-  // User
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // Event
-  eventKey    String
-  event       NotificationEvent @relation(fields: [eventKey], references: [eventKey])
-  
-  // Channels (какие каналы включены для этого события)
-  emailEnabled   Boolean @default(true)
-  inAppEnabled   Boolean @default(true)
-  smsEnabled     Boolean @default(false)
-  pushEnabled    Boolean @default(false)
-  
-  // Preferences
-  frequency   NotificationFrequency @default(INSTANT)
-  quietHours  Json? // { start: "22:00", end: "08:00", timezone: "Europe/Warsaw" }
-  
-  // Status
-  isActive    Boolean  @default(true)
-  
-  // Timestamps
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@unique([userId, eventKey])
-  @@index([userId])
-  @@index([eventKey])
-}
-
-// ============================================================================
-// ENUMS FOR NOTIFICATION SYSTEM
-// ============================================================================
 
 enum EventCategory {
   ORDER
@@ -2280,79 +1964,22 @@ enum QueueStatus {
   SENT
   FAILED
   CANCELLED
-  SKIPPED  // User unsubscribed or quiet hours
+  SKIPPED
 }
 
 enum NotificationFrequency {
-  INSTANT     // Сразу
-  HOURLY      // Раз в час (digest)
-  DAILY       // Раз в день (digest)
-  WEEKLY      // Раз в неделю (digest)
-}
-
-// ============================================================================
-// EMAIL TEMPLATES (White-Label Support)
-// ============================================================================
-
-// Email Template - шаблоны писем с white-label поддержкой
-model EmailTemplate {
-  id          String   @id @default(cuid())
-  
-  // Organization (white-label) - null = global template
-  orgId       String?
-  
-  // Template identification
-  key         String   // 'ORDER_CREATED', 'KYC_APPROVED', etc.
-  name        String   // "Order Created Email"
-  description String?
-  category    EmailCategory
-  
-  // Content
-  subject     String   // "Your order #{{orderId}} has been created"
-  htmlContent String   @db.Text // HTML template with {{variables}}
-  textContent String?  @db.Text // Plain text fallback
-  
-  // Design
-  preheader   String?  // Email preview text
-  layout      String   @default("default") // 'default', 'minimal', 'marketing'
-  
-  // Variables & Metadata
-  variables   Json     // Required variables: ['orderId', 'amount', etc.]
-  metadata    Json?    // Custom metadata
-  
-  // Versioning
-  version     Int      @default(1)
-  isActive    Boolean  @default(true)
-  isDefault   Boolean  @default(false) // System default template
-  
-  // Status
-  status      TemplateStatus @default(DRAFT)
-  publishedAt DateTime?
-  publishedBy String?
-  
-  // Audit
-  createdBy   String?
-  updatedBy   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // Relations
-  emailLogs          EmailLog[] @relation("TemplateUsed")
-  notificationEvents NotificationEvent[] @relation("EventEmailTemplate")
-  
-  @@unique([orgId, key, version])
-  @@index([orgId, key])
-  @@index([category])
-  @@index([status])
-  @@index([isActive])
+  INSTANT
+  HOURLY
+  DAILY
+  WEEKLY
 }
 
 enum EmailCategory {
-  TRANSACTIONAL  // Order confirmations, receipts
-  NOTIFICATION   // Status updates, alerts
-  MARKETING      // Newsletters, promotions
-  SYSTEM         // Password reset, email verification
-  COMPLIANCE     // KYC updates, AML alerts
+  TRANSACTIONAL
+  NOTIFICATION
+  MARKETING
+  SYSTEM
+  COMPLIANCE
 }
 
 enum TemplateStatus {
@@ -2361,4 +1988,3 @@ enum TemplateStatus {
   PUBLISHED
   ARCHIVED
 }
-

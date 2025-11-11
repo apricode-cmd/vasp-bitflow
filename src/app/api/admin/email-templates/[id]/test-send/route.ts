@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
+import { getEmailUrls } from '@/lib/utils/email-urls';
 import { z } from 'zod';
 
 const testSendSchema = z.object({
@@ -52,22 +53,85 @@ export async function POST(
       settingsMap[s.key] = s.value;
     });
 
-    // Prepare test data with white-label settings
+    // Get proper URLs
+    const emailUrls = getEmailUrls();
+
+    // Prepare test data with white-label settings and proper URLs
     const defaultTestData: Record<string, string> = {
+      // White-label settings
       brandName: settingsMap.brandName || 'Apricode Exchange',
-      brandLogo: settingsMap.brandLogo || 'https://example.com/logo.png',
+      brandLogo: emailUrls.logo(settingsMap.brandLogo || '/logo.png'),
       primaryColor: settingsMap.primaryColor || '#06b6d4',
-      supportEmail: settingsMap.supportEmail || 'support@example.com',
-      supportPhone: settingsMap.supportPhone || '+1 234 567 8900',
+      supportEmail: settingsMap.supportEmail || 'support@apricode.io',
+      supportPhone: settingsMap.supportPhone || '+48 123 456 789',
+      currentYear: new Date().getFullYear().toString(),
+      
+      // Test user data
       userName: 'Test User',
+      userEmail: 'test@example.com',
+      
+      // Test order data
       orderId: 'TEST-12345',
-      amount: '1000',
-      currency: 'EUR',
+      orderNumber: 'TEST-12345',
+      orderUrl: emailUrls.order('TEST-12345'),
+      
+      // Test amounts
+      cryptoAmount: '0.02000000',
       cryptoCurrency: 'BTC',
-      rate: '0.00002',
-      total: '0.02 BTC',
-      orderUrl: 'https://example.com/orders/TEST-12345',
-      dashboardUrl: 'https://example.com/dashboard',
+      cryptoCurrencyName: 'Bitcoin',
+      fiatAmount: '1000.00',
+      fiatCurrency: 'EUR',
+      fiatCurrencyName: 'Euro',
+      
+      // Test rates and fees
+      exchangeRate: '50000.00',
+      rate: '50000.00',
+      fee: '15.00',
+      feePercent: '1.50',
+      totalAmount: '1015.00',
+      total: '1015.00 EUR',
+      
+      // Test wallet
+      walletAddress: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
+      blockchain: 'Bitcoin',
+      blockchainCode: 'BTC',
+      
+      // Test URLs
+      dashboardUrl: emailUrls.dashboard,
+      loginUrl: emailUrls.login,
+      kycUrl: emailUrls.kyc,
+      buyUrl: emailUrls.buy,
+      resetUrl: emailUrls.resetPassword('test-token-123'),
+      verifyUrl: emailUrls.verifyEmail('test-verification-token-123'),
+      setupUrl: emailUrls.adminSetupPasskey('test-setup-token-123'),
+      
+      // Test dates and times
+      expiresAt: '24 hours',
+      expiresIn: '15 minutes',
+      createdAt: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+      
+      // Test payment data
+      paymentMethod: 'Bank Transfer',
+      bankName: 'Test Bank',
+      accountNumber: '1234567890',
+      iban: 'PL12345678901234567890123456',
+      swift: 'TESTPL22',
+      reference: 'TEST-REF-12345',
+      
+      // Test KYC data
+      kycStatus: 'APPROVED',
+      rejectionReason: '',
+      
+      // Test transaction data
+      txHash: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+      confirmations: '6',
+      
+      // Test admin data
+      adminName: 'Admin User',
+      adminEmail: 'admin@apricode.io',
+      invitedBy: 'Super Admin',
+      
+      // Override with custom test data
       ...testData
     };
 
@@ -76,15 +140,35 @@ export async function POST(
     let subject = template.subject;
     let preheader = template.preheader || '';
 
+    console.log('🔄 [test-send] Replacing variables...');
+    console.log('   Variables to replace:', Object.keys(defaultTestData).length);
+    
+    // Find all variables in template
+    const variablesInTemplate = htmlContent.match(/\{\{([^}]+)\}\}/g) || [];
+    console.log('   Variables in template:', variablesInTemplate.slice(0, 10));
+
     Object.entries(defaultTestData).forEach(([key, value]) => {
       const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
+      const beforeCount = (htmlContent.match(regex) || []).length;
       htmlContent = htmlContent.replace(regex, value);
       subject = subject.replace(regex, value);
       preheader = preheader.replace(regex, value);
+      
+      if (beforeCount > 0) {
+        console.log(`   ✅ Replaced {{${key}}} (${beforeCount}x) with: ${value.substring(0, 50)}${value.length > 50 ? '...' : ''}`);
+      }
     });
 
     // Replace preheader placeholder in HTML
     htmlContent = htmlContent.replace(/\{\{preheader\}\}/g, preheader);
+    
+    // Check for remaining unreplaced variables
+    const remainingVars = htmlContent.match(/\{\{([^}]+)\}\}/g) || [];
+    if (remainingVars.length > 0) {
+      console.warn('⚠️  [test-send] Unreplaced variables:', remainingVars.slice(0, 5));
+    } else {
+      console.log('✅ [test-send] All variables replaced successfully');
+    }
 
     // Get email provider
     console.log('🔍 [test-send] Getting email provider...');

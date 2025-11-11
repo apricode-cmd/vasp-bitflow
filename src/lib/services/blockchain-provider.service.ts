@@ -38,6 +38,13 @@ export async function getActiveBlockchainProvider(): Promise<IBlockchainProvider
   });
 
   if (!integration) {
+    // Debug: show what we found
+    const allIntegrations = await prisma.integration.findMany({
+      where: { service: { in: providerIds } },
+      select: { service: true, isEnabled: true, status: true }
+    });
+    console.error('❌ No active blockchain provider found. Available providers:', providerIds);
+    console.error('   Integrations in DB:', allIntegrations);
     throw new Error(`No active blockchain provider configured. Available providers: ${providerIds.join(', ')}. Please enable one in admin settings (Integrations).`);
   }
 
@@ -54,7 +61,15 @@ export async function getActiveBlockchainProvider(): Promise<IBlockchainProvider
   let config: any = {};
   
   if (integration.apiKey) {
-    config.apiKey = encryptionService.decrypt(integration.apiKey);
+    try {
+      config.apiKey = encryptionService.decrypt(integration.apiKey);
+      console.log('✅ API key decrypted:', config.apiKey.substring(0, 20) + '...');
+    } catch (error) {
+      console.error('❌ Failed to decrypt API key:', error);
+      throw new Error('Failed to decrypt blockchain provider API key');
+    }
+  } else {
+    console.warn('⚠️  No API key found for blockchain provider');
   }
   
   if (integration.apiEndpoint) {
@@ -69,6 +84,12 @@ export async function getActiveBlockchainProvider(): Promise<IBlockchainProvider
         : integration.config)
     };
   }
+
+  console.log('🔧 Initializing blockchain provider with config:', {
+    hasApiKey: !!config.apiKey,
+    apiEndpoint: config.apiEndpoint,
+    configKeys: Object.keys(config)
+  });
 
   // Initialize provider
   await provider.initialize(config);

@@ -153,6 +153,9 @@ class NotificationService {
       // 5. Create queue entries for each channel
       const queueIds: string[] = [];
       
+      // Get templateKey from event (use eventKey as fallback)
+      const templateKey = event.templateKey || eventKey;
+      
       for (const ch of channelsToUse) {
         const queueEntry = await prisma.notificationQueue.create({
           data: {
@@ -164,6 +167,7 @@ class NotificationService {
             subject: data.subject,
             message: data.message,
             data: enrichedData, // ✅ Use enriched data with real values
+            templateKey: ch === 'EMAIL' ? templateKey : undefined, // ✅ Set templateKey for EMAIL channel
             status: 'PENDING',
             scheduledFor: scheduledFor || new Date(),
           },
@@ -183,6 +187,15 @@ class NotificationService {
               data: enrichedData, // ✅ Use enriched data
               actionUrl: data.actionUrl || enrichedData.orderUrl || enrichedData.dashboardUrl,
             },
+          });
+        }
+        
+        // 🔥 AUTO-PROCESS: Send immediately if not scheduled for future
+        const isScheduledForFuture = scheduledFor && scheduledFor > new Date();
+        if (!isScheduledForFuture) {
+          // Process in background (don't await to avoid blocking)
+          this.processNotification(queueEntry).catch(error => {
+            console.error(`❌ Auto-process failed for ${queueEntry.id}:`, error);
           });
         }
       }
@@ -277,8 +290,10 @@ class NotificationService {
           break;
 
         case 'ADMIN_INVITED':
-          if (adminId && setupToken) {
-            return await buildAdminInviteEmailData(adminId, setupToken);
+          // For ADMIN_INVITED, data is already prepared in invite/route.ts
+          // Just return it as-is (setupUrl, adminName, role, etc. are already there)
+          if (data.data) {
+            return data.data;
           }
           break;
 
@@ -648,12 +663,13 @@ class NotificationService {
       // Import email service dynamically
       const { sendNotificationEmail } = await import('./email-notification.service');
 
-      // Send email
+      // Send email with template
       const result = await sendNotificationEmail({
         to: recipientEmail,
         subject: notification.subject || 'Notification',
         message: notification.message,
         data: notification.data as any,
+        templateKey: notification.templateKey || notification.eventKey, // ✅ Use templateKey from queue
       });
 
       if (result.success) {

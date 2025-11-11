@@ -168,9 +168,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Emit ORDER_CREATED event for notifications
     await eventEmitter.emit('ORDER_CREATED', {
       userId,
+      recipientEmail: session.user.email || undefined, // ✅ Add email for notification
       orderId: order.id,
       amount: order.totalFiat,
       currency: order.fiatCurrencyCode,
+      cryptoAmount: order.cryptoAmount,
+      cryptoCurrency: order.currencyCode,
+      walletAddress: order.walletAddress,
+      paymentReference: order.paymentReference,
     });
 
     return NextResponse.json(order, { status: 201 });

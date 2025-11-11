@@ -64,8 +64,12 @@ export async function generatePasskeyRegistrationOptions(
       transports: ['internal', 'hybrid'] as AuthenticatorTransportFuture[],
     })),
     authenticatorSelection: {
-      authenticatorAttachment: 'platform', // Prefer platform authenticators (Touch ID, Face ID)
-      userVerification: 'required',
+      // ✅ Убрали 'platform' - теперь поддерживаются ВСЕ типы аутентификаторов:
+      // - Platform: Touch ID, Face ID, Windows Hello, Android Biometrics
+      // - Cross-platform: YubiKey, Google Titan Key, другие FIDO2 ключи
+      // authenticatorAttachment: undefined, // Allow both platform and cross-platform
+      userVerification: 'preferred', // ✅ Изменили на 'preferred' вместо 'required'
+      // Это позволяет использовать устройства без биометрии (например, только PIN)
       residentKey: 'preferred',
     },
     attestationType: 'none',

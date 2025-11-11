@@ -55,15 +55,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Regenerate backup codes
     const backupCodes = await regenerateBackupCodes(session.user.id);
     
-    // Audit log
-    await auditService.logAdminAction(
+    // Audit log (для клиента используем logUserAction)
+    await auditService.logUserAction(
       session.user.id,
       AUDIT_ACTIONS.SETTINGS_UPDATED,
       AUDIT_ENTITIES.USER,
       session.user.id,
-      {},
-      { backupCodesRegenerated: true },
-      { method: 'TOTP' }
+      { 
+        backupCodesRegenerated: true,
+        method: 'TOTP' 
+      }
     );
     
     console.log('✅ Backup codes regenerated for user:', session.user.email);

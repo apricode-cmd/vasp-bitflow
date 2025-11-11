@@ -188,6 +188,33 @@ class EventEmitterService {
           actionUrl: '/kyc',
         };
 
+      // USER EVENTS
+      case 'WELCOME_EMAIL':
+        return {
+          subject: `Welcome to ${payload.platformName || 'Apricode Exchange'}!`,
+          message: `Welcome ${payload.userName}! We're excited to have you on board. Complete your KYC verification to start trading.`,
+          data: {
+            userId: payload.userId,
+            userName: payload.userName,
+          },
+          actionUrl: '/kyc',
+        };
+
+      // ADMIN EVENTS
+      case 'ADMIN_INVITED':
+        return {
+          subject: 'Admin Invitation',
+          message: `You've been invited to join as an admin. Click the link to set up your account.`,
+          data: payload.data || {
+            adminName: payload.adminName,
+            setupUrl: payload.setupUrl,
+            expiresIn: payload.expiresIn,
+            role: payload.role,
+            adminDashboard: payload.adminDashboard,
+          },
+          actionUrl: payload.setupUrl,
+        };
+
       // PAYMENT EVENTS
       case 'PAYMENT_PENDING':
         return {
@@ -254,6 +281,16 @@ class EventEmitterService {
         return {
           subject: 'Two-Factor Authentication Enabled',
           message: 'Two-factor authentication has been enabled on your account. Your account is now more secure!',
+          data: {
+            method: payload.method,
+          },
+          actionUrl: '/profile?tab=security',
+        };
+
+      case 'SECURITY_2FA_DISABLED':
+        return {
+          subject: 'Two-Factor Authentication Disabled',
+          message: 'Two-factor authentication has been disabled on your account. We recommend keeping 2FA enabled for better security.',
           data: {
             method: payload.method,
           },

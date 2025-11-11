@@ -11,6 +11,7 @@ import bcrypt from 'bcryptjs';
 import { disableTotp } from '@/lib/services/totp.service';
 import { prisma } from '@/lib/prisma';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
+import { eventEmitter } from '@/lib/services/event-emitter.service';
 
 const disableSchema = z.object({
   password: z.string().min(1, 'Password is required')
@@ -55,16 +56,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Disable TOTP
     await disableTotp(session.user.id);
     
-    // Audit log
-    await auditService.logAdminAction(
+    // Audit log (для клиента используем logUserAction)
+    await auditService.logUserAction(
       session.user.id,
       AUDIT_ACTIONS.SETTINGS_UPDATED,
       AUDIT_ENTITIES.USER,
       session.user.id,
-      { twoFactorEnabled: true },
-      { twoFactorEnabled: false },
-      { method: 'TOTP' }
+      { 
+        twoFactorEnabled: false,
+        method: 'TOTP' 
+      }
     );
+    
+    // Emit event for notification and email
+    await eventEmitter.emit('SECURITY_2FA_DISABLED', {
+      userId: session.user.id,
+      recipientEmail: session.user.email,
+      method: 'TOTP',
+    });
     
     console.log('✅ 2FA disabled for user:', session.user.email);
     

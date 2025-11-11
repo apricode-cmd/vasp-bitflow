@@ -1,7 +1,14 @@
 /**
- * Email Service
+ * Email Service (DEPRECATED)
  * 
- * Integration with Resend for sending transactional emails.
+ * ⚠️ DEPRECATED: Use email-notification.service.ts instead
+ * 
+ * This file contains old email functions with hardcoded HTML templates.
+ * All email sending should now use:
+ * - email-notification.service.ts (sends emails with templates from admin panel)
+ * - notification.service.ts (queues notifications and processes them)
+ * 
+ * @deprecated Use email-notification.service.ts
  */
 
 import { Resend } from 'resend';

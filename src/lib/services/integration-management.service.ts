@@ -218,16 +218,26 @@ export async function updateIntegrationConfig(params: UpdateIntegrationParams) {
       );
       
       if (!isMasked && updates.apiKey) {
-        updateData.apiKey = encrypt(updates.apiKey);
-        // If adding/updating API key and integration is enabled, set to active
-        if (integration.isEnabled) {
-          updateData.status = 'active';
+        // Check if it's already encrypted (double encryption prevention)
+        const isAlreadyEncrypted = updates.apiKey.startsWith('encrypted:') || updates.apiKey.startsWith('plain:');
+        
+        if (isAlreadyEncrypted) {
+          console.warn('⚠️ Attempting to encrypt already encrypted key - skipping');
+          // Keep existing key
+        } else {
+          console.log('✅ Encrypting new API key for', service);
+          updateData.apiKey = encrypt(updates.apiKey);
+          // If adding/updating API key and integration is enabled, set to active
+          if (integration.isEnabled) {
+            updateData.status = 'active';
+          }
         }
       } else if (isMasked) {
         console.warn('⚠️ Skipping masked API key update');
         // Keep existing key
       } else {
         // Explicitly clearing the key
+        console.log('🗑️ Clearing API key for', service);
         updateData.apiKey = null;
       }
     }
@@ -292,7 +302,11 @@ export async function updateIntegrationConfig(params: UpdateIntegrationParams) {
         }
         
         // When enabling, set to active if API key exists (including new one)
-        if (integration.apiKey || updates.apiKey) {
+        // OR if config has required fields (for multi-param integrations like Sumsub)
+        const hasApiKey = integration.apiKey || updates.apiKey;
+        const hasConfigData = updates.config && Object.keys(updates.config).length > 0;
+        
+        if (hasApiKey || hasConfigData) {
           updateData.status = 'active';
         } else {
           updateData.status = 'inactive'; // No API key yet

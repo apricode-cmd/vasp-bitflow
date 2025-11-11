@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { stepUpMfaService } from '@/lib/services/step-up-mfa.service';
+import { eventEmitter } from '@/lib/services/event-emitter.service';
 import { z } from 'zod';
 import crypto from 'crypto';
 
@@ -145,6 +146,18 @@ export async function POST(request: NextRequest) {
         mfaVerifiedAt: new Date(),
         // mfaEventId: null, // Optional: link to MfaEvent if needed
         severity: 'WARNING', // Creating admin is important action
+      },
+    });
+
+    // 🔥 Send invitation email
+    await eventEmitter.emit('ADMIN_INVITED', {
+      recipientEmail: validatedData.email,
+      data: {
+        adminName: `${validatedData.firstName} ${validatedData.lastName}`,
+        setupUrl: inviteLink,
+        expiresIn: '15 minutes',
+        role: validatedData.role,
+        adminDashboard: `${origin}/admin`,
       },
     });
 

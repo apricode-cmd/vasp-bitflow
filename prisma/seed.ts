@@ -1183,16 +1183,46 @@ async function main(): Promise<void> {
       isSystem: true,
       isActive: true,
     },
+    {
+      eventKey: 'WELCOME_EMAIL',
+      name: 'Welcome Email',
+      description: 'Welcome email sent to new users after registration',
+      category: 'SYSTEM' as const,
+      channels: ['EMAIL', 'IN_APP'] as const,
+      priority: 'NORMAL' as const,
+      isSystem: true,
+      isActive: true,
+    },
   ];
 
+  // Create events with proper category and template links
   for (const event of notificationEvents) {
+    // Get categoryId from categoryMap
+    const categoryId = categoryMap[event.category];
+    
+    // Try to find matching email template
+    const template = await prisma.emailTemplate.findFirst({
+      where: { 
+        key: event.eventKey,
+        status: 'PUBLISHED',
+        isActive: true
+      }
+    });
+    
     await prisma.notificationEvent.upsert({
       where: { eventKey: event.eventKey },
-      update: {},
-      create: event,
+      update: {
+        categoryId: categoryId,
+        templateId: template?.id || undefined,
+      },
+      create: {
+        ...event,
+        categoryId: categoryId,
+        templateId: template?.id || undefined,
+      },
     });
   }
-  console.log(`  ✓ ${notificationEvents.length} notification events created\n`);
+  console.log(`  ✓ ${notificationEvents.length} notification events created with proper links\n`);
   
   // Seed Email Templates
   console.log('\n📧 Seeding email templates...');

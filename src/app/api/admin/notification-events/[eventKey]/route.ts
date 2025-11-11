@@ -118,12 +118,19 @@ export async function PATCH(
       );
     }
 
-    // Prevent modification of system events
+    // Prevent modification of system events (except isActive)
     if (existing.isSystem) {
-      return NextResponse.json(
-        { success: false, error: 'Cannot modify system events' },
-        { status: 400 }
-      );
+      // Allow only isActive toggle for system events
+      const allowedFields = ['isActive'];
+      const requestedFields = Object.keys(validatedData);
+      const hasDisallowedFields = requestedFields.some(field => !allowedFields.includes(field));
+      
+      if (hasDisallowedFields) {
+        return NextResponse.json(
+          { success: false, error: 'Cannot modify system events (only isActive toggle is allowed)' },
+          { status: 400 }
+        );
+      }
     }
 
     // Validate templateId if provided

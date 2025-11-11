@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth-utils';
 import { registerSchema } from '@/lib/validations/auth';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
+import { eventEmitter } from '@/lib/services/event-emitter.service';
 import { z } from 'zod';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -80,6 +81,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         country: validatedData.country
       }
     );
+
+    // Emit WELCOME_EMAIL event
+    await eventEmitter.emit('WELCOME_EMAIL', {
+      userId: user.id,
+      recipientEmail: user.email,
+      userName: `${validatedData.firstName} ${validatedData.lastName}`,
+    });
 
     return NextResponse.json(
       {

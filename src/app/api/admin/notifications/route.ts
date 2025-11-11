@@ -41,6 +41,8 @@ export async function GET(request: NextRequest) {
           adminEmail: true,
           adminRole: true,
           context: true,
+          diffBefore: true, // ✅ Добавляем diffBefore для старых значений
+          diffAfter: true, // ✅ Добавляем diffAfter для данных о целевом админе
           createdAt: true,
           readBy: {
             where: {
@@ -125,23 +127,39 @@ function formatNotificationTitle(action: string, entity: string): string {
 }
 
 function formatNotificationMessage(log: any): string {
-  const { action, entityType, adminEmail, context } = log;
+  const { action, entityType, adminEmail, context, diffAfter, diffBefore } = log;
   const metadata = context || {};
+  const after = diffAfter || {};
+  const before = diffBefore || {};
 
   if (action === 'ADMIN_INVITED') {
-    return `${adminEmail} invited a new administrator: ${metadata?.targetAdmin || 'Unknown'}`;
+    const targetName = after.firstName && after.lastName 
+      ? `${after.firstName} ${after.lastName}` 
+      : after.email || 'Unknown';
+    return `${adminEmail} invited a new administrator: ${targetName}`;
   }
   
   if (action === 'ADMIN_SUSPENDED') {
-    return `${adminEmail} suspended administrator: ${metadata?.targetAdmin || 'Unknown'}`;
+    const targetName = after.firstName && after.lastName 
+      ? `${after.firstName} ${after.lastName}` 
+      : after.email || metadata?.targetAdmin || 'Unknown';
+    return `${adminEmail} suspended administrator: ${targetName}`;
   }
   
   if (action === 'ADMIN_TERMINATED') {
-    return `${adminEmail} terminated administrator: ${metadata?.targetAdmin || 'Unknown'}`;
+    const targetName = after.firstName && after.lastName 
+      ? `${after.firstName} ${after.lastName}` 
+      : after.email || metadata?.targetAdmin || 'Unknown';
+    return `${adminEmail} terminated administrator: ${targetName}`;
   }
   
   if (action === 'ADMIN_ROLE_CHANGED') {
-    return `${adminEmail} changed role for ${metadata?.targetAdmin || 'Unknown'} from ${metadata?.oldRole || 'Unknown'} to ${metadata?.newRole || 'Unknown'}`;
+    const targetName = after.firstName && after.lastName 
+      ? `${after.firstName} ${after.lastName}` 
+      : after.email || metadata?.targetAdmin || 'Unknown';
+    const oldRole = before.role || metadata?.oldRole || 'Unknown';
+    const newRole = after.role || metadata?.newRole || 'Unknown';
+    return `${adminEmail} changed role for ${targetName} from ${oldRole} to ${newRole}`;
   }
   
   if (action === 'ORDER_STATUS_CHANGED') {
