@@ -148,7 +148,8 @@ export async function generateInvoicePDF(orderId: string): Promise<Buffer> {
  */
 export function generateInvoiceFilename(orderId: string): string {
   const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-  return `invoice-${orderId}-${timestamp}.pdf`;
+  // Remove quotes to prevent file extension issues
+  return `invoice-${orderId}-${timestamp}.pdf`.replace(/"/g, '');
 }
 
 /**

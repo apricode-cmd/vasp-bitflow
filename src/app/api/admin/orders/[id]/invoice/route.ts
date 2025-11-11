@@ -81,7 +81,7 @@ export async function GET(
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Disposition': `attachment; filename=${filename}`, // Remove quotes
         'Content-Length': pdfBuffer.length.toString(),
         'Cache-Control': 'private, max-age=3600', // Cache for 1 hour
       }

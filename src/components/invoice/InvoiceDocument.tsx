@@ -24,15 +24,15 @@ import {
 // Styles
 const styles = StyleSheet.create({
   page: {
-    padding: 40,
-    fontSize: 10,
+    padding: 30, // Reduced from 40
+    fontSize: 9, // Reduced from 10
     fontFamily: 'Helvetica',
     color: '#1f2937',
   },
   
   // Header
   header: {
-    marginBottom: 30,
+    marginBottom: 20, // Reduced from 30
   },
   headerRow: {
     flexDirection: 'row',
@@ -75,12 +75,12 @@ const styles = StyleSheet.create({
   // Parties section
   parties: {
     flexDirection: 'row',
-    marginBottom: 30,
-    gap: 20,
+    marginBottom: 20, // Reduced from 30
+    gap: 15, // Reduced from 20
   },
   party: {
     flex: 1,
-    padding: 15,
+    padding: 12, // Reduced from 15
     backgroundColor: '#f9fafb',
     borderRadius: 4,
   },
@@ -129,15 +129,14 @@ const styles = StyleSheet.create({
   tableRowLast: {
     borderBottomWidth: 0,
   },
-  col1: { flex: 3 },
-  col2: { flex: 2, textAlign: 'right' },
-  col3: { flex: 2, textAlign: 'right' },
-  col4: { flex: 2, textAlign: 'right' },
+  col1: { flex: 4 }, // Description
+  col2: { flex: 2, textAlign: 'right' }, // Quantity
+  col3: { flex: 2, textAlign: 'right' }, // Amount
   
   // Totals
   totalsSection: {
-    marginTop: 20,
-    marginBottom: 30,
+    marginTop: 15, // Reduced from 20
+    marginBottom: 20, // Reduced from 30
   },
   totalRow: {
     flexDirection: 'row',
@@ -183,8 +182,8 @@ const styles = StyleSheet.create({
   
   // Payment instructions
   paymentSection: {
-    marginBottom: 30,
-    padding: 15,
+    marginBottom: 15, // Reduced from 30
+    padding: 12, // Reduced from 15
     backgroundColor: '#eff6ff',
     borderRadius: 4,
     borderLeftWidth: 3,
@@ -213,38 +212,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   
-  // Wallet section
-  walletSection: {
-    marginBottom: 30,
-    padding: 15,
-    backgroundColor: '#f0fdf4',
-    borderRadius: 4,
-    borderLeftWidth: 3,
-    borderLeftColor: '#10b981',
-  },
-  walletTitle: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#065f46',
-  },
-  walletAddress: {
-    fontSize: 8,
-    fontFamily: 'Courier',
-    color: '#064e3b',
-    backgroundColor: '#dcfce7',
-    padding: 8,
-    borderRadius: 3,
-    wordBreak: 'break-all',
-  },
-  
   // Footer
   footer: {
     position: 'absolute',
-    bottom: 30,
-    left: 40,
-    right: 40,
-    paddingTop: 15,
+    bottom: 20, // Reduced from 30
+    left: 30, // Match page padding
+    right: 30, // Match page padding
+    paddingTop: 10, // Reduced from 15
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
   },
@@ -253,25 +227,6 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     textAlign: 'center',
     lineHeight: 1.4,
-  },
-  
-  // Notes
-  notes: {
-    marginBottom: 30,
-    padding: 12,
-    backgroundColor: '#fef3c7',
-    borderRadius: 4,
-  },
-  notesTitle: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    marginBottom: 6,
-    color: '#92400e',
-  },
-  notesText: {
-    fontSize: 8,
-    lineHeight: 1.5,
-    color: '#78350f',
   },
 });
 
@@ -409,8 +364,7 @@ export const InvoiceDocument: React.FC<{ data: InvoiceData }> = ({ data }) => {
           <View style={styles.tableHeader}>
             <Text style={styles.col1}>Description</Text>
             <Text style={styles.col2}>Quantity</Text>
-            <Text style={styles.col3}>Rate</Text>
-            <Text style={styles.col4}>Amount</Text>
+            <Text style={styles.col3}>Amount</Text>
           </View>
           
           <View style={styles.tableRow}>
@@ -418,8 +372,7 @@ export const InvoiceDocument: React.FC<{ data: InvoiceData }> = ({ data }) => {
               {data.cryptoCurrency} Purchase
             </Text>
             <Text style={styles.col2}>{formatCrypto(data.cryptoAmount)}</Text>
-            <Text style={styles.col3}>{formatFiat(data.exchangeRate)}</Text>
-            <Text style={styles.col4}>{formatFiat(data.subtotal)}</Text>
+            <Text style={styles.col3}>{formatFiat(data.subtotal)}</Text>
           </View>
           
           <View style={[styles.tableRow, styles.tableRowLast]}>
@@ -427,8 +380,7 @@ export const InvoiceDocument: React.FC<{ data: InvoiceData }> = ({ data }) => {
               Platform Fee ({data.platformFeePercent}%)
             </Text>
             <Text style={styles.col2}>-</Text>
-            <Text style={styles.col3}>-</Text>
-            <Text style={styles.col4}>{formatFiat(data.platformFee)}</Text>
+            <Text style={styles.col3}>{formatFiat(data.platformFee)}</Text>
           </View>
         </View>
 
@@ -484,30 +436,6 @@ export const InvoiceDocument: React.FC<{ data: InvoiceData }> = ({ data }) => {
             </View>
           </View>
         )}
-
-        {/* Wallet Address */}
-        <View style={styles.walletSection}>
-          <Text style={styles.walletTitle}>
-            Cryptocurrency Delivery Address
-          </Text>
-          <Text style={styles.walletAddress}>{data.walletAddress}</Text>
-          {data.blockchainNetwork && (
-            <Text style={{ fontSize: 8, marginTop: 6, color: '#065f46' }}>
-              Network: {data.blockchainNetwork}
-            </Text>
-          )}
-        </View>
-
-        {/* Notes */}
-        <View style={styles.notes}>
-          <Text style={styles.notesTitle}>Important Notes:</Text>
-          <View style={styles.notesText}>
-            <Text>• Please include the payment reference in your bank transfer.</Text>
-            <Text>• Cryptocurrency will be sent to your wallet after payment confirmation.</Text>
-            <Text>• Processing time: 1-3 business days after payment received.</Text>
-            <Text>• For questions, contact: {data.companyEmail || 'support@apricode.exchange'}</Text>
-          </View>
-        </View>
 
         {/* Footer */}
         <View style={styles.footer}>
