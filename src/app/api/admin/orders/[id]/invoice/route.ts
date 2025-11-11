@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRole, getCurrentUserId } from '@/lib/middleware/admin-auth';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
+import { prisma } from '@/lib/prisma';
 import {
   generateInvoicePDF,
   generateInvoiceFilename,
@@ -57,11 +58,27 @@ export async function GET(
       );
     }
 
-    // 3. Generate PDF
+    // 3. Get order for payment reference
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { paymentReference: true }
+    });
+
+    if (!order) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Order not found'
+        },
+        { status: 404 }
+      );
+    }
+
+    // 4. Generate PDF
     console.log(`[ADMIN INVOICE] Generating PDF for order ${orderId}...`);
     const pdfBuffer = await generateInvoicePDF(orderId);
 
-    // 4. Log admin action
+    // 5. Log admin action
     await auditService.logAdminAction(
       adminId,
       AUDIT_ACTIONS.ORDER_VIEWED,
@@ -72,8 +89,9 @@ export async function GET(
       { action: 'invoice_downloaded' }
     );
 
-    // 5. Return PDF as download
-    const filename = generateInvoiceFilename(orderId);
+    // 6. Return PDF as download
+    // Use payment reference for filename (APR-XXX-YYY instead of CUID)
+    const filename = generateInvoiceFilename(order.paymentReference);
     
     console.log(`[ADMIN INVOICE] PDF generated successfully: ${filename} (${pdfBuffer.length} bytes)`);
 

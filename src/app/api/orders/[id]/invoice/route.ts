@@ -44,7 +44,8 @@ export async function GET(
       select: {
         id: true,
         userId: true,
-        status: true
+        status: true,
+        paymentReference: true
       }
     });
 
@@ -89,7 +90,8 @@ export async function GET(
     const pdfBuffer = await generateInvoicePDF(orderId);
 
     // 5. Return PDF as download
-    const filename = generateInvoiceFilename(orderId);
+    // Use payment reference for filename (APR-XXX-YYY instead of CUID)
+    const filename = generateInvoiceFilename(order.paymentReference);
     
     console.log(`[CLIENT INVOICE] PDF generated successfully: ${filename} (${pdfBuffer.length} bytes)`);
 
