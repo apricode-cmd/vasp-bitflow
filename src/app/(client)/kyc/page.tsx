@@ -1123,17 +1123,17 @@ export default function KycPage(): React.ReactElement {
                   const pepStatus = formData['pep_status'];
                   const isPepSubField = ['pep_role_title', 'pep_institution', 'pep_country', 'pep_since', 'pep_until', 'relationship_to_pep', 'pep_additional_info', 'pep_evidence_file'].includes(field.fieldName);
                   
-                  // Hide subfields if PEP status is NO or not selected
+                  // Hide ALL PEP subfields if status is NO or not selected
                   if (isPepSubField && (!pepStatus || pepStatus === 'NO')) {
                     return null;
                   }
 
-                  // Hide 'Until' field for CURRENT status
+                  // Hide 'Until' field for ALL CURRENT statuses (not needed for current positions)
                   if (field.fieldName === 'pep_until' && pepStatus && pepStatus.includes('CURRENT')) {
                     return null;
                   }
 
-                  // Hide 'Relationship' field for SELF_* statuses
+                  // Hide 'Relationship' field for SELF statuses (only for FAMILY/ASSOCIATE)
                   if (field.fieldName === 'relationship_to_pep' && pepStatus && pepStatus.startsWith('SELF_')) {
                     return null;
                   }
