@@ -115,7 +115,7 @@ export function decrypt(encrypted: string): string {
     return decrypted;
   } catch (error) {
     console.error('Decryption error:', error);
-    // Return as-is if decryption fails
+    // Return as-is if decryption fails (graceful degradation)
     return encrypted;
   }
 }

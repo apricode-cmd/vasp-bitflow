@@ -15,6 +15,7 @@ import {
 import { IKycProvider } from './categories/IKycProvider';
 import { IRatesProvider } from './categories/IRatesProvider';
 import { IEmailProvider } from './categories/IEmailProvider';
+import { decrypt } from '@/lib/services/encryption.service';
 
 /**
  * Integration Factory Class
@@ -69,9 +70,21 @@ class IntegrationFactory {
    * @private
    */
   private async getActiveProvider(category: IntegrationCategory): Promise<IIntegrationProvider | null> {
-    // Find active integration in database for this category
+    // 1. Get all providers for this category from registry
+    const categoryProviders = integrationRegistry.getProvidersByCategory(category);
+    
+    if (categoryProviders.length === 0) {
+      console.warn(`No providers registered for category ${category}`);
+      return null;
+    }
+
+    // Get list of provider IDs (service names) for this category
+    const categoryProviderIds = categoryProviders.map(p => p.providerId);
+
+    // 2. Find active integration in database that matches this category
     const integration = await prisma.integration.findFirst({
       where: {
+        service: { in: categoryProviderIds }, // Filter by category providers
         isEnabled: true,
         status: 'active'
       },
@@ -81,21 +94,17 @@ class IntegrationFactory {
     });
 
     if (!integration) {
+      console.warn(`No active integration found in DB for category ${category}`);
       // Fallback to first available provider in category (for backward compatibility)
-      const providers = integrationRegistry.getProvidersByCategory(category);
-      if (providers.length === 0) {
-        return null;
-      }
-
-      const provider = providers[0].instance;
+      const provider = categoryProviders[0].instance;
       
-      // Try to initialize with environment config
+      // Try to initialize with empty config
       await this.initializeProvider(provider, {});
       
       return provider;
     }
 
-    // Get provider from registry
+    // 3. Get provider from registry
     const provider = integrationRegistry.getProvider(integration.service);
     
     if (!provider) {
@@ -103,23 +112,50 @@ class IntegrationFactory {
       return null;
     }
 
-    // Check if already initialized
+    // 4. Check if already initialized
     const cacheKey = `${category}-${integration.service}`;
     if (this.initializedProviders.has(cacheKey)) {
       return this.initializedProviders.get(cacheKey)!;
     }
 
-    // Initialize provider with database config
+    // 5. Initialize provider with database config
+    const integrationConfig = integration.config as Record<string, any> || {};
+    
+    // Decrypt API key if it exists
+    let decryptedApiKey: string | undefined;
+    if (integration.apiKey) {
+      decryptedApiKey = decrypt(integration.apiKey);
+      
+      // Log decryption result
+      if (decryptedApiKey && !decryptedApiKey.startsWith('encrypted:')) {
+        console.log(`✅ Decrypted API key for ${integration.service}: ${decryptedApiKey.substring(0, 10)}...`);
+      } else {
+        console.warn(`⚠️ API key for ${integration.service} could not be decrypted, using as-is`);
+      }
+    }
+    
     const config: BaseIntegrationConfig = {
-      apiKey: integration.apiKey || undefined,
+      apiKey: decryptedApiKey || undefined,
       apiEndpoint: integration.apiEndpoint || undefined,
-      webhookSecret: integration.config?.webhookSecret || undefined,
-      metadata: integration.config || {}
+      webhookSecret: integrationConfig.webhookSecret || undefined,
+      // Merge integration.config EXCEPT apiKey and other sensitive fields
+      ...Object.fromEntries(
+        Object.entries(integrationConfig).filter(([key]) => 
+          key !== 'apiKey' && key !== 'api_key' && key !== 'secret'
+        )
+      ),
+      metadata: {
+        ...Object.fromEntries(
+          Object.entries(integrationConfig).filter(([key]) => 
+            key !== 'apiKey' && key !== 'api_key' && key !== 'secret'
+          )
+        )
+      }
     };
 
     await this.initializeProvider(provider, config);
     
-    // Cache initialized provider
+    // 6. Cache initialized provider
     this.initializedProviders.set(cacheKey, provider);
 
     return provider;
@@ -153,11 +189,31 @@ class IntegrationFactory {
     }
 
     // Initialize with database config
+    const integrationConfig = integration.config as Record<string, any> || {};
+    
+    // Decrypt API key if it exists
+    let decryptedApiKey: string | undefined;
+    if (integration.apiKey) {
+      try {
+        decryptedApiKey = decrypt(integration.apiKey);
+      } catch (error) {
+        console.error(`Failed to decrypt API key for ${integration.service}:`, error);
+      }
+    }
+    
     const config: BaseIntegrationConfig = {
-      apiKey: integration.apiKey || undefined,
+      apiKey: decryptedApiKey || undefined,
       apiEndpoint: integration.apiEndpoint || undefined,
-      webhookSecret: integration.config?.webhookSecret || undefined,
-      metadata: integration.config || {}
+      webhookSecret: integrationConfig.webhookSecret || undefined,
+      // Merge integration.config EXCEPT apiKey (use decrypted one)
+      ...Object.fromEntries(
+        Object.entries(integrationConfig).filter(([key]) => key !== 'apiKey')
+      ),
+      metadata: {
+        ...integrationConfig,
+        // Don't include masked apiKey in metadata
+        apiKey: undefined
+      }
     };
 
     await this.initializeProvider(provider, config);

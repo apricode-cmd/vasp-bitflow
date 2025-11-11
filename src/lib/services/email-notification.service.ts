@@ -15,6 +15,7 @@ import type { TemplateVariables } from './email-template.service';
 
 export interface SendNotificationEmailOptions {
   to: string;
+  from?: string; // Optional, will use provider default if not provided
   subject?: string; // Optional, will use template subject if not provided
   message?: string; // For fallback templates
   data: TemplateVariables;
@@ -34,7 +35,7 @@ export interface SendEmailResult {
 export async function sendNotificationEmail(
   options: SendNotificationEmailOptions
 ): Promise<SendEmailResult> {
-  const { to, subject, message, data, templateKey, orgId = null } = options;
+  const { to, from, subject, message, data, templateKey, orgId = null } = options;
 
   try {
     // 1. Get email provider from IntegrationFactory
@@ -57,6 +58,7 @@ export async function sendNotificationEmail(
     // 3. Send email via provider (Resend, SendGrid, etc.)
     const result = await emailProvider.sendEmail({
       to,
+      from, // Optional override
       subject: subject || rendered.subject,
       html: rendered.html,
       text: rendered.text,

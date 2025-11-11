@@ -614,6 +614,25 @@ export default function IntegrationsPage(): JSX.Element {
                     </p>
                   </div>
 
+                  {/* From Email (for Resend) */}
+                  {selectedIntegration.category === 'EMAIL' && selectedIntegration.service === 'resend' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="modal-from-email">From Email *</Label>
+                      <Input
+                        id="modal-from-email"
+                        type="email"
+                        value={(selectedIntegration.config as any)?.fromEmail || ''}
+                        onChange={(e) => updateIntegration(selectedIntegration.service, { 
+                          config: { ...selectedIntegration.config, fromEmail: e.target.value }
+                        })}
+                        placeholder="onboarding@resend.dev"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Email address to send from. Use <code className="bg-muted px-1 rounded">onboarding@resend.dev</code> for testing or add your verified domain at <a href="https://resend.com/domains" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">resend.com/domains</a>
+                      </p>
+                    </div>
+                  )}
+
                   {/* Form ID (for KYCAID) */}
                   {selectedIntegration.category === 'KYC' && selectedIntegration.service === 'kycaid' && (
                     <div className="space-y-2">

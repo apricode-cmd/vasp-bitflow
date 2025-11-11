@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
-import { IntegrationFactory } from '@/lib/integrations/IntegrationFactory';
+import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
 import { z } from 'zod';
 
 const testSendSchema = z.object({
@@ -87,23 +87,42 @@ export async function POST(
     htmlContent = htmlContent.replace(/\{\{preheader\}\}/g, preheader);
 
     // Get email provider
-    const integrationFactory = new IntegrationFactory();
+    console.log('🔍 [test-send] Getting email provider...');
     const emailProvider = await integrationFactory.getEmailProvider();
 
     if (!emailProvider) {
+      console.error('❌ [test-send] Email provider not found');
       return NextResponse.json(
         { success: false, error: 'Email provider not configured' },
         { status: 500 }
       );
     }
 
+    console.log('✅ [test-send] Email provider obtained:', emailProvider.providerId);
+    console.log('   Configured:', emailProvider.isConfigured());
+    
+    // Check internal state
+    const resendAdapter = emailProvider as any;
+    console.log('   Internal state:', {
+      initialized: resendAdapter.initialized,
+      hasClient: !!resendAdapter.client,
+      hasApiKey: !!resendAdapter.config?.apiKey,
+      apiKeyLength: resendAdapter.config?.apiKey?.length,
+      apiKeyPrefix: resendAdapter.config?.apiKey?.substring(0, 10),
+      fromEmail: resendAdapter.config?.fromEmail
+    });
+
     // Send test email
+    console.log('📧 [test-send] Sending email to:', recipientEmail);
     const result = await emailProvider.sendEmail({
       to: recipientEmail,
+      from: 'onboarding@resend.dev', // Use Resend test domain
       subject: `[TEST] ${subject}`,
       html: htmlContent,
       text: template.textContent || undefined,
     });
+    
+    console.log('📬 [test-send] Send result:', { success: result.success, messageId: result.messageId, error: result.error });
 
     if (!result.success) {
       return NextResponse.json(
