@@ -141,11 +141,18 @@ export async function startKycVerification(userId: string) {
       throw new Error('User or profile not found');
     }
 
-    // Validate required fields
-    if (!user.profile.firstName || !user.profile.lastName || 
-        !user.profile.dateOfBirth || !user.profile.nationality || 
-        !user.profile.country || !user.profile.phoneNumber) {
-      throw new Error('Please complete your profile before starting KYC');
+    // Validate required fields with detailed error message
+    const missingFields: string[] = [];
+    if (!user.profile.firstName) missingFields.push('First Name');
+    if (!user.profile.lastName) missingFields.push('Last Name');
+    if (!user.profile.dateOfBirth) missingFields.push('Date of Birth');
+    if (!user.profile.nationality) missingFields.push('Nationality');
+    if (!user.profile.country) missingFields.push('Country');
+    if (!user.profile.phoneNumber) missingFields.push('Phone Number');
+    
+    if (missingFields.length > 0) {
+      console.error('❌ Missing required profile fields:', missingFields);
+      throw new Error(`Please complete your profile before starting KYC. Missing fields: ${missingFields.join(', ')}`);
     }
 
     // Get active provider
