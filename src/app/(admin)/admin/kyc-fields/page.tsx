@@ -83,6 +83,7 @@ export default function KycFormFieldsPage() {
   const [editDialog, setEditDialog] = useState(false);
   const [selectedField, setSelectedField] = useState<KycField | null>(null);
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>(''); // ✅ Добавлен state для активной вкладки
 
   // Form state for editing
   const [editForm, setEditForm] = useState({
@@ -106,6 +107,11 @@ export default function KycFormFieldsPage() {
       const data = await res.json();
       setFields(data.fields);
       setGrouped(data.grouped);
+      
+      // ✅ Устанавливаем первую категорию как активную, если еще не выбрана
+      if (!activeTab && Object.keys(data.grouped).length > 0) {
+        setActiveTab(Object.keys(data.grouped)[0]);
+      }
     } catch (error) {
       console.error('Failed to fetch KYC fields:', error);
       toast.error('Failed to load KYC form fields');
@@ -221,7 +227,7 @@ export default function KycFormFieldsPage() {
         </p>
       </div>
 
-      <Tabs defaultValue={categories[0] || 'personal'} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <ScrollArea className="w-full whitespace-nowrap">
           <TabsList className="inline-flex w-auto">
             {categories.map((category) => {
