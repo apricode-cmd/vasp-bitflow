@@ -540,11 +540,11 @@ export default function EmailTemplateEditorPage({ params }: { params: { id: stri
                   <CardContent>
                     <div
                       className={cn(
-                        'mx-auto bg-white rounded-lg shadow-xl overflow-hidden transition-all',
+                        'mx-auto rounded-lg shadow-xl overflow-hidden transition-all',
                         previewMode === 'desktop' ? 'max-w-full' : 'max-w-[375px]'
                       )}
                     >
-                      {/* Email Header */}
+                      {/* Email Header Info */}
                       <div className="bg-gray-100 p-4 border-b">
                         <div className="text-xs text-gray-500 mb-1">Subject:</div>
                         <div className="font-semibold text-sm">{formData.subject || 'No subject'}</div>
@@ -556,10 +556,13 @@ export default function EmailTemplateEditorPage({ params }: { params: { id: stri
                         )}
                       </div>
 
-                      {/* Email Body */}
-                      <div
-                        className="p-4 bg-white"
-                        dangerouslySetInnerHTML={{ __html: getPreviewHtml() }}
+                      {/* Email Body - Use iframe for proper HTML email rendering */}
+                      <iframe
+                        srcDoc={getPreviewHtml()}
+                        className="w-full border-0"
+                        style={{ minHeight: '600px', height: 'auto' }}
+                        title="Email Preview"
+                        sandbox="allow-same-origin"
                       />
                     </div>
                   </CardContent>

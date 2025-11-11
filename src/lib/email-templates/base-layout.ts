@@ -41,7 +41,7 @@ export function getBaseEmailLayout(content: string, options: EmailLayoutOptions 
   </noscript>
   <![endif]-->
   <style>
-    /* Reset styles */
+    /* Reset styles for email clients */
     body {
       margin: 0;
       padding: 0;
@@ -63,148 +63,76 @@ export function getBaseEmailLayout(content: string, options: EmailLayoutOptions 
       -ms-interpolation-mode: bicubic;
     }
     
-    /* Base styles */
-    .email-container {
-      max-width: 600px;
-      margin: 0 auto;
-      background-color: #ffffff;
-    }
-    
-    .email-header {
-      background-color: ${primaryColor};
-      padding: 30px 20px;
-      text-align: center;
-    }
-    
-    .email-logo {
-      max-width: 200px;
-      height: auto;
-    }
-    
-    .email-content {
-      padding: 40px 30px;
-      color: #333333;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      font-size: 16px;
-      line-height: 1.6;
-    }
-    
-    .email-footer {
-      background-color: #f8f9fa;
-      padding: 30px 20px;
-      text-align: center;
-      color: #6c757d;
-      font-size: 14px;
-    }
-    
-    .button {
-      display: inline-block;
-      padding: 14px 28px;
-      background-color: ${primaryColor};
-      color: #ffffff !important;
-      text-decoration: none;
-      border-radius: 6px;
-      font-weight: 600;
-      margin: 20px 0;
-    }
-    
-    .button:hover {
-      opacity: 0.9;
-    }
-    
-    .info-box {
-      background-color: #f8f9fa;
-      border-left: 4px solid ${primaryColor};
-      padding: 20px;
-      margin: 20px 0;
-      border-radius: 4px;
-    }
-    
-    .warning-box {
-      background-color: #fff3cd;
-      border-left: 4px solid #ffc107;
-      padding: 20px;
-      margin: 20px 0;
-      border-radius: 4px;
-    }
-    
-    .success-box {
-      background-color: #d1e7dd;
-      border-left: 4px solid #198754;
-      padding: 20px;
-      margin: 20px 0;
-      border-radius: 4px;
-    }
-    
-    .divider {
-      border-top: 1px solid #e9ecef;
-      margin: 30px 0;
-    }
-    
     /* Responsive */
     @media only screen and (max-width: 600px) {
       .email-content {
-        padding: 20px 15px !important;
-      }
-      
-      .button {
-        display: block;
-        width: 100%;
-        text-align: center;
+        padding: 30px 20px !important;
       }
     }
   </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f5f5f5;">
+<body style="margin: 0; padding: 0; background-color: #F3F4F6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
   <!-- Preview Text -->
-  <div style="display: none; max-height: 0; overflow: hidden;">
+  <div style="display: none; max-height: 0; overflow: hidden; opacity: 0;">
     {{preheader}}
   </div>
   
   <!-- Email Wrapper -->
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #F3F4F6;">
     <tr>
-      <td align="center" style="padding: 20px 0;">
+      <td align="center" style="padding: 40px 20px;">
         
         <!-- Email Container -->
-        <table class="email-container" role="presentation" width="600" cellspacing="0" cellpadding="0" border="0">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
           
-          <!-- Header -->
+          <!-- Header with Gradient -->
           <tr>
-            <td class="email-header">
-              <img src="${brandLogo}" alt="${brandName}" class="email-logo" />
+            <td align="center" style="background: linear-gradient(135deg, ${primaryColor} 0%, #0891B2 100%); padding: 40px 30px; position: relative;">
+              <!-- Decorative Pattern -->
+              <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; opacity: 0.1; background-image: url('data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');"></div>
+              
+              <!-- Logo -->
+              <img src="${brandLogo}" alt="${brandName}" style="max-width: 180px; height: auto; display: block; margin: 0 auto; position: relative; z-index: 1;" />
             </td>
           </tr>
           
           <!-- Content -->
           <tr>
-            <td class="email-content">
+            <td class="email-content" style="padding: 48px 40px; color: #1F2937; font-size: 16px; line-height: 1.6;">
               ${content}
             </td>
           </tr>
           
           <!-- Footer -->
           <tr>
-            <td class="email-footer">
-              <p style="margin: 0 0 10px 0;">
+            <td style="background-color: #F9FAFB; padding: 32px 40px; text-align: center; border-top: 1px solid #E5E7EB;">
+              <p style="margin: 0 0 16px 0; color: #6B7280; font-size: 14px; font-weight: 500;">
                 ${footerText}
               </p>
-              ${supportEmail ? `
-              <p style="margin: 10px 0;">
-                <a href="mailto:${supportEmail}" style="color: ${primaryColor}; text-decoration: none;">
-                  ${supportEmail}
-                </a>
-              </p>
-              ` : ''}
-              ${supportPhone ? `
-              <p style="margin: 10px 0;">
-                <a href="tel:${supportPhone}" style="color: ${primaryColor}; text-decoration: none;">
-                  ${supportPhone}
-                </a>
-              </p>
-              ` : ''}
-              <p style="margin: 20px 0 0 0; font-size: 12px; color: #999;">
-                This email was sent to you by ${brandName}. 
+              
+              <!-- Contact Info -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin: 16px auto;">
+                <tr>
+                  ${supportEmail ? `
+                  <td style="padding: 0 12px;">
+                    <a href="mailto:${supportEmail}" style="color: ${primaryColor}; text-decoration: none; font-size: 14px; font-weight: 500;">
+                      📧 ${supportEmail}
+                    </a>
+                  </td>
+                  ` : ''}
+                  ${supportPhone ? `
+                  <td style="padding: 0 12px; border-left: 1px solid #E5E7EB;">
+                    <a href="tel:${supportPhone}" style="color: ${primaryColor}; text-decoration: none; font-size: 14px; font-weight: 500;">
+                      📞 ${supportPhone}
+                    </a>
+                  </td>
+                  ` : ''}
+                </tr>
+              </table>
+              
+              <!-- Legal Text -->
+              <p style="margin: 20px 0 0 0; font-size: 12px; color: #9CA3AF; line-height: 1.5;">
+                This email was sent to you by ${brandName}.<br>
                 If you have any questions, please contact our support team.
               </p>
             </td>
