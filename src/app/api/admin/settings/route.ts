@@ -107,6 +107,8 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
         category = 'brand';
       } else if (setting.key.startsWith('seo') || setting.key.startsWith('og')) {
         category = 'seo';
+      } else if (setting.key.startsWith('company')) {
+        category = 'legal';
       } else if (setting.key.includes('maintenance') || setting.key.includes('registration') || setting.key.includes('kyc') || setting.key.includes('email')) {
         category = 'system';
       } else if (setting.key.includes('Fee') || setting.key.includes('Order') || setting.key.includes('min') || setting.key.includes('max')) {

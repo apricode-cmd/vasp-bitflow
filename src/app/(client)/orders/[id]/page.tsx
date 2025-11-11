@@ -14,7 +14,8 @@ import { CopyButton } from '@/components/ui/copy-button';
 import { OrderStatusBadge } from '@/components/features/OrderStatusBadge';
 import { CurrencyIcon } from '@/components/features/CurrencyIcon';
 import { formatDateTime, formatFiatCurrency, formatCryptoAmount } from '@/lib/formatters';
-import { ArrowLeft, CheckCircle, Clock } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Clock, Download } from 'lucide-react';
+import { DownloadInvoiceButton } from '@/components/orders/DownloadInvoiceButton';
 
 interface OrderDetailPageProps {
   params: Promise<{
@@ -86,7 +87,12 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
             </p>
           </div>
         </div>
-        <OrderStatusBadge status={order.status} />
+        <div className="flex items-center gap-3">
+          <OrderStatusBadge status={order.status} />
+          {order.status !== 'CANCELLED' && (
+            <DownloadInvoiceButton orderId={order.id} />
+          )}
+        </div>
       </div>
 
       {/* Status Messages */}

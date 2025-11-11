@@ -319,13 +319,26 @@ async function main(): Promise<void> {
   console.log('⚙️  Creating system settings...');
   
   const settings = [
+    // Trading settings
     { key: 'platform_fee', value: '1.5', type: 'NUMBER' as const, category: 'trading', description: 'Platform fee percentage', isPublic: true },
     { key: 'order_expiry_hours', value: '24', type: 'NUMBER' as const, category: 'trading', description: 'Hours until order expires', isPublic: false },
     { key: 'kyc_expiry_months', value: '12', type: 'NUMBER' as const, category: 'kyc', description: 'Months until KYC needs renewal', isPublic: false },
     { key: 'min_order_eur', value: '10', type: 'NUMBER' as const, category: 'trading', description: 'Minimum order value in EUR', isPublic: true },
     { key: 'max_order_eur', value: '100000', type: 'NUMBER' as const, category: 'trading', description: 'Maximum order value in EUR', isPublic: true },
+    
+    // General settings
     { key: 'support_email', value: 'support@apricode.io', type: 'STRING' as const, category: 'general', description: 'Support email address', isPublic: true },
-    { key: 'platform_name', value: 'Apricode Exchange', type: 'STRING' as const, category: 'general', description: 'Platform name', isPublic: true }
+    { key: 'platform_name', value: 'Apricode Exchange', type: 'STRING' as const, category: 'general', description: 'Platform name', isPublic: true },
+    
+    // Legal company information (for invoices and legal documents)
+    { key: 'companyLegalName', value: 'Apricode Exchange Ltd.', type: 'STRING' as const, category: 'legal', description: 'Official registered company name', isPublic: false },
+    { key: 'companyRegistrationNumber', value: 'KRS 0000123456', type: 'STRING' as const, category: 'legal', description: 'Company registration number', isPublic: false },
+    { key: 'companyTaxNumber', value: 'PL1234567890', type: 'STRING' as const, category: 'legal', description: 'Tax identification number (VAT/NIP)', isPublic: false },
+    { key: 'companyLicenseNumber', value: 'VASP-2024-001', type: 'STRING' as const, category: 'legal', description: 'VASP license number (optional)', isPublic: false },
+    { key: 'companyAddress', value: 'ul. Przykładowa 123, 00-001 Warszawa, Poland', type: 'STRING' as const, category: 'legal', description: 'Company legal address', isPublic: false },
+    { key: 'companyPhone', value: '+48 22 123 45 67', type: 'STRING' as const, category: 'legal', description: 'Company contact phone', isPublic: false },
+    { key: 'companyEmail', value: 'legal@apricode.exchange', type: 'STRING' as const, category: 'legal', description: 'Company legal email', isPublic: false },
+    { key: 'companyWebsite', value: 'https://apricode.exchange', type: 'STRING' as const, category: 'legal', description: 'Company website URL', isPublic: false }
   ];
 
   for (const setting of settings) {

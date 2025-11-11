@@ -332,6 +332,14 @@ export default function AdminOrdersPage(): JSX.Element {
                     View Customer
                   </Link>
                 </DropdownMenuItem>
+                {order.status !== 'CANCELLED' && (
+                  <DropdownMenuItem asChild>
+                    <a href={`/api/admin/orders/${order.id}/invoice`} target="_blank" rel="noopener noreferrer">
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Invoice
+                    </a>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 {order.status === 'PENDING' && (
                   <DropdownMenuItem onClick={() => handleStatusUpdate(order.id, 'PROCESSING')}>

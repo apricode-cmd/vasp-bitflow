@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/shadcn-io/color-picker';
 import { toast } from 'sonner';
 import {
-  Building2, Globe, Settings as SettingsIcon,
+  Building2, Globe, Settings as SettingsIcon, Scale,
   Save, Loader2, AlertCircle, Sparkles, Mail, Palette
 } from 'lucide-react';
 import Color from 'color';
@@ -47,6 +47,16 @@ interface SystemSettings {
   seoDescription: string;
   seoKeywords: string;
   ogImage: string;
+  
+  // Legal
+  companyLegalName: string;
+  companyRegistrationNumber: string;
+  companyTaxNumber: string;
+  companyLicenseNumber: string;
+  companyAddress: string;
+  companyPhone: string;
+  companyEmail: string;
+  companyWebsite: string;
   
   // System
   maintenanceMode: boolean;
@@ -271,7 +281,7 @@ export default function SettingsPage(): JSX.Element {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="brand">
             <Building2 className="h-4 w-4 mr-2" />
             Brand
@@ -279,6 +289,10 @@ export default function SettingsPage(): JSX.Element {
           <TabsTrigger value="seo">
             <Globe className="h-4 w-4 mr-2" />
             SEO
+          </TabsTrigger>
+          <TabsTrigger value="legal">
+            <Scale className="h-4 w-4 mr-2" />
+            Legal
           </TabsTrigger>
           <TabsTrigger value="system">
             <SettingsIcon className="h-4 w-4 mr-2" />
@@ -600,6 +614,175 @@ export default function SettingsPage(): JSX.Element {
                   Recommended: 1200x630px for social media sharing
                 </p>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Legal Settings */}
+        <TabsContent value="legal" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Scale className="h-5 w-5 text-primary" />
+                Company Legal Information
+              </CardTitle>
+              <CardDescription>
+                Official company details for invoices, legal documents, and compliance
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Company Identity */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  Company Identity
+                </h3>
+                
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="companyLegalName">
+                      Legal Company Name <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="companyLegalName"
+                      value={settings.companyLegalName || ''}
+                      onChange={(e) => setSettings({ ...settings, companyLegalName: e.target.value })}
+                      placeholder="e.g., Apricode Exchange Ltd."
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Official registered company name (as shown on documents)
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="companyRegistrationNumber">
+                      Registration Number <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="companyRegistrationNumber"
+                      value={settings.companyRegistrationNumber || ''}
+                      onChange={(e) => setSettings({ ...settings, companyRegistrationNumber: e.target.value })}
+                      placeholder="e.g., KRS 0000123456"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Company registration number (KRS, CRN, etc.)
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="companyTaxNumber">
+                      Tax Number (VAT/NIP) <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="companyTaxNumber"
+                      value={settings.companyTaxNumber || ''}
+                      onChange={(e) => setSettings({ ...settings, companyTaxNumber: e.target.value })}
+                      placeholder="e.g., PL1234567890"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Tax identification number (VAT ID, NIP, etc.)
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="companyLicenseNumber">
+                      VASP License Number
+                    </Label>
+                    <Input
+                      id="companyLicenseNumber"
+                      value={settings.companyLicenseNumber || ''}
+                      onChange={(e) => setSettings({ ...settings, companyLicenseNumber: e.target.value })}
+                      placeholder="e.g., VASP-2024-001 (optional)"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Virtual Asset Service Provider license (if applicable)
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Contact Information */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  Contact Information
+                </h3>
+                
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="companyAddress">
+                      Legal Address <span className="text-destructive">*</span>
+                    </Label>
+                    <Textarea
+                      id="companyAddress"
+                      value={settings.companyAddress || ''}
+                      onChange={(e) => setSettings({ ...settings, companyAddress: e.target.value })}
+                      placeholder="e.g., ul. Przykładowa 123, 00-001 Warszawa, Poland"
+                      rows={2}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Full legal address (street, city, postal code, country)
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="companyPhone">
+                      Company Phone <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="companyPhone"
+                      type="tel"
+                      value={settings.companyPhone || ''}
+                      onChange={(e) => setSettings({ ...settings, companyPhone: e.target.value })}
+                      placeholder="e.g., +48 22 123 45 67"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Official company phone number (with country code)
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="companyEmail">
+                      Company Email <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="companyEmail"
+                      type="email"
+                      value={settings.companyEmail || ''}
+                      onChange={(e) => setSettings({ ...settings, companyEmail: e.target.value })}
+                      placeholder="e.g., legal@apricode.exchange"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Official company email for legal correspondence
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="companyWebsite">
+                      Company Website
+                    </Label>
+                    <Input
+                      id="companyWebsite"
+                      type="url"
+                      value={settings.companyWebsite || ''}
+                      onChange={(e) => setSettings({ ...settings, companyWebsite: e.target.value })}
+                      placeholder="e.g., https://apricode.exchange"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Official company website URL
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Important</AlertTitle>
+                <AlertDescription>
+                  This information will be used on invoices, legal documents, and official communications.
+                  Ensure all details are accurate and match your official company registration.
+                </AlertDescription>
+              </Alert>
             </CardContent>
           </Card>
         </TabsContent>
