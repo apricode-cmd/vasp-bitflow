@@ -1,0 +1,783 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Apricode Exchange API",
+    "version": "1.0.0",
+    "description": "Enterprise-grade cryptocurrency exchange API for buying crypto with fiat currency. Supports BTC, ETH, USDT, SOL with EUR and PLN.",
+    "contact": {
+      "name": "Apricode API Support",
+      "email": "api@apricode.io",
+      "url": "https://apricode.io/support"
+    },
+    "license": {
+      "name": "Proprietary",
+      "url": "https://apricode.io/terms"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://apricode.io/api/v1",
+      "description": "Production server"
+    },
+    {
+      "url": "http://localhost:3000/api/v1",
+      "description": "Development server"
+    }
+  ],
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Rates",
+      "description": "Exchange rate operations"
+    },
+    {
+      "name": "Currencies",
+      "description": "Available currencies"
+    },
+    {
+      "name": "Orders",
+      "description": "Order management"
+    }
+  ],
+  "paths": {
+    "/rates": {
+      "get": {
+        "tags": ["Rates"],
+        "summary": "Get current exchange rates",
+        "description": "Returns current exchange rates for all supported cryptocurrency and fiat currency pairs",
+        "operationId": "getRates",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RatesResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "rates": {
+                      "BTC": {
+                        "EUR": 45000.5,
+                        "PLN": 180000
+                      },
+                      "ETH": {
+                        "EUR": 3000.25,
+                        "PLN": 12000.5
+                      },
+                      "USDT": {
+                        "EUR": 0.95,
+                        "PLN": 3.8
+                      },
+                      "SOL": {
+                        "EUR": 120,
+                        "PLN": 480
+                      }
+                    },
+                    "timestamp": "2025-11-11T12:00:00Z"
+                  },
+                  "meta": {
+                    "version": "1.0",
+                    "responseTime": "45ms"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/currencies": {
+      "get": {
+        "tags": ["Currencies"],
+        "summary": "Get available currencies",
+        "description": "Returns list of all supported cryptocurrencies and fiat currencies",
+        "operationId": "getCurrencies",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrenciesResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "crypto": [
+                      {
+                        "code": "BTC",
+                        "name": "Bitcoin",
+                        "symbol": "₿",
+                        "decimals": 8,
+                        "isActive": true
+                      },
+                      {
+                        "code": "ETH",
+                        "name": "Ethereum",
+                        "symbol": "Ξ",
+                        "decimals": 18,
+                        "isActive": true
+                      }
+                    ],
+                    "fiat": [
+                      {
+                        "code": "EUR",
+                        "name": "Euro",
+                        "symbol": "€",
+                        "isActive": true
+                      },
+                      {
+                        "code": "PLN",
+                        "name": "Polish Zloty",
+                        "symbol": "zł",
+                        "isActive": true
+                      }
+                    ]
+                  },
+                  "meta": {
+                    "version": "1.0",
+                    "responseTime": "12ms"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/orders": {
+      "post": {
+        "tags": ["Orders"],
+        "summary": "Create new order",
+        "description": "Creates a new cryptocurrency purchase order. User must have approved KYC.",
+        "operationId": "createOrder",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrderRequest"
+              },
+              "example": {
+                "userEmail": "client@example.com",
+                "currencyCode": "BTC",
+                "fiatCurrencyCode": "EUR",
+                "amount": 0.01,
+                "walletAddress": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Order created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "cmhv0ym8q0022jnhg07skmbw0",
+                    "paymentReference": "APR-3B9ACA00-A1B2C3",
+                    "cryptoAmount": 0.01,
+                    "fiatAmount": 450,
+                    "rate": 45000,
+                    "feePercent": 1.5,
+                    "feeAmount": 6.75,
+                    "totalFiat": 456.75,
+                    "status": "PENDING",
+                    "walletAddress": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+                    "expiresAt": "2025-11-12T12:00:00Z",
+                    "createdAt": "2025-11-11T12:00:00Z"
+                  },
+                  "meta": {
+                    "version": "1.0",
+                    "responseTime": "125ms"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "get": {
+        "tags": ["Orders"],
+        "summary": "List orders",
+        "description": "Returns list of orders. If API key is bound to a user, returns only that user's orders.",
+        "operationId": "listOrders",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by order status",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["PENDING", "PAYMENT_PENDING", "PROCESSING", "COMPLETED", "CANCELLED", "EXPIRED"]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Items per page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrdersListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/orders/{id}": {
+      "get": {
+        "tags": ["Orders"],
+        "summary": "Get order details",
+        "description": "Returns detailed information about a specific order",
+        "operationId": "getOrder",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Order ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "API key authentication. Use format: `Bearer apx_live_your_api_key`"
+      }
+    },
+    "schemas": {
+      "RatesResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "rates": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "number"
+                  }
+                }
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        }
+      },
+      "CurrenciesResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "crypto": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CryptoCurrency"
+                }
+              },
+              "fiat": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FiatCurrency"
+                }
+              }
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        }
+      },
+      "CreateOrderRequest": {
+        "type": "object",
+        "required": ["userEmail", "currencyCode", "fiatCurrencyCode", "amount", "walletAddress"],
+        "properties": {
+          "userEmail": {
+            "type": "string",
+            "format": "email",
+            "description": "User's email address (must have approved KYC)"
+          },
+          "currencyCode": {
+            "type": "string",
+            "enum": ["BTC", "ETH", "USDT", "SOL"],
+            "description": "Cryptocurrency code"
+          },
+          "fiatCurrencyCode": {
+            "type": "string",
+            "enum": ["EUR", "PLN"],
+            "description": "Fiat currency code"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "description": "Amount of cryptocurrency to buy"
+          },
+          "walletAddress": {
+            "type": "string",
+            "description": "Cryptocurrency wallet address"
+          }
+        }
+      },
+      "OrderResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Order"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        }
+      },
+      "OrdersListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Order"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        }
+      },
+      "Order": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Order ID"
+          },
+          "paymentReference": {
+            "type": "string",
+            "description": "Payment reference (APR-XXX-YYY)"
+          },
+          "cryptoAmount": {
+            "type": "number",
+            "description": "Amount of cryptocurrency"
+          },
+          "fiatAmount": {
+            "type": "number",
+            "description": "Fiat amount before fees"
+          },
+          "rate": {
+            "type": "number",
+            "description": "Exchange rate used"
+          },
+          "feePercent": {
+            "type": "number",
+            "description": "Fee percentage"
+          },
+          "feeAmount": {
+            "type": "number",
+            "description": "Fee amount in fiat"
+          },
+          "totalFiat": {
+            "type": "number",
+            "description": "Total fiat amount including fees"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["PENDING", "PAYMENT_PENDING", "PROCESSING", "COMPLETED", "CANCELLED", "EXPIRED"]
+          },
+          "walletAddress": {
+            "type": "string",
+            "description": "Cryptocurrency wallet address"
+          },
+          "transactionHash": {
+            "type": "string",
+            "nullable": true,
+            "description": "Blockchain transaction hash"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Order expiration date"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CryptoCurrency": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "decimals": {
+            "type": "integer"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "FiatCurrency": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Meta": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "example": "1.0"
+          },
+          "responseTime": {
+            "type": "string",
+            "example": "45ms"
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "totalPages": {
+            "type": "integer"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "error": {
+            "type": "string"
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        }
+      }
+    },
+    "responses": {
+      "UnauthorizedError": {
+        "description": "Invalid or missing API key",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "success": false,
+              "error": "Invalid or inactive API key",
+              "meta": {
+                "version": "1.0",
+                "responseTime": "5ms"
+              }
+            }
+          }
+        }
+      },
+      "ForbiddenError": {
+        "description": "Insufficient permissions",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "success": false,
+              "error": "User must have approved KYC",
+              "meta": {
+                "version": "1.0",
+                "responseTime": "8ms"
+              }
+            }
+          }
+        }
+      },
+      "NotFoundError": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "success": false,
+              "error": "Order not found",
+              "meta": {
+                "version": "1.0",
+                "responseTime": "6ms"
+              }
+            }
+          }
+        }
+      },
+      "ValidationError": {
+        "description": "Validation failed",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "success": false,
+              "error": "Validation failed",
+              "details": [
+                {
+                  "field": "amount",
+                  "message": "Amount must be positive"
+                }
+              ],
+              "meta": {
+                "version": "1.0",
+                "responseTime": "10ms"
+              }
+            }
+          }
+        }
+      },
+      "RateLimitError": {
+        "description": "Rate limit exceeded",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "success": false,
+              "error": "Rate limit exceeded",
+              "message": "Rate limit: 100 requests per hour",
+              "meta": {
+                "version": "1.0",
+                "responseTime": "3ms"
+              }
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "Internal server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "success": false,
+              "error": "Internal server error",
+              "meta": {
+                "version": "1.0",
+                "responseTime": "15ms"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+

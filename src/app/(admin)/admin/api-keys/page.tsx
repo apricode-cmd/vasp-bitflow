@@ -35,7 +35,15 @@ export default function ApiKeysPage(): JSX.Element {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newKeyData, setNewKeyData] = useState({
     name: '',
-    rateLimit: 100
+    rateLimit: 100,
+    permissions: {
+      rates: ['read', 'calculate'],
+      currencies: ['read'],
+      orders: ['read', 'create', 'cancel'],
+      customers: ['read', 'create'],
+      kyc: ['read', 'initiate'],
+      payment_methods: ['read']
+    }
   });
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   
@@ -45,7 +53,7 @@ export default function ApiKeysPage(): JSX.Element {
   
   // Step-up MFA state
   const [mfaDialogOpen, setMfaDialogOpen] = useState(false);
-  const [mfaPendingAction, setMfaPendingAction] = useState<'revoke' | null>(null);
+  const [mfaPendingAction, setMfaPendingAction] = useState<'revoke' | 'create' | null>(null);
 
   useEffect(() => {
     fetchApiKeys();
@@ -66,7 +74,7 @@ export default function ApiKeysPage(): JSX.Element {
     }
   };
 
-  const createApiKey = async (): Promise<void> => {
+  const createApiKey = async (mfaChallengeId?: string, mfaResponse?: AuthenticationResponseJSON): Promise<void> => {
     try {
       // Validate name
       if (!newKeyData.name || newKeyData.name.trim().length < 3) {
@@ -74,27 +82,51 @@ export default function ApiKeysPage(): JSX.Element {
         return;
       }
 
+      const body: any = {
+        name: newKeyData.name.trim(),
+        permissions: newKeyData.permissions,
+        rateLimit: newKeyData.rateLimit
+      };
+
+      // If MFA data provided, include it
+      if (mfaChallengeId && mfaResponse) {
+        body.mfaChallengeId = mfaChallengeId;
+        body.mfaResponse = mfaResponse;
+      }
+
       const response = await fetch('/api/admin/api-keys', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: newKeyData.name.trim(),
-          permissions: {
-            rates: ['read'],
-            currencies: ['read'],
-            orders: ['read', 'create']
-          },
-          rateLimit: newKeyData.rateLimit
-        })
+        body: JSON.stringify(body)
       });
 
       const data = await response.json();
+
+      // Check if MFA is required
+      if (data.requiresMfa && !mfaChallengeId) {
+        // Open MFA dialog
+        setMfaPendingAction('create');
+        setMfaDialogOpen(true);
+        return;
+      }
 
       if (data.success) {
         setGeneratedKey(data.data.key);
         toast.success('API key generated! Save it securely - it won\'t be shown again');
         setShowCreateForm(false);
-        setNewKeyData({ name: '', rateLimit: 100 }); // Reset form
+        setNewKeyData({ 
+          name: '', 
+          rateLimit: 100,
+          permissions: {
+            rates: ['read', 'calculate'],
+            currencies: ['read'],
+            orders: ['read', 'create', 'cancel'],
+            customers: ['read', 'create'],
+            kyc: ['read', 'initiate'],
+            payment_methods: ['read']
+          }
+        }); // Reset form
+        setMfaDialogOpen(false); // Close MFA dialog if open
         await fetchApiKeys();
       } else {
         // Show detailed error
@@ -171,6 +203,8 @@ export default function ApiKeysPage(): JSX.Element {
     // Retry the action with MFA data
     if (mfaPendingAction === 'revoke') {
       confirmRevoke(challengeId, response);
+    } else if (mfaPendingAction === 'create') {
+      createApiKey(challengeId, response);
     }
   };
 
@@ -274,16 +308,22 @@ export default function ApiKeysPage(): JSX.Element {
               </p>
             </div>
             <div className="bg-muted p-3 rounded-lg">
-              <p className="text-sm font-medium mb-2">Default Permissions:</p>
+              <p className="text-sm font-medium mb-2">Default Permissions (Public API v1):</p>
               <ul className="text-xs text-muted-foreground space-y-1">
-                <li>✅ Read rates</li>
-                <li>✅ Read currencies</li>
-                <li>✅ Read & create orders</li>
+                <li>✅ <strong>Rates:</strong> read, calculate</li>
+                <li>✅ <strong>Currencies:</strong> read</li>
+                <li>✅ <strong>Orders:</strong> read, create, cancel</li>
+                <li>✅ <strong>Customers:</strong> read, create</li>
+                <li>✅ <strong>KYC:</strong> read, initiate</li>
+                <li>✅ <strong>Payment Methods:</strong> read</li>
               </ul>
+              <p className="text-xs text-muted-foreground mt-2 italic">
+                Covers all 13 Public API v1 endpoints
+              </p>
             </div>
             <div className="flex gap-2">
               <Button 
-                onClick={createApiKey}
+                onClick={() => createApiKey()}
                 disabled={!newKeyData.name || newKeyData.name.trim().length < 3}
               >
                 Generate Key
@@ -292,7 +332,18 @@ export default function ApiKeysPage(): JSX.Element {
                 variant="outline" 
                 onClick={() => {
                   setShowCreateForm(false);
-                  setNewKeyData({ name: '', rateLimit: 100 });
+                  setNewKeyData({ 
+                    name: '', 
+                    rateLimit: 100,
+                    permissions: {
+                      rates: ['read', 'calculate'],
+                      currencies: ['read'],
+                      orders: ['read', 'create', 'cancel'],
+                      customers: ['read', 'create'],
+                      kyc: ['read', 'initiate'],
+                      payment_methods: ['read']
+                    }
+                  });
                 }}
               >
                 Cancel
@@ -389,8 +440,12 @@ export default function ApiKeysPage(): JSX.Element {
       <StepUpMfaDialog
         open={mfaDialogOpen}
         onOpenChange={setMfaDialogOpen}
-        action="REVOKE_API_KEY"
-        actionDescription="Revoking an API key requires additional verification for security."
+        action={mfaPendingAction === 'create' ? 'GENERATE_API_KEY' : 'REVOKE_API_KEY'}
+        actionDescription={
+          mfaPendingAction === 'create'
+            ? 'Generating an API key requires additional verification for security.'
+            : 'Revoking an API key requires additional verification for security.'
+        }
         onSuccess={handleMfaSuccess}
         onCancel={() => {
           setMfaDialogOpen(false);

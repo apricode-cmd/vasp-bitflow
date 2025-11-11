@@ -5,6 +5,9 @@
 /* react-phone-number-input styles */
 @import 'react-phone-number-input/style.css';
 
+/* Scalar API Reference styles */
+@import '@scalar/api-reference-react/style.css';
+
 /* Branded gradient background like Apricode website */
 @layer base {
   body {

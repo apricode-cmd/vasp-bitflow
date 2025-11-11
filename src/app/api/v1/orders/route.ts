@@ -8,11 +8,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireApiKey, logApiRequest } from '@/lib/middleware/api-auth';
 import { prisma } from '@/lib/prisma';
-import { createOrderSchema } from '@/lib/validations/order';
 import { rateManagementService } from '@/lib/services/rate-management.service';
 import { calculateOrderTotal, validateOrderLimits } from '@/lib/utils/order-calculations';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 import { z } from 'zod';
+
+// API-specific order schema (extends base schema with userEmail)
+const apiCreateOrderSchema = z.object({
+  userEmail: z.string().email('Invalid email address'),
+  currencyCode: z.enum(['BTC', 'ETH', 'USDT', 'SOL'], {
+    required_error: 'Cryptocurrency is required'
+  }),
+  fiatCurrencyCode: z.enum(['EUR', 'PLN'], {
+    required_error: 'Fiat currency is required'
+  }),
+  cryptoAmount: z
+    .number({
+      required_error: 'Amount is required',
+      invalid_type_error: 'Amount must be a number'
+    })
+    .positive('Amount must be positive')
+    .max(1000000, 'Amount is too large'),
+  walletAddress: z
+    .string()
+    .min(26, 'Invalid wallet address')
+    .max(62, 'Invalid wallet address')
+    .regex(/^[a-zA-Z0-9]+$/, 'Wallet address can only contain alphanumeric characters'),
+  paymentMethodCode: z
+    .string({
+      required_error: 'Payment method is required'
+    })
+    .min(1, 'Payment method is required'),
+});
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const startTime = Date.now();
@@ -29,12 +56,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const body = await request.json();
 
-    // Extend validation to require userEmail for API-created orders
-    const extendedSchema = createOrderSchema.extend({
-      userEmail: z.string().email()
-    });
-
-    const validated = extendedSchema.parse(body);
+    // Validate request body
+    const validated = apiCreateOrderSchema.parse(body);
 
     // Find user
     const user = await prisma.user.findUnique({
@@ -97,7 +120,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Validate limits
     const limitsCheck = validateOrderLimits(
-      validated.amount,
+      validated.cryptoAmount,
       tradingPair.minCryptoAmount,
       tradingPair.maxCryptoAmount
     );
@@ -124,7 +147,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Calculate order total
     const calculation = calculateOrderTotal(
-      validated.amount,
+      validated.cryptoAmount,
       rate,
       tradingPair.feePercent / 100
     );
@@ -145,13 +168,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         currencyCode: validated.currencyCode,
         fiatCurrencyCode: validated.fiatCurrencyCode,
         paymentReference,
-        cryptoAmount: validated.amount,
+        cryptoAmount: validated.cryptoAmount,
         fiatAmount: calculation.fiatAmount,
-        rate: calculation.rate,
+        rate: rate, // Use the rate from rateManagementService
         feePercent: tradingPair.feePercent,
-        feeAmount: calculation.fee,
+        feeAmount: calculation.fee, // fee from calculation
         totalFiat: calculation.totalFiat,
         walletAddress: validated.walletAddress,
+        paymentMethodCode: validated.paymentMethodCode,
         status: 'PENDING',
         expiresAt
       },
@@ -185,12 +209,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         responseTime: `${responseTime}ms`
       }
     }, { status: 201 });
-  } catch (error) {
-    console.error('API v1 create order error:', error);
+  } catch (error: any) {
+    console.error('[API v1 POST /orders] Error:', error);
+    console.error('[API v1 POST /orders] Error message:', error?.message);
+    console.error('[API v1 POST /orders] Error stack:', error?.stack);
 
     const responseTime = Date.now() - startTime;
 
     if (error instanceof z.ZodError) {
+      console.error('[API v1 POST /orders] Zod validation error:', error.errors);
       return NextResponse.json(
         {
           success: false,
@@ -206,6 +233,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       {
         success: false,
         error: 'Failed to create order',
+        details: error?.message || 'Unknown error',
         meta: { version: '1.0', responseTime: `${responseTime}ms` }
       },
       { status: 500 }

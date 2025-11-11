@@ -33,11 +33,10 @@ export async function POST(request: NextRequest) {
 
     // Request challenge
     const challenge = await stepUpMfaService.requestChallenge(
-      session.adminId,
+      session.user.id, // ✅ Fixed: use session.user.id instead of session.adminId
       action,
       resourceType,
-      resourceId,
-      metadata
+      resourceId
     );
 
     return NextResponse.json({

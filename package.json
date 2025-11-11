@@ -51,6 +51,7 @@
     "@radix-ui/react-toast": "^1.2.0",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@react-pdf/renderer": "^4.3.1",
+    "@scalar/api-reference-react": "^0.8.5",
     "@simplewebauthn/browser": "^9.0.1",
     "@simplewebauthn/server": "^9.0.3",
     "@tanstack/react-table": "^8.21.3",

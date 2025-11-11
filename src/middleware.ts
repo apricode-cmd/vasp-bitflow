@@ -121,6 +121,8 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/login') ||
     path.startsWith('/register') ||
     path.startsWith('/2fa-verify') ||
+    path.startsWith('/api-docs') ||  // Public API documentation
+    path.startsWith('/api/docs/') ||  // OpenAPI spec endpoint
     path.startsWith('/api/rates') ||
     path.startsWith('/api/payment-methods') ||
     path.startsWith('/api/legal-documents/public') ||

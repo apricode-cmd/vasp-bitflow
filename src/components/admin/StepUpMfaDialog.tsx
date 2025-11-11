@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { startAuthentication } from '@simplewebauthn/browser';
 import type { AuthenticationResponseJSON } from '@simplewebauthn/types';
 import {
@@ -41,10 +41,25 @@ export function StepUpMfaDialog({
   const [error, setError] = useState<string | null>(null);
   const [challengeId, setChallengeId] = useState<string | null>(null);
   const [options, setOptions] = useState<any>(null);
+  const [hasRequested, setHasRequested] = useState(false);
+
+  // Auto-request challenge when dialog opens
+  useEffect(() => {
+    if (open && !hasRequested) {
+      setHasRequested(true);
+      handleRequestChallenge();
+    }
+    
+    // Reset when dialog closes
+    if (!open) {
+      setHasRequested(false);
+    }
+  }, [open]);
 
   // Request challenge when dialog opens
   const handleRequestChallenge = async () => {
     try {
+      console.log('[StepUpMfaDialog] Requesting challenge...');
       setIsLoading(true);
       setError(null);
 
@@ -55,6 +70,7 @@ export function StepUpMfaDialog({
       });
 
       const data = await response.json();
+      console.log('[StepUpMfaDialog] Challenge received:', { success: data.success, hasChallengeId: !!data.challengeId, hasOptions: !!data.options });
 
       if (!data.success) {
         throw new Error(data.error || 'Failed to request challenge');
@@ -63,10 +79,12 @@ export function StepUpMfaDialog({
       setChallengeId(data.challengeId);
       setOptions(data.options);
 
+      console.log('[StepUpMfaDialog] Starting WebAuthn verification...');
       // Automatically start WebAuthn flow
       await handleVerify(data.challengeId, data.options);
+      console.log('[StepUpMfaDialog] WebAuthn verification completed successfully');
     } catch (err: any) {
-      console.error('Challenge request error:', err);
+      console.error('[StepUpMfaDialog] Challenge request error:', err);
       setError(err.message || 'Failed to request verification');
     } finally {
       setIsLoading(false);
@@ -76,21 +94,36 @@ export function StepUpMfaDialog({
   // Verify with WebAuthn
   const handleVerify = async (chalId: string, opts: any) => {
     try {
+      console.log('[StepUpMfaDialog] handleVerify called with:', { chalId, opts });
       setIsLoading(true);
       setError(null);
 
+      // Validate options before calling startAuthentication
+      if (!opts || !opts.challenge) {
+        throw new Error('Invalid WebAuthn options: missing challenge');
+      }
+
+      console.log('[StepUpMfaDialog] Calling startAuthentication...');
       // Start WebAuthn authentication
       const authResponse = await startAuthentication(opts);
+      console.log('[StepUpMfaDialog] startAuthentication completed:', { id: authResponse.id });
 
       // Call success callback
+      console.log('[StepUpMfaDialog] Calling onSuccess callback...');
       onSuccess(chalId, authResponse);
     } catch (err: any) {
-      console.error('WebAuthn verification error:', err);
+      console.error('[StepUpMfaDialog] WebAuthn verification error:', {
+        name: err.name,
+        message: err.message,
+        stack: err.stack
+      });
       
       if (err.name === 'NotAllowedError') {
         setError('Verification was cancelled. Please try again.');
       } else if (err.name === 'SecurityError') {
         setError('Security error. Please ensure you are using HTTPS.');
+      } else if (err.name === 'InvalidStateError') {
+        setError('No registered security key found. Please register a Passkey first.');
       } else {
         setError(err.message || 'Verification failed. Please try again.');
       }
@@ -101,24 +134,22 @@ export function StepUpMfaDialog({
 
   // Handle dialog open change
   const handleOpenChange = (newOpen: boolean) => {
-    if (!newOpen && onCancel) {
-      onCancel();
+    if (!newOpen) {
+      // Reset state when closing
+      setChallengeId(null);
+      setOptions(null);
+      setError(null);
+      if (onCancel) {
+        onCancel();
+      }
     }
     onOpenChange(newOpen);
-  };
-
-  // Auto-request challenge when dialog opens
-  const handleDialogOpen = () => {
-    if (open && !challengeId) {
-      handleRequestChallenge();
-    }
   };
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent 
-        className="sm:max-w-md" 
-        onOpenAutoFocus={handleDialogOpen}
+        className="sm:max-w-md"
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
