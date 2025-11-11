@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { getBaseEmailLayout } from '@/lib/email-templates/base-layout';
 
 interface EmailTemplate {
   id: string;
@@ -174,24 +175,61 @@ export default function EmailTemplateEditorPage({ params }: { params: { id: stri
   const getPreviewHtml = () => {
     let html = formData.htmlContent;
     
-    if (whiteLabelSettings) {
-      html = html
-        .replace(/\{\{brandName\}\}/g, whiteLabelSettings.brandName)
-        .replace(/\{\{brandLogo\}\}/g, whiteLabelSettings.brandLogo)
-        .replace(/\{\{primaryColor\}\}/g, whiteLabelSettings.primaryColor)
-        .replace(/\{\{supportEmail\}\}/g, whiteLabelSettings.supportEmail);
+    // Check if htmlContent already has full layout (contains <!DOCTYPE html>)
+    const hasFullLayout = html.includes('<!DOCTYPE html>');
+    
+    if (hasFullLayout) {
+      // Already has full layout, just replace variables
+      if (whiteLabelSettings) {
+        html = html
+          .replace(/\{\{brandName\}\}/g, whiteLabelSettings.brandName)
+          .replace(/\{\{brandLogo\}\}/g, whiteLabelSettings.brandLogo)
+          .replace(/\{\{primaryColor\}\}/g, whiteLabelSettings.primaryColor)
+          .replace(/\{\{supportEmail\}\}/g, whiteLabelSettings.supportEmail)
+          .replace(/\{\{supportPhone\}\}/g, whiteLabelSettings.supportPhone || '');
+      }
+
+      // Replace other variables with highlighted placeholders
+      formData.variables.forEach(variable => {
+        // Skip white-label variables
+        if (['brandName', 'brandLogo', 'primaryColor', 'supportEmail', 'supportPhone'].includes(variable)) {
+          return;
+        }
+        const regex = new RegExp(`\\{\\{${variable}\\}\\}`, 'g');
+        html = html.replace(regex, `<span style="background: #fef3c7; padding: 2px 6px; border-radius: 4px; font-weight: 600;">${variable}</span>`);
+      });
+
+      // Replace preheader
+      html = html.replace(/\{\{preheader\}\}/g, formData.preheader);
+
+      return html;
+    } else {
+      // Body content only, wrap in layout
+      let bodyContent = html;
+      
+      // Replace other variables with highlighted placeholders (except white-label vars)
+      formData.variables.forEach(variable => {
+        if (['brandName', 'brandLogo', 'primaryColor', 'supportEmail', 'supportPhone'].includes(variable)) {
+          return;
+        }
+        const regex = new RegExp(`\\{\\{${variable}\\}\\}`, 'g');
+        bodyContent = bodyContent.replace(regex, `<span style="background: #fef3c7; padding: 2px 6px; border-radius: 4px; font-weight: 600;">${variable}</span>`);
+      });
+
+      // Wrap in base layout
+      let fullHtml = getBaseEmailLayout(bodyContent, whiteLabelSettings || {
+        brandName: 'Your Brand',
+        brandLogo: '/logo.png',
+        primaryColor: '#06b6d4',
+        supportEmail: 'support@example.com',
+        supportPhone: '',
+      });
+
+      // Replace preheader
+      fullHtml = fullHtml.replace(/\{\{preheader\}\}/g, formData.preheader);
+
+      return fullHtml;
     }
-
-    // Replace other variables with highlighted placeholders
-    formData.variables.forEach(variable => {
-      const regex = new RegExp(`\\{\\{${variable}\\}\\}`, 'g');
-      html = html.replace(regex, `<span style="background: #fef3c7; padding: 2px 6px; border-radius: 4px; font-weight: 600;">${variable}</span>`);
-    });
-
-    // Replace preheader
-    html = html.replace(/\{\{preheader\}\}/g, formData.preheader);
-
-    return html;
   };
 
   // Add variable

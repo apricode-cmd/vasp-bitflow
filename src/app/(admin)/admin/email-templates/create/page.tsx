@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { getBaseEmailLayout } from '@/lib/email-templates/base-layout';
 
 interface WhiteLabelSettings {
   brandName: string;
@@ -127,26 +128,31 @@ export default function CreateEmailTemplatePage(): React.ReactElement {
 
   // Replace white-label variables in preview
   const getPreviewHtml = () => {
-    let html = formData.htmlContent;
+    let bodyContent = formData.htmlContent;
     
-    if (whiteLabelSettings) {
-      html = html
-        .replace(/\{\{brandName\}\}/g, whiteLabelSettings.brandName)
-        .replace(/\{\{brandLogo\}\}/g, whiteLabelSettings.brandLogo)
-        .replace(/\{\{primaryColor\}\}/g, whiteLabelSettings.primaryColor)
-        .replace(/\{\{supportEmail\}\}/g, whiteLabelSettings.supportEmail);
-    }
-
-    // Replace other variables with highlighted placeholders
+    // Replace other variables with highlighted placeholders (except white-label vars)
     formData.variables.forEach(variable => {
+      // Skip white-label variables - they will be replaced by layout
+      if (['brandName', 'brandLogo', 'primaryColor', 'supportEmail', 'supportPhone'].includes(variable)) {
+        return;
+      }
       const regex = new RegExp(`\\{\\{${variable}\\}\\}`, 'g');
-      html = html.replace(regex, `<span style="background: #fef3c7; padding: 2px 6px; border-radius: 4px; font-weight: 600;">${variable}</span>`);
+      bodyContent = bodyContent.replace(regex, `<span style="background: #fef3c7; padding: 2px 6px; border-radius: 4px; font-weight: 600;">${variable}</span>`);
+    });
+
+    // Wrap in base layout with white-label settings
+    let fullHtml = getBaseEmailLayout(bodyContent, whiteLabelSettings || {
+      brandName: 'Your Brand',
+      brandLogo: '/logo.png',
+      primaryColor: '#06b6d4',
+      supportEmail: 'support@example.com',
+      supportPhone: '',
     });
 
     // Replace preheader
-    html = html.replace(/\{\{preheader\}\}/g, formData.preheader);
+    fullHtml = fullHtml.replace(/\{\{preheader\}\}/g, formData.preheader);
 
-    return html;
+    return fullHtml;
   };
 
   // Add variable
