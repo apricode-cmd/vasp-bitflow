@@ -11,6 +11,7 @@ import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { kycFormService } from '@/lib/services/kyc-form.service';
 import { auditService } from '@/lib/services/audit.service';
+import { eventEmitter } from '@/lib/services/event-emitter.service';
 import { z } from 'zod';
 
 const updateKycSchema = z.object({
@@ -176,6 +177,28 @@ export async function PUT(
       console.log('[UPDATE KYC] Audit log created');
     } catch (auditError) {
       console.error('[UPDATE KYC] Audit log error (non-critical):', auditError);
+    }
+
+    // Send notification to user
+    try {
+      if (validated.status === 'APPROVED') {
+        await eventEmitter.emit('KYC_APPROVED', {
+          userId: existingSession.userId,
+          recipientEmail: existingSession.user.email,
+          userName: existingSession.user.profile?.firstName || existingSession.user.email,
+        });
+        console.log('[UPDATE KYC] KYC_APPROVED notification sent');
+      } else if (validated.status === 'REJECTED') {
+        await eventEmitter.emit('KYC_REJECTED', {
+          userId: existingSession.userId,
+          recipientEmail: existingSession.user.email,
+          userName: existingSession.user.profile?.firstName || existingSession.user.email,
+          rejectionReason: validated.rejectionReason || 'No reason provided',
+        });
+        console.log('[UPDATE KYC] KYC_REJECTED notification sent');
+      }
+    } catch (notificationError) {
+      console.error('[UPDATE KYC] Notification error (non-critical):', notificationError);
     }
 
     return NextResponse.json({

@@ -84,6 +84,11 @@ export function ClientHeader(): React.ReactElement {
         const response = await fetch('/api/notifications');
         if (response.ok) {
           const data = await response.json();
+          console.log('📧 Notifications loaded:', {
+            count: data.notifications?.length || 0,
+            unreadCount: data.unreadCount,
+            notifications: data.notifications
+          });
           setNotifications(data.notifications || []);
         }
       } catch (error) {
