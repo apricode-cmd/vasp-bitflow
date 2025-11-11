@@ -60,6 +60,7 @@ class EmailTemplateService {
 
       // 3. Merge variables with white-label settings
       const allVariables: TemplateVariables = {
+        brandName: settings.brandName || 'Apricode Exchange',
         platformName: settings.brandName || 'Apricode Exchange',
         brandLogo: settings.brandLogo || '/logo.png',
         primaryColor: settings.primaryColor || '#06b6d4',
@@ -160,6 +161,7 @@ class EmailTemplateService {
     const settings = await getPublicSettings();
 
     const allVariables: TemplateVariables = {
+      brandName: settings.brandName || 'Apricode Exchange',
       platformName: settings.brandName || 'Apricode Exchange',
       brandLogo: settings.brandLogo || '/logo.png',
       primaryColor: settings.primaryColor || '#06b6d4',

@@ -1203,6 +1203,9 @@ async function main(): Promise<void> {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
   
+  // Import getBaseEmailLayout
+  const { getBaseEmailLayout } = await import('../src/lib/email-templates/base-layout.js');
+  
   const presetsPath = path.join(__dirname, '../src/lib/email-templates/presets.json');
   const presetsData = await fs.readFile(presetsPath, 'utf-8');
   const emailTemplates = JSON.parse(presetsData);
@@ -1217,6 +1220,15 @@ async function main(): Promise<void> {
     });
 
     if (!existing) {
+      // Wrap body content in base layout with white-label placeholders
+      const fullHtmlContent = getBaseEmailLayout(template.bodyContent, {
+        brandName: '{{brandName}}',
+        brandLogo: '{{brandLogo}}',
+        primaryColor: '{{primaryColor}}',
+        supportEmail: '{{supportEmail}}',
+        supportPhone: '{{supportPhone}}',
+      });
+
       await prisma.emailTemplate.create({
         data: {
           key: template.key,
@@ -1225,7 +1237,7 @@ async function main(): Promise<void> {
           category: template.category,
           subject: template.subject,
           preheader: template.preheader,
-          htmlContent: template.htmlContent,
+          htmlContent: fullHtmlContent,
           textContent: '', // Will be generated from HTML
           layout: template.layout,
           variables: template.variables,
