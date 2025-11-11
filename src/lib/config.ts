@@ -20,6 +20,13 @@ export const config = {
     url: process.env.NEXTAUTH_URL!
   },
   
+  // Application URL (for email links, webhooks, etc.)
+  app: {
+    url: process.env.NEXTAUTH_URL || 'http://localhost:3000',
+    isDevelopment: process.env.NODE_ENV === 'development',
+    isProduction: process.env.NODE_ENV === 'production',
+  },
+  
   kycaid: {
     apiKey: process.env.KYCAID_API_KEY!,
     formId: process.env.KYCAID_FORM_ID!,

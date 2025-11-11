@@ -7,10 +7,12 @@
  * - White-label branding (logo, colors, company name)
  * - Fallback to default templates
  * - Variable substitution ({{variableName}})
+ * - Absolute URLs for email links and assets
  */
 
 import { prisma } from '@/lib/prisma';
 import { getPublicSettings } from '@/lib/settings';
+import { getEmailUrls, getBaseUrl } from '@/lib/utils/email-urls';
 import type { EmailCategory } from '@prisma/client';
 
 export interface TemplateVariables {
@@ -58,15 +60,29 @@ class EmailTemplateService {
       // 2. Get white-label settings
       const settings = await getPublicSettings();
 
-      // 3. Merge variables with white-label settings
+      // 3. Get email URLs helper
+      const emailUrls = getEmailUrls();
+      const baseUrl = getBaseUrl();
+
+      // 4. Merge variables with white-label settings and URLs
       const allVariables: TemplateVariables = {
+        // Brand & White-label
         brandName: settings.brandName || 'Apricode Exchange',
         platformName: settings.brandName || 'Apricode Exchange',
-        brandLogo: settings.brandLogo || '/logo.png',
+        brandLogo: emailUrls.logo(settings.brandLogo || '/logo.png'), // ✅ Absolute URL
         primaryColor: settings.primaryColor || '#06b6d4',
         supportEmail: settings.supportEmail || 'support@apricode.io',
         supportPhone: settings.supportPhone || '',
         currentYear: new Date().getFullYear(),
+        
+        // Base URLs (for templates to use)
+        baseUrl: baseUrl,
+        dashboardUrl: emailUrls.dashboard,
+        loginUrl: emailUrls.login,
+        kycUrl: emailUrls.kyc,
+        buyUrl: emailUrls.buy,
+        
+        // User-provided variables (can override defaults)
         ...variables,
       };
 

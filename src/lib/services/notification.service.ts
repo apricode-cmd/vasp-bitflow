@@ -8,6 +8,7 @@
  * - Channel routing
  * - User preferences
  * - Delivery tracking
+ * - Real data integration from database
  */
 
 import { prisma } from '@/lib/prisma';
@@ -17,6 +18,18 @@ import type {
   QueueStatus,
   NotificationQueue 
 } from '@prisma/client';
+import {
+  buildOrderEmailData,
+  buildOrderCompletedEmailData,
+  buildKycApprovedEmailData,
+  buildKycRejectedEmailData,
+  buildWelcomeEmailData,
+  buildPasswordResetEmailData,
+  buildEmailVerificationData,
+  buildAdminInviteEmailData,
+  buildPaymentReceivedEmailData,
+  buildOrderCancelledEmailData,
+} from './email-data-builders';
 
 export interface NotificationData {
   userId?: string;
@@ -123,7 +136,21 @@ class NotificationService {
         }
       }
 
-      // 4. Create queue entries for each channel
+      // 4. Build real data from database (for EMAIL channel)
+      let enrichedData = data.data || {};
+      
+      // Only build real data if EMAIL channel is requested
+      if (channelsToUse.includes('EMAIL')) {
+        try {
+          enrichedData = await this.buildRealData(eventKey, data);
+          console.log(`✅ Real data built for ${eventKey}:`, Object.keys(enrichedData));
+        } catch (error) {
+          console.error(`⚠️ Failed to build real data for ${eventKey}, using original:`, error);
+          enrichedData = data.data || {};
+        }
+      }
+
+      // 5. Create queue entries for each channel
       const queueIds: string[] = [];
       
       for (const ch of channelsToUse) {
@@ -136,7 +163,7 @@ class NotificationService {
             channel: ch,
             subject: data.subject,
             message: data.message,
-            data: data.data || {},
+            data: enrichedData, // ✅ Use enriched data with real values
             status: 'PENDING',
             scheduledFor: scheduledFor || new Date(),
           },
@@ -153,8 +180,8 @@ class NotificationService {
               channel: 'IN_APP',
               title: data.subject || event.name,
               message: data.message,
-              data: data.data,
-              actionUrl: data.actionUrl,
+              data: enrichedData, // ✅ Use enriched data
+              actionUrl: data.actionUrl || enrichedData.orderUrl || enrichedData.dashboardUrl,
             },
           });
         }
@@ -170,6 +197,101 @@ class NotificationService {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
+    }
+  }
+
+  /**
+   * Build real data from database for email templates
+   * 
+   * @param eventKey - The event type (ORDER_CREATED, KYC_APPROVED, etc.)
+   * @param data - Initial data with IDs to fetch from database
+   * @returns Enriched data with all necessary fields for email template
+   */
+  async buildRealData(eventKey: string, data: NotificationData): Promise<Record<string, any>> {
+    try {
+      console.log(`🔍 Building real data for event: ${eventKey}`, data);
+
+      // Extract relevant IDs from data
+      const orderId = data.data?.orderId;
+      const userId = data.userId || data.data?.userId;
+      const adminId = data.data?.adminId;
+      const resetToken = data.data?.resetToken;
+      const verificationToken = data.data?.verificationToken;
+      const setupToken = data.data?.setupToken;
+      const reason = data.data?.reason;
+
+      // Build data based on event type
+      switch (eventKey) {
+        case 'ORDER_CREATED':
+          if (orderId) {
+            return await buildOrderEmailData(orderId);
+          }
+          break;
+
+        case 'ORDER_COMPLETED':
+          if (orderId) {
+            return await buildOrderCompletedEmailData(orderId);
+          }
+          break;
+
+        case 'ORDER_CANCELLED':
+          if (orderId) {
+            return await buildOrderCancelledEmailData(orderId, reason);
+          }
+          break;
+
+        case 'PAYMENT_RECEIVED':
+          if (orderId) {
+            return await buildPaymentReceivedEmailData(orderId);
+          }
+          break;
+
+        case 'KYC_APPROVED':
+          if (userId) {
+            return await buildKycApprovedEmailData(userId);
+          }
+          break;
+
+        case 'KYC_REJECTED':
+          if (userId) {
+            return await buildKycRejectedEmailData(userId);
+          }
+          break;
+
+        case 'WELCOME_EMAIL':
+          if (userId) {
+            return await buildWelcomeEmailData(userId);
+          }
+          break;
+
+        case 'PASSWORD_RESET':
+          if (userId && resetToken) {
+            return await buildPasswordResetEmailData(userId, resetToken);
+          }
+          break;
+
+        case 'EMAIL_VERIFICATION':
+          if (userId && verificationToken) {
+            return await buildEmailVerificationData(userId, verificationToken);
+          }
+          break;
+
+        case 'ADMIN_INVITED':
+          if (adminId && setupToken) {
+            return await buildAdminInviteEmailData(adminId, setupToken);
+          }
+          break;
+
+        default:
+          console.warn(`⚠️ No data builder for event: ${eventKey}`);
+      }
+
+      // Fallback to original data if no builder matches
+      return data.data || {};
+    } catch (error) {
+      console.error(`❌ Error building real data for ${eventKey}:`, error);
+      // Return original data on error (graceful degradation)
+      return data.data || {};
     }
   }
 
