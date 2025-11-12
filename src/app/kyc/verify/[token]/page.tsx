@@ -15,7 +15,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface VerifyPageProps {
@@ -28,6 +28,8 @@ export default function KycVerifyPage({ params }: VerifyPageProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [sdkReady, setSdkReady] = useState(false);
   const token = params.token;
 
   useEffect(() => {
@@ -52,60 +54,135 @@ export default function KycVerifyPage({ params }: VerifyPageProps) {
         // 2. Load Sumsub SDK script
         const loadScript = () => {
           return new Promise((resolve, reject) => {
-            if (document.getElementById('sumsub-websdk-script')) {
+            // Check if already loaded
+            if ((window as any).snsWebSdk) {
+              console.log('✅ Sumsub SDK already loaded');
               resolve(true);
               return;
             }
+            
+            // Check if script tag exists
+            if (document.getElementById('sumsub-websdk-script')) {
+              // Wait for SDK to be available on window
+              let attempts = 0;
+              const checkSdk = setInterval(() => {
+                attempts++;
+                if ((window as any).snsWebSdk) {
+                  clearInterval(checkSdk);
+                  console.log('✅ Sumsub SDK found after waiting');
+                  resolve(true);
+                } else if (attempts > 50) { // 5 seconds timeout
+                  clearInterval(checkSdk);
+                  reject(new Error('Sumsub SDK timeout'));
+                }
+              }, 100);
+              return;
+            }
+            
+            // Load new script
             const script = document.createElement('script');
             script.id = 'sumsub-websdk-script';
             script.src = 'https://static.sumsub.com/idensic/static/sns-websdk-builder.js';
             script.async = true;
-            script.onload = () => resolve(true);
-            script.onerror = () => reject(new Error('Failed to load Sumsub SDK'));
+            script.onload = () => {
+              console.log('📦 Sumsub script loaded, waiting for SDK...');
+              // Wait for SDK to be available on window
+              let attempts = 0;
+              const checkSdk = setInterval(() => {
+                attempts++;
+                if ((window as any).snsWebSdk) {
+                  clearInterval(checkSdk);
+                  console.log('✅ Sumsub SDK initialized');
+                  resolve(true);
+                } else if (attempts > 50) { // 5 seconds timeout
+                  clearInterval(checkSdk);
+                  reject(new Error('Sumsub SDK not initialized after script load'));
+                }
+              }, 100);
+            };
+            script.onerror = () => reject(new Error('Failed to load Sumsub SDK script'));
             document.body.appendChild(script);
           });
         };
 
         await loadScript();
 
-        // 3. Initialize WebSDK
+        console.log('✅ Sumsub SDK ready');
+
+        // 3. Wait for container to be in DOM
+        setLoading(false); // Show container
+        setSdkReady(true);  // Signal to launch SDK
+        
+        // Small delay to ensure DOM is ready
+        await new Promise(resolve => setTimeout(resolve, 200));
+
+        // 4. Check if container exists
+        const container = document.getElementById('sumsub-websdk-container');
+        if (!container) {
+          throw new Error('SDK container not found in DOM');
+        }
+
+        console.log('✅ Container found, initializing SDK...');
+
+        // 5. Set body and html styles for full-screen experience
+        document.documentElement.style.height = '100%';
+        document.documentElement.style.margin = '0';
+        document.documentElement.style.padding = '0';
+        document.body.style.height = '100%';
+        document.body.style.margin = '0';
+        document.body.style.padding = '0';
+        document.body.style.overflow = 'hidden';
+
+        // 6. Initialize WebSDK
         const snsWebSdk = (window as any).snsWebSdk;
         if (!snsWebSdk) {
-          throw new Error('Sumsub SDK not loaded');
+          throw new Error('Sumsub SDK object not available on window');
         }
 
         const instance = snsWebSdk
           .init(
             sdkToken,
             async () => {
-              // Token refresh callback
-              const refreshResponse = await fetch('/api/kyc/sdk-token');
+              // Token refresh callback - use white-label token to get new SDK token
+              console.log('🔄 Refreshing SDK token via white-label...');
+              const refreshResponse = await fetch(`/api/kyc/verify/${token}`);
+              
+              if (!refreshResponse.ok) {
+                console.error('❌ Failed to refresh SDK token');
+                throw new Error('Failed to refresh verification token');
+              }
+              
               const refreshData = await refreshResponse.json();
-              return refreshData.token;
+              console.log('✅ SDK token refreshed');
+              return refreshData.sdkToken;
             }
           )
           .withConf({
             lang: 'en',
             theme: 'light',
-            // Mobile-optimized settings
             uiConf: {
               customCssStr: `
-                body { margin: 0; padding: 0; }
-                #sumsub-websdk-container { 
-                  min-height: 100vh; 
-                  width: 100vw;
+                html, body {
+                  height: 100% !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  overflow: hidden !important;
+                }
+                #sumsub-websdk-container {
+                  height: 100vh !important;
+                  width: 100vw !important;
+                }
+                iframe {
+                  height: 100vh !important;
+                  width: 100vw !important;
                 }
               `
             }
           })
           .on('idCheck.onApplicantSubmitted', () => {
             console.log('✅ Verification submitted');
-            toast.success('Verification submitted! Redirecting...');
-            
-            // Redirect to success page after 2 seconds
-            setTimeout(() => {
-              router.push('/kyc?status=submitted');
-            }, 2000);
+            toast.success('Verification submitted successfully!');
+            setSuccess(true);
           })
           .on('idCheck.onError', (error: any) => {
             console.error('❌ Verification error:', error);
@@ -113,24 +190,53 @@ export default function KycVerifyPage({ params }: VerifyPageProps) {
           })
           .on('idCheck.onApplicantLoaded', () => {
             console.log('📱 Applicant loaded');
-            setLoading(false);
           })
           .build();
 
-        // 4. Launch SDK in full-screen container
+        // 6. Launch SDK in full-screen container
         instance.launch('#sumsub-websdk-container');
 
-        console.log('🚀 Sumsub SDK launched');
+        console.log('🚀 Sumsub SDK launched successfully');
 
       } catch (error: any) {
         console.error('❌ Initialization error:', error);
         setError(error.message || 'Failed to load verification');
         setLoading(false);
+        setSdkReady(false);
       }
     };
 
     initializeSumsub();
   }, [token, router]);
+
+  // Success state
+  if (success) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="max-w-md w-full space-y-6 text-center">
+          <div className="flex justify-center">
+            <div className="rounded-full bg-green-500/10 p-4">
+              <CheckCircle2 className="h-16 w-16 text-green-600" />
+            </div>
+          </div>
+          <div className="space-y-3">
+            <h1 className="text-3xl font-bold">Verification Submitted!</h1>
+            <p className="text-muted-foreground text-lg">
+              Thank you for completing the verification process.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Your documents are being reviewed. You will receive an email notification once the review is complete.
+            </p>
+          </div>
+          <div className="pt-4">
+            <p className="text-xs text-muted-foreground">
+              You can safely close this window now.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Error state
   if (error) {
@@ -146,12 +252,11 @@ export default function KycVerifyPage({ params }: VerifyPageProps) {
             <h1 className="text-2xl font-bold">Verification Error</h1>
             <p className="text-muted-foreground">{error}</p>
           </div>
-          <button
-            onClick={() => router.push('/kyc')}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            Return to KYC Page
-          </button>
+          <div className="pt-2">
+            <p className="text-xs text-muted-foreground">
+              Please contact support if this issue persists.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -178,14 +283,16 @@ export default function KycVerifyPage({ params }: VerifyPageProps) {
   return (
     <div 
       id="sumsub-websdk-container" 
-      className="min-h-screen w-full"
       style={{ 
         position: 'fixed', 
         top: 0, 
         left: 0, 
         right: 0, 
         bottom: 0,
-        zIndex: 9999 
+        width: '100vw',
+        height: '100vh',
+        zIndex: 9999,
+        overflow: 'auto'
       }}
     />
   );

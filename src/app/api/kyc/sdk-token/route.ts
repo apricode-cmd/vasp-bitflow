@@ -14,17 +14,21 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
   try {
-    // 1. Authenticate user
+    // 1. Authenticate user (support both session and white-label token)
     const session = await getClientSession();
+    const whitelabelUserId = request.headers.get('X-User-Id');
     
-    if (!session?.user?.id) {
+    // Allow white-label access via X-User-Id header (internal server-to-server only)
+    const userId = whitelabelUserId || session?.user?.id;
+    
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    console.log('🎫 SDK token request from user:', session.user.id);
+    console.log('🎫 SDK token request from user:', userId, whitelabelUserId ? '(white-label)' : '(session)');
 
     // 2. Get active KYC provider
     const provider = await integrationFactory.getKycProvider();
@@ -43,7 +47,7 @@ export async function GET(request: NextRequest) {
 
     // 4. Get or create KYC session
     let kycSession = await prisma.kycSession.findUnique({
-      where: { userId: session.user.id }
+      where: { userId: userId }
     });
 
     if (!kycSession) {
@@ -51,7 +55,7 @@ export async function GET(request: NextRequest) {
       
       // Get user profile
       const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
+        where: { id: userId },
         include: { profile: true }
       });
 
@@ -102,16 +106,16 @@ export async function GET(request: NextRequest) {
     }
 
     // ✅ IMPORTANT: Use the ACTUAL externalUserId that was used to create the applicant
-    // This may be different from session.user.id if there was a 409 conflict and retry
+    // This may be different from userId if there was a 409 conflict and retry
     // The correct externalUserId is stored in kycSession.metadata.applicant.externalUserId
     const metadata = kycSession.metadata as any;
-    const externalUserIdForToken = metadata?.applicant?.externalUserId || session.user.id;
+    const externalUserIdForToken = metadata?.applicant?.externalUserId || userId;
     
     console.log('🎫 Creating SDK token for:', {
-      userId: session.user.id,
+      userId: userId,
       applicantId: kycSession.applicantId,
       externalUserId: externalUserIdForToken,
-      isRetried: externalUserIdForToken !== session.user.id
+      isRetried: externalUserIdForToken !== userId
     });
 
     const tokenData = await sumsubAdapter.createAccessToken(externalUserIdForToken);

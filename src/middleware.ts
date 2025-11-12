@@ -137,8 +137,20 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/api/legal-documents/public') ||
     path.startsWith('/api/v1/') ||  // Public API v1 (uses API keys)
     path.startsWith('/api/kyc/webhook') ||  // Webhook from KYCAID
+    path.startsWith('/api/kyc/verify/') ||  // White-label verification links
+    path.startsWith('/kyc/verify/') ||  // White-label verification pages
     path.startsWith('/legal/')
   ) {
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
+  }
+
+  // Allow white-label KYC SDK token generation (internal server-to-server)
+  // When X-User-Id header is present, it's a trusted white-label request
+  if (path === '/api/kyc/sdk-token' && request.headers.get('X-User-Id')) {
     return NextResponse.next({
       request: {
         headers: requestHeaders,

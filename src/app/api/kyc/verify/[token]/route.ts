@@ -113,9 +113,26 @@ export async function GET(
       }
     );
 
-    if (!sdkTokenResponse.ok) {
+    // Check if response is JSON (not HTML redirect)
+    const contentType = sdkTokenResponse.headers.get('content-type');
+    const isJson = contentType?.includes('application/json');
+    
+    if (!sdkTokenResponse.ok || !isJson) {
       const errorText = await sdkTokenResponse.text();
-      console.error('❌ [WHITE-LABEL] Failed to generate SDK token:', errorText);
+      console.error('❌ [WHITE-LABEL] Failed to generate SDK token:', {
+        status: sdkTokenResponse.status,
+        contentType,
+        preview: errorText.substring(0, 200)
+      });
+      
+      // If middleware redirected to login, provide clear error
+      if (errorText.includes('<!DOCTYPE') || errorText.includes('<html')) {
+        return NextResponse.json(
+          { error: 'Authentication required. Please use the link from your email or log in first.' },
+          { status: 401 }
+        );
+      }
+      
       return NextResponse.json(
         { error: 'Failed to generate verification token' },
         { status: 500 }
