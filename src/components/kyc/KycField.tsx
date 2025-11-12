@@ -1,9 +1,10 @@
 /**
  * KycField - Universal field renderer
- * Handles all field types: text, email, select, date, country, phone, textarea, etc.
+ * Handles all field types: text, email, select, date, country, phone, textarea, file, etc.
  */
 'use client';
 
+import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,7 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DatePicker } from '@/components/ui/date-picker';
 import { CountryDropdown } from '@/components/ui/country-dropdown';
 import { PhoneInput } from '@/components/ui/phone-input';
+import { Button } from '@/components/ui/button';
 import { KycField as KycFieldType } from '@/lib/kyc/config';
+import { Upload, FileText, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import type { Value as PhoneValue } from 'react-phone-number-input';
 
 interface Props {
@@ -169,6 +173,9 @@ export function KycField({ field, value, onChange, error }: Props) {
           />
         );
 
+      case 'file':
+        return <FileUploadField field={field} value={value} onChange={onChange} error={error} />;
+
       default:
         // Fallback to text input
         return (
@@ -192,6 +199,187 @@ export function KycField({ field, value, onChange, error }: Props) {
       {error && (
         <p className="text-sm text-destructive">{error}</p>
       )}
+    </div>
+  );
+}
+
+/**
+ * FileUploadField - File upload with preview and upload to KYC provider
+ */
+function FileUploadField({ field, value, onChange, error }: {
+  field: KycFieldType;
+  value: any;
+  onChange: (value: any) => void;
+  error?: string;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<any>(value);
+
+  const handleFileSelect = async (file: File) => {
+    // Validate file
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      toast.error('File size exceeds 10MB limit');
+      return;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Invalid file type. Only JPEG, PNG, and PDF are allowed');
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      // Prepare FormData
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // Map field name to document type
+      let documentType = 'SELFIE';
+      let documentSubType = null;
+      
+      if (field.fieldName.includes('passport')) {
+        documentType = 'PASSPORT';
+      } else if (field.fieldName.includes('id_scan_front') || field.fieldName.includes('id_front')) {
+        documentType = 'ID_CARD';
+        documentSubType = 'FRONT_SIDE';
+      } else if (field.fieldName.includes('id_scan_back') || field.fieldName.includes('id_back')) {
+        documentType = 'ID_CARD';
+        documentSubType = 'BACK_SIDE';
+      } else if (field.fieldName.includes('proof_of_address') || field.fieldName.includes('utility_bill')) {
+        documentType = 'UTILITY_BILL';
+      } else if (field.fieldName.includes('selfie') || field.fieldName.includes('liveness')) {
+        documentType = 'SELFIE';
+      }
+      
+      formData.append('documentType', documentType);
+      formData.append('country', 'POL'); // TODO: Get from form context
+      
+      if (documentSubType) {
+        formData.append('documentSubType', documentSubType);
+      }
+
+      console.log('📤 Uploading file:', {
+        fieldName: field.fieldName,
+        documentType,
+        documentSubType,
+        fileName: file.name
+      });
+
+      // Upload to API
+      const response = await fetch('/api/kyc/upload-document', {
+        method: 'POST',
+        body: formData
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Upload failed');
+      }
+
+      console.log('✅ Upload successful:', result);
+
+      // Update state
+      const fileData = {
+        fileName: file.name,
+        fileSize: file.size,
+        documentId: result.data.documentId,
+        providerDocumentId: result.data.providerDocumentId,
+        status: 'success',
+        warnings: result.data.warnings || []
+      };
+
+      setUploadedFile(fileData);
+      onChange(fileData); // Save to form state
+
+      toast.success(`${field.label} uploaded successfully!`);
+
+    } catch (error: any) {
+      console.error('❌ Upload error:', error);
+      toast.error(`Failed to upload: ${error.message}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemove = () => {
+    setUploadedFile(null);
+    onChange(null);
+  };
+
+  // Already uploaded
+  if (uploadedFile && uploadedFile.status === 'success') {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 p-3 bg-green-100 dark:bg-green-950/30 rounded-lg border border-green-200">
+          <FileText className="h-4 w-4 text-green-600 flex-shrink-0" />
+          <span className="text-sm font-medium text-green-900 dark:text-green-100 flex-1 truncate">
+            {uploadedFile.fileName}
+          </span>
+          <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+        </div>
+        
+        {uploadedFile.warnings && uploadedFile.warnings.length > 0 && (
+          <div className="text-xs text-orange-600 bg-orange-50 dark:bg-orange-950/20 p-2 rounded border border-orange-200">
+            ⚠️ {uploadedFile.warnings.join(', ')}
+          </div>
+        )}
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-full"
+          onClick={handleRemove}
+        >
+          <Upload className="h-3 w-3 mr-1" />
+          Re-upload
+        </Button>
+      </div>
+    );
+  }
+
+  // Upload UI
+  return (
+    <div className="space-y-2">
+      <div className={`flex items-center justify-center border-2 border-dashed rounded-lg p-6 transition-colors ${
+        error ? 'border-destructive' : 'border-muted-foreground/25 hover:border-primary hover:bg-accent/50'
+      } ${uploading ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}>
+        <label htmlFor={`file-${field.fieldName}`} className="cursor-pointer text-center w-full">
+          {uploading ? (
+            <div className="flex flex-col items-center gap-2">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Uploading...</p>
+            </div>
+          ) : (
+            <>
+              <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                Drop file here or <span className="text-primary underline">browse</span>
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                JPEG, PNG, PDF (max 10MB)
+              </p>
+            </>
+          )}
+        </label>
+        <Input
+          id={`file-${field.fieldName}`}
+          type="file"
+          accept="image/jpeg,image/png,image/jpg,application/pdf"
+          className="hidden"
+          disabled={uploading}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              handleFileSelect(file);
+            }
+          }}
+        />
+      </div>
     </div>
   );
 }
