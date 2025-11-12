@@ -4,7 +4,8 @@
  */
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -12,7 +13,7 @@ import { QRCode } from '@/components/ui/shadcn-io/qr-code';
 import { KycStatusBadge } from '@/components/features/KycStatusBadge';
 import { 
   CheckCircle, XCircle, Clock, Loader2, RefreshCw,
-  Shield, FileText, ExternalLink, Copy, Info, ArrowRight
+  Shield, FileText, ExternalLink, Copy, Info, ArrowRight, Camera
 } from 'lucide-react';
 import { KycStatus } from '@prisma/client';
 import { toast } from 'sonner';
@@ -35,7 +36,9 @@ interface Props {
 }
 
 export function KycStatusCard({ kycSession, onRefresh, userId }: Props) {
+  const { data: session } = useSession();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [sumsubMobileUrl, setSumsubMobileUrl] = useState<string | null>(null);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -50,6 +53,26 @@ export function KycStatusCard({ kycSession, onRefresh, userId }: Props) {
     navigator.clipboard.writeText(link);
     toast.success('Link copied to clipboard!');
   };
+
+  // Fetch Sumsub mobile link for QR code
+  useEffect(() => {
+    if (kycSession.kycProviderId === 'sumsub' && session?.user?.id) {
+      const fetchMobileLink = async () => {
+        try {
+          const response = await fetch('/api/kyc/mobile-link');
+          if (response.ok) {
+            const data = await response.json();
+            if (data.url) {
+              setSumsubMobileUrl(data.url);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to fetch Sumsub mobile link:', error);
+        }
+      };
+      fetchMobileLink();
+    }
+  }, [kycSession.kycProviderId, session?.user?.id]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-in p-6">
@@ -83,8 +106,178 @@ export function KycStatusCard({ kycSession, onRefresh, userId }: Props) {
           {/* PENDING or IN_PROGRESS */}
           {(kycSession.status === 'PENDING' || kycSession.status === 'IN_PROGRESS') && (
             <div className="space-y-6">
-              {/* KYCAID QR Code (if KYCAID is active provider) */}
-              {kycSession.kycProviderId === 'kycaid' && kycSession.formUrl ? (
+              {/* Sumsub WebSDK */}
+              {kycSession.kycProviderId === 'sumsub' && session?.user?.id ? (
+                <>
+                  {/* Main action area */}
+                  <div className="grid md:grid-cols-[2fr,1fr] gap-8 items-center">
+                    {/* Left: Desktop WebSDK option */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                        <ExternalLink className="h-4 w-4" />
+                        Continue on this device
+                      </div>
+                      <Button 
+                        className="w-full"
+                        size="lg"
+                        onClick={async () => {
+                          try {
+                            toast.info('Loading verification interface...');
+                            
+                            // 1. Fetch SDK token
+                            const response = await fetch('/api/kyc/sdk-token');
+                            if (!response.ok) {
+                              throw new Error('Failed to get SDK token');
+                            }
+                            const { token } = await response.json();
+                            
+                            // 2. Create modal
+                            const modal = document.createElement('div');
+                            modal.id = 'sumsub-modal';
+                            modal.className = 'fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4';
+                            modal.innerHTML = `
+                              <div class="bg-white dark:bg-gray-900 rounded-lg w-full max-w-4xl max-h-[90vh] overflow-auto relative">
+                                <button id="close-modal" class="absolute top-4 right-4 z-10 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                  </svg>
+                                </button>
+                                <div id="sumsub-websdk-container" class="p-6 min-h-[600px]"></div>
+                              </div>
+                            `;
+                            document.body.appendChild(modal);
+                            
+                            // 3. Close button handler
+                            const closeBtn = document.getElementById('close-modal');
+                            closeBtn?.addEventListener('click', () => {
+                              modal.remove();
+                            });
+                            
+                            // 4. Load Sumsub SDK script
+                            const loadScript = () => {
+                              return new Promise((resolve, reject) => {
+                                if (document.getElementById('sumsub-websdk-script')) {
+                                  resolve(true);
+                                  return;
+                                }
+                                const script = document.createElement('script');
+                                script.id = 'sumsub-websdk-script';
+                                script.src = 'https://static.sumsub.com/idensic/static/sns-websdk-builder.js';
+                                script.async = true;
+                                script.onload = () => resolve(true);
+                                script.onerror = () => reject(new Error('Failed to load SDK'));
+                                document.body.appendChild(script);
+                              });
+                            };
+                            
+                            await loadScript();
+                            
+                            // 5. Initialize WebSDK
+                            const snsWebSdk = (window as any).snsWebSdk;
+                            if (!snsWebSdk) {
+                              throw new Error('Sumsub SDK not loaded');
+                            }
+                            
+                            const instance = snsWebSdk
+                              .init(
+                                token,
+                                async () => {
+                                  // Token refresh callback
+                                  const refreshResponse = await fetch('/api/kyc/sdk-token');
+                                  const refreshData = await refreshResponse.json();
+                                  return refreshData.token;
+                                }
+                              )
+                              .withConf({
+                                lang: 'en',
+                                theme: 'light'
+                              })
+                              .on('idCheck.onApplicantSubmitted', () => {
+                                toast.success('Verification submitted! Please wait for review.');
+                                modal.remove();
+                                onRefresh();
+                              })
+                              .on('idCheck.onError', (error: any) => {
+                                toast.error('Verification error: ' + (error.message || 'Unknown error'));
+                              })
+                              .build();
+                            
+                            // 6. Launch SDK
+                            instance.launch('#sumsub-websdk-container');
+                            
+                          } catch (error: any) {
+                            toast.error('Failed to load verification: ' + error.message);
+                            console.error('Sumsub modal error:', error);
+                          }
+                        }}
+                      >
+                        <Camera className="h-5 w-5 mr-2" />
+                        Start Verification
+                      </Button>
+                      <p className="text-xs text-muted-foreground">
+                        Opens verification interface in a modal window
+                      </p>
+                    </div>
+
+                    {/* Right: Mobile QR */}
+                    <div className="flex flex-col items-center justify-center gap-3 md:border-l md:pl-8 py-2">
+                      <div className="text-xs font-medium text-muted-foreground text-center">
+                        Or scan with phone
+                      </div>
+                      {sumsubMobileUrl ? (
+                        <>
+                          <QRCode
+                            className="size-32 rounded-lg border bg-background p-2.5 shadow-sm hover:shadow-md transition-all"
+                            data={sumsubMobileUrl}
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => copyLink(sumsubMobileUrl)}
+                            className="w-full max-w-[200px]"
+                          >
+                            <Copy className="h-3 w-3 mr-2" />
+                            Copy Link
+                          </Button>
+                        </>
+                      ) : (
+                        <div className="size-32 rounded-lg border bg-muted flex items-center justify-center">
+                          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground text-center">
+                        Complete on mobile
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* What to prepare - compact */}
+                  <div className="rounded-lg border bg-muted/30 p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-md bg-background p-2 mt-0.5">
+                        <Info className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 space-y-1.5">
+                        <p className="text-sm font-medium">What you'll need</p>
+                        <ul className="text-sm text-muted-foreground space-y-1">
+                          <li className="flex items-start gap-2">
+                            <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 mt-1.5 shrink-0" />
+                            <span>Government-issued ID (passport or ID card)</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 mt-1.5 shrink-0" />
+                            <span>Good lighting for selfie and document photos</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 mt-1.5 shrink-0" />
+                            <span>5-7 minutes of your time</span>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : kycSession.kycProviderId === 'kycaid' && kycSession.formUrl ? (
                 <>
                   {/* Main action area */}
                   <div className="grid md:grid-cols-[2fr,1fr] gap-8 items-center">
