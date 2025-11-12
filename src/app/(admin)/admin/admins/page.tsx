@@ -8,6 +8,9 @@ import { redirect } from 'next/navigation';
 import { getAdminSessionData } from '@/lib/services/admin-session.service';
 import { AdminManagementClient } from './page-client';
 
+// Force dynamic rendering (uses cookies for auth)
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: 'Administrator Management - Apricode Exchange',
   description: 'Manage admin accounts, roles, and permissions',

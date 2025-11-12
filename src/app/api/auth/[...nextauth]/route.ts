@@ -6,5 +6,12 @@
 
 import { clientHandlers } from '@/auth-client';
 
-export const { GET, POST } = clientHandlers;
+// Export handlers directly (Vercel Edge compatibility)
+export async function GET(request: Request) {
+  return clientHandlers.GET(request);
+}
+
+export async function POST(request: Request) {
+  return clientHandlers.POST(request);
+}
 

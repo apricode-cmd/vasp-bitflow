@@ -37,10 +37,10 @@ NEXTAUTH_URL
 ```
 **Value:**
 ```
-https://your-project.vercel.app
+https://app.bitflow.biz
 ```
 
-**Note:** Update this after getting your Vercel URL, or use custom domain
+**Important:** Must match your production domain exactly!
 
 ---
 
@@ -59,7 +59,45 @@ openssl rand -base64 32
 
 ---
 
-### 3. Storage (REQUIRED)
+### 3. WebAuthn / Passkey (REQUIRED for Admin)
+
+```bash
+RP_NAME
+```
+**Value:**
+```
+BitFlow
+```
+
+**Note:** Relying Party name shown in passkey prompts
+
+---
+
+```bash
+RP_ID
+```
+**Value:**
+```
+app.bitflow.biz
+```
+
+**Important:** Must match domain (without https://)
+
+---
+
+```bash
+ORIGIN
+```
+**Value:**
+```
+https://app.bitflow.biz
+```
+
+**Important:** Must match NEXTAUTH_URL
+
+---
+
+### 4. Storage (REQUIRED)
 
 ```bash
 STORAGE_PROVIDER
