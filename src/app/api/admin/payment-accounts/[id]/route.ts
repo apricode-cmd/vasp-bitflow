@@ -69,9 +69,8 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const authResult = await requireAdminRole('ADMIN');
-  if (authResult instanceof NextResponse) return authResult;
-  const { session } = authResult;
+  const session = await requireAdminRole('ADMIN');
+  if (session instanceof NextResponse) return session;
 
   try {
     const body = await request.json();
