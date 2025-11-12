@@ -33,7 +33,20 @@ A secure platform for buying cryptocurrency (BTC, ETH, USDT, SOL) with fiat curr
 - **CoinGecko** - Cryptocurrency rates
 - **Resend** - Email notifications
 
-## 📦 Installation
+## 🚀 Quick Deploy to Vercel
+
+### Production Deployment (BitFlow)
+
+1. **Connect Repository**: Link `https://github.com/apricode-cmd/vasp-bitflow.git` to Vercel
+2. **Configure Branch**: Set Production Branch to `main`
+3. **Add Environment Variables**: See `VERCEL_ENV_VARS.md` for complete list
+4. **Deploy**: Vercel will auto-deploy on push to `main`
+
+**Live URL**: `https://app.bitflow.biz`
+
+---
+
+## 📦 Local Installation
 
 ### Prerequisites
 
