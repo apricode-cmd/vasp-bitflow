@@ -151,9 +151,44 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Generate white-label URL (branded domain instead of sumsub.com)
+    console.log('🎨 [WHITE-LABEL] Generating branded URL...');
+    
+    const jwt = (await import('jsonwebtoken')).default;
+    const secret = process.env.NEXTAUTH_SECRET;
+    if (!secret) {
+      console.error('❌ NEXTAUTH_SECRET not configured');
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      );
+    }
+
+    // Create JWT token with verification data
+    const whitelabelToken = jwt.sign(
+      {
+        userId,
+        sessionId: kycSession.id,
+        provider: providerId,
+        originalUrl: mobileUrl, // Store original Sumsub URL (not used, but for reference)
+        exp: Math.floor(Date.now() / 1000) + 3600 // 1 hour expiration
+      },
+      secret
+    );
+
+    // Generate white-label URL on our domain
+    const baseUrl = process.env.NEXTAUTH_URL || request.url.split('/api')[0];
+    const whitelabelUrl = `${baseUrl}/kyc/verify/${whitelabelToken}`;
+
+    console.log('✅ [WHITE-LABEL] Branded URL generated:', {
+      original: mobileUrl.substring(0, 50) + '...',
+      whitelabel: whitelabelUrl.substring(0, 50) + '...'
+    });
+
     return NextResponse.json({
       success: true,
-      mobileUrl,
+      mobileUrl: whitelabelUrl, // Return white-label URL
+      originalUrl: mobileUrl,   // Original Sumsub URL (for debugging)
       externalActionId: data.externalActionId
     });
 
