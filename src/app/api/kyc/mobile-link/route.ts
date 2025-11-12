@@ -11,6 +11,7 @@ import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
 import { getIntegrationWithSecrets } from '@/lib/services/integration-management.service';
 import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 
 export async function GET(request: NextRequest) {
   try {
@@ -154,7 +155,6 @@ export async function GET(request: NextRequest) {
     // Generate white-label URL (branded domain instead of sumsub.com)
     console.log('🎨 [WHITE-LABEL] Generating branded URL...');
     
-    const jwt = (await import('jsonwebtoken')).default;
     const secret = process.env.NEXTAUTH_SECRET;
     if (!secret) {
       console.error('❌ NEXTAUTH_SECRET not configured');
@@ -177,8 +177,8 @@ export async function GET(request: NextRequest) {
     );
 
     // Generate white-label URL on our domain
-    const baseUrl = process.env.NEXTAUTH_URL || request.url.split('/api')[0];
-    const whitelabelUrl = `${baseUrl}/kyc/verify/${whitelabelToken}`;
+    const appBaseUrl = process.env.NEXTAUTH_URL || request.url.split('/api')[0];
+    const whitelabelUrl = `${appBaseUrl}/kyc/verify/${whitelabelToken}`;
 
     console.log('✅ [WHITE-LABEL] Branded URL generated:', {
       original: mobileUrl.substring(0, 50) + '...',
