@@ -30,6 +30,24 @@ const securityHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   
+  // Production optimizations
+  swcMinify: true, // Use SWC for minification (faster than Terser)
+  
+  // Remove console.log in production (keep errors/warnings)
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn']
+    } : false
+  },
+  
+  // Experimental optimizations for production
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'recharts', '@radix-ui/react-icons'],
+    serverActions: {
+      bodySizeLimit: '2mb',
+    },
+  },
+  
   // Disable TypeScript/ESLint errors blocking build (show warnings only)
   typescript: {
     // ⚠️ Allows production builds even with TypeScript errors
@@ -91,7 +109,10 @@ const nextConfig = {
   },
   images: {
     domains: ['localhost'],
-    formats: ['image/avif', 'image/webp']
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 60,
+    deviceSizes: [640, 750, 828, 1080, 1200],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   }
 };
 
