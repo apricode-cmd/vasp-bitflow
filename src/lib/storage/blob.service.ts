@@ -16,7 +16,7 @@ export interface BlobUploadResult {
 }
 
 const HAS_BLOB_TOKEN = !!process.env.BLOB_READ_WRITE_TOKEN;
-const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads', 'kyc');
+const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads');
 
 /**
  * Upload file to Vercel Blob or local filesystem

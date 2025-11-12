@@ -35,17 +35,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
 
     if (!kycSession) {
+      console.error('❌ No KYC session found for user:', userId);
       return NextResponse.json(
         { success: false, error: 'KYC session not found. Please start KYC verification first.' },
         { status: 400 }
       );
     }
 
-    // Get applicant ID
-    const metadata = kycSession.metadata as any;
-    const applicantId = metadata?.applicant?.id || metadata?.applicantId;
+    // Get applicant ID (from top-level field, not metadata)
+    const applicantId = kycSession.applicantId;
+
+    console.log('🔍 KYC session data:', {
+      sessionId: kycSession.id,
+      applicantId: applicantId,
+      kycProviderId: kycSession.kycProviderId,
+      status: kycSession.status
+    });
 
     if (!applicantId) {
+      console.error('❌ No applicant ID found in session');
       return NextResponse.json(
         { success: false, error: 'No applicant ID found. Please restart KYC verification.' },
         { status: 400 }
