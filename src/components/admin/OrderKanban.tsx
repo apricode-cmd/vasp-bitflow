@@ -688,9 +688,11 @@ export function OrderKanban({
         </Card>
 
         {/* Kanban Board - Horizontal Scroll */}
-        <div className="relative">
-          <ScrollArea className="w-full">
-            <div className="flex gap-4 pb-4 min-h-[600px]">
+        <div className="relative -mx-6 px-6">
+          <div className="overflow-x-auto overflow-y-visible pb-4 scroll-smooth scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent hover:scrollbar-thumb-primary/40">
+            <div className="flex gap-4 min-h-[600px] w-max">
+              {/* Scroll hint gradient - визуальная подсказка о прокрутке */}
+              <div className="absolute top-0 right-6 h-full w-12 bg-gradient-to-l from-background via-background/50 to-transparent pointer-events-none z-10" />
       {KANBAN_COLUMNS.map((column) => {
         const columnOrders = getOrdersByStatus(column.id);
             const Icon = column.icon;
@@ -1039,7 +1041,7 @@ export function OrderKanban({
         );
       })}
             </div>
-          </ScrollArea>
+          </div>
         </div>
 
         {/* Bulk Action Confirmation Dialog */}
