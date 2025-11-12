@@ -61,7 +61,7 @@ export async function requireAdminAuth() {
     );
   }
 
-  return wrapSession(sessionData);
+  return { session: wrapSession(sessionData) };
 }
 
 /**
@@ -90,7 +90,7 @@ export async function requireAdminRole(role: AdminRole | AdminRole[]) {
 
   // SUPER_ADMIN has access to everything
   if (sessionData.role === 'SUPER_ADMIN') {
-    return wrapSession(sessionData);
+    return { session: wrapSession(sessionData) };
   }
 
   const allowedRoles = Array.isArray(role) ? role : [role];
@@ -102,7 +102,7 @@ export async function requireAdminRole(role: AdminRole | AdminRole[]) {
     );
   }
 
-  return wrapSession(sessionData);
+  return { session: wrapSession(sessionData) };
 }
 
 /**
@@ -147,7 +147,7 @@ export async function requireAdminPermission(resource: string, action: string) {
     );
   }
 
-  return wrapSession(sessionData);
+  return { session: wrapSession(sessionData) };
 }
 
 /**

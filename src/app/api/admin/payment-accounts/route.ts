@@ -113,14 +113,6 @@ export async function POST(request: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
   const { session } = authResult;
 
-  if (!session?.user?.id) {
-    console.error('❌ Session or user ID missing in POST payment-accounts');
-    return NextResponse.json(
-      { success: false, error: 'Unauthorized: Invalid session' },
-      { status: 401 }
-    );
-  }
-
   try {
     const body = await request.json();
     const validated = createPaymentAccountSchema.parse(body);
