@@ -46,7 +46,7 @@ import {
   Shield, CheckCircle, XCircle, Clock, Loader2, 
   FileText, Camera, User, AlertCircle, ArrowRight, ArrowLeft,
   Check, Scale, FolderArchive, RefreshCw, Info, Upload, HelpCircle,
-  Smartphone, ExternalLink, QrCode
+  Smartphone, ExternalLink, QrCode, Copy
 } from 'lucide-react';
 import { KycStatus } from '@prisma/client';
 import { formatDateTime } from '@/lib/formatters';
@@ -1440,10 +1440,24 @@ export default function KycPage(): React.ReactElement {
                           Or scan with phone
                         </div>
                         {sumsubMobileUrl ? (
-                          <QRCode
-                            className="size-32 rounded-lg border bg-background p-2.5 shadow-sm hover:shadow-md transition-all"
-                            data={sumsubMobileUrl}
-                          />
+                          <>
+                            <QRCode
+                              className="size-32 rounded-lg border bg-background p-2.5 shadow-sm hover:shadow-md transition-all"
+                              data={sumsubMobileUrl}
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                navigator.clipboard.writeText(sumsubMobileUrl);
+                                toast.success('Link copied to clipboard!');
+                              }}
+                              className="w-full max-w-[200px]"
+                            >
+                              <Copy className="h-3 w-3 mr-2" />
+                              Copy Link
+                            </Button>
+                          </>
                         ) : (
                           <div className="size-32 rounded-lg border bg-muted flex items-center justify-center">
                             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -1528,6 +1542,21 @@ export default function KycPage(): React.ReactElement {
                           className="size-32 rounded-lg border bg-background p-2.5 shadow-sm hover:shadow-md transition-all"
                           data={kycSession.formUrl}
                         />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            navigator.clipboard.writeText(kycSession.formUrl!);
+                            toast.success('Link copied to clipboard!');
+                          }}
+                          className="w-full max-w-[200px]"
+                        >
+                          <Copy className="h-3 w-3 mr-2" />
+                          Copy Link
+                        </Button>
+                        <p className="text-xs text-muted-foreground text-center">
+                          Complete on mobile
+                        </p>
                       </div>
                     </div>
 
