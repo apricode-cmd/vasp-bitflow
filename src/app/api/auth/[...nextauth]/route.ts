@@ -6,16 +6,17 @@
  * IMPORTANT: Must use standard NextAuth v5 pattern for Vercel Edge compatibility
  */
 
-import { handlers } from '@/auth';
+import { handlers } from '../../../../auth';
 
-console.log('🔐 [NEXTAUTH-ROUTE] Route file loaded, handlers:', handlers);
+console.log('🔐 [NEXTAUTH-ROUTE] Route file loaded');
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// Standard NextAuth v5 export pattern
-export const { GET, POST } = handlers;
+// Export handlers directly (Vercel-compatible way)
+export const GET = handlers.GET;
+export const POST = handlers.POST;
 
 console.log('🔐 [NEXTAUTH-ROUTE] Handlers exported:', { 
   GET: typeof GET, 
