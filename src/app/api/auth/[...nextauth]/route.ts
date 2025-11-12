@@ -14,7 +14,7 @@ import { securityAuditService } from '@/lib/services/security-audit.service';
 
 export const runtime = 'nodejs'; // NextAuth v4 requires Node.js runtime
 
-const handler = NextAuth({
+const { handlers } = NextAuth({
   debug: process.env.NODE_ENV === 'development',
   providers: [
     Credentials({
@@ -31,7 +31,8 @@ const handler = NextAuth({
             where: { email: validated.email },
             include: {
               twoFactorAuth: true,
-              kycSession: true
+              kycSession: true,
+              profile: true
             }
           });
 
@@ -95,5 +96,6 @@ const handler = NextAuth({
   }
 });
 
-export { handler as GET, handler as POST };
+export const GET = handlers.GET;
+export const POST = handlers.POST;
 
