@@ -1494,14 +1494,6 @@ export default function KycPage(): React.ReactElement {
                         </div>
                       </div>
                     </div>
-
-                    {/* Info alert */}
-                    <Alert>
-                      <Clock className="h-4 w-4" />
-                      <AlertDescription>
-                        Your documents are being reviewed by our team. This usually takes 2-4 hours.
-                      </AlertDescription>
-                    </Alert>
                   </>
                 ) : kycSession.kycProviderId === 'sumsub' ? (
                   <Alert>
