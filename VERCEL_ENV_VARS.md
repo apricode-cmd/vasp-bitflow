@@ -11,10 +11,13 @@ DATABASE_URL
 ```
 **Value:**
 ```
-postgres://postgres.rltqjdujiacriilmijpz:sYWtAE9nQNkViy3E@aws-1-eu-central-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
+postgres://postgres.rltqjdujiacriilmijpz:sYWtAE9nQNkViy3E@aws-1-eu-central-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=10&statement_cache_size=0
 ```
 
-**Important:** Use port **6543** (connection pooling)
+**Important:** 
+- Use port **6543** (connection pooling)
+- `connection_limit=10` for production workload
+- `statement_cache_size=0` required for pgBouncer
 
 ---
 
