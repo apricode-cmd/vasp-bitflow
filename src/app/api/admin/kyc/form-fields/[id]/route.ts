@@ -50,9 +50,48 @@ export async function GET(
 
 /**
  * PUT /api/admin/kyc/form-fields/[id]
- * Обновить поле KYC формы
+ * Обновить поле KYC формы (полное обновление)
  */
 export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const authResult = await requireAdminRole('ADMIN');
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+
+    const body = await request.json();
+    const validated = updateFieldSchema.parse(body);
+
+    const field = await prisma.kycFormField.update({
+      where: { id: params.id },
+      data: validated
+    });
+
+    return NextResponse.json(field);
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: error.errors },
+        { status: 400 }
+      );
+    }
+
+    console.error('Admin update KYC field error:', error);
+    return NextResponse.json(
+      { error: 'Failed to update KYC field' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * PATCH /api/admin/kyc/form-fields/[id]
+ * Обновить поле KYC формы (частичное обновление)
+ */
+export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
