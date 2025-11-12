@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyPassword } from '@/lib/auth-utils';
-import { signIn } from '@/auth';
+import { createAdminSession } from '@/lib/services/admin-session.service';
 import crypto from 'crypto';
 
 function verifyTOTP(secret: string, token: string): boolean {
@@ -127,12 +127,16 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Emergency access granted:', username);
 
-    // Create session using NextAuth
-    const result = await signIn('credentials', {
-      email: admin.email,
-      password: password,
-      redirect: false,
-    });
+    // Create admin session
+    const sessionResult = await createAdminSession(admin.id, 'EMERGENCY');
+    
+    if (!sessionResult.success) {
+      console.error('❌ Failed to create session:', sessionResult.error);
+      return NextResponse.json(
+        { error: 'Failed to create session' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
