@@ -44,12 +44,5 @@ if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma;
 }
 
-// Graceful connection handling for Vercel serverless
-if (process.env.VERCEL) {
-  prisma.$connect().catch((error) => {
-    console.error('❌ Failed to connect to database:', error);
-  });
-}
-
 export default prisma;
 
