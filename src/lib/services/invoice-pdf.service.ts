@@ -33,7 +33,7 @@ export async function generateInvoicePDF(orderId: string): Promise<Buffer> {
       fiatCurrency: true,
       paymentMethod: {
         include: {
-          bankAccount: true
+          paymentAccount: true // Use new PaymentAccount system
         }
       }
     }
@@ -59,13 +59,14 @@ export async function generateInvoicePDF(orderId: string): Promise<Buffer> {
 
   console.log(`[INVOICE] Legal settings loaded: ${Object.keys(legalData).length} fields`);
 
-  // 3. Get bank details (from payment method or fallback to active bank details)
-  let bankDetails = order.paymentMethod?.bankAccount;
+  // 3. Get bank details (from payment method's payment account)
+  let bankDetails = order.paymentMethod?.paymentAccount;
   
   if (!bankDetails) {
-    // Fallback: get active bank details for the fiat currency
-    bankDetails = await prisma.bankDetails.findFirst({
+    // Fallback: get active payment account for the fiat currency
+    bankDetails = await prisma.paymentAccount.findFirst({
       where: {
+        type: 'BANK',
         currency: order.fiatCurrencyCode,
         isActive: true
       },
@@ -75,7 +76,7 @@ export async function generateInvoicePDF(orderId: string): Promise<Buffer> {
     });
   }
 
-  console.log(`[INVOICE] Bank details: ${bankDetails ? 'Found' : 'Not available'}`);
+  console.log(`[INVOICE] Payment account details: ${bankDetails ? `Found (${bankDetails.code})` : 'Not available'}`);
 
   // 4. Build invoice data
   const invoiceData: InvoiceData = {

@@ -43,6 +43,11 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
         include: {
           profile: true
         }
+      },
+      paymentMethod: {
+        include: {
+          paymentAccount: true
+        }
       }
     }
   });
@@ -56,13 +61,22 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
     redirect('/orders');
   }
 
-  // Get bank details for the fiat currency (DEPRECATED - will use PaymentAccount)
-  const bankDetails = await prisma.bankDetails.findFirst({
-    where: {
-      currency: order.fiatCurrencyCode,
-      isActive: true
-    }
-  });
+  // Get payment account for the fiat currency (from payment method or fallback)
+  let paymentAccount = order.paymentMethod?.paymentAccount;
+  
+  if (!paymentAccount) {
+    // Fallback: get active payment account for the fiat currency
+    paymentAccount = await prisma.paymentAccount.findFirst({
+      where: {
+        type: 'BANK',
+        currency: order.fiatCurrencyCode,
+        isActive: true
+      },
+      orderBy: {
+        priority: 'desc'
+      }
+    });
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -211,8 +225,8 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
         </Card>
       </div>
 
-      {/* Bank Details (for pending orders) */}
-      {order.status === 'PENDING' && bankDetails && (
+      {/* Payment Instructions (for pending orders) */}
+      {order.status === 'PENDING' && paymentAccount && (
         <Card>
           <CardHeader>
             <CardTitle>Payment Instructions</CardTitle>
@@ -224,34 +238,34 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
             <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <span className="text-sm text-muted-foreground">Bank Name:</span>
-                <p className="font-medium">{bankDetails.bankName}</p>
+                <p className="font-medium">{paymentAccount.bankName}</p>
               </div>
               <div>
                 <span className="text-sm text-muted-foreground">Account Holder:</span>
-                <p className="font-medium">{bankDetails.accountHolder}</p>
+                <p className="font-medium">{paymentAccount.accountHolder}</p>
               </div>
               <div>
                 <span className="text-sm text-muted-foreground">IBAN:</span>
                 <div className="flex items-center gap-2">
-                  <code className="font-mono text-sm">{bankDetails.iban}</code>
-                  <CopyButton text={bankDetails.iban} variant="ghost" size="sm" />
+                  <code className="font-mono text-sm">{paymentAccount.iban}</code>
+                  <CopyButton text={paymentAccount.iban || ''} variant="ghost" size="sm" />
                 </div>
               </div>
-              {bankDetails.swift && (
+              {paymentAccount.swift && (
                 <div>
                   <span className="text-sm text-muted-foreground">SWIFT/BIC:</span>
                   <div className="flex items-center gap-2">
-                    <code className="font-mono text-sm">{bankDetails.swift}</code>
-                    <CopyButton text={bankDetails.swift} variant="ghost" size="sm" />
+                    <code className="font-mono text-sm">{paymentAccount.swift}</code>
+                    <CopyButton text={paymentAccount.swift} variant="ghost" size="sm" />
                   </div>
                 </div>
               )}
             </div>
 
-            {bankDetails.instructions && (
+            {paymentAccount.instructions && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h4 className="font-semibold text-blue-900 mb-2">Important:</h4>
-                <p className="text-sm text-blue-800">{bankDetails.instructions.replace('{orderId}', order.paymentReference)}</p>
+                <p className="text-sm text-blue-800">{paymentAccount.instructions.replace('{orderId}', order.paymentReference)}</p>
                 <p className="text-sm text-blue-800 mt-2">
                   Payment Reference: <strong>{order.paymentReference}</strong>
                 </p>
