@@ -168,7 +168,7 @@ export default function KycVerifyPage({ params }: VerifyPageProps) {
                   padding: 0 !important;
                   overflow: hidden !important;
                 }
-                #sumsub-websdk-container {
+                #sumsub-websdk-container { 
                   height: 100vh !important;
                   width: 100vw !important;
                 }

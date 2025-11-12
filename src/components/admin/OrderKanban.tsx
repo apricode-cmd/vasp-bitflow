@@ -405,8 +405,10 @@ export function OrderKanban({
     }
 
     // Check if this transition requires additional data
-    const requiresPayIn = draggedOrder.status === 'PENDING' && newStatus === 'PAYMENT_PENDING';
-    const requiresPayOut = draggedOrder.status === 'PROCESSING' && newStatus === 'COMPLETED';
+    // PayIn required when moving to PROCESSING (payment proof)
+    const requiresPayIn = newStatus === 'PROCESSING';
+    // PayOut required when moving to COMPLETED (crypto transaction)
+    const requiresPayOut = newStatus === 'COMPLETED';
 
     if (requiresPayIn || requiresPayOut) {
       // Show dialog to collect PayIn/PayOut data
@@ -686,7 +688,7 @@ export function OrderKanban({
         </Card>
 
         {/* Kanban Board */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 min-h-[600px]">
       {KANBAN_COLUMNS.map((column) => {
         const columnOrders = getOrdersByStatus(column.id);
             const Icon = column.icon;
@@ -774,19 +776,26 @@ export function OrderKanban({
                             <HoverCard openDelay={300}>
                               <HoverCardTrigger asChild>
                                 <Card
-                                  draggable
+                                  draggable={true}
                                   onDragStart={(e) => handleDragStart(order, e)}
                                   onDragEnd={handleDragEnd}
-                                  className={`cursor-move hover:shadow-lg transition-all group relative ${
+                                  className={`cursor-grab active:cursor-grabbing hover:shadow-lg transition-all group relative ${
                                     isSelected 
                                       ? 'ring-2 ring-primary border-primary' 
                                       : 'hover:border-primary/50'
                                   } ${
                                     draggedOrder?.id === order.id 
-                                      ? '' // Classes applied via classList in handleDragStart
+                                      ? 'opacity-50 scale-95 rotate-2' 
                                       : 'hover:-translate-y-1'
                                   }`}
                                   onClick={(e) => {
+                                    // Prevent click during drag
+                                    if (draggedOrder) {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      return;
+                                    }
+                                    
                                     if (e.shiftKey) {
                                       e.stopPropagation();
                                       toggleOrderSelection(order.id);

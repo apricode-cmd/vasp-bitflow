@@ -22,8 +22,8 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
   const authResult = await requireAdminRole('ADMIN');
   if (authResult instanceof NextResponse) {
     return authResult;
-  const { session } = authResult;
   }
+  const { session } = authResult;
 
   try {
     const body = await request.json();
@@ -53,8 +53,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
     const newStatus = validatedData.status;
 
     // Smart status transition logic
-    const requiresPayIn = oldStatus === 'PENDING' && newStatus === 'PAYMENT_PENDING';
-    const requiresPayOut = oldStatus === 'PROCESSING' && newStatus === 'COMPLETED';
+    // PayIn required when moving to PROCESSING (payment proof uploaded)
+    const requiresPayIn = newStatus === 'PROCESSING' && !order.payIn;
+    // PayOut required when moving to COMPLETED (crypto sent)
+    const requiresPayOut = newStatus === 'COMPLETED' && !order.payOut;
 
     // Validate required data for transitions
     if (requiresPayIn && !validatedData.payInData) {
@@ -62,7 +64,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
         { 
           error: 'PayIn data required',
           requiresPayIn: true,
-          message: 'Please provide payment information to move order to Payment Received'
+          message: 'Please provide payment proof information to move order to Processing. Customer must upload payment confirmation first.'
         },
         { status: 400 }
       );
@@ -73,7 +75,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
         { 
           error: 'PayOut data required',
           requiresPayOut: true,
-          message: 'Please provide payout information to complete the order'
+          message: 'Please provide cryptocurrency transaction details to complete the order.'
         },
         { status: 400 }
       );
@@ -81,7 +83,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
 
     // Update order with transaction
     const updatedOrder = await prisma.$transaction(async (tx) => {
-      // Create PayIn if transitioning to PAYMENT_PENDING
+      // Create PayIn if transitioning to PROCESSING (payment proof uploaded)
       if (requiresPayIn && validatedData.payInData) {
         const payInExists = await tx.payIn.findUnique({
           where: { orderId: params.id }
@@ -107,7 +109,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
         }
       }
 
-      // Create PayOut if transitioning to COMPLETED
+      // Create PayOut if transitioning to COMPLETED (crypto sent)
       if (requiresPayOut && validatedData.payOutData) {
         const payOutExists = await tx.payOut.findUnique({
           where: { orderId: params.id }
