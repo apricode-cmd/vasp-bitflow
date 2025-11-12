@@ -3,10 +3,13 @@
  */
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { KycField } from '@/lib/kyc/config';
 import { shouldShowField, isFieldConditionallyRequired } from '@/lib/kyc/conditionalLogic';
 import { toast } from 'sonner';
+
+const KYC_FORM_STORAGE_KEY = 'kyc-form-draft';
+const AUTOSAVE_DELAY = 1000; // 1 second debounce
 
 interface UseKycFormReturn {
   formData: Record<string, any>;
@@ -17,11 +20,54 @@ interface UseKycFormReturn {
   validateAll: (fields: KycField[]) => boolean;
   resetForm: () => void;
   setFormData: (data: Record<string, any>) => void;
+  clearDraft: () => void;
 }
 
 export function useKycForm(initialData: Record<string, any> = {}): UseKycFormReturn {
-  const [formData, setFormDataState] = useState<Record<string, any>>(initialData);
+  const [formData, setFormDataState] = useState<Record<string, any>>(() => {
+    // Try to load saved draft from localStorage on mount
+    if (typeof window !== 'undefined') {
+      try {
+        const savedDraft = localStorage.getItem(KYC_FORM_STORAGE_KEY);
+        if (savedDraft) {
+          const parsed = JSON.parse(savedDraft);
+          console.log('📋 [AUTOSAVE] Restored form draft from localStorage:', Object.keys(parsed).length, 'fields');
+          toast.info('Form data restored from previous session', { duration: 3000 });
+          return { ...initialData, ...parsed }; // Merge with initialData
+        }
+      } catch (error) {
+        console.error('Failed to load form draft:', error);
+      }
+    }
+    return initialData;
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Auto-save to localStorage with debounce
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const timeoutId = setTimeout(() => {
+      try {
+        if (Object.keys(formData).length > 0) {
+          localStorage.setItem(KYC_FORM_STORAGE_KEY, JSON.stringify(formData));
+          console.log('💾 [AUTOSAVE] Form data saved to localStorage:', Object.keys(formData).length, 'fields');
+        }
+      } catch (error) {
+        console.error('Failed to save form draft:', error);
+      }
+    }, AUTOSAVE_DELAY);
+
+    return () => clearTimeout(timeoutId);
+  }, [formData]);
+
+  // Clear draft from localStorage
+  const clearDraft = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(KYC_FORM_STORAGE_KEY);
+      console.log('🗑️ [AUTOSAVE] Cleared form draft from localStorage');
+    }
+  }, []);
 
   const setFieldValue = (fieldName: string, value: any) => {
     setFormDataState(prev => ({ ...prev, [fieldName]: value }));
@@ -162,7 +208,8 @@ export function useKycForm(initialData: Record<string, any> = {}): UseKycFormRet
     validateStep,
     validateAll,
     resetForm,
-    setFormData
+    setFormData,
+    clearDraft
   };
 }
 

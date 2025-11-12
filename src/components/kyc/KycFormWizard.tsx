@@ -11,7 +11,7 @@ import { KYC_STEPS, getStepsWithFields, getFieldsForStep } from '@/lib/kyc/confi
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, ArrowRight, Loader2, Shield, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Shield, Check, Save } from 'lucide-react';
 import { useKycForm } from './hooks/useKycForm';
 import { toast } from 'sonner';
 
@@ -31,7 +31,7 @@ export function KycFormWizard({ fields, kycSession, onComplete }: Props) {
   const [isSaving, setIsSaving] = useState(false);
   const [isAutoFilled, setIsAutoFilled] = useState(false);
   
-  const { formData, errors, setFieldValue, validateStep, setFormData } = useKycForm();
+  const { formData, errors, setFieldValue, validateStep, setFormData, clearDraft } = useKycForm();
 
   // Auto-fill form data from user profile
   useEffect(() => {
@@ -260,6 +260,9 @@ export function KycFormWizard({ fields, kycSession, onComplete }: Props) {
 
       toast.success('KYC form submitted successfully! Now complete identity verification.');
       
+      // Clear draft from localStorage (form successfully submitted)
+      clearDraft();
+      
       // Call onComplete to refresh status and show verification screen
       onComplete();
       
@@ -309,9 +312,17 @@ export function KycFormWizard({ fields, kycSession, onComplete }: Props) {
               <span className="font-medium">
                 Step {currentStepIndex + 1} of {activeSteps.length}
               </span>
-              <span className="text-muted-foreground">
-                {Math.round(progress)}% Complete
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-muted-foreground">
+                  {Math.round(progress)}% Complete
+                </span>
+                {Object.keys(formData).length > 0 && (
+                  <span className="flex items-center gap-1.5 text-xs text-green-600">
+                    <Save className="h-3 w-3" />
+                    Auto-saved
+                  </span>
+                )}
+              </div>
             </div>
             <Progress value={progress} className="h-2" />
 
