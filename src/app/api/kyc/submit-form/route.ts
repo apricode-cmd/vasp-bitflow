@@ -95,10 +95,26 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ KYC form data saved successfully!');
 
+    // Link any uploaded documents to this session
+    const documentsLinked = await prisma.kycDocument.updateMany({
+      where: {
+        userId: session.user.id,
+        kycSessionId: null
+      },
+      data: {
+        kycSessionId: kycSession.id
+      }
+    });
+
+    if (documentsLinked.count > 0) {
+      console.log(`✅ Linked ${documentsLinked.count} documents to session`);
+    }
+
     return NextResponse.json({
       success: true,
       sessionId: kycSession.id,
-      fieldsSaved: formDataRecords.length
+      fieldsSaved: formDataRecords.length,
+      documentsLinked: documentsLinked.count
     });
 
   } catch (error) {

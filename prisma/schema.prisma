@@ -40,6 +40,7 @@ model User {
   userAuditLogs             UserAuditLog[]             @relation("UserAuditLogs")
   kycLevelData              UserKycLevel?              @relation("UserKycLevelRelation")
   userWallets               UserWallet[]
+  kycDocuments              KycDocument[]
 
   @@index([email])
   @@index([role])
@@ -792,18 +793,21 @@ model KycFormField {
 }
 
 model KycDocument {
-  id               String     @id @default(cuid())
-  kycSessionId     String
+  id               String      @id @default(cuid())
+  userId           String      // User who uploaded (before session created)
+  kycSessionId     String?     // Nullable - linked when session is created
   documentType     String
   fileUrl          String
   fileName         String
   fileSize         Int
   mimeType         String
-  verifiedByAI     Boolean    @default(false)
+  verifiedByAI     Boolean     @default(false)
   verificationData Json?
-  uploadedAt       DateTime   @default(now())
-  kycSession       KycSession @relation(fields: [kycSessionId], references: [id], onDelete: Cascade)
+  uploadedAt       DateTime    @default(now())
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kycSession       KycSession? @relation(fields: [kycSessionId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@index([kycSessionId])
   @@index([documentType])
 }

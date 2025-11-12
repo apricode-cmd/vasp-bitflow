@@ -232,6 +232,32 @@ export function KycFormWizard({ fields, kycSession, onComplete }: Props) {
       const savedData = await formDataResponse.json();
       console.log('✅ Form data saved:', savedData);
 
+      // Step 4: Sync documents to KYC provider
+      console.log('4️⃣ Syncing documents to provider...');
+      try {
+        const syncResponse = await fetch('/api/kyc/sync-documents', {
+          method: 'POST'
+        });
+
+        if (syncResponse.ok) {
+          const syncData = await syncResponse.json();
+          console.log('✅ Documents synced:', syncData);
+          
+          if (syncData.synced > 0) {
+            toast.success(`${syncData.synced} document(s) sent to verification provider`);
+          }
+          
+          if (syncData.failed > 0) {
+            console.warn('⚠️ Some documents failed to sync:', syncData.errors);
+            toast.warning(`${syncData.failed} document(s) failed to sync`);
+          }
+        } else {
+          console.warn('⚠️ Document sync failed (non-critical)');
+        }
+      } catch (syncError) {
+        console.warn('⚠️ Document sync error (non-critical):', syncError);
+      }
+
       toast.success('KYC form submitted successfully! Now complete identity verification.');
       
       // Call onComplete to refresh status and show verification screen

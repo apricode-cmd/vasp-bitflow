@@ -345,23 +345,36 @@ function FileUploadField({ field, value, onChange, error }: {
   // Upload UI
   return (
     <div className="space-y-2">
-      <div className={`flex items-center justify-center border-2 border-dashed rounded-lg p-6 transition-colors ${
-        error ? 'border-destructive' : 'border-muted-foreground/25 hover:border-primary hover:bg-accent/50'
+      <div className={`group relative flex items-center justify-center border-2 border-dashed rounded-xl p-8 transition-all duration-200 ${
+        error 
+          ? 'border-destructive bg-destructive/5' 
+          : 'border-border bg-card hover:border-primary hover:bg-primary/5 hover:shadow-sm'
       } ${uploading ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}>
         <label htmlFor={`file-${field.fieldName}`} className="cursor-pointer text-center w-full">
           {uploading ? (
-            <div className="flex flex-col items-center gap-2">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Uploading...</p>
+            <div className="flex flex-col items-center gap-3">
+              <div className="relative">
+                <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl"></div>
+                <Loader2 className="relative h-10 w-10 animate-spin text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Uploading to verification system...</p>
+                <p className="text-xs text-muted-foreground mt-1">Please wait</p>
+              </div>
             </div>
           ) : (
             <>
-              <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                Drop file here or <span className="text-primary underline">browse</span>
+              <div className="relative mb-3">
+                <div className="absolute inset-0 bg-primary/10 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div className="relative rounded-xl bg-primary/10 p-3 mx-auto w-fit">
+                  <Upload className="h-6 w-6 text-primary" />
+                </div>
+              </div>
+              <p className="text-sm font-medium mb-1">
+                Drop file here or <span className="text-primary">browse</span>
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                JPEG, PNG, PDF (max 10MB)
+              <p className="text-xs text-muted-foreground">
+                Supports JPEG, PNG, PDF • Max 10MB
               </p>
             </>
           )}

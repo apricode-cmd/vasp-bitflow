@@ -190,7 +190,7 @@ SET
 WHERE "fieldName" = 'id_issuing_authority';
 
 -- ================================================================
--- STEP 10: Add proof_of_address_type field
+-- STEP 10: Add proof_of_address_type field (in address category!)
 -- ================================================================
 INSERT INTO "KycFormField" (
   "id",
@@ -210,10 +210,10 @@ VALUES (
   'proof_of_address_type',
   'Proof of Address Type',
   'select',
-  'documents',
+  'address',
   false,
   true,
-  38.5,
+  25,
   '["utility_bill", "bank_statement", "tax_statement", "rental_agreement", "other"]'::jsonb,
   NOW(),
   NOW()
@@ -230,7 +230,7 @@ DO UPDATE SET
   "updatedAt" = NOW();
 
 -- ================================================================
--- STEP 11: Add proof_of_address field (REQUIRED!)
+-- STEP 11: Add proof_of_address field (REQUIRED, in address category!)
 -- ================================================================
 INSERT INTO "KycFormField" (
   "id",
@@ -250,10 +250,10 @@ VALUES (
   'proof_of_address',
   'Proof of Address',
   'file',
-  'documents',
+  'address',
   true,
   true,
-  39,
+  26,
   '{"acceptedFormats": ["image/jpeg", "image/png", "application/pdf"], "maxSize": 10485760}'::jsonb,
   NOW(),
   NOW()
@@ -286,7 +286,7 @@ DO UPDATE SET
 -- ORDER BY "priority" ASC;
 
 -- ================================================================
--- ✅ EXPECTED RESULT:
+-- ✅ EXPECTED RESULT (documents category):
 -- ================================================================
 -- passport_number       | text    | documents | false | true  | 28   | id_type | {"operator":"==","value":"passport"}
 -- passport_scan         | file    | documents | false | true  | 29   | id_type | {"operator":"==","value":"passport"}
@@ -299,10 +299,68 @@ DO UPDATE SET
 -- id_scan_front         | file    | documents | true  | true  | 36   | id_type | {"operator":"in","value":["id_card","drivers_license"]}
 -- id_scan_back          | file    | documents | true  | true  | 37   | id_type | {"operator":"in","value":["id_card","drivers_license"]}
 -- liveness_selfie       | file    | documents | false | true  | 38   | NULL    | NULL
--- proof_of_address_type | select  | documents | false | true  | 38.5 | NULL    | NULL
--- proof_of_address      | file    | documents | true  | true  | 39   | NULL    | NULL
+--
+-- ✅ EXPECTED RESULT (address category):
+-- ================================================================
+-- proof_of_address_type | select  | address   | false | true  | 25   | NULL    | NULL
+-- proof_of_address      | file    | address   | true  | true  | 26   | NULL    | NULL
 
 -- ================================================================
 -- 🎉 SUCCESS! All document fields configured with conditional logic
+-- ================================================================
+
+-- ================================================================
+-- STEP 12: ADD userId TO KycDocument (Allow uploads before session)
+-- ================================================================
+
+-- Add userId column
+ALTER TABLE "KycDocument"
+ADD COLUMN IF NOT EXISTS "userId" TEXT;
+
+-- Populate userId from existing kycSessions (for existing records)
+UPDATE "KycDocument" d
+SET "userId" = s."userId"
+FROM "KycSession" s
+WHERE d."kycSessionId" = s."id"
+AND d."userId" IS NULL;
+
+-- Set NOT NULL constraint (after populating)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'KycDocument' 
+    AND column_name = 'userId' 
+    AND is_nullable = 'NO'
+  ) THEN
+    ALTER TABLE "KycDocument"
+    ALTER COLUMN "userId" SET NOT NULL;
+  END IF;
+END $$;
+
+-- Make kycSessionId optional (drop NOT NULL)
+ALTER TABLE "KycDocument"
+ALTER COLUMN "kycSessionId" DROP NOT NULL;
+
+-- Add foreign key constraint for userId (if not exists)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'KycDocument_userId_fkey'
+  ) THEN
+    ALTER TABLE "KycDocument"
+    ADD CONSTRAINT "KycDocument_userId_fkey" 
+    FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
+
+-- Add index on userId (if not exists)
+CREATE INDEX IF NOT EXISTS "KycDocument_userId_idx" ON "KycDocument"("userId");
+
+-- ================================================================
+-- 🎉 FINAL SUCCESS!
+-- Now users can upload documents BEFORE completing KYC form
+-- Documents stored in Vercel Blob → sent to Sumsub on final submit
 -- ================================================================
 

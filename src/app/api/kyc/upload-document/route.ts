@@ -1,13 +1,15 @@
 /**
  * KYC Document Upload API
+ * POST /api/kyc/upload-document
  * 
- * POST /api/kyc/upload-document - Upload KYC document directly to provider (Sumsub/KYCAID)
+ * Uploads KYC documents to Vercel Blob (temporary storage).
+ * Documents are later sent to KYC provider when user submits the form.
  * 
- * FormData params:
+ * FormData fields:
  * - file: File (required)
- * - documentType: 'PASSPORT' | 'ID_CARD' | 'UTILITY_BILL' | 'SELFIE' (required)
- * - documentSubType: 'FRONT_SIDE' | 'BACK_SIDE' (optional, for ID_CARD)
- * - country: ISO-3 country code (required, e.g. "POL", "USA")
+ * - documentType: PASSPORT | ID_CARD | UTILITY_BILL | etc (required)
+ * - documentSubType: FRONT_SIDE | BACK_SIDE (optional)
+ * - country: ISO-3 code (required)
  * - number: Document number (optional)
  * - issuedDate: YYYY-MM-DD (optional)
  * - validUntil: YYYY-MM-DD (optional)
@@ -16,8 +18,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getClientSession } from '@/auth-client';
 import { prisma } from '@/lib/prisma';
-import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
+import { uploadToBlob } from '@/lib/storage/blob.service';
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
@@ -25,17 +30,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const session = await getClientSession();
     if (!session?.user?.id) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Unauthorized'
-        },
+        { success: false, error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
     const userId = session.user.id;
 
-    // Get form data
+    // Parse FormData
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const documentType = formData.get('documentType') as string;
@@ -48,33 +50,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Validate required fields
     if (!file || !documentType || !country) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Missing required fields: file, documentType, country'
-        },
+        { success: false, error: 'Missing required fields: file, documentType, country' },
         { status: 400 }
       );
     }
 
-    // Validate file size (10MB max)
-    if (file.size > 10 * 1024 * 1024) {
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'File size exceeds 10MB limit'
-        },
+        { success: false, error: `File size exceeds maximum allowed size of ${MAX_FILE_SIZE / 1024 / 1024}MB` },
         { status: 400 }
       );
     }
 
     // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
-    if (!allowedTypes.includes(file.type)) {
+    if (!ALLOWED_TYPES.includes(file.type)) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Invalid file type. Only JPEG, PNG, and PDF are allowed'
-        },
+        { success: false, error: `Invalid file type. Allowed types: ${ALLOWED_TYPES.join(', ')}` },
         { status: 400 }
       );
     }
@@ -89,140 +81,74 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       mimeType: file.type
     });
 
-    // Get or create KYC session
-    let kycSession = await prisma.kycSession.findUnique({
-      where: { userId }
+    // Upload to Vercel Blob (temporary storage before KYC submission)
+    console.log('☁️ Uploading to Vercel Blob...');
+    const blobResult = await uploadToBlob(file, file.name, `kyc/${userId}`);
+    
+    console.log('✅ Blob upload successful:', {
+      url: blobResult.url,
+      size: blobResult.size
     });
-
-    if (!kycSession) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'KYC session not found. Please start KYC verification first.'
-        },
-        { status: 400 }
-      );
-    }
-
-    // Check if already approved
-    if (kycSession.status === 'APPROVED') {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'KYC already approved'
-        },
-        { status: 400 }
-      );
-    }
-
-    // Extract applicant ID from session metadata
-    const metadata = kycSession.metadata as any;
-    const applicantId = metadata?.applicant?.id || metadata?.applicantId;
-
-    if (!applicantId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'No applicant ID found. Please restart KYC verification.'
-        },
-        { status: 400 }
-      );
-    }
-
-    // Get KYC provider (Sumsub/KYCAID)
-    const kycProvider = await integrationFactory.getKycProvider();
-
-    // Check if provider supports document upload
-    if (!kycProvider.uploadDocument) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Current KYC provider does not support direct document upload'
-        },
-        { status: 501 }
-      );
-    }
-
-    // Convert File to Buffer
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
 
     // Prepare document metadata
     const docMetadata: any = {
       idDocType: documentType,
-      country: country
+      country: country,
+      uploadedVia: 'client_form',
+      blobPath: blobResult.pathname
     };
 
     if (documentSubType) {
       docMetadata.idDocSubType = documentSubType;
     }
+
     if (number) {
       docMetadata.number = number;
     }
+
     if (issuedDate) {
       docMetadata.issuedDate = issuedDate;
     }
+
     if (validUntil) {
       docMetadata.validUntil = validUntil;
     }
 
-    // Upload to provider
-    console.log('📡 Uploading to KYC provider:', kycProvider.providerId);
-    const uploadResult = await kycProvider.uploadDocument(
-      applicantId,
-      buffer,
-      file.name,
-      docMetadata,
-      true // returnWarnings
-    );
-
-    if (!uploadResult.success) {
-      console.error('❌ Provider upload failed:', uploadResult.error);
-      return NextResponse.json(
-        {
-          success: false,
-          error: uploadResult.error || 'Failed to upload document to KYC provider'
-        },
-        { status: 500 }
-      );
-    }
-
-    console.log('✅ Document uploaded to provider:', uploadResult);
-
-    // Save document record to database
+    // Save document record in database (without kycSessionId - will be linked later)
     const document = await prisma.kycDocument.create({
       data: {
-        kycSessionId: kycSession.id,
+        userId: userId,
+        kycSessionId: null, // Will be linked when KYC session is created
         documentType: documentType,
-        fileUrl: '', // Provider manages files, we don't store URL
+        fileUrl: blobResult.url,
         fileName: file.name,
         fileSize: file.size,
         mimeType: file.type,
         verifiedByAI: false,
         verificationData: {
-          providerId: kycProvider.providerId,
-          documentId: uploadResult.documentId,
-          imageIds: uploadResult.imageIds,
-          status: uploadResult.status,
-          warnings: uploadResult.warnings,
-          uploadedAt: new Date().toISOString(),
-          metadata: docMetadata
+          storedIn: 'vercel_blob',
+          blobUrl: blobResult.url,
+          blobPathname: blobResult.pathname,
+          metadata: docMetadata,
+          uploadedAt: new Date().toISOString()
         }
       }
     });
 
-    // Log user action
+    console.log('✅ Document saved to database:', document.id);
+
+    // Audit log
     await auditService.logUserAction(
       userId,
       AUDIT_ACTIONS.KYC_DOCUMENT_UPLOADED,
-      AUDIT_ENTITIES.KYC_SESSION,
-      kycSession.id,
+      AUDIT_ENTITIES.USER,
+      userId,
       {
+        documentId: document.id,
         documentType,
-        documentId: uploadResult.documentId,
         fileName: file.name,
         fileSize: file.size,
-        provider: kycProvider.providerId
+        storedIn: 'vercel_blob'
       }
     );
 
@@ -230,23 +156,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       success: true,
       data: {
         documentId: document.id,
-        providerDocumentId: uploadResult.documentId,
-        imageIds: uploadResult.imageIds,
-        status: uploadResult.status,
-        warnings: uploadResult.warnings
+        fileName: file.name,
+        fileSize: file.size,
+        uploadedAt: document.uploadedAt,
+        status: 'uploaded_to_storage' // Not yet submitted to KYC provider
       }
     }, { status: 201 });
 
   } catch (error: any) {
     console.error('❌ Upload document error:', error);
-
     return NextResponse.json(
-      {
-        success: false,
-        error: error.message || 'Failed to upload document'
-      },
+      { success: false, error: error.message || 'Failed to upload document' },
       { status: 500 }
     );
   }
 }
-
