@@ -8,6 +8,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 
+// Force dynamic rendering (uses request.url and cookies)
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest): Promise<NextResponse> {
   // Check admin authorization
   const { error } = await requireAdminRole('ADMIN');

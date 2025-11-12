@@ -2,24 +2,98 @@
  * NextAuth API Route Handler
  * 
  * Handles all NextAuth authentication requests for CLIENT users.
- * 
- * IMPORTANT: Must use standard NextAuth v5 pattern for Vercel Edge compatibility
  */
 
-import { handlers } from '../../../../auth';
+import NextAuth from 'next-auth';
+import Credentials from 'next-auth/providers/credentials';
+import { prisma } from '@/lib/prisma';
+import bcrypt from 'bcryptjs';
+import { loginSchema } from '@/lib/validations/auth';
+import { verifyUserTotp } from '@/lib/services/totp.service';
+import { securityAuditService } from '@/lib/services/security-audit.service';
 
-console.log('🔐 [NEXTAUTH-ROUTE] Route file loaded');
+export const runtime = 'nodejs'; // NextAuth v4 requires Node.js runtime
 
-// Force dynamic rendering
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
+const handler = NextAuth({
+  debug: process.env.NODE_ENV === 'development',
+  providers: [
+    Credentials({
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' },
+        twoFactorCode: { label: '2FA Code', type: 'text' }
+      },
+      async authorize(credentials) {
+        try {
+          const validated = loginSchema.parse(credentials);
 
-// Export handlers directly (Vercel-compatible way)
-export const GET = handlers.GET;
-export const POST = handlers.POST;
+          const user = await prisma.user.findUnique({
+            where: { email: validated.email },
+            include: {
+              twoFactorAuth: true,
+              kycSession: true
+            }
+          });
 
-console.log('🔐 [NEXTAUTH-ROUTE] Handlers exported:', { 
-  GET: typeof GET, 
-  POST: typeof POST 
+          if (!user) {
+            await securityAuditService.logFailedLogin(validated.email, 'USER_NOT_FOUND');
+            return null;
+          }
+
+          const isValidPassword = await bcrypt.compare(validated.password, user.password);
+          if (!isValidPassword) {
+            await securityAuditService.logFailedLogin(validated.email, 'INVALID_PASSWORD', user.id);
+            return null;
+          }
+
+          if (user.twoFactorAuth?.totpEnabled && validated.twoFactorCode) {
+            const isValidTotp = await verifyUserTotp(user.id, validated.twoFactorCode);
+            if (!isValidTotp) {
+              await securityAuditService.logFailedLogin(validated.email, 'INVALID_2FA', user.id);
+              return null;
+            }
+          }
+
+          await securityAuditService.logSuccessfulLogin(user.id, 'CLIENT');
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.profile?.firstName || user.email,
+            role: user.role
+          };
+        } catch (error) {
+          console.error('Auth error:', error);
+          return null;
+        }
+      }
+    })
+  ],
+  pages: {
+    signIn: '/login',
+    error: '/login'
+  },
+  session: {
+    strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60 // 30 days
+  },
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.role = user.role;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (token && session.user) {
+        session.user.id = token.id as string;
+        session.user.role = token.role as string;
+      }
+      return session;
+    }
+  }
 });
+
+export { handler as GET, handler as POST };
 
