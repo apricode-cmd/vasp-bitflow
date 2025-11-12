@@ -251,7 +251,7 @@ export default function KycFormFieldsPage() {
               <TabsTrigger key={step.id} value={`step-${step.id}`} className="flex items-center gap-2">
                 <span className="font-semibold">Step {step.id}:</span>
                 <span>{step.title}</span>
-              </TabsTrigger>
+                </TabsTrigger>
             ))}
           </TabsList>
         </ScrollArea>
@@ -272,7 +272,7 @@ export default function KycFormFieldsPage() {
                     const categoryFieldsCount = stepFields.filter(f => f.category === categoryCode).length;
                     const categoryEnabledCount = stepFields.filter(f => f.category === categoryCode && f.isEnabled).length;
 
-                    return (
+          return (
                       <Badge key={categoryCode} variant="secondary" className="flex items-center gap-1.5 px-3 py-1.5">
                         <IconComponent className="h-3.5 w-3.5" />
                         <span>{category?.name || categoryCode}</span>
@@ -295,83 +295,83 @@ export default function KycFormFieldsPage() {
 
               return (
                 <Card key={categoryCode}>
-                  <CardHeader>
+                <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
                       <IconComponent className="h-5 w-5" />
                       {category?.name || categoryCode}
-                    </CardTitle>
-                    <CardDescription>
+                  </CardTitle>
+                  <CardDescription>
                       {categoryFields.length} field(s) • {categoryFields.filter(f => f.isEnabled).length} enabled
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
                       {categoryFields.map((field) => (
-                        <div
-                          key={field.id}
-                          className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
-                        >
-                          <div className="flex-1 space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">{field.label}</span>
-                              <code className="text-xs bg-muted px-2 py-1 rounded">
-                                {field.fieldName}
-                              </code>
-                              <Badge variant="outline">{field.fieldType}</Badge>
-                              {field.isRequired && (
-                                <Badge variant="destructive" className="text-xs">
-                                  Required
-                                </Badge>
-                              )}
-                              {!field.isEnabled && (
-                                <Badge variant="secondary" className="text-xs">
-                                  Disabled
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              Priority: {field.priority}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                              <Label htmlFor={`required-${field.id}`} className="text-xs">
+                      <div
+                        key={field.id}
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                      >
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{field.label}</span>
+                            <code className="text-xs bg-muted px-2 py-1 rounded">
+                              {field.fieldName}
+                            </code>
+                            <Badge variant="outline">{field.fieldType}</Badge>
+                            {field.isRequired && (
+                              <Badge variant="destructive" className="text-xs">
                                 Required
-                              </Label>
-                              <Switch
-                                id={`required-${field.id}`}
-                                checked={field.isRequired}
-                                onCheckedChange={() => handleQuickToggle(field, 'isRequired')}
-                              />
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              <Label htmlFor={`enabled-${field.id}`} className="text-xs">
-                                Enabled
-                              </Label>
-                              <Switch
-                                id={`enabled-${field.id}`}
-                                checked={field.isEnabled}
-                                onCheckedChange={() => handleQuickToggle(field, 'isEnabled')}
-                              />
-                            </div>
-
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEdit(field)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
+                              </Badge>
+                            )}
+                            {!field.isEnabled && (
+                              <Badge variant="secondary" className="text-xs">
+                                Disabled
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            Priority: {field.priority}
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-2">
+                            <Label htmlFor={`required-${field.id}`} className="text-xs">
+                              Required
+                            </Label>
+                            <Switch
+                              id={`required-${field.id}`}
+                              checked={field.isRequired}
+                              onCheckedChange={() => handleQuickToggle(field, 'isRequired')}
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Label htmlFor={`enabled-${field.id}`} className="text-xs">
+                              Enabled
+                            </Label>
+                            <Switch
+                              id={`enabled-${field.id}`}
+                              checked={field.isEnabled}
+                              onCheckedChange={() => handleQuickToggle(field, 'isEnabled')}
+                            />
+                          </div>
+
+                          <Button
+                              variant="ghost"
+                              size="icon"
+                            onClick={() => handleEdit(field)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+          );
+        })}
 
             {/* Empty state */}
             {stepFields.length === 0 && (

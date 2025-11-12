@@ -93,9 +93,9 @@ export default function KycPage(): React.ReactElement {
         <div className="text-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin mx-auto" />
           <p className="text-muted-foreground">Loading KYC verification...</p>
-        </div>
       </div>
-    );
+          </div>
+        );
   }
 
   // Error state
@@ -106,7 +106,7 @@ export default function KycPage(): React.ReactElement {
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
-        </Alert>
+                </Alert>
       </div>
     );
   }

@@ -74,7 +74,7 @@ export default function TradingPairsPage(): JSX.Element {
   // Delete confirmation dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [pairToDelete, setPairToDelete] = React.useState<string | null>(null);
-  
+
   // Filter state
   const [showInactive, setShowInactive] = React.useState(false);
 
