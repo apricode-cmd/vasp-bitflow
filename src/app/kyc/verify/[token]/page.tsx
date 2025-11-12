@@ -19,21 +19,16 @@ import { Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface VerifyPageProps {
-  params: Promise<{
+  params: {
     token: string;
-  }>;
+  };
 }
 
 export default function KycVerifyPage({ params }: VerifyPageProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Unwrap params
-    params.then(p => setToken(p.token));
-  }, [params]);
+  const token = params.token;
 
   useEffect(() => {
     if (!token) return;
