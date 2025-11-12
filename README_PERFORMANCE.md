@@ -10,7 +10,7 @@
 - 🟠 14 отдельных COUNT запросов в /admin/stats
 - 🟠 Отсутствие production-оптимизаций Next.js
 - 🟠 Build size 1GB (норма 100-300MB)
-- 🟡 Логирование всех SQL запросов в dev
+- 🟡 SQL query logging в консоль (не путать с audit logging в `/admin/audit`!)
 
 ---
 
@@ -18,7 +18,8 @@
 
 #### A. Prisma Client (src/lib/prisma.ts)
 ```typescript
-// ✅ Убрано логирование 'query' в dev
+// ✅ Убрано SQL query logging в консоль ('query' в dev)
+//    Примечание: Application audit logging (/admin/audit) не затронут!
 // ✅ Добавлено graceful connection handling для Vercel
 // ✅ Явная настройка datasource
 ```

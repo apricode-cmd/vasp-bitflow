@@ -6,8 +6,12 @@
  * 
  * Performance optimizations:
  * - Connection pooling configured for Vercel serverless
- * - Minimal logging in production
+ * - Minimal SQL query logging (only errors in production)
  * - Graceful shutdown handling
+ * 
+ * Note: Application-level audit logging (user/admin actions) is handled separately
+ * by audit.service.ts and is accessible via /admin/audit. This logging config
+ * only affects SQL query debugging output, not business event auditing.
  */
 
 import { PrismaClient } from '@prisma/client';
