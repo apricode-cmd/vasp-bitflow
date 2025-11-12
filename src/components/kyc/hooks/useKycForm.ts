@@ -9,7 +9,6 @@ import { shouldShowField, isFieldConditionallyRequired } from '@/lib/kyc/conditi
 import { toast } from 'sonner';
 
 const KYC_FORM_STORAGE_KEY = 'kyc-form-draft';
-const AUTOSAVE_DELAY = 1000; // 1 second debounce
 
 interface UseKycFormReturn {
   formData: Record<string, any>;
@@ -21,6 +20,7 @@ interface UseKycFormReturn {
   resetForm: () => void;
   setFormData: (data: Record<string, any>) => void;
   clearDraft: () => void;
+  saveDraft: () => void;
 }
 
 export function useKycForm(initialData: Record<string, any> = {}): UseKycFormReturn {
@@ -31,8 +31,7 @@ export function useKycForm(initialData: Record<string, any> = {}): UseKycFormRet
         const savedDraft = localStorage.getItem(KYC_FORM_STORAGE_KEY);
         if (savedDraft) {
           const parsed = JSON.parse(savedDraft);
-          console.log('📋 [AUTOSAVE] Restored form draft from localStorage:', Object.keys(parsed).length, 'fields');
-          toast.info('Form data restored from previous session', { duration: 3000 });
+          console.log('📋 [RESTORE] Form draft restored from localStorage:', Object.keys(parsed).length, 'fields');
           return { ...initialData, ...parsed }; // Merge with initialData
         }
       } catch (error) {
@@ -43,29 +42,25 @@ export function useKycForm(initialData: Record<string, any> = {}): UseKycFormRet
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Auto-save to localStorage with debounce
-  useEffect(() => {
+  // Manually save draft to localStorage (called on step navigation)
+  const saveDraft = useCallback(() => {
     if (typeof window === 'undefined') return;
     
-    const timeoutId = setTimeout(() => {
-      try {
-        if (Object.keys(formData).length > 0) {
-          localStorage.setItem(KYC_FORM_STORAGE_KEY, JSON.stringify(formData));
-          console.log('💾 [AUTOSAVE] Form data saved to localStorage:', Object.keys(formData).length, 'fields');
-        }
-      } catch (error) {
-        console.error('Failed to save form draft:', error);
+    try {
+      if (Object.keys(formData).length > 0) {
+        localStorage.setItem(KYC_FORM_STORAGE_KEY, JSON.stringify(formData));
+        console.log('💾 [SAVE] Form data saved to localStorage:', Object.keys(formData).length, 'fields');
       }
-    }, AUTOSAVE_DELAY);
-
-    return () => clearTimeout(timeoutId);
+    } catch (error) {
+      console.error('Failed to save form draft:', error);
+    }
   }, [formData]);
 
   // Clear draft from localStorage
   const clearDraft = useCallback(() => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(KYC_FORM_STORAGE_KEY);
-      console.log('🗑️ [AUTOSAVE] Cleared form draft from localStorage');
+      console.log('🗑️ [SAVE] Cleared form draft from localStorage');
     }
   }, []);
 
@@ -209,7 +204,8 @@ export function useKycForm(initialData: Record<string, any> = {}): UseKycFormRet
     validateAll,
     resetForm,
     setFormData,
-    clearDraft
+    clearDraft,
+    saveDraft
   };
 }
 

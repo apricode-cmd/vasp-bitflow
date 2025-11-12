@@ -31,7 +31,7 @@ export function KycFormWizard({ fields, kycSession, onComplete }: Props) {
   const [isSaving, setIsSaving] = useState(false);
   const [isAutoFilled, setIsAutoFilled] = useState(false);
   
-  const { formData, errors, setFieldValue, validateStep, setFormData, clearDraft } = useKycForm();
+  const { formData, errors, setFieldValue, validateStep, setFormData, clearDraft, saveDraft } = useKycForm();
 
   // Auto-fill form data from user profile
   useEffect(() => {
@@ -146,12 +146,23 @@ export function KycFormWizard({ fields, kycSession, onComplete }: Props) {
   const isLastStep = currentStepIndex === activeSteps.length - 1;
   const progress = ((currentStepIndex + 1) / activeSteps.length) * 100;
 
+  // Calculate filled fields for current step
+  const currentStepFields = getFieldsForStep(currentStep, fields);
+  const filledFieldsCount = currentStepFields.filter(field => {
+    const value = formData[field.fieldName];
+    return value !== undefined && value !== null && value !== '';
+  }).length;
+  const totalFieldsCount = currentStepFields.length;
+
   const handleNext = () => {
     // Validate current step
     const stepFields = getFieldsForStep(currentStep, fields);
     if (!validateStep(stepFields)) {
       return;
     }
+
+    // Save form data to localStorage before moving to next step
+    saveDraft();
 
     if (isLastStep) {
       handleSubmit();
@@ -163,6 +174,8 @@ export function KycFormWizard({ fields, kycSession, onComplete }: Props) {
 
   const handleBack = () => {
     if (currentStepIndex > 0) {
+      // Save form data to localStorage before moving back
+      saveDraft();
       setCurrentStepIndex(currentStepIndex - 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -316,10 +329,10 @@ export function KycFormWizard({ fields, kycSession, onComplete }: Props) {
                 <span className="text-muted-foreground">
                   {Math.round(progress)}% Complete
                 </span>
-                {Object.keys(formData).length > 0 && (
+                {filledFieldsCount > 0 && (
                   <span className="flex items-center gap-1.5 text-xs text-green-600">
                     <Save className="h-3 w-3" />
-                    Auto-saved
+                    {filledFieldsCount}/{totalFieldsCount} filled
                   </span>
                 )}
               </div>
