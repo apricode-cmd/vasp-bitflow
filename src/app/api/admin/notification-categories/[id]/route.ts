@@ -23,8 +23,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await requireAdminRole('ADMIN');
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminRole('ADMIN');
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     const category = await prisma.notificationEventCategory.findUnique({
       where: { id: params.id },
@@ -89,8 +90,9 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await requireAdminRole('SUPER_ADMIN');
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminRole('SUPER_ADMIN');
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     const body = await request.json();
     const validated = updateCategorySchema.parse(body);
@@ -187,8 +189,9 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await requireAdminRole('SUPER_ADMIN');
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminRole('SUPER_ADMIN');
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     // Check if category exists
     const existing = await prisma.notificationEventCategory.findUnique({

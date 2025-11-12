@@ -28,8 +28,9 @@ const inviteAdminSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     // Only SUPER_ADMIN can invite admins
-    const session = await requireAdminRole('SUPER_ADMIN');
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminRole('SUPER_ADMIN');
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     const body = await request.json();
     const validatedData = inviteAdminSchema.parse(body);

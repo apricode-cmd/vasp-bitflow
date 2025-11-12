@@ -23,9 +23,10 @@ const changePasswordSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireAdminRole('ADMIN');
-    if (session instanceof NextResponse) {
-      return session;
+    const authResult = await requireAdminRole('ADMIN');
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    const { session } = authResult;
     }
 
     const userId = session.user.id;

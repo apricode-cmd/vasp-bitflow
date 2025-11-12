@@ -17,9 +17,10 @@ export async function DELETE(
 ): Promise<NextResponse> {
   try {
     // Check admin permission
-    const session = await requireAdminRole('ADMIN');
-    if (session instanceof NextResponse) {
-      return session;
+    const authResult = await requireAdminRole('ADMIN');
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    const { session } = authResult;
     }
 
     const { id } = await params;

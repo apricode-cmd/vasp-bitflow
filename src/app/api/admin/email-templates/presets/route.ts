@@ -14,8 +14,9 @@ import { join } from 'path';
 // GET /api/admin/email-templates/presets - List presets
 export async function GET(request: NextRequest) {
   try {
-    const session = await requireAdminRole('ADMIN');
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminRole('ADMIN');
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     // Read presets from JSON file
     const presetsPath = join(process.cwd(), 'src/lib/email-templates/presets.json');
@@ -45,8 +46,9 @@ export async function GET(request: NextRequest) {
 // POST /api/admin/email-templates/presets - Import preset
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireAdminRole('ADMIN');
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminRole('ADMIN');
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     const body = await request.json();
     const { presetKey } = body;

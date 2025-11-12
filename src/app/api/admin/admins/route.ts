@@ -11,8 +11,9 @@ import { requireAdminRole } from '@/lib/middleware/admin-auth';
 export async function GET(request: NextRequest) {
   try {
     // Only SUPER_ADMIN can list all admins
-    const session = await requireAdminRole('SUPER_ADMIN');
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminRole('SUPER_ADMIN');
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     // Get all admins with their details
     const admins = await prisma.admin.findMany({

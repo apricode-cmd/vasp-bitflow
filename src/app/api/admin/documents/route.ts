@@ -14,9 +14,10 @@ import { lexicalToHtml, lexicalToPlainText } from '@/lib/utils/lexical-to-html';
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await requireAdminAuth();
-    if (session instanceof NextResponse) {
-      return session;
+    const authResult = await requireAdminAuth();
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    const { session } = authResult;
     }
 
     // Parse query parameters
@@ -120,9 +121,10 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireAdminAuth();
-    if (session instanceof NextResponse) {
-      return session;
+    const authResult = await requireAdminAuth();
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    const { session } = authResult;
     }
 
     const body = await request.json();

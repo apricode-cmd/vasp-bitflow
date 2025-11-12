@@ -13,8 +13,9 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await requireAdminAuth();
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminAuth();
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     const auditLogId = params.id;
 

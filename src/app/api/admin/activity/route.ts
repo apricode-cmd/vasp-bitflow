@@ -13,8 +13,9 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await requireAdminAuth();
-  if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminAuth();
+  if (authResult instanceof NextResponse) return authResult;
+  const { session } = authResult;
 
     if (!session?.user?.id) {
       return NextResponse.json(

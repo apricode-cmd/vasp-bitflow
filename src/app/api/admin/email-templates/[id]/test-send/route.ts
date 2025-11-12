@@ -21,8 +21,9 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await requireAdminRole('ADMIN');
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminRole('ADMIN');
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     const body = await request.json();
     const { recipientEmail, testData = {} } = testSendSchema.parse(body);

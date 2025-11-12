@@ -23,8 +23,9 @@ export async function GET(
   { params }: { params: { code: string } }
 ) {
   try {
-    const session = await requireAdminRole('SUPER_ADMIN');
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminRole('SUPER_ADMIN');
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     const role = await permissionService.getRoleDetails(params.code);
 
@@ -53,8 +54,9 @@ export async function PUT(
   { params }: { params: { code: string } }
 ) {
   try {
-    const session = await requireAdminRole('SUPER_ADMIN');
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminRole('SUPER_ADMIN');
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     const body = await request.json();
     const validatedData = updateRoleSchema.parse(body);
@@ -124,8 +126,9 @@ export async function DELETE(
   { params }: { params: { code: string } }
 ) {
   try {
-    const session = await requireAdminRole('SUPER_ADMIN');
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminRole('SUPER_ADMIN');
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     // Check if role exists
     const role = await prisma.roleModel.findUnique({

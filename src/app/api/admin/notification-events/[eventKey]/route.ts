@@ -35,8 +35,9 @@ export async function GET(
   { params }: { params: { eventKey: string } }
 ) {
   try {
-    const session = await requireAdminRole('ADMIN');
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminRole('ADMIN');
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     const event = await prisma.notificationEvent.findUnique({
       where: { eventKey: params.eventKey },
@@ -100,8 +101,9 @@ export async function PATCH(
   { params }: { params: { eventKey: string } }
 ) {
   try {
-    const session = await requireAdminRole('ADMIN');
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminRole('ADMIN');
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     const body = await request.json();
     const validatedData = updateEventSchema.parse(body);
@@ -191,8 +193,9 @@ export async function DELETE(
   { params }: { params: { eventKey: string } }
 ) {
   try {
-    const session = await requireAdminRole('SUPER_ADMIN'); // Only super admin can delete
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminRole('SUPER_ADMIN'); // Only super admin can delete
+    if (authResult instanceof NextResponse) return authResult; // Only super admin can delete
+    const { session } = authResult;
 
     // Check if event exists
     const existing = await prisma.notificationEvent.findUnique({

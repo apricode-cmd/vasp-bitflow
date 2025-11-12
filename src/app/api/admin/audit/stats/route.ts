@@ -14,8 +14,9 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await requireAdminPermission('audit', 'read');
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminPermission('audit', 'read');
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     const { searchParams } = new URL(request.url);
 

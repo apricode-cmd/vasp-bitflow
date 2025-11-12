@@ -12,8 +12,9 @@ import { getEmailUrls } from '@/lib/utils/email-urls';
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireAdminRole('ADMIN');
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminRole('ADMIN');
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     const body = await request.json();
     const { to, from, templateKey, testData } = body;
@@ -112,8 +113,9 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await requireAdminRole('ADMIN');
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminRole('ADMIN');
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     const templates = await prisma.emailTemplate.findMany({
       where: {

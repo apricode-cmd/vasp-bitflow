@@ -13,8 +13,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await requireAdminAuth();
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminAuth();
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     const document = await prisma.legalDocument.findUnique({
       where: { id: params.id },
@@ -49,8 +50,9 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await requireAdminAuth();
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminAuth();
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     // Check if document exists
     const existing = await prisma.legalDocument.findUnique({
@@ -140,8 +142,9 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await requireAdminAuth();
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminAuth();
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     // Check if document exists
     const existing = await prisma.legalDocument.findUnique({

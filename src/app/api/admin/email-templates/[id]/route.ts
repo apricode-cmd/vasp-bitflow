@@ -30,8 +30,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await requireAdminRole('ADMIN');
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminRole('ADMIN');
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     const template = await prisma.emailTemplate.findUnique({
       where: { id: params.id }
@@ -86,8 +87,9 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await requireAdminRole('ADMIN');
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminRole('ADMIN');
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     const body = await request.json();
     const validatedData = updateTemplateSchema.parse(body);
@@ -151,8 +153,9 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await requireAdminRole('SUPER_ADMIN'); // Only super admin can delete
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminRole('SUPER_ADMIN'); // Only super admin can delete
+    if (authResult instanceof NextResponse) return authResult; // Only super admin can delete
+    const { session } = authResult;
 
     // Check if template exists
     const existing = await prisma.emailTemplate.findUnique({

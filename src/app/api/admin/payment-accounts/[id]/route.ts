@@ -69,8 +69,9 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const session = await requireAdminRole('ADMIN');
-  if (session instanceof NextResponse) return session;
+  const authResult = await requireAdminRole('ADMIN');
+  if (authResult instanceof NextResponse) return authResult;
+  const { session } = authResult;
 
   try {
     const body = await request.json();
@@ -152,8 +153,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const session = await requireAdminRole('ADMIN');
-  if (session instanceof NextResponse) return session;
+  const authResult = await requireAdminRole('ADMIN');
+  if (authResult instanceof NextResponse) return authResult;
+  const { session } = authResult;
 
   try {
     // Check if account exists

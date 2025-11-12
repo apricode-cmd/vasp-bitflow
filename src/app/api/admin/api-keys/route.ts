@@ -45,9 +45,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     // Check admin permission
-    const session = await requireAdminRole('ADMIN');
-    if (session instanceof NextResponse) {
-      return session;
+    const authResult = await requireAdminRole('ADMIN');
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    const { session } = authResult;
     }
 
     const body = await request.json();

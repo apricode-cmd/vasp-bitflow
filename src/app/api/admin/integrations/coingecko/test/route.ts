@@ -11,13 +11,9 @@ import { coinGeckoService } from '@/lib/services/coingecko';
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     // Check admin authentication
-    const session = await requireAdminRole('ADMIN');
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const authResult = await requireAdminRole('ADMIN');
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     console.log('🧪 Testing CoinGecko API connection...');
 

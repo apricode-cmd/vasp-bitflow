@@ -15,8 +15,9 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await requireAdminRole('SUPER_ADMIN');
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminRole('SUPER_ADMIN');
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     const adminId = params.id;
 

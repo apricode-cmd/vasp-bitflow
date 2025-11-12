@@ -10,8 +10,9 @@ import { stepUpMfaService } from '@/lib/services/step-up-mfa.service';
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireAdminAuth();
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminAuth();
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     const body = await request.json();
     const { action, resourceType, resourceId, metadata } = body;

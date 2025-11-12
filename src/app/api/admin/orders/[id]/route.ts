@@ -19,9 +19,10 @@ interface RouteContext {
 
 export async function PATCH(request: NextRequest, { params }: RouteContext): Promise<NextResponse> {
   // Check admin authorization
-  const session = await requireAdminRole('ADMIN');
-  if (session instanceof NextResponse) {
-    return session;
+  const authResult = await requireAdminRole('ADMIN');
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  const { session } = authResult;
   }
 
   try {
@@ -234,9 +235,10 @@ export async function DELETE(
 ): Promise<NextResponse> {
   try {
     // Check admin authorization
-    const session = await requireAdminRole('ADMIN');
-    if (session instanceof NextResponse) {
-      return session;
+    const authResult = await requireAdminRole('ADMIN');
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    const { session } = authResult;
     }
 
     const { id } = params;

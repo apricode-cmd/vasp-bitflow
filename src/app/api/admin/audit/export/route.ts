@@ -11,8 +11,9 @@ import { userAuditLogService, type UserAuditLogFilters } from '@/lib/services/us
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await requireAdminPermission('audit', 'export');
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminPermission('audit', 'export');
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     const { searchParams } = new URL(request.url);
 

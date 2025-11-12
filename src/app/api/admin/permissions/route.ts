@@ -10,8 +10,9 @@ import { permissionService } from '@/lib/services/permission.service';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await requireAdminAuth();
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminAuth();
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     // Get admin permissions
     const permissions = await permissionService.getAdminPermissions(session.user.id);

@@ -11,10 +11,12 @@ import { auditService } from '@/lib/services/audit.service';
 
 export async function GET(request: Request): Promise<NextResponse> {
   // Check admin authorization
-  const session = await requireAdminAuth();
+  const authResult = await requireAdminAuth();
   
-  if (session instanceof NextResponse) {
-    return session; // Return 401 error
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  
+  const { session } = authResult; // Return 401 error
   }
 
   try {

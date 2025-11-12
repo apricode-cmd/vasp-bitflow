@@ -24,9 +24,10 @@ const querySchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     // Require admin authentication
-    const session = await requireAdminAuth();
-    if (session instanceof NextResponse) {
-      return session;
+    const authResult = await requireAdminAuth();
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    const { session } = authResult;
     }
 
     // Parse and validate query parameters

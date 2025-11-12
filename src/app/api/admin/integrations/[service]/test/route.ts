@@ -15,12 +15,15 @@ export async function POST(
   try {
     // Check admin authentication (custom JWT-based auth)
     console.log('🔐 Checking admin auth for integration test...');
-    const session = await requireAdminRole('ADMIN');
+    const authResult = await requireAdminRole('ADMIN');
     
     // If session is NextResponse, it's an error (401/403)
-    if (session instanceof NextResponse) {
+    if (authResult instanceof NextResponse) {
       console.error('❌ Admin auth failed');
-      return session;
+      return authResult;
+    
+    // If session is NextResponse, it's an error (401/403)
+    const { session } = authResult;
     }
 
     console.log('✅ Admin auth passed, user:', session.user.email, 'id:', session.user.id);

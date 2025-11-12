@@ -11,8 +11,9 @@ import type { AuthenticationResponseJSON } from '@simplewebauthn/types';
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireAdminAuth();
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminAuth();
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     const body = await request.json();
     const { challengeId, response } = body;

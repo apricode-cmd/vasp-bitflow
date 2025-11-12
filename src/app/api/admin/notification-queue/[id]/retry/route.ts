@@ -13,8 +13,9 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await requireAdminRole('ADMIN');
-    if (session instanceof NextResponse) return session;
+    const authResult = await requireAdminRole('ADMIN');
+    if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     // Get queue item
     const queueItem = await prisma.notificationQueue.findUnique({

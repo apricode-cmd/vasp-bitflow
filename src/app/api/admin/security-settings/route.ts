@@ -35,9 +35,10 @@ const securitySettingsSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await requireAdminRole('ADMIN');
-    if (session instanceof NextResponse) {
-      return session;
+    const authResult = await requireAdminRole('ADMIN');
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    const { session } = authResult;
     }
 
     const adminId = session.user.id;
@@ -77,9 +78,10 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await requireAdminRole('ADMIN');
-    if (session instanceof NextResponse) {
-      return session;
+    const authResult = await requireAdminRole('ADMIN');
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    const { session } = authResult;
     }
 
     const adminId = session.user.id;
