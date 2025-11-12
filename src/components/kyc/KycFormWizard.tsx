@@ -171,40 +171,75 @@ export function KycFormWizard({ fields, kycSession, onComplete }: Props) {
   const handleSubmit = async () => {
     setIsSaving(true);
     try {
-      // Validate all fields one more time
-      const allRequiredFields = fields.filter(f => f.isRequired && f.isEnabled);
-      const missingFields: string[] = [];
+      console.log('📝 Submitting KYC form...');
+      
+      // Step 1: Save profile data (basic fields)
+      console.log('1️⃣ Saving profile data...');
+      const profileData = {
+        firstName: formData.first_name || formData.firstName || formData.given_name,
+        lastName: formData.last_name || formData.lastName || formData.surname,
+        phoneNumber: formData.phone || formData.mobile_phone || formData.phone_number,
+        phoneCountry: formData.phone_country,
+        country: formData.address_country || formData.country,
+        city: formData.address_city || formData.city,
+        address: formData.address_street || formData.address,
+        postalCode: formData.address_postal || formData.postal_code || formData.zip_code,
+        dateOfBirth: formData.date_of_birth || formData.dateOfBirth || formData.dob || null,
+        placeOfBirth: formData.place_of_birth || formData.placeOfBirth || formData.birth_place || null,
+        nationality: formData.nationality || formData.citizenship || null,
+      };
 
-      allRequiredFields.forEach(field => {
-        if (!formData[field.fieldName]) {
-          missingFields.push(field.label);
-        }
+      const profileResponse = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profileData)
       });
 
-      if (missingFields.length > 0) {
-        toast.error(`Please fill in all required fields: ${missingFields.join(', ')}`);
-        setIsSaving(false);
-        return;
+      if (!profileResponse.ok) {
+        const profileError = await profileResponse.json();
+        throw new Error(profileError.error || 'Failed to save profile data');
+      }
+      
+      console.log('✅ Profile saved');
+
+      // Step 2: Start KYC verification (creates session with provider)
+      console.log('2️⃣ Starting KYC verification...');
+      const kycStartResponse = await fetch('/api/kyc/start', {
+        method: 'POST'
+      });
+
+      const kycStartData = await kycStartResponse.json();
+      
+      if (!kycStartData.success) {
+        throw new Error(kycStartData.error || 'Failed to start KYC verification');
       }
 
-      // Submit to API
-      const response = await fetch('/api/kyc/submit-form', {
+      console.log('✅ KYC session created with provider:', kycStartData.kycProviderId || 'N/A');
+
+      // Step 3: Save ALL form data to KycFormData
+      console.log('3️⃣ Saving form data...');
+      const formDataResponse = await fetch('/api/kyc/submit-form', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ formData })
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        toast.success('KYC form submitted successfully!');
-        onComplete();
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.error || 'Failed to submit KYC form');
+      if (!formDataResponse.ok) {
+        const formDataError = await formDataResponse.json();
+        throw new Error(formDataError.error || 'Failed to save form data');
       }
-    } catch (error) {
-      console.error('Error submitting KYC:', error);
-      toast.error('An error occurred. Please try again.');
+
+      const savedData = await formDataResponse.json();
+      console.log('✅ Form data saved:', savedData);
+
+      toast.success('KYC form submitted successfully! Now complete identity verification.');
+      
+      // Call onComplete to refresh status and show verification screen
+      onComplete();
+      
+    } catch (error: any) {
+      console.error('❌ Failed to submit form:', error);
+      toast.error(error.message || 'Failed to submit form');
     } finally {
       setIsSaving(false);
     }
