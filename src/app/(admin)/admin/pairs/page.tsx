@@ -74,6 +74,9 @@ export default function TradingPairsPage(): JSX.Element {
   // Delete confirmation dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [pairToDelete, setPairToDelete] = React.useState<string | null>(null);
+  
+  // Filter state
+  const [showInactive, setShowInactive] = React.useState(false);
 
   // Form state
   const [formData, setFormData] = React.useState({
@@ -260,6 +263,14 @@ export default function TradingPairsPage(): JSX.Element {
     }
   };
 
+  // Filter pairs based on showInactive toggle
+  const filteredPairs = React.useMemo(() => {
+    if (showInactive) {
+      return pairs; // Show all pairs
+    }
+    return pairs.filter(p => p.isActive); // Show only active pairs
+  }, [pairs, showInactive]);
+
   const columns: ColumnDef<TradingPair>[] = [
     {
       accessorKey: 'pair',
@@ -361,9 +372,23 @@ export default function TradingPairsPage(): JSX.Element {
         </Button>
       </div>
 
+      <div className="flex items-center gap-2 p-4 bg-muted/50 rounded-lg">
+        <Switch
+          id="show-inactive"
+          checked={showInactive}
+          onCheckedChange={setShowInactive}
+        />
+        <Label htmlFor="show-inactive" className="cursor-pointer">
+          Show inactive pairs ({pairs.filter(p => !p.isActive).length})
+        </Label>
+        <Badge variant="secondary" className="ml-auto">
+          {filteredPairs.length} / {pairs.length} pairs
+        </Badge>
+      </div>
+
       <DataTable
         columns={columns}
-        data={pairs}
+        data={filteredPairs}
         searchKey="pair"
         searchPlaceholder="Search pairs..."
         isLoading={isLoading}
@@ -386,7 +411,13 @@ export default function TradingPairsPage(): JSX.Element {
                 value={formData.cryptoCode}
                 onValueChange={(value) => setFormData({ ...formData, cryptoCode: value })}
                 placeholder="Select crypto..."
+                disabled={!!editingPair}
               />
+              {editingPair && (
+                <p className="text-xs text-muted-foreground">
+                  Cannot change currency codes when editing
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -396,7 +427,13 @@ export default function TradingPairsPage(): JSX.Element {
                 value={formData.fiatCode}
                 onValueChange={(value) => setFormData({ ...formData, fiatCode: value })}
                 placeholder="Select fiat..."
+                disabled={!!editingPair}
               />
+              {editingPair && (
+                <p className="text-xs text-muted-foreground">
+                  Cannot change currency codes when editing
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
