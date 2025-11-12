@@ -13,12 +13,15 @@ import { loginSchema } from '@/lib/validations/auth';
 import { verifyUserTotp } from '@/lib/services/totp.service';
 import { securityAuditService } from '@/lib/services/security-audit.service';
 
+console.log('🔐 [AUTH-CLIENT] Initializing NextAuth for CLIENT users...');
+
 export const { 
   handlers: clientHandlers, 
   signIn: clientSignIn, 
   signOut: clientSignOut, 
   auth: getClientSession 
 } = NextAuth({
+  debug: process.env.NODE_ENV === 'development',
   providers: [
     Credentials({
       credentials: {

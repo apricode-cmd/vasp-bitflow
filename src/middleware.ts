@@ -49,6 +49,15 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/api/auth') ||  // Client auth (NextAuth endpoints)
     path.startsWith('/api/admin/')  // Admin API (auth checked in each route)
   ) {
+    // Log NextAuth requests
+    if (path.startsWith('/api/auth')) {
+      console.log('🔐 [MIDDLEWARE] NextAuth request:', {
+        method: request.method,
+        path,
+        url: request.url
+      });
+    }
+    
     const response = NextResponse.next({
       request: {
         headers: requestHeaders,
