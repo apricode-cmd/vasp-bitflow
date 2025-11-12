@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireApiKey, logApiRequest } from '@/lib/middleware/api-auth';
 import { prisma } from '@/lib/prisma';
-import { kycService } from '@/lib/services/kyc.service';
+import { startKycVerification } from '@/lib/services/kyc.service';
 import { z } from 'zod';
 
 const initiateKycSchema = z.object({
@@ -102,7 +102,7 @@ export async function POST(
 
     // Start KYC verification
     try {
-      const kycSession = await kycService.startVerification(userId);
+      const kycSession = await startKycVerification(userId);
 
       const responseTime = Date.now() - startTime;
       await logApiRequest(apiKey.id, request, 201, responseTime);

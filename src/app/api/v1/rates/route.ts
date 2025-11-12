@@ -8,6 +8,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireApiKey, logApiRequest } from '@/lib/middleware/api-auth';
 import { rateManagementService } from '@/lib/services/rate-management.service';
 
+// Force dynamic rendering (uses request.headers for auth)
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const startTime = Date.now();
 

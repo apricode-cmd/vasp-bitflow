@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/middleware/admin-auth';
+import { requireAdminAuth } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 
@@ -24,7 +24,7 @@ const querySchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     // Require admin authentication
-    const session = await requireAdmin();
+    const session = await requireAdminAuth();
     if (session instanceof NextResponse) {
       return session;
     }
