@@ -49,22 +49,9 @@ export function useSettings() {
 }
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-  // Preload settings from localStorage to prevent flash
-  const [settings, setSettings] = useState<PublicSettings>(() => {
-    if (typeof window === 'undefined') return {};
-    
-    const cached: PublicSettings = {};
-    const brandLogo = localStorage.getItem('brand-logo');
-    const brandLogoDark = localStorage.getItem('brand-logo-dark');
-    const brandName = localStorage.getItem('brand-name');
-    
-    if (brandLogo) cached.brandLogo = brandLogo;
-    if (brandLogoDark) cached.brandLogoDark = brandLogoDark;
-    if (brandName) cached.brandName = brandName;
-    
-    return cached;
-  });
+  const [settings, setSettings] = useState<PublicSettings>({});
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
   const fetchSettings = async () => {
     try {
@@ -83,14 +70,16 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         }
         
         // Cache logo URLs in localStorage for instant load
-        if (data.settings.brandLogo) {
-          localStorage.setItem('brand-logo', data.settings.brandLogo);
-        }
-        if (data.settings.brandLogoDark) {
-          localStorage.setItem('brand-logo-dark', data.settings.brandLogoDark);
-        }
-        if (data.settings.brandName) {
-          localStorage.setItem('brand-name', data.settings.brandName);
+        if (typeof window !== 'undefined') {
+          if (data.settings.brandLogo) {
+            localStorage.setItem('brand-logo', data.settings.brandLogo);
+          }
+          if (data.settings.brandLogoDark) {
+            localStorage.setItem('brand-logo-dark', data.settings.brandLogoDark);
+          }
+          if (data.settings.brandName) {
+            localStorage.setItem('brand-name', data.settings.brandName);
+          }
         }
       }
     } catch (error) {
@@ -101,6 +90,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const applyPrimaryColor = (hexColor: string) => {
+    if (typeof window === 'undefined') return;
+    
     try {
       const color = Color(hexColor);
       
@@ -123,14 +114,39 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // Preload color from localStorage to prevent flash
-    const savedColor = localStorage.getItem('brand-primary-color');
-    if (savedColor) {
-      applyPrimaryColor(savedColor);
+    setMounted(true);
+    
+    // Preload cached settings from localStorage
+    if (typeof window !== 'undefined') {
+      const cached: PublicSettings = {};
+      const brandLogo = localStorage.getItem('brand-logo');
+      const brandLogoDark = localStorage.getItem('brand-logo-dark');
+      const brandName = localStorage.getItem('brand-name');
+      const savedColor = localStorage.getItem('brand-primary-color');
+      
+      if (brandLogo) cached.brandLogo = brandLogo;
+      if (brandLogoDark) cached.brandLogoDark = brandLogoDark;
+      if (brandName) cached.brandName = brandName;
+      
+      // Apply cached settings immediately
+      if (Object.keys(cached).length > 0) {
+        setSettings(cached);
+      }
+      
+      // Apply cached color immediately
+      if (savedColor) {
+        applyPrimaryColor(savedColor);
+      }
     }
     
+    // Fetch fresh settings from server
     fetchSettings();
   }, []);
+  
+  // Prevent hydration mismatch by not rendering until mounted
+  if (!mounted) {
+    return <>{children}</>;
+  }
 
   return (
     <SettingsContext.Provider value={{ settings, loading, refresh: fetchSettings }}>

@@ -36,25 +36,9 @@ export function BrandLogo({
     setMounted(true);
   }, []);
 
-  if (!mounted) {
-    // During SSR, show light mode logo or fallback
-    if (settings.brandLogo && settings.brandLogo !== '/uploads/default_logo.svg') {
-      return (
-        <Image
-          src={settings.brandLogo}
-          alt={settings.brandName || 'Platform Logo'}
-          width={size}
-          height={size}
-          className={className || 'w-full h-full object-contain'}
-          priority={priority}
-        />
-      );
-    }
-    return <ApricodeLogo className={fallbackClassName} />;
-  }
-
-  // Select logo based on theme
-  const isDark = resolvedTheme === 'dark';
+  // Always return the same structure to prevent hydration mismatch
+  // Select logo based on theme (only after mounted)
+  const isDark = mounted && resolvedTheme === 'dark';
   const logoUrl = isDark && settings.brandLogoDark 
     ? settings.brandLogoDark 
     : settings.brandLogo;
@@ -69,6 +53,7 @@ export function BrandLogo({
         height={size}
         className={className || 'w-full h-full object-contain'}
         priority={priority}
+        key={logoUrl} // Force re-render when logo changes
       />
     );
   }
