@@ -31,7 +31,16 @@ export const {
       },
       async authorize(credentials) {
         try {
+          console.log('🔐 [AUTH-CLIENT] authorize called with:', {
+            hasEmail: !!credentials?.email,
+            hasPassword: !!credentials?.password,
+            has2FA: !!credentials?.twoFactorCode,
+            emailType: typeof credentials?.email,
+            emailPreview: typeof credentials?.email === 'string' ? credentials.email.substring(0, 20) : 'not-string'
+          });
+
           if (!credentials?.email || !credentials?.password) {
+            console.log('❌ [AUTH-CLIENT] Missing email or password');
             return null;
           }
 
@@ -141,7 +150,11 @@ export const {
             role: user.role
           };
         } catch (error: any) {
-          console.error('Client auth error:', error);
+          console.error('❌ [AUTH-CLIENT] Authorization error:', {
+            message: error?.message,
+            name: error?.name,
+            stack: error?.stack?.split('\n')[0]
+          });
           return null;
         }
       }
