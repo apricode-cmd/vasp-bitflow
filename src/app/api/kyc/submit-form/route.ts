@@ -39,12 +39,11 @@ export async function POST(request: NextRequest) {
     if (!kycSession) {
       console.log('⚠️ No KYC session found, creating one automatically...');
       
-      // Create KYC session automatically
+      // Create KYC session automatically (without provider - will be set later)
       kycSession = await prisma.kycSession.create({
         data: {
           userId: session.user.id,
           status: 'PENDING',
-          provider: 'manual', // Will be updated when provider is selected
           metadata: {
             createdVia: 'form-submit',
             createdAt: new Date().toISOString()

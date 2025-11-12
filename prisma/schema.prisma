@@ -778,11 +778,17 @@ model KycFormField {
   validation Json?
   options    Json?
   priority   Int      @default(0)
+  
+  // Conditional logic (Phase 2)
+  dependsOn  String?  // Parent field name (e.g., 'pep_status', 'employment_status')
+  showWhen   Json?    // Condition object: {"operator": "!=", "value": "NO"}
+  
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   @@index([category])
   @@index([isEnabled])
+  @@index([dependsOn])
 }
 
 model KycDocument {
