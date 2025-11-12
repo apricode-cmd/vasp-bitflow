@@ -59,15 +59,28 @@ export function KycStatusCard({ kycSession, onRefresh, userId }: Props) {
     if (kycSession.kycProviderId === 'sumsub' && session?.user?.id) {
       const fetchMobileLink = async () => {
         try {
+          console.log('📱 Fetching Sumsub mobile link...');
           const response = await fetch('/api/kyc/mobile-link');
+          
           if (response.ok) {
             const data = await response.json();
-            if (data.url) {
-              setSumsubMobileUrl(data.url);
+            console.log('✅ Sumsub mobile link received:', data);
+            
+            if (data.mobileUrl) {
+              setSumsubMobileUrl(data.mobileUrl);
+              console.log('🔗 Mobile URL set:', data.mobileUrl);
+            } else {
+              console.error('❌ No mobileUrl in response:', data);
+              toast.error('Failed to generate mobile link');
             }
+          } else {
+            const errorData = await response.json();
+            console.error('❌ Failed to fetch mobile link:', errorData);
+            toast.error('Failed to generate QR code');
           }
         } catch (error) {
-          console.error('Failed to fetch Sumsub mobile link:', error);
+          console.error('❌ Exception fetching Sumsub mobile link:', error);
+          toast.error('Failed to load QR code');
         }
       };
       fetchMobileLink();
