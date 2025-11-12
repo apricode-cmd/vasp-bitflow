@@ -7,6 +7,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { KycField } from './KycField';
 import { KycField as KycFieldType, KYC_CATEGORIES, getFieldsForStep, KycStep } from '@/lib/kyc/config';
+import { shouldShowField } from '@/lib/kyc/conditionalLogic';
 import { Badge } from '@/components/ui/badge';
 import * as Icons from 'lucide-react';
 
@@ -20,7 +21,10 @@ interface Props {
 
 export function KycFormStep({ step, fields, formData, errors, onChange }: Props) {
   // Get fields for this step (only enabled, sorted by priority)
-  const stepFields = getFieldsForStep(step, fields);
+  const allStepFields = getFieldsForStep(step, fields);
+  
+  // Filter by conditional logic
+  const stepFields = allStepFields.filter(field => shouldShowField(field, formData));
 
   return (
     <Card>

@@ -31,17 +31,28 @@ export async function POST(request: NextRequest) {
     console.log('📝 Saving KYC form data for user:', session.user.id);
     console.log('📊 Total fields to save:', Object.keys(formData).length);
 
-    // Get existing KYC session (it should exist from /api/kyc/start)
+    // Get existing KYC session or create one
     let kycSession = await prisma.kycSession.findUnique({
       where: { userId: session.user.id }
     });
 
     if (!kycSession) {
-      console.log('⚠️ No KYC session found, this should not happen!');
-      return NextResponse.json(
-        { error: 'KYC session not found. Please start verification first.' },
-        { status: 400 }
-      );
+      console.log('⚠️ No KYC session found, creating one automatically...');
+      
+      // Create KYC session automatically
+      kycSession = await prisma.kycSession.create({
+        data: {
+          userId: session.user.id,
+          status: 'PENDING',
+          provider: 'manual', // Will be updated when provider is selected
+          metadata: {
+            createdVia: 'form-submit',
+            createdAt: new Date().toISOString()
+          }
+        }
+      });
+      
+      console.log('✅ Created KYC session:', kycSession.id);
     }
 
     console.log('📋 Using existing KYC Session ID:', kycSession.id);

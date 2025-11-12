@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 import { KycField } from '@/lib/kyc/config';
+import { shouldShowField, isFieldConditionallyRequired } from '@/lib/kyc/conditionalLogic';
 import { toast } from 'sonner';
 
 interface UseKycFormReturn {
@@ -123,8 +124,12 @@ export function useKycForm(initialData: Record<string, any> = {}): UseKycFormRet
     let isValid = true;
     const newErrors: Record<string, string> = {};
 
-    fields.forEach(field => {
-      if (!validateField(field)) {
+    // Only validate visible fields
+    const visibleFields = fields.filter(field => shouldShowField(field, formData));
+
+    visibleFields.forEach(field => {
+      const isRequired = isFieldConditionallyRequired(field, formData);
+      if (isRequired && !validateField(field)) {
         isValid = false;
       }
     });
