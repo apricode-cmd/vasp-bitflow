@@ -30,7 +30,21 @@ postgres://postgres.rltqjdujiacriilmijpz:sYWtAE9nQNkViy3E@aws-1-eu-central-1.poo
 
 ---
 
-### 2. NextAuth (REQUIRED)
+### 2. Encryption (REQUIRED)
+
+```bash
+ENCRYPTION_SECRET
+```
+**Value:**
+```
+4b4a42b82eba6bc3c5431f9082161758f6f102a9f7d2bcf7d12ba0950e2ec912
+```
+
+**Important:** Required for encrypting TOTP secrets and API keys. Must be at least 32 characters.
+
+---
+
+### 3. NextAuth (REQUIRED)
 
 ```bash
 NEXTAUTH_URL
@@ -59,7 +73,7 @@ openssl rand -base64 32
 
 ---
 
-### 3. WebAuthn / Passkey (REQUIRED for Admin)
+### 4. WebAuthn / Passkey (REQUIRED for Admin)
 
 ```bash
 RP_NAME
