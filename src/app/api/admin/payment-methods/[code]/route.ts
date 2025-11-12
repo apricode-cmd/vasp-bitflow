@@ -1,5 +1,6 @@
 /**
  * Payment Method by Code API
+ * GET: Get single payment method
  * PUT: Update payment method
  * DELETE: Delete payment method
  */
@@ -11,6 +12,66 @@ import { updatePaymentMethodSchema } from '@/lib/validations/payment-method';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { code: string } }
+): Promise<NextResponse> {
+  try {
+    // Check admin permission
+    const sessionOrError = await requireAdminRole('ADMIN');
+    if (sessionOrError instanceof NextResponse) {
+      return sessionOrError;
+    }
+
+    // Get payment method with full details
+    const method = await prisma.paymentMethod.findUnique({
+      where: { code: params.code },
+      include: {
+        paymentAccount: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            type: true,
+          },
+        },
+        _count: {
+          select: {
+            orders: true,
+            payIns: true,
+            payOuts: true,
+          },
+        },
+      },
+    });
+
+    if (!method) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Payment method not found'
+        },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: method
+    });
+  } catch (error) {
+    console.error('Get payment method error:', error);
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Failed to fetch payment method'
+      },
+      { status: 500 }
+    );
+  }
+}
 
 export async function PUT(
   request: NextRequest,
