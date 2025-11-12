@@ -82,6 +82,41 @@ export interface KycDocumentVerification {
   errors?: string[];
 }
 
+/**
+ * Document metadata for upload
+ */
+export interface KycDocumentMetadata {
+  idDocType: 'PASSPORT' | 'ID_CARD' | 'UTILITY_BILL' | 'UTILITY_BILL2' | 'SELFIE' | 'DRIVERS';
+  country: string; // ISO-3 code (e.g., "POL", "USA")
+  idDocSubType?: 'FRONT_SIDE' | 'BACK_SIDE'; // For two-sided documents
+  number?: string; // Document number
+  issuedDate?: string; // Format: YYYY-MM-DD
+  validUntil?: string; // Format: YYYY-MM-DD
+  placeOfBirth?: string;
+  dob?: string; // Format: YYYY-MM-DD
+}
+
+/**
+ * Document upload result
+ */
+export interface KycDocumentUploadResult {
+  success: boolean;
+  documentId?: string;
+  imageIds?: string[];
+  status?: string;
+  warnings?: any[];
+  error?: string;
+}
+
+/**
+ * Required documents check result
+ */
+export interface KycRequiredDocsCheck {
+  ready: boolean;
+  missing: string[];
+  error?: string;
+}
+
 // ==========================================
 // KYC PROVIDER INTERFACE
 // ==========================================
@@ -138,5 +173,36 @@ export interface IKycProvider extends IIntegrationProvider {
    * Verify document liveness/authenticity (AI check)
    */
   verifyDocumentLiveness?(documentUrl: string): Promise<KycDocumentVerification>;
+
+  /**
+   * Upload document directly to KYC provider
+   * 
+   * @param applicantId - Provider's applicant ID
+   * @param file - File buffer or Blob
+   * @param fileName - Original file name
+   * @param metadata - Document metadata (type, country, etc.)
+   * @param returnWarnings - Return validation warnings (default: true)
+   */
+  uploadDocument?(
+    applicantId: string,
+    file: Buffer | Blob,
+    fileName: string,
+    metadata: KycDocumentMetadata,
+    returnWarnings?: boolean
+  ): Promise<KycDocumentUploadResult>;
+
+  /**
+   * Submit applicant for review after documents uploaded
+   * 
+   * @param applicantId - Provider's applicant ID
+   */
+  submitForReview?(applicantId: string): Promise<{ success: boolean; error?: string }>;
+
+  /**
+   * Check if all required documents are uploaded
+   * 
+   * @param applicantId - Provider's applicant ID
+   */
+  checkRequiredDocuments?(applicantId: string): Promise<KycRequiredDocsCheck>;
 }
 

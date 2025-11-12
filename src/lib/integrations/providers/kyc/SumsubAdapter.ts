@@ -820,6 +820,212 @@ export class SumsubAdapter implements IKycProvider {
       extractedData: {}
     };
   }
+
+  /**
+   * Upload document directly to Sumsub API
+   * POST /resources/applicants/{applicantId}/info/idDoc
+   */
+  async uploadDocument(
+    applicantId: string,
+    file: Buffer | Blob,
+    fileName: string,
+    metadata: any,
+    returnWarnings: boolean = true
+  ): Promise<any> {
+    try {
+      if (!this.isConfigured()) {
+        throw new Error('Sumsub provider not configured');
+      }
+
+      const path = `/resources/applicants/${applicantId}/info/idDoc`;
+      const method = 'POST';
+      const ts = Math.floor(Date.now() / 1000).toString();
+
+      // For multipart/form-data, signature is calculated without body
+      const signature = this.buildSignature(ts, method, path, '');
+
+      // Prepare FormData
+      const FormData = require('form-data');
+      const formData = new FormData();
+      
+      // Add metadata as JSON string
+      formData.append('metadata', JSON.stringify(metadata));
+      
+      // Add file content
+      if (Buffer.isBuffer(file)) {
+        formData.append('content', file, { filename: fileName });
+      } else {
+        // Blob (browser File object) - convert to buffer first
+        const arrayBuffer = await (file as Blob).arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        formData.append('content', buffer, { filename: fileName });
+      }
+
+      // Prepare headers
+      const headers: any = {
+        'X-App-Token': this.config.appToken!,
+        'X-App-Access-Sig': signature,
+        'X-App-Access-Ts': ts,
+        ...formData.getHeaders()
+      };
+
+      if (returnWarnings) {
+        headers['X-Return-Doc-Warnings'] = 'true';
+      }
+
+      // Make request
+      const url = `${this.baseUrl}${path}`;
+      console.log('📤 [SUMSUB] Uploading document:', {
+        applicantId,
+        fileName,
+        metadata,
+        url
+      });
+
+      const response = await fetch(url, {
+        method,
+        headers,
+        body: formData
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        console.error('❌ [SUMSUB] Upload failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          data: responseData
+        });
+
+        return {
+          success: false,
+          error: responseData.description || responseData.message || `Upload failed: ${response.status}`
+        };
+      }
+
+      console.log('✅ [SUMSUB] Document uploaded:', responseData);
+
+      return {
+        success: true,
+        documentId: responseData.documentId,
+        imageIds: responseData.imageIds || [],
+        status: responseData.reviewStatus,
+        warnings: responseData.warnings || []
+      };
+
+    } catch (error: any) {
+      console.error('❌ [SUMSUB] Upload error:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to upload document'
+      };
+    }
+  }
+
+  /**
+   * Submit applicant for review
+   * POST /resources/applicants/{applicantId}/status/pending
+   */
+  async submitForReview(applicantId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      if (!this.isConfigured()) {
+        throw new Error('Sumsub provider not configured');
+      }
+
+      const path = `/resources/applicants/${applicantId}/status/pending`;
+      const method = 'POST';
+      
+      const { headers } = this.buildRequest(method, path);
+
+      const url = `${this.baseUrl}${path}`;
+      console.log('🚀 [SUMSUB] Submitting for review:', { applicantId, url });
+
+      const response = await fetch(url, {
+        method,
+        headers
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        console.error('❌ [SUMSUB] Submit failed:', responseData);
+        return {
+          success: false,
+          error: responseData.description || 'Failed to submit for review'
+        };
+      }
+
+      console.log('✅ [SUMSUB] Submitted for review:', responseData);
+      return { success: true };
+
+    } catch (error: any) {
+      console.error('❌ [SUMSUB] Submit error:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to submit for review'
+      };
+    }
+  }
+
+  /**
+   * Check if all required documents are uploaded
+   * GET /resources/applicants/{applicantId}/requiredIdDocsStatus
+   */
+  async checkRequiredDocuments(applicantId: string): Promise<any> {
+    try {
+      if (!this.isConfigured()) {
+        throw new Error('Sumsub provider not configured');
+      }
+
+      const path = `/resources/applicants/${applicantId}/requiredIdDocsStatus`;
+      const method = 'GET';
+      
+      const { headers } = this.buildRequest(method, path);
+
+      const url = `${this.baseUrl}${path}`;
+      const response = await fetch(url, {
+        method,
+        headers
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          ready: false,
+          missing: [],
+          error: data.description || 'Failed to check documents'
+        };
+      }
+
+      // Parse response - Sumsub returns structure like:
+      // { "IDENTITY": { "DOC_TYPE_1": "PRESENT", "DOC_TYPE_2": "NOT_PROVIDED" } }
+      const missingDocs: string[] = [];
+      
+      for (const [category, docs] of Object.entries(data)) {
+        if (typeof docs === 'object' && docs !== null) {
+          for (const [docType, status] of Object.entries(docs)) {
+            if (status === 'NOT_PROVIDED' || status === 'ABSENT') {
+              missingDocs.push(docType);
+            }
+          }
+        }
+      }
+
+      return {
+        ready: missingDocs.length === 0,
+        missing: missingDocs
+      };
+
+    } catch (error: any) {
+      console.error('❌ [SUMSUB] Check documents error:', error);
+      return {
+        ready: false,
+        missing: [],
+        error: error.message
+      };
+    }
+  }
 }
 
 // Export singleton instance
