@@ -11,8 +11,22 @@ import QRCode from 'qrcode';
 import { encrypt, decrypt } from './encryption.service';
 import { prisma } from '@/lib/prisma';
 
-const APP_NAME = 'Apricode Exchange';
 const TOTP_WINDOW = 1; // Allow 30 seconds before/after for clock drift
+
+/**
+ * Get platform name from settings for TOTP issuer
+ */
+async function getPlatformName(): Promise<string> {
+  try {
+    const setting = await prisma.systemSettings.findUnique({
+      where: { key: 'brandName' }
+    });
+    return setting?.value || 'Apricode Exchange';
+  } catch (error) {
+    console.error('Error fetching platform name for TOTP:', error);
+    return 'Apricode Exchange';
+  }
+}
 
 /**
  * Generate a new TOTP secret for a user
@@ -32,9 +46,10 @@ export function generateTotpSecret(): {
 /**
  * Generate TOTP instance
  */
-export function createTotpInstance(secret: string, userEmail: string): TOTP {
+export async function createTotpInstance(secret: string, userEmail: string): Promise<TOTP> {
+  const platformName = await getPlatformName();
   return new TOTP({
-    issuer: APP_NAME,
+    issuer: platformName,
     label: userEmail,
     algorithm: 'SHA1',
     digits: 6,
@@ -50,7 +65,7 @@ export async function generateQrCode(
   secret: string,
   userEmail: string
 ): Promise<string> {
-  const totp = createTotpInstance(secret, userEmail);
+  const totp = await createTotpInstance(secret, userEmail);
   const otpauthUrl = totp.toString();
   
   // Generate QR code as data URL
@@ -67,13 +82,13 @@ export async function generateQrCode(
 /**
  * Verify TOTP code
  */
-export function verifyTotpCode(
+export async function verifyTotpCode(
   secret: string,
   userEmail: string,
   code: string
-): boolean {
+): Promise<boolean> {
   try {
-    const totp = createTotpInstance(secret, userEmail);
+    const totp = await createTotpInstance(secret, userEmail);
     
     // Validate code (with time window for clock drift)
     const delta = totp.validate({
@@ -181,7 +196,7 @@ export async function verifyUserTotp(
   const secret = decrypt(twoFactorAuth.totpSecret);
   
   // 1. Try TOTP code first
-  const isTotpValid = verifyTotpCode(secret, userEmail, code);
+  const isTotpValid = await verifyTotpCode(secret, userEmail, code);
   
   if (isTotpValid) {
     return { success: true, message: 'TOTP code valid' };

@@ -20,6 +20,7 @@
 
 import { notificationService } from './notification.service';
 import type { NotificationChannel } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 
 export interface EventPayload {
   userId?: string;
@@ -35,6 +36,21 @@ export interface EmitOptions {
 }
 
 class EventEmitterService {
+  /**
+   * Get platform name from settings
+   */
+  private async getPlatformName(): Promise<string> {
+    try {
+      const setting = await prisma.systemSettings.findUnique({
+        where: { key: 'brandName' }
+      });
+      return setting?.value || 'Apricode Exchange';
+    } catch (error) {
+      console.error('Error fetching platform name:', error);
+      return 'Apricode Exchange';
+    }
+  }
+
   /**
    * Emit an event and trigger notifications
    */
@@ -52,7 +68,7 @@ class EventEmitterService {
       }
 
       // Generate notification content based on event
-      const notificationData = this.generateNotificationContent(eventKey, payload);
+      const notificationData = await this.generateNotificationContent(eventKey, payload);
 
       if (!notificationData) {
         console.warn(`⚠️ No notification content for event: ${eventKey}`);
@@ -85,15 +101,17 @@ class EventEmitterService {
   /**
    * Generate notification content based on event type
    */
-  private generateNotificationContent(
+  private async generateNotificationContent(
     eventKey: string,
     payload: EventPayload
-  ): {
+  ): Promise<{
     subject: string;
     message: string;
     data: Record<string, any>;
     actionUrl?: string;
-  } | null {
+  } | null> {
+    // Get platform name for dynamic branding
+    const platformName = await this.getPlatformName();
     switch (eventKey) {
       // ORDER EVENTS
       case 'ORDER_CREATED':
@@ -191,11 +209,12 @@ class EventEmitterService {
       // USER EVENTS
       case 'WELCOME_EMAIL':
         return {
-          subject: `Welcome to ${payload.platformName || 'Apricode Exchange'}!`,
+          subject: `Welcome to ${platformName}!`,
           message: `Welcome ${payload.userName}! We're excited to have you on board. Complete your KYC verification to start trading.`,
           data: {
             userId: payload.userId,
             userName: payload.userName,
+            platformName, // Add for email template
           },
           actionUrl: '/kyc',
         };
