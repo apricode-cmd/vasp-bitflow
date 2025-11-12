@@ -13,7 +13,7 @@ import { SettingsProvider } from '@/components/providers/settings-provider';
 
 export function Providers({ children }: { children: React.ReactNode }): React.ReactElement {
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
       {/* SessionProvider for CLIENT authentication only */}
       {/* Admin routes use separate layout without SessionProvider */}
       <SessionProvider basePath="/api/auth">

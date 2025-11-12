@@ -15,7 +15,7 @@ export default function AdminGroupLayout({
 }): React.ReactElement {
   return (
     <>
-      <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
         <SettingsProvider>
           {children}
         </SettingsProvider>
