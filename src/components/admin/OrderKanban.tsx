@@ -687,8 +687,10 @@ export function OrderKanban({
           </div>
         </Card>
 
-        {/* Kanban Board */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 min-h-[600px]">
+        {/* Kanban Board - Horizontal Scroll */}
+        <div className="relative">
+          <ScrollArea className="w-full">
+            <div className="flex gap-4 pb-4 min-h-[600px]">
       {KANBAN_COLUMNS.map((column) => {
         const columnOrders = getOrdersByStatus(column.id);
             const Icon = column.icon;
@@ -699,7 +701,7 @@ export function OrderKanban({
         return (
           <div
             key={column.id}
-                className={`flex flex-col rounded-xl border-2 transition-all duration-300 ${
+                className={`flex flex-col rounded-xl border-2 transition-all duration-300 w-[350px] flex-shrink-0 ${
                   isDragOver && isDropAllowed
                     ? `${column.color} border-dashed shadow-lg scale-[1.02]` 
                     : isDragOver && !isDropAllowed
@@ -804,75 +806,64 @@ export function OrderKanban({
                                     }
                                   }}
                                 >
-                                  <CardContent className="p-4 space-y-3">
-                                    {/* Selection Checkbox & Drag Handle */}
+                                  <CardContent className="p-3 space-y-2">
+                                    {/* Header: Ref + Actions */}
                                     <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-2">
+                                      <div className="flex items-center gap-1.5">
                                         <Checkbox
                                           checked={isSelected}
                                           onCheckedChange={() => toggleOrderSelection(order.id)}
                                           onClick={(e) => e.stopPropagation()}
                                           className="opacity-0 group-hover:opacity-100 transition-opacity"
                                         />
-                                        <GripVertical className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                                        <Badge variant="outline" className="font-mono text-xs">
+                                        <GripVertical className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0">
                                           #{order.paymentReference.slice(-6)}
                                         </Badge>
                                       </div>
-                                      <Eye className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                                      <Eye className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </div>
 
-                                    {/* User Info */}
-                                    <div className="flex items-center gap-3">
-                                      <Avatar className="h-9 w-9 border-2 border-background shadow-sm">
-                                        <AvatarFallback className="bg-gradient-primary text-white text-xs font-bold">
+                                    {/* User Info - Compact */}
+                                    <div className="flex items-center gap-2">
+                                      <Avatar className="h-7 w-7 border border-background">
+                                        <AvatarFallback className="bg-gradient-primary text-white text-[10px] font-bold">
                                           {userInitials}
                                         </AvatarFallback>
                                       </Avatar>
                                       <div className="flex-1 min-w-0">
-                                        <p className="font-semibold text-sm truncate">
+                                        <p className="font-semibold text-xs truncate">
                                           {order.user.profile?.firstName} {order.user.profile?.lastName}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground truncate">
-                                          {order.user.email}
                                         </p>
                                       </div>
                                     </div>
 
-                                    <Separator />
-
-                                    {/* Order Details */}
-                                    <div className="space-y-2">
+                                    {/* Amount & Total - Compact */}
+                                    <div className="space-y-1">
                                       <div className="flex items-center justify-between">
-                                        <span className="text-xs text-muted-foreground">Amount:</span>
-                                        <Badge variant="secondary" className="font-mono text-xs">
+                                        <Badge variant="secondary" className="font-mono text-[10px] px-1.5 py-0">
                                           {order.cryptoAmount} {order.currencyCode}
                                         </Badge>
-                                      </div>
-                                      <div className="flex items-center justify-between">
-                                        <span className="text-xs text-muted-foreground">Total:</span>
-                                        <span className="font-bold text-sm">
+                                        <span className="font-bold text-xs">
                                           {formatCurrency(order.totalFiat, order.fiatCurrencyCode)}
                                         </span>
                                       </div>
                                       {order.paymentMethod && (
                                         <div className="flex items-center justify-between">
-                                          <span className="text-xs text-muted-foreground">Payment:</span>
-                                          <Badge variant="outline" className="text-xs">
+                                          <span className="text-[10px] text-muted-foreground">Payment:</span>
+                                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                                             {order.paymentMethod.name}
                                           </Badge>
                                         </div>
                                       )}
                                     </div>
 
-                                    <Separator />
-
-                                    {/* Date */}
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    {/* Date - Compact */}
+                                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground pt-1 border-t">
                                       <Calendar className="h-3 w-3" />
-                      {formatDate(new Date(order.createdAt))}
-                    </div>
-                  </CardContent>
+                                      {formatDate(new Date(order.createdAt))}
+                                    </div>
+                                  </CardContent>
                 </Card>
                               </HoverCardTrigger>
                               <HoverCardContent className="w-80" side="right">
@@ -1047,7 +1038,9 @@ export function OrderKanban({
           </div>
         );
       })}
-    </div>
+            </div>
+          </ScrollArea>
+        </div>
 
         {/* Bulk Action Confirmation Dialog */}
         <AlertDialog open={bulkActionDialog.open} onOpenChange={(open) => setBulkActionDialog({ ...bulkActionDialog, open })}>

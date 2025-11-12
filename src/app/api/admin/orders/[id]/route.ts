@@ -9,6 +9,7 @@ import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { updateOrderStatusSchema } from '@/lib/validations/order';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
+import { eventEmitter } from '@/lib/services/event-emitter';
 import { z } from 'zod';
 
 interface RouteContext {
@@ -208,7 +209,39 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
       }
     );
 
-    // TODO: Send email notification to user about status change
+    // Send notification to user about status change
+    try {
+      const eventKeyMap: Record<string, string> = {
+        'PAYMENT_PENDING': 'ORDER_PAYMENT_RECEIVED',
+        'PAYMENT_RECEIVED': 'ORDER_PAYMENT_RECEIVED',
+        'COMPLETED': 'ORDER_COMPLETED',
+        'CANCELLED': 'ORDER_CANCELLED',
+        'REFUNDED': 'ORDER_REFUNDED'
+      };
+
+      const eventKey = eventKeyMap[newStatus];
+      
+      if (eventKey) {
+        await eventEmitter.emit(eventKey, {
+          userId: updatedOrder.userId,
+          orderId: updatedOrder.id,
+          orderReference: updatedOrder.paymentReference,
+          cryptoAmount: updatedOrder.cryptoAmount,
+          currencyCode: updatedOrder.currencyCode,
+          totalFiat: updatedOrder.totalFiat,
+          fiatCurrencyCode: updatedOrder.fiatCurrencyCode,
+          status: newStatus,
+          oldStatus: oldStatus,
+          transactionHash: updatedOrder.transactionHash,
+          walletAddress: updatedOrder.walletAddress,
+          adminNotes: validatedData.adminNotes
+        });
+        console.log(`✅ [NOTIFICATION] Sent ${eventKey} for order ${updatedOrder.id}`);
+      }
+    } catch (notifError) {
+      // Don't fail the request if notification fails
+      console.error('❌ [NOTIFICATION] Failed to send:', notifError);
+    }
 
     return NextResponse.json(updatedOrder);
   } catch (error) {

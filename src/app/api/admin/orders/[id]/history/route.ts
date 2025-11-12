@@ -19,10 +19,11 @@ export async function GET(
   { params }: RouteContext
 ): Promise<NextResponse> {
   // Check admin authorization
-  const sessionOrError = await requireAdminRole('ADMIN');
-  if (sessionOrError instanceof NextResponse) {
-    return sessionOrError;
+  const authResult = await requireAdminRole('ADMIN');
+  if (authResult instanceof NextResponse) {
+    return authResult;
   }
+  const { session } = authResult;
 
   try {
     // Check if order exists
