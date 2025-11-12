@@ -59,18 +59,48 @@ export function KycField({ field, value, onChange, error }: Props) {
         );
 
       case 'select':
-        const options = Array.isArray(field.options) ? field.options : [];
+        // Parse options - can be JSON string, array, or null
+        let options: string[] = [];
+        if (Array.isArray(field.options)) {
+          options = field.options;
+        } else if (field.options && typeof field.options === 'string') {
+          try {
+            const parsed = JSON.parse(field.options);
+            options = Array.isArray(parsed) ? parsed : [];
+          } catch {
+            console.warn(`Failed to parse options for ${field.fieldName}:`, field.options);
+            options = [];
+          }
+        } else if (field.options && typeof field.options === 'object') {
+          // Prisma Json type returns as object
+          options = Object.values(field.options).filter(v => typeof v === 'string');
+        }
+        
+        // Debug log
+        if (options.length === 0) {
+          console.warn(`⚠️ No options for select field: ${field.fieldName}`, {
+            rawOptions: field.options,
+            type: typeof field.options
+          });
+        }
+
         return (
-          <Select value={value || ''} onValueChange={onChange}>
+          <Select value={value || undefined} onValueChange={onChange}>
             <SelectTrigger className={error ? 'border-destructive' : ''}>
               <SelectValue placeholder={`Select ${field.label}`} />
             </SelectTrigger>
             <SelectContent>
-              {options.map((opt: string) => (
-                <SelectItem key={opt} value={opt}>
-                  {opt}
-                </SelectItem>
-              ))}
+              {options.length === 0 ? (
+                <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                  No options available
+                </div>
+              ) : (
+                options.map((opt: string) => (
+                  <SelectItem key={opt} value={opt}>
+                    {opt}
+                  </SelectItem>
+                ))
+              )}
             </SelectContent>
           </Select>
         );
