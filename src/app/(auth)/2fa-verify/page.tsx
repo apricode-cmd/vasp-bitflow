@@ -56,45 +56,24 @@ export default function TwoFactorVerifyPage(): React.ReactElement {
       // Sign in with email, password, and 2FA code
       console.log('🔐 Attempting 2FA login with code length:', value.length);
       
-      // First try with redirect: false to check for errors
-      const result = await signIn('credentials', {
+      // Clear sessionStorage before redirect
+      sessionStorage.removeItem('2fa_email');
+      sessionStorage.removeItem('2fa_password');
+      
+      toast.success('Login successful! Redirecting...');
+      
+      // Let NextAuth handle the redirect automatically
+      // This ensures the session cookie is set BEFORE the redirect happens
+      await signIn('credentials', {
         email,
         password,
         twoFactorCode: value,
-        redirect: false
+        redirect: true,  // Let NextAuth handle redirect
+        callbackUrl: '/dashboard'
       });
-
-      console.log('🔐 SignIn result:', result);
-
-      if (result?.error) {
-        console.error('🔐 SignIn error:', result.error);
-        setError('Invalid code. Please try again.');
-        setCode('');
-        setIsVerifying(false);
-        return;
-      }
-
-      // If successful, clear sessionStorage and redirect
-      if (result?.ok || !result?.error) {
-        sessionStorage.removeItem('2fa_email');
-        sessionStorage.removeItem('2fa_password');
-        
-        toast.success('Login successful! Redirecting...');
-        
-        console.log('✅ 2FA login successful, result:', result);
-        
-        // Login logging already happens in auth-client.ts via securityAuditService
-        // No need to call /api/auth/log-login here
-        
-        // Wait longer for session cookie to be set
-        console.log('⏳ Waiting for session cookie...');
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        console.log('🔄 Redirecting to dashboard...');
-        // Use router.push with refresh to ensure session is loaded
-        router.push('/dashboard');
-        router.refresh();
-      }
+      
+      // This code will never be reached because signIn with redirect: true
+      // will navigate away from this page
     } catch (error) {
       console.error('❌ 2FA verification error:', error);
       setError('An error occurred. Please try again.');

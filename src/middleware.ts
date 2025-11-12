@@ -149,7 +149,14 @@ export async function middleware(request: NextRequest) {
   // For protected CLIENT routes, check CLIENT session
   const clientSession = await getClientSession();
   
+  console.log('🔐 [MIDDLEWARE] Client session check:', {
+    path,
+    hasSession: !!clientSession,
+    sessionUser: clientSession?.user?.email
+  });
+  
   if (!clientSession) {
+    console.log('❌ [MIDDLEWARE] No client session, redirecting to /login');
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
@@ -157,6 +164,8 @@ export async function middleware(request: NextRequest) {
   // 1. Admin layout (src/app/(admin)/admin/layout.tsx)
   // 2. Client layout (src/app/(client)/layout.tsx)
   // 3. API routes (via requireAuth/requireRole)
+  
+  console.log('✅ [MIDDLEWARE] Client session valid, allowing access to:', path);
   
   return NextResponse.next({
     request: {
