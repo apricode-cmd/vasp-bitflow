@@ -703,7 +703,7 @@ export function OrderKanban({
         return (
           <div
             key={column.id}
-                className={`flex flex-col rounded-xl border-2 transition-all duration-300 w-[350px] flex-shrink-0 ${
+                className={`flex flex-col rounded-xl border-2 transition-all duration-300 w-[calc(100vw-3rem)] sm:w-[340px] md:w-[350px] lg:w-[340px] xl:w-[350px] flex-shrink-0 ${
                   isDragOver && isDropAllowed
                     ? `${column.color} border-dashed shadow-lg scale-[1.02]` 
                     : isDragOver && !isDropAllowed
