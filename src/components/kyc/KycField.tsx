@@ -35,8 +35,9 @@ export function KycField({ field, value, onChange, error }: Props) {
     if (isNationalityField || field.fieldType === 'country') {
       return (
         <CountryDropdown
-          value={value || ''}
-          onChange={onChange}
+          defaultValue={value}
+          onChange={(country) => onChange(country.alpha3)}
+          placeholder={`Select ${field.label}`}
         />
       );
     }
@@ -88,8 +89,9 @@ export function KycField({ field, value, onChange, error }: Props) {
       case 'country':
         return (
           <CountryDropdown
-            value={value || ''}
-            onChange={onChange}
+            defaultValue={value}
+            onChange={(country) => onChange(country.alpha3)}
+            placeholder={`Select ${field.label}`}
           />
         );
 
