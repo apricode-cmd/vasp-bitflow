@@ -25,6 +25,8 @@ interface DatePickerProps {
   disabled?: boolean;
   fromYear?: number;
   toYear?: number;
+  maxDate?: Date;
+  minDate?: Date;
 }
 
 export function DatePicker({
@@ -34,6 +36,8 @@ export function DatePicker({
   disabled = false,
   fromYear = 1900,
   toYear = new Date().getFullYear(),
+  maxDate,
+  minDate,
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false);
 
@@ -60,9 +64,15 @@ export function DatePicker({
             onDateChange?.(selectedDate);
             setOpen(false);
           }}
-          disabled={(date) =>
-            date > new Date() || date < new Date(fromYear, 0, 1)
-          }
+          disabled={(date) => {
+            // Disable dates outside min/max range
+            if (maxDate && date > maxDate) return true;
+            if (minDate && date < minDate) return true;
+            // Default: disable future dates and dates before fromYear
+            if (!maxDate && date > new Date()) return true;
+            if (date < new Date(fromYear, 0, 1)) return true;
+            return false;
+          }}
           initialFocus
           captionLayout="dropdown"
           fromYear={fromYear}
