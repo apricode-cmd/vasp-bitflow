@@ -8,6 +8,9 @@ import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { userAuditLogService } from '@/lib/services/user-audit-log.service';
 import { z } from 'zod';
 
+// Force dynamic rendering (uses cookies for auth)
+export const dynamic = 'force-dynamic';
+
 const querySchema = z.object({
   userId: z.string().optional(),
   action: z.string().optional(),

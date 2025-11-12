@@ -9,6 +9,9 @@ import { requireAdminPermission } from '@/lib/middleware/admin-auth';
 import { adminAuditLogService } from '@/lib/services/admin-audit-log.service';
 import { userAuditLogService } from '@/lib/services/user-audit-log.service';
 
+// Force dynamic rendering (uses cookies for auth)
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const session = await requireAdminPermission('audit', 'read');
