@@ -102,13 +102,25 @@ export function KycFormWizard({ fields, kycSession, onComplete }: Props) {
             'citizenship': profile?.nationality,
             'country_of_citizenship': profile?.nationality,
             
-            // Address
+            // Address (все возможные варианты названий полей)
             'address': profile?.address,
             'street_address': profile?.address,
+            'address_street': profile?.address,
+            'residential_address': profile?.address,
+            
             'city': profile?.city,
+            'address_city': profile?.city,
+            'residential_city': profile?.city,
+            
             'postal_code': profile?.postalCode,
             'zip_code': profile?.postalCode,
+            'address_postal': profile?.postalCode,
+            'postcode': profile?.postalCode,
+            
             'country': profile?.country,
+            'address_country': profile?.country,
+            'residence_country': profile?.country,
+            'country_of_residence': profile?.country,
           };
 
           // Apply auto-fill for each field
