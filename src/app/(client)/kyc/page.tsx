@@ -245,6 +245,14 @@ export default function KycPage(): React.ReactElement {
         const data = await response.json();
         // Filter only enabled fields
         const enabledFields = data.fields.filter((f: KycField) => f.isEnabled);
+        
+        console.log('📋 KYC Fields loaded:', {
+          total: enabledFields.length,
+          required: enabledFields.filter((f: KycField) => f.isRequired).length,
+          fieldNames: enabledFields.map((f: KycField) => f.fieldName),
+          requiredFields: enabledFields.filter((f: KycField) => f.isRequired).map((f: KycField) => f.fieldName)
+        });
+        
         setFields(enabledFields);
         setGrouped(data.grouped);
       } else {
