@@ -22,17 +22,20 @@ interface Props {
 }
 
 export function KycField({ field, value, onChange, error }: Props) {
-  // Check if field is nationality/citizenship (should use country dropdown)
-  const isNationalityField = field.fieldName.toLowerCase().includes('nationality') || 
-                             field.fieldName.toLowerCase().includes('citizenship');
+  // Check if field is country-related (should use country dropdown)
+  const isCountryField = field.fieldType === 'country' ||
+                         field.fieldName.toLowerCase().includes('nationality') || 
+                         field.fieldName.toLowerCase().includes('citizenship') ||
+                         field.fieldName.toLowerCase().includes('_country') ||
+                         field.fieldName.toLowerCase() === 'country';
   
   // Check if field is date of birth (needs age validation)
   const isDateOfBirth = field.fieldName.toLowerCase().includes('birth') || 
                         field.fieldName.toLowerCase().includes('dob');
 
   const renderInput = () => {
-    // Special handling for nationality/citizenship fields
-    if (isNationalityField || field.fieldType === 'country') {
+    // Special handling for country fields
+    if (isCountryField) {
       return (
         <CountryDropdown
           defaultValue={value}
