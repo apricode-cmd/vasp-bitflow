@@ -68,7 +68,7 @@ export default function KycFormFieldsPage() {
 
   const fetchFields = async () => {
     try {
-      const res = await fetch('/api/admin/kyc-fields');
+      const res = await fetch('/api/admin/kyc/form-fields');
       if (!res.ok) throw new Error('Failed to fetch');
       
       const data = await res.json();
@@ -123,7 +123,7 @@ export default function KycFormFieldsPage() {
         }
       }
 
-      const res = await fetch(`/api/admin/kyc-fields/${selectedField.id}`, {
+      const res = await fetch(`/api/admin/kyc/form-fields/${selectedField.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -151,7 +151,7 @@ export default function KycFormFieldsPage() {
 
   const handleQuickToggle = async (field: KycField, toggleField: 'isRequired' | 'isEnabled') => {
     try {
-      const res = await fetch(`/api/admin/kyc-fields/${field.id}`, {
+      const res = await fetch(`/api/admin/kyc/form-fields/${field.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
