@@ -201,14 +201,14 @@ class IntegrationFactory {
       }
     }
     
+    // ✅ Build config with explicit webhookSecret mapping
     const config: BaseIntegrationConfig = {
-      apiKey: decryptedApiKey || undefined,
-      apiEndpoint: integration.apiEndpoint || undefined,
-      webhookSecret: integrationConfig.webhookSecret || undefined,
-      // Merge integration.config EXCEPT apiKey (use decrypted one)
       ...Object.fromEntries(
         Object.entries(integrationConfig).filter(([key]) => key !== 'apiKey')
       ),
+      apiKey: decryptedApiKey || undefined,
+      apiEndpoint: integration.apiEndpoint || undefined,
+      webhookSecret: integrationConfig.webhookSecret || undefined, // ✅ Explicit
       metadata: {
         ...integrationConfig,
         // Don't include masked apiKey in metadata
