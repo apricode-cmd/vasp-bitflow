@@ -39,12 +39,9 @@ export default function KycVerifyPage({ params }: VerifyPageProps) {
     document.documentElement.style.height = '100%';
     document.documentElement.style.margin = '0';
     document.documentElement.style.padding = '0';
-    document.documentElement.style.overflow = 'hidden';
     document.body.style.height = '100%';
     document.body.style.margin = '0';
     document.body.style.padding = '0';
-    document.body.style.overflow = 'hidden';
-    document.body.style.position = 'fixed';
     document.body.style.width = '100%';
 
     const initializeSumsub = async () => {
@@ -166,42 +163,25 @@ export default function KycVerifyPage({ params }: VerifyPageProps) {
             uiConf: {
               customCssStr: `
                 html, body {
-                  height: 100% !important;
-                  min-height: 100vh !important;
-                  min-height: -webkit-fill-available !important;
                   margin: 0 !important;
                   padding: 0 !important;
-                  overflow: hidden !important;
-                  position: fixed !important;
                   width: 100% !important;
+                  height: 100% !important;
                 }
                 
                 #sumsub-websdk-container { 
-                  height: 100vh !important;
-                  height: -webkit-fill-available !important;
-                  width: 100vw !important;
-                  position: fixed !important;
-                  top: 0 !important;
-                  left: 0 !important;
-                  right: 0 !important;
-                  bottom: 0 !important;
-                  overflow: auto !important;
+                  width: 100% !important;
+                  min-height: 100vh !important;
+                  min-height: -webkit-fill-available !important;
+                  overflow-y: auto !important;
+                  overflow-x: hidden !important;
                   -webkit-overflow-scrolling: touch !important;
                 }
                 
                 iframe {
-                  height: 100% !important;
-                  min-height: 100vh !important;
-                  min-height: -webkit-fill-available !important;
                   width: 100% !important;
+                  min-height: 100vh !important;
                   border: none !important;
-                }
-                
-                /* Fix for mobile Safari address bar */
-                @supports (-webkit-touch-callout: none) {
-                  html, body, #sumsub-websdk-container {
-                    height: -webkit-fill-available !important;
-                  }
                 }
               `
             }
@@ -246,18 +226,7 @@ export default function KycVerifyPage({ params }: VerifyPageProps) {
   if (success) {
     return (
       <div 
-        className="flex items-center justify-center bg-background p-4"
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100vw',
-          height: '100vh',
-          minHeight: '-webkit-fill-available',
-          overflow: 'hidden'
-        }}
+        className="min-h-screen flex items-center justify-center bg-background p-4"
       >
         <div className="max-w-md w-full space-y-6 text-center px-4">
           <div className="flex justify-center">
@@ -288,18 +257,7 @@ export default function KycVerifyPage({ params }: VerifyPageProps) {
   if (error) {
     return (
       <div 
-        className="flex items-center justify-center bg-background p-4"
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100vw',
-          height: '100vh',
-          minHeight: '-webkit-fill-available',
-          overflow: 'hidden'
-        }}
+        className="min-h-screen flex items-center justify-center bg-background p-4"
       >
         <div className="max-w-md w-full space-y-4 text-center px-4">
           <div className="flex justify-center">
@@ -325,18 +283,7 @@ export default function KycVerifyPage({ params }: VerifyPageProps) {
   if (loading) {
     return (
       <div 
-        className="flex items-center justify-center bg-background"
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100vw',
-          height: '100vh',
-          minHeight: '-webkit-fill-available',
-          overflow: 'hidden'
-        }}
+        className="min-h-screen flex items-center justify-center bg-background"
       >
         <div className="text-center space-y-4 px-4">
           <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
@@ -351,21 +298,15 @@ export default function KycVerifyPage({ params }: VerifyPageProps) {
     );
   }
 
-  // Sumsub SDK container (full-screen)
+  // Sumsub SDK container (scrollable)
   return (
     <div 
       id="sumsub-websdk-container" 
       style={{ 
-        position: 'fixed', 
-        top: 0, 
-        left: 0, 
-        right: 0, 
-        bottom: 0,
-        width: '100vw',
-        height: '100vh',
-        minHeight: '-webkit-fill-available',
-        zIndex: 9999,
-        overflow: 'auto',
+        width: '100%',
+        minHeight: '100vh',
+        overflowY: 'auto',
+        overflowX: 'hidden',
         WebkitOverflowScrolling: 'touch',
         backgroundColor: '#ffffff'
       }}

@@ -19,19 +19,6 @@ export default function VerifyLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <div 
-      style={{
-        width: '100%',
-        height: '100vh',
-        minHeight: '-webkit-fill-available',
-        margin: 0,
-        padding: 0,
-        overflow: 'hidden',
-      }}
-    >
-      {children}
-    </div>
-  );
+  return <>{children}</>;
 }
 
