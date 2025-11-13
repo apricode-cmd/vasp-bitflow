@@ -23,9 +23,10 @@ interface Props {
   value: any;
   onChange: (value: any) => void;
   error?: string;
+  formData?: Record<string, any>; // For accessing other form fields (e.g. country, nationality)
 }
 
-export function KycField({ field, value, onChange, error }: Props) {
+export function KycField({ field, value, onChange, error, formData = {} }: Props) {
   // Check if field is country-related (should use country dropdown)
   const isCountryField = field.fieldType === 'country' ||
                          field.fieldName.toLowerCase().includes('nationality') || 
@@ -174,7 +175,7 @@ export function KycField({ field, value, onChange, error }: Props) {
         );
 
       case 'file':
-        return <FileUploadField field={field} value={value} onChange={onChange} error={error} />;
+        return <FileUploadField field={field} value={value} onChange={onChange} error={error} formData={formData} />;
 
       default:
         // Fallback to text input
@@ -206,11 +207,12 @@ export function KycField({ field, value, onChange, error }: Props) {
 /**
  * FileUploadField - File upload with preview and upload to KYC provider
  */
-function FileUploadField({ field, value, onChange, error }: {
+function FileUploadField({ field, value, onChange, error, formData = {} }: {
   field: KycFieldType;
   value: any;
   onChange: (value: any) => void;
   error?: string;
+  formData?: Record<string, any>;
 }) {
   const [uploading, setUploading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<any>(value);
@@ -232,9 +234,9 @@ function FileUploadField({ field, value, onChange, error }: {
     setUploading(true);
 
     try {
-      // Prepare FormData
-      const formData = new FormData();
-      formData.append('file', file);
+      // Prepare FormData for upload
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', file);
       
       // Map field name to document type
       let documentType = 'SELFIE';
@@ -254,24 +256,35 @@ function FileUploadField({ field, value, onChange, error }: {
         documentType = 'SELFIE';
       }
       
-      formData.append('documentType', documentType);
-      formData.append('country', 'POL'); // TODO: Get from form context
+      uploadFormData.append('documentType', documentType);
+      
+      // Get country from form data (try nationality first, then country)
+      const country = formData?.nationality || formData?.country || formData?.residence_country || formData?.country_of_residence || 'POL';
+      uploadFormData.append('country', country);
       
       if (documentSubType) {
-        formData.append('documentSubType', documentSubType);
+        uploadFormData.append('documentSubType', documentSubType);
+      }
+      
+      // Add document number if available in form
+      if (documentType === 'PASSPORT' && formData?.passport_number) {
+        uploadFormData.append('number', formData.passport_number);
+      } else if (documentType === 'ID_CARD' && formData?.id_number) {
+        uploadFormData.append('number', formData.id_number);
       }
 
       console.log('📤 Uploading file:', {
         fieldName: field.fieldName,
         documentType,
         documentSubType,
+        country,
         fileName: file.name
       });
 
       // Upload to API
       const response = await fetch('/api/kyc/upload-document', {
         method: 'POST',
-        body: formData
+        body: uploadFormData
       });
 
       const result = await response.json();

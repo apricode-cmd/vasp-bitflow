@@ -74,6 +74,7 @@ export function KycFormStep({ step, fields, formData, errors, onChange }: Props)
                       value={formData[field.fieldName]}
                       onChange={(value) => onChange(field.fieldName, value)}
                       error={errors[field.fieldName]}
+                      formData={formData}
                     />
                   </div>
                 ))}
