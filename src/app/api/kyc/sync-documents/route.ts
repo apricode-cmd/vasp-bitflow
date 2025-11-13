@@ -99,6 +99,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     console.log(`📦 Found ${documents.length} documents to sync`);
 
+    // FIRST: Check what documents are required by Sumsub
+    let requiredDocs: any = null;
+    if (kycProvider.checkRequiredDocuments) {
+      try {
+        const requiredResult = await kycProvider.checkRequiredDocuments(applicantId);
+        requiredDocs = requiredResult;
+        console.log('📋 Required documents from Sumsub:', JSON.stringify(requiredResult, null, 2));
+      } catch (error: any) {
+        console.error('⚠️ Failed to check required documents:', error.message);
+        // Continue anyway - we'll try to upload and handle errors
+      }
+    }
+
     const results = {
       synced: 0,
       failed: 0,
