@@ -2,17 +2,31 @@
  * Admin Session Info API
  * 
  * Returns current admin session data
+ * Supports BOTH Passkey (Custom JWT) and Password+TOTP (NextAuth) sessions
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminSessionData } from '@/lib/services/admin-session.service';
+import { getAdminSession } from '@/auth-admin';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
   try {
-    const sessionData = await getAdminSessionData();
+    // Try Custom JWT (Passkey) first
+    let sessionData = await getAdminSessionData();
+    let adminId: string | undefined;
 
-    if (!sessionData) {
+    if (sessionData) {
+      adminId = sessionData.adminId;
+    } else {
+      // Try NextAuth (Password+TOTP)
+      const nextAuthSession = await getAdminSession();
+      if (nextAuthSession?.user?.id) {
+        adminId = nextAuthSession.user.id;
+      }
+    }
+
+    if (!adminId) {
       return NextResponse.json(
         { success: false, error: 'Not authenticated' },
         { status: 401 }
@@ -21,7 +35,7 @@ export async function GET(request: NextRequest) {
 
     // Get full admin details
     const admin = await prisma.admin.findUnique({
-      where: { id: sessionData.adminId },
+      where: { id: adminId },
       select: {
         id: true,
         email: true,

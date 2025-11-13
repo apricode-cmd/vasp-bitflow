@@ -2,13 +2,16 @@
  * Admin Authentication Middleware
  * 
  * Provides authentication and authorization helpers for admin API routes.
- * Uses custom JWT session management (admin-session.service.ts).
+ * Supports BOTH authentication methods:
+ * - Custom JWT (Passkey) via admin-session.service.ts
+ * - NextAuth JWT (Password+TOTP) via auth-admin.ts
  * 
  * @module lib/middleware/admin-auth
  */
 
 import { NextResponse } from 'next/server';
 import { getAdminSessionData, type AdminSessionData } from '@/lib/services/admin-session.service';
+import { getAdminSession } from '@/auth-admin';
 import { permissionService } from '@/lib/services/permission.service';
 import { AdminRole } from '@prisma/client';
 
@@ -41,6 +44,8 @@ function wrapSession(sessionData: AdminSessionData): SessionWrapper {
 /**
  * Require admin authentication
  * 
+ * Checks BOTH Passkey (Custom JWT) and Password+TOTP (NextAuth) sessions
+ * 
  * @returns Admin session (NextAuth-style wrapper) or 401 error response
  * 
  * @example
@@ -52,7 +57,24 @@ function wrapSession(sessionData: AdminSessionData): SessionWrapper {
  * }
  */
 export async function requireAdminAuth() {
-  const sessionData = await getAdminSessionData();
+  // Try Custom JWT (Passkey) first
+  let sessionData = await getAdminSessionData();
+
+  if (!sessionData) {
+    // Try NextAuth (Password+TOTP)
+    const nextAuthSession = await getAdminSession();
+    if (nextAuthSession?.user?.id) {
+      // Convert NextAuth session to AdminSessionData format
+      sessionData = {
+        adminId: nextAuthSession.user.id,
+        email: nextAuthSession.user.email || '',
+        role: nextAuthSession.user.role || 'ADMIN',
+        authMethod: 'PASSWORD' as const,
+        iat: 0,
+        exp: 0,
+      };
+    }
+  }
 
   if (!sessionData) {
     return NextResponse.json(
@@ -67,6 +89,8 @@ export async function requireAdminAuth() {
 /**
  * Require admin authentication with specific role
  * 
+ * Checks BOTH Passkey (Custom JWT) and Password+TOTP (NextAuth) sessions
+ * 
  * @param role - Required admin role (SUPER_ADMIN has access to everything)
  * @returns Admin session (NextAuth-style wrapper) or 401/403 error response
  * 
@@ -79,7 +103,24 @@ export async function requireAdminAuth() {
  * }
  */
 export async function requireAdminRole(role: AdminRole | AdminRole[]) {
-  const sessionData = await getAdminSessionData();
+  // Try Custom JWT (Passkey) first
+  let sessionData = await getAdminSessionData();
+
+  if (!sessionData) {
+    // Try NextAuth (Password+TOTP)
+    const nextAuthSession = await getAdminSession();
+    if (nextAuthSession?.user?.id) {
+      // Convert NextAuth session to AdminSessionData format
+      sessionData = {
+        adminId: nextAuthSession.user.id,
+        email: nextAuthSession.user.email || '',
+        role: nextAuthSession.user.role || 'ADMIN',
+        authMethod: 'PASSWORD' as const,
+        iat: 0,
+        exp: 0,
+      };
+    }
+  }
 
   if (!sessionData) {
     return NextResponse.json(
@@ -108,6 +149,8 @@ export async function requireAdminRole(role: AdminRole | AdminRole[]) {
 /**
  * Require admin authentication with permission check
  * 
+ * Checks BOTH Passkey (Custom JWT) and Password+TOTP (NextAuth) sessions
+ * 
  * @param resource - Resource name (e.g., 'orders', 'kyc', 'users')
  * @param action - Action name (e.g., 'read', 'create', 'delete')
  * @returns Admin session (NextAuth-style wrapper) or 401/403 error response
@@ -121,7 +164,24 @@ export async function requireAdminRole(role: AdminRole | AdminRole[]) {
  * }
  */
 export async function requireAdminPermission(resource: string, action: string) {
-  const sessionData = await getAdminSessionData();
+  // Try Custom JWT (Passkey) first
+  let sessionData = await getAdminSessionData();
+
+  if (!sessionData) {
+    // Try NextAuth (Password+TOTP)
+    const nextAuthSession = await getAdminSession();
+    if (nextAuthSession?.user?.id) {
+      // Convert NextAuth session to AdminSessionData format
+      sessionData = {
+        adminId: nextAuthSession.user.id,
+        email: nextAuthSession.user.email || '',
+        role: nextAuthSession.user.role || 'ADMIN',
+        authMethod: 'PASSWORD' as const,
+        iat: 0,
+        exp: 0,
+      };
+    }
+  }
 
   if (!sessionData) {
     return NextResponse.json(
@@ -168,6 +228,8 @@ export function isErrorResponse(session: any): session is NextResponse {
 /**
  * Get current admin user ID from session
  * 
+ * Checks BOTH Passkey (Custom JWT) and Password+TOTP (NextAuth) sessions
+ * 
  * @returns Admin ID or null
  * 
  * @example
@@ -175,7 +237,17 @@ export function isErrorResponse(session: any): session is NextResponse {
  * if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
  */
 export async function getCurrentUserId(): Promise<string | null> {
-  const sessionData = await getAdminSessionData();
+  // Try Custom JWT (Passkey) first
+  let sessionData = await getAdminSessionData();
+
+  if (!sessionData) {
+    // Try NextAuth (Password+TOTP)
+    const nextAuthSession = await getAdminSession();
+    if (nextAuthSession?.user?.id) {
+      return nextAuthSession.user.id;
+    }
+  }
+
   return sessionData?.adminId || null;
 }
 
