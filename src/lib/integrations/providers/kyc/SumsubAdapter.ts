@@ -842,7 +842,20 @@ export class SumsubAdapter implements IKycProvider {
       const ts = Math.floor(Date.now() / 1000).toString();
 
       // For multipart/form-data, signature is calculated without body
+      const signaturePayload = ts + method.toUpperCase() + path + '';
       const signature = this.buildSignature(ts, method, path, '');
+      
+      console.log('🔐 [SUMSUB] Signature calculation:', {
+        timestamp: ts,
+        method: method,
+        path: path,
+        body: '<empty for multipart>',
+        payload: signaturePayload,
+        signature: signature,
+        secretKeyPresent: !!this.config.secretKey,
+        secretKeyLength: this.config.secretKey?.length || 0,
+        appTokenPresent: !!this.config.appToken
+      });
 
       // Prepare FormData
       const FormData = require('form-data');
