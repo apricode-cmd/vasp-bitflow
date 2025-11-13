@@ -9,6 +9,7 @@ import { getClientSession } from '@/auth-client';
 import { prisma } from '@/lib/prisma';
 import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
 import { KycUserData } from '@/lib/integrations/categories/IKycProvider';
+import { alpha3ToIso2, formatDateForKyc } from '@/lib/utils/country-codes';
 
 export async function POST(request: NextRequest) {
   try {
@@ -125,27 +126,7 @@ export async function POST(request: NextRequest) {
         });
 
         if (user?.profile) {
-          // Convert Alpha-3 to ISO-2 for provider
-          const alpha3ToIso2 = (alpha3: string): string => {
-            const mapping: Record<string, string> = {
-              'USA': 'US', 'GBR': 'GB', 'POL': 'PL', 'DEU': 'DE', 'FRA': 'FR',
-              'ESP': 'ES', 'ITA': 'IT', 'UKR': 'UA', 'NLD': 'NL', 'BEL': 'BE',
-              'ASC': 'AS', // Ascension Island
-            };
-            return mapping[alpha3] || alpha3;
-          };
-
-          // Format date
-          const formatDateForKyc = (date: Date | null): string => {
-            if (!date) return '';
-            const d = new Date(date);
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-          };
-
-          // Prepare user data
+          // Prepare user data (using imported helpers)
           const userData: KycUserData = {
             email: user.email,
             firstName: user.profile.firstName,
@@ -161,6 +142,22 @@ export async function POST(request: NextRequest) {
             gender: (user.profile as any).gender || undefined,
             externalId: user.id
           };
+
+          // Log what we're sending
+          console.log('📋 User data to send to provider:', {
+            email: userData.email,
+            firstName: userData.firstName,
+            lastName: userData.lastName,
+            dateOfBirth: userData.dateOfBirth,
+            nationality: userData.nationality,
+            residenceCountry: userData.residenceCountry,
+            phone: userData.phone,
+            gender: (userData as any).gender,
+            placeOfBirth: (userData as any).placeOfBirth,
+            city: userData.city,
+            postalCode: userData.postalCode,
+            address: userData.address
+          });
 
           // Get KYC provider
           const provider = await integrationFactory.getProviderByService(kycSession.kycProviderId);

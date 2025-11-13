@@ -1,302 +1,70 @@
 /**
  * Country code conversion utilities
- * Converts between ISO 3166-1 alpha-2 (2-letter) and alpha-3 (3-letter) codes
+ * Alpha-3 (ISO 3166-1 alpha-3) → Alpha-2 (ISO 3166-1 alpha-2)
  */
 
-/**
- * Map of ISO 3166-1 alpha-2 to alpha-3 country codes
- * Source: https://en.wikipedia.org/wiki/ISO_3166-1
- */
-export const COUNTRY_CODE_MAP: Record<string, string> = {
-  // Europe
-  'AD': 'AND', // Andorra
-  'AL': 'ALB', // Albania
-  'AT': 'AUT', // Austria
-  'BA': 'BIH', // Bosnia and Herzegovina
-  'BE': 'BEL', // Belgium
-  'BG': 'BGR', // Bulgaria
-  'BY': 'BLR', // Belarus
-  'CH': 'CHE', // Switzerland
-  'CY': 'CYP', // Cyprus
-  'CZ': 'CZE', // Czech Republic
-  'DE': 'DEU', // Germany
-  'DK': 'DNK', // Denmark
-  'EE': 'EST', // Estonia
-  'ES': 'ESP', // Spain
-  'FI': 'FIN', // Finland
-  'FR': 'FRA', // France
-  'GB': 'GBR', // United Kingdom
-  'GR': 'GRC', // Greece
-  'HR': 'HRV', // Croatia
-  'HU': 'HUN', // Hungary
-  'IE': 'IRL', // Ireland
-  'IS': 'ISL', // Iceland
-  'IT': 'ITA', // Italy
-  'LI': 'LIE', // Liechtenstein
-  'LT': 'LTU', // Lithuania
-  'LU': 'LUX', // Luxembourg
-  'LV': 'LVA', // Latvia
-  'MC': 'MCO', // Monaco
-  'MD': 'MDA', // Moldova
-  'ME': 'MNE', // Montenegro
-  'MK': 'MKD', // North Macedonia
-  'MT': 'MLT', // Malta
-  'NL': 'NLD', // Netherlands
-  'NO': 'NOR', // Norway
-  'PL': 'POL', // Poland
-  'PT': 'PRT', // Portugal
-  'RO': 'ROU', // Romania
-  'RS': 'SRB', // Serbia
-  'RU': 'RUS', // Russia
-  'SE': 'SWE', // Sweden
-  'SI': 'SVN', // Slovenia
-  'SK': 'SVK', // Slovakia
-  'SM': 'SMR', // San Marino
-  'UA': 'UKR', // Ukraine
-  'VA': 'VAT', // Vatican City
-  'XK': 'XKX', // Kosovo (user-assigned)
-
-  // Americas
-  'AG': 'ATG', // Antigua and Barbuda
-  'AR': 'ARG', // Argentina
-  'AW': 'ABW', // Aruba
-  'BB': 'BRB', // Barbados
-  'BM': 'BMU', // Bermuda
-  'BO': 'BOL', // Bolivia
-  'BR': 'BRA', // Brazil
-  'BS': 'BHS', // Bahamas
-  'BZ': 'BLZ', // Belize
-  'CA': 'CAN', // Canada
-  'CL': 'CHL', // Chile
-  'CO': 'COL', // Colombia
-  'CR': 'CRI', // Costa Rica
-  'CU': 'CUB', // Cuba
-  'DM': 'DMA', // Dominica
-  'DO': 'DOM', // Dominican Republic
-  'EC': 'ECU', // Ecuador
-  'GD': 'GRD', // Grenada
-  'GT': 'GTM', // Guatemala
-  'GY': 'GUY', // Guyana
-  'HN': 'HND', // Honduras
-  'HT': 'HTI', // Haiti
-  'JM': 'JAM', // Jamaica
-  'KN': 'KNA', // Saint Kitts and Nevis
-  'KY': 'CYM', // Cayman Islands
-  'LC': 'LCA', // Saint Lucia
-  'MX': 'MEX', // Mexico
-  'NI': 'NIC', // Nicaragua
-  'PA': 'PAN', // Panama
-  'PE': 'PER', // Peru
-  'PR': 'PRI', // Puerto Rico
-  'PY': 'PRY', // Paraguay
-  'SR': 'SUR', // Suriname
-  'SV': 'SLV', // El Salvador
-  'TT': 'TTO', // Trinidad and Tobago
-  'US': 'USA', // United States
-  'UY': 'URY', // Uruguay
-  'VC': 'VCT', // Saint Vincent and the Grenadines
-  'VE': 'VEN', // Venezuela
-  'VG': 'VGB', // British Virgin Islands
-  'VI': 'VIR', // U.S. Virgin Islands
-
-  // Asia
-  'AE': 'ARE', // United Arab Emirates
-  'AF': 'AFG', // Afghanistan
-  'AM': 'ARM', // Armenia
-  'AZ': 'AZE', // Azerbaijan
-  'BD': 'BGD', // Bangladesh
-  'BH': 'BHR', // Bahrain
-  'BN': 'BRN', // Brunei
-  'BT': 'BTN', // Bhutan
-  'CN': 'CHN', // China
-  'GE': 'GEO', // Georgia
-  'HK': 'HKG', // Hong Kong
-  'ID': 'IDN', // Indonesia
-  'IL': 'ISR', // Israel
-  'IN': 'IND', // India
-  'IQ': 'IRQ', // Iraq
-  'IR': 'IRN', // Iran
-  'JO': 'JOR', // Jordan
-  'JP': 'JPN', // Japan
-  'KG': 'KGZ', // Kyrgyzstan
-  'KH': 'KHM', // Cambodia
-  'KP': 'PRK', // North Korea
-  'KR': 'KOR', // South Korea
-  'KW': 'KWT', // Kuwait
-  'KZ': 'KAZ', // Kazakhstan
-  'LA': 'LAO', // Laos
-  'LB': 'LBN', // Lebanon
-  'LK': 'LKA', // Sri Lanka
-  'MM': 'MMR', // Myanmar
-  'MN': 'MNG', // Mongolia
-  'MO': 'MAC', // Macau
-  'MV': 'MDV', // Maldives
-  'MY': 'MYS', // Malaysia
-  'NP': 'NPL', // Nepal
-  'OM': 'OMN', // Oman
-  'PH': 'PHL', // Philippines
-  'PK': 'PAK', // Pakistan
-  'PS': 'PSE', // Palestine
-  'QA': 'QAT', // Qatar
-  'SA': 'SAU', // Saudi Arabia
-  'SG': 'SGP', // Singapore
-  'SY': 'SYR', // Syria
-  'TH': 'THA', // Thailand
-  'TJ': 'TJK', // Tajikistan
-  'TL': 'TLS', // Timor-Leste
-  'TM': 'TKM', // Turkmenistan
-  'TR': 'TUR', // Turkey
-  'TW': 'TWN', // Taiwan
-  'UZ': 'UZB', // Uzbekistan
-  'VN': 'VNM', // Vietnam
-  'YE': 'YEM', // Yemen
-
-  // Africa
-  'AO': 'AGO', // Angola
-  'BF': 'BFA', // Burkina Faso
-  'BI': 'BDI', // Burundi
-  'BJ': 'BEN', // Benin
-  'BW': 'BWA', // Botswana
-  'CD': 'COD', // Democratic Republic of the Congo
-  'CF': 'CAF', // Central African Republic
-  'CG': 'COG', // Republic of the Congo
-  'CI': 'CIV', // Ivory Coast
-  'CM': 'CMR', // Cameroon
-  'CV': 'CPV', // Cape Verde
-  'DJ': 'DJI', // Djibouti
-  'DZ': 'DZA', // Algeria
-  'EG': 'EGY', // Egypt
-  'EH': 'ESH', // Western Sahara
-  'ER': 'ERI', // Eritrea
-  'ET': 'ETH', // Ethiopia
-  'GA': 'GAB', // Gabon
-  'GH': 'GHA', // Ghana
-  'GM': 'GMB', // Gambia
-  'GN': 'GIN', // Guinea
-  'GQ': 'GNQ', // Equatorial Guinea
-  'GW': 'GNB', // Guinea-Bissau
-  'KE': 'KEN', // Kenya
-  'KM': 'COM', // Comoros
-  'LR': 'LBR', // Liberia
-  'LS': 'LSO', // Lesotho
-  'LY': 'LBY', // Libya
-  'MA': 'MAR', // Morocco
-  'MG': 'MDG', // Madagascar
-  'ML': 'MLI', // Mali
-  'MR': 'MRT', // Mauritania
-  'MU': 'MUS', // Mauritius
-  'MW': 'MWI', // Malawi
-  'MZ': 'MOZ', // Mozambique
-  'NA': 'NAM', // Namibia
-  'NE': 'NER', // Niger
-  'NG': 'NGA', // Nigeria
-  'RE': 'REU', // Réunion
-  'RW': 'RWA', // Rwanda
-  'SC': 'SYC', // Seychelles
-  'SD': 'SDN', // Sudan
-  'SL': 'SLE', // Sierra Leone
-  'SN': 'SEN', // Senegal
-  'SO': 'SOM', // Somalia
-  'SS': 'SSD', // South Sudan
-  'ST': 'STP', // São Tomé and Príncipe
-  'SZ': 'SWZ', // Eswatini
-  'TD': 'TCD', // Chad
-  'TG': 'TGO', // Togo
-  'TN': 'TUN', // Tunisia
-  'TZ': 'TZA', // Tanzania
-  'UG': 'UGA', // Uganda
-  'ZA': 'ZAF', // South Africa
-  'ZM': 'ZMB', // Zambia
-  'ZW': 'ZWE', // Zimbabwe
-
-  // Oceania
-  'AS': 'ASM', // American Samoa
-  'AU': 'AUS', // Australia
-  'CK': 'COK', // Cook Islands
-  'FJ': 'FJI', // Fiji
-  'FM': 'FSM', // Micronesia
-  'GU': 'GUM', // Guam
-  'KI': 'KIR', // Kiribati
-  'MH': 'MHL', // Marshall Islands
-  'MP': 'MNP', // Northern Mariana Islands
-  'NC': 'NCL', // New Caledonia
-  'NR': 'NRU', // Nauru
-  'NU': 'NIU', // Niue
-  'NZ': 'NZL', // New Zealand
-  'PF': 'PYF', // French Polynesia
-  'PG': 'PNG', // Papua New Guinea
-  'PN': 'PCN', // Pitcairn Islands
-  'PW': 'PLW', // Palau
-  'SB': 'SLB', // Solomon Islands
-  'TK': 'TKL', // Tokelau
-  'TO': 'TON', // Tonga
-  'TV': 'TUV', // Tuvalu
-  'VU': 'VUT', // Vanuatu
-  'WF': 'WLF', // Wallis and Futuna
-  'WS': 'WSM', // Samoa
-};
-
-/**
- * Convert ISO 3166-1 alpha-2 (2-letter) country code to alpha-3 (3-letter)
- * @param alpha2 - 2-letter country code (e.g., 'US', 'GB', 'PL')
- * @returns 3-letter country code (e.g., 'USA', 'GBR', 'POL') or null if not found
- */
-export function convertAlpha2ToAlpha3(alpha2: string | null | undefined): string | null {
-  if (!alpha2) return null;
+export function alpha3ToIso2(alpha3: string): string {
+  const mapping: Record<string, string> = {
+    'USA': 'US', 'GBR': 'GB', 'POL': 'PL', 'DEU': 'DE', 'FRA': 'FR',
+    'ESP': 'ES', 'ITA': 'IT', 'UKR': 'UA', 'NLD': 'NL', 'BEL': 'BE',
+    'AUT': 'AT', 'CHE': 'CH', 'SWE': 'SE', 'NOR': 'NO', 'DNK': 'DK',
+    'FIN': 'FI', 'IRL': 'IE', 'PRT': 'PT', 'GRC': 'GR', 'CZE': 'CZ',
+    'HUN': 'HU', 'ROU': 'RO', 'BGR': 'BG', 'SVK': 'SK', 'SVN': 'SI',
+    'HRV': 'HR', 'LTU': 'LT', 'LVA': 'LV', 'EST': 'EE', 'CYP': 'CY',
+    'MLT': 'MT', 'LUX': 'LU', 'ISL': 'IS', 'LIE': 'LI', 'MCO': 'MC',
+    'AND': 'AD', 'SMR': 'SM', 'VAT': 'VA', 'ALB': 'AL', 'MKD': 'MK',
+    'SRB': 'RS', 'MNE': 'ME', 'BIH': 'BA', 'KOS': 'XK', 'MDA': 'MD',
+    'BLR': 'BY', 'RUS': 'RU', 'TUR': 'TR', 'GEO': 'GE', 'ARM': 'AM',
+    'AZE': 'AZ', 'KAZ': 'KZ', 'UZB': 'UZ', 'TKM': 'TM', 'KGZ': 'KG',
+    'TJK': 'TJ', 'AFG': 'AF', 'PAK': 'PK', 'IND': 'IN', 'BGD': 'BD',
+    'LKA': 'LK', 'NPL': 'NP', 'BTN': 'BT', 'MDV': 'MV', 'CHN': 'CN',
+    'JPN': 'JP', 'KOR': 'KR', 'PRK': 'KP', 'MNG': 'MN', 'TWN': 'TW',
+    'HKG': 'HK', 'MAC': 'MO', 'THA': 'TH', 'VNM': 'VN', 'LAO': 'LA',
+    'KHM': 'KH', 'MMR': 'MM', 'MYS': 'MY', 'SGP': 'SG', 'IDN': 'ID',
+    'PHL': 'PH', 'BRN': 'BN', 'TLS': 'TL', 'AUS': 'AU', 'NZL': 'NZ',
+    'PNG': 'PG', 'FJI': 'FJ', 'SLB': 'SB', 'VUT': 'VU', 'NCL': 'NC',
+    'PYF': 'PF', 'WLF': 'WF', 'COK': 'CK', 'NIU': 'NU', 'TKL': 'TK',
+    'WSM': 'WS', 'KIR': 'KI', 'TUV': 'TV', 'NRU': 'NR', 'PLW': 'PW',
+    'MHL': 'MH', 'FSM': 'FM', 'GUM': 'GU', 'MNP': 'MP', 'VIR': 'VI',
+    'CAN': 'CA', 'MEX': 'MX', 'GTM': 'GT', 'BLZ': 'BZ', 'SLV': 'SV',
+    'HND': 'HN', 'NIC': 'NI', 'CRI': 'CR', 'PAN': 'PA', 'CUB': 'CU',
+    'JAM': 'JM', 'HTI': 'HT', 'DOM': 'DO', 'PRI': 'PR', 'BHS': 'BS',
+    'TTO': 'TT', 'BRB': 'BB', 'VCT': 'VC', 'GRD': 'GD', 'LCA': 'LC',
+    'DMA': 'DM', 'ATG': 'AG', 'KNA': 'KN', 'AIA': 'AI', 'MSR': 'MS',
+    'VGB': 'VG', 'CYM': 'KY', 'TCA': 'TC', 'ABW': 'AW', 'CUW': 'CW',
+    'SXM': 'SX', 'BRA': 'BR', 'ARG': 'AR', 'CHL': 'CL', 'COL': 'CO',
+    'VEN': 'VE', 'PER': 'PE', 'ECU': 'EC', 'BOL': 'BO', 'PRY': 'PY',
+    'URY': 'UY', 'GUY': 'GY', 'SUR': 'SR', 'GUF': 'GF', 'EGY': 'EG',
+    'ZAF': 'ZA', 'NGA': 'NG', 'KEN': 'KE', 'ETH': 'ET', 'GHA': 'GH',
+    'TZA': 'TZ', 'UGA': 'UG', 'DZA': 'DZ', 'MAR': 'MA', 'TUN': 'TN',
+    'LBY': 'LY', 'SDN': 'SD', 'SSD': 'SS', 'SOM': 'SO', 'ERI': 'ER',
+    'DJI': 'DJ', 'CMR': 'CM', 'CIV': 'CI', 'SEN': 'SN', 'MLI': 'ML',
+    'BFA': 'BF', 'NER': 'NE', 'TCD': 'TD', 'MRT': 'MR', 'GMB': 'GM',
+    'GNB': 'GW', 'GIN': 'GN', 'SLE': 'SL', 'LBR': 'LR', 'BEN': 'BJ',
+    'TGO': 'TG', 'GAB': 'GA', 'GNQ': 'GQ', 'COG': 'CG', 'COD': 'CD',
+    'CAF': 'CF', 'AGO': 'AO', 'ZMB': 'ZM', 'ZWE': 'ZW', 'MWI': 'MW',
+    'MOZ': 'MZ', 'NAM': 'NA', 'BWA': 'BW', 'LSO': 'LS', 'SWZ': 'SZ',
+    'MDG': 'MG', 'COM': 'KM', 'SYC': 'SC', 'MUS': 'MU', 'REU': 'RE',
+    'MYT': 'YT', 'SAU': 'SA', 'ARE': 'AE', 'OMN': 'OM', 'YEM': 'YE',
+    'IRQ': 'IQ', 'IRN': 'IR', 'SYR': 'SY', 'JOR': 'JO', 'LBN': 'LB',
+    'ISR': 'IL', 'PSE': 'PS', 'KWT': 'KW', 'BHR': 'BH', 'QAT': 'QA',
+    'ASC': 'AS', // Ascension Island
+  };
   
-  const normalized = alpha2.toUpperCase().trim();
-  
-  // If already 3 letters, return as-is
-  if (normalized.length === 3) {
-    return normalized;
-  }
-  
-  // If not 2 letters, return null
-  if (normalized.length !== 2) {
-    console.warn(`Invalid country code length: ${alpha2}`);
-    return null;
-  }
-  
-  const alpha3 = COUNTRY_CODE_MAP[normalized];
-  
-  if (!alpha3) {
-    console.warn(`Unknown country code: ${alpha2}`);
-    return null;
-  }
-  
-  return alpha3;
+  return mapping[alpha3] || alpha3.substring(0, 2); // Fallback to first 2 chars
 }
 
 /**
- * Normalize country code for KYC provider
- * - KYCAID: uses alpha-2 (2-letter)
- * - Sumsub: uses alpha-3 (3-letter)
- * 
- * @param countryCode - Country code (2 or 3 letters)
- * @param provider - KYC provider ('kycaid' or 'sumsub')
- * @returns Normalized country code for the provider
+ * Format date for KYC providers
+ * Returns: YYYY-MM-DD
  */
-export function normalizeCountryCodeForProvider(
-  countryCode: string | null | undefined,
-  provider: 'kycaid' | 'sumsub'
-): string | null {
-  if (!countryCode) return null;
+export function formatDateForKyc(date: Date | null): string {
+  if (!date) return '';
   
-  const normalized = countryCode.toUpperCase().trim();
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
   
-  if (provider === 'sumsub') {
-    // Sumsub requires alpha-3 (3-letter)
-    return convertAlpha2ToAlpha3(normalized);
-  } else {
-    // KYCAID uses alpha-2 (2-letter)
-    // If already 2 letters, return as-is
-    if (normalized.length === 2) {
-      return normalized;
-    }
-    
-    // If 3 letters, try to reverse lookup (not implemented, just return as-is)
-    console.warn(`KYCAID expects alpha-2, but got: ${countryCode}`);
-    return normalized;
-  }
+  return `${year}-${month}-${day}`;
 }
-

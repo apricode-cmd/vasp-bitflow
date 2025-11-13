@@ -1187,14 +1187,17 @@ export class SumsubAdapter implements IKycProvider {
         addresses: addresses.length > 0 ? addresses : undefined
       };
       
+      // LOG the EXACT payload we're sending
+      console.log('📤 [SUMSUB UPDATE] Payload to send:', JSON.stringify(bodyObj, null, 2));
+      
       const body = JSON.stringify(bodyObj);
       const { headers } = this.buildRequest(method, path, body);
       
-      console.log('🔄 Updating Sumsub applicant:', {
+      console.log('🔄 [SUMSUB UPDATE] Updating applicant:', {
         applicantId,
-        email: userData.email,
-        nationality: `${userData.nationality} → ${nationalityAlpha3}`,
-        residence: `${userData.residenceCountry} → ${residenceAlpha3}`
+        path,
+        method,
+        bodySize: body.length
       });
       
       const response = await fetch(this.baseUrl + path, {
@@ -1205,7 +1208,7 @@ export class SumsubAdapter implements IKycProvider {
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        console.error('❌ Sumsub update failed:', {
+        console.error('❌ [SUMSUB UPDATE] Failed:', {
           status: response.status,
           statusText: response.statusText,
           error: errorData
@@ -1217,7 +1220,7 @@ export class SumsubAdapter implements IKycProvider {
       }
       
       const data = await response.json();
-      console.log('✅ Applicant updated in Sumsub:', data);
+      console.log('✅ [SUMSUB UPDATE] Success! Response:', JSON.stringify(data, null, 2));
       
       return { success: true };
       
