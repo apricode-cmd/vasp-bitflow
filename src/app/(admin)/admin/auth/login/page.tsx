@@ -16,7 +16,8 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Shield, AlertCircle, Loader2, Key } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -51,6 +52,7 @@ interface AuthMethods {
 }
 
 export default function AdminLoginPage(): React.ReactElement {
+  const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [adminEmail, setAdminEmail] = useState<string | null>(null);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
@@ -62,6 +64,35 @@ export default function AdminLoginPage(): React.ReactElement {
       email: '',
     },
   });
+
+  // Handle error from URL params (after failed login redirect)
+  useEffect(() => {
+    const urlError = searchParams.get('error');
+    if (urlError) {
+      let errorMessage = 'Authentication failed. Please try again.';
+      
+      switch (urlError) {
+        case 'CredentialsSignin':
+          errorMessage = 'Invalid credentials. Please check your password and TOTP code.';
+          break;
+        case 'AccessDenied':
+          errorMessage = 'Access denied. Your account may be suspended.';
+          break;
+        case 'Configuration':
+          errorMessage = 'Authentication configuration error. Please contact support.';
+          break;
+        default:
+          errorMessage = `Authentication error: ${urlError}`;
+      }
+      
+      setError(errorMessage);
+      
+      // Clear URL params after showing error
+      if (window.history.replaceState) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+  }, [searchParams]);
 
   const handleEmailSubmit = async (data: EmailInput) => {
     setIsCheckingEmail(true);
