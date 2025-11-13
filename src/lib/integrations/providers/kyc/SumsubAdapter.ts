@@ -312,8 +312,6 @@ export class SumsubAdapter implements IKycProvider {
 
       const bodyObj = {
         externalUserId: externalUserId, // May have suffix on retry
-        email: userData.email,
-        phone: userData.phone,
         fixedInfo: {
           firstName: userData.firstName,
           lastName: userData.lastName,
@@ -321,7 +319,9 @@ export class SumsubAdapter implements IKycProvider {
           placeOfBirth: (userData as any).placeOfBirth || undefined,
           country: residenceAlpha3, // Country of residence (where they live)
           nationality: nationalityAlpha3, // Nationality/citizenship (passport country)
-          gender: (userData as any).gender || undefined, // M/F if available
+          email: userData.email, // ✅ MOVED to fixedInfo
+          phone: userData.phone, // ✅ MOVED to fixedInfo
+          gender: this.convertGenderForSumsub((userData as any).gender), // ✅ MALE/FEMALE/X
           taxResidence: residenceAlpha3, // Tax residence = residence country (not nationality!)
           addresses: addresses.length > 0 ? addresses : undefined
         }
@@ -1130,6 +1130,131 @@ export class SumsubAdapter implements IKycProvider {
         error: error.message
       };
     }
+  }
+
+  /**
+   * Update applicant's fixedInfo
+   * Used when user updates profile or submits updated KYC form
+   */
+  async updateApplicant(
+    applicantId: string, 
+    userData: KycUserData
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      if (!this.isConfigured()) {
+        throw new Error('Sumsub provider not configured');
+      }
+
+      const path = `/resources/applicants/${applicantId}/fixedInfo`;
+      const method = 'PATCH';
+      
+      // Convert country codes from alpha-2 to alpha-3 for Sumsub
+      const nationalityAlpha3 = normalizeCountryCodeForProvider(userData.nationality, 'sumsub');
+      const residenceAlpha3 = normalizeCountryCodeForProvider(userData.residenceCountry || userData.nationality, 'sumsub');
+      
+      if (!nationalityAlpha3) {
+        throw new Error(`Invalid nationality code: ${userData.nationality}`);
+      }
+      
+      if (!residenceAlpha3) {
+        throw new Error(`Invalid residence country code: ${userData.residenceCountry}`);
+      }
+      
+      // Prepare addresses array
+      const addresses = [];
+      if (userData.address || userData.city || userData.postalCode) {
+        addresses.push({
+          country: residenceAlpha3,
+          postCode: userData.postalCode || undefined,
+          town: userData.city || undefined,
+          street: userData.address || undefined,
+          state: undefined
+        });
+      }
+      
+      // Build fixedInfo payload (EXACTLY as Sumsub expects)
+      const bodyObj = {
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        dob: userData.dateOfBirth,              // YYYY-MM-DD
+        placeOfBirth: (userData as any).placeOfBirth || undefined,
+        country: residenceAlpha3,               // ISO-3
+        nationality: nationalityAlpha3,         // ISO-3
+        email: userData.email,                  // ✅ IN fixedInfo
+        phone: userData.phone,                  // ✅ IN fixedInfo
+        gender: this.convertGenderForSumsub((userData as any).gender), // ✅ MALE/FEMALE/X
+        taxResidence: residenceAlpha3,
+        addresses: addresses.length > 0 ? addresses : undefined
+      };
+      
+      const body = JSON.stringify(bodyObj);
+      const { headers } = this.buildRequest(method, path, body);
+      
+      console.log('🔄 Updating Sumsub applicant:', {
+        applicantId,
+        email: userData.email,
+        nationality: `${userData.nationality} → ${nationalityAlpha3}`,
+        residence: `${userData.residenceCountry} → ${residenceAlpha3}`
+      });
+      
+      const response = await fetch(this.baseUrl + path, {
+        method: method,
+        headers,
+        body
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: response.statusText }));
+        console.error('❌ Sumsub update failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+        return {
+          success: false,
+          error: errorData.description || errorData.message || `Update failed: ${response.status}`
+        };
+      }
+      
+      const data = await response.json();
+      console.log('✅ Applicant updated in Sumsub:', data);
+      
+      return { success: true };
+      
+    } catch (error: any) {
+      console.error('❌ Update applicant error:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to update applicant'
+      };
+    }
+  }
+
+  /**
+   * Convert gender format for Sumsub
+   * Our format: M | F | O
+   * Sumsub format: MALE | FEMALE | X
+   */
+  private convertGenderForSumsub(gender?: string): string | undefined {
+    if (!gender) return undefined;
+    
+    const mapping: Record<string, string> = {
+      'M': 'MALE',
+      'F': 'FEMALE',
+      'O': 'X',
+      'MALE': 'MALE',     // Already correct
+      'FEMALE': 'FEMALE', // Already correct
+      'X': 'X'            // Already correct
+    };
+    
+    const result = mapping[gender.toUpperCase()];
+    
+    if (!result) {
+      console.warn(`⚠️ Unknown gender value: ${gender}, skipping`);
+      return undefined;
+    }
+    
+    return result;
   }
 }
 

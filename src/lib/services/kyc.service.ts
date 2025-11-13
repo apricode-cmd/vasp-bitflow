@@ -257,7 +257,7 @@ export async function startKycVerification(userId: string) {
     console.log('  nationality:', user.profile.nationality, '→', userData.nationality);
     console.log('  residenceCountry:', user.profile.country, '→', userData.residenceCountry);
     
-    // Step 1: Create applicant (or use existing if already created)
+    // Step 1: Create applicant (or update existing if already created)
     let applicant: any;
     try {
       applicant = await provider.createApplicant(userData);
@@ -273,7 +273,22 @@ export async function startKycVerification(userId: string) {
         
         if (match && match[1]) {
           const existingApplicantId = match[1];
-          console.log(`✅ Using existing applicant: ${existingApplicantId}`);
+          console.log(`🔄 Found existing applicant: ${existingApplicantId}`);
+          
+          // UPDATE applicant with current data
+          if (provider.updateApplicant) {
+            console.log('📝 Updating applicant with current profile data...');
+            const updateResult = await provider.updateApplicant(existingApplicantId, userData);
+            
+            if (updateResult.success) {
+              console.log('✅ Applicant updated successfully in provider');
+            } else {
+              console.warn('⚠️ Failed to update applicant in provider:', updateResult.error);
+              // Continue anyway - use existing applicant
+            }
+          } else {
+            console.warn('⚠️ Provider does not support updateApplicant, using stale data');
+          }
           
           applicant = {
             applicantId: existingApplicantId,

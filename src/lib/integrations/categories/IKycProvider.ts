@@ -206,5 +206,17 @@ export interface IKycProvider extends IIntegrationProvider {
    * @param applicantId - Provider's applicant ID
    */
   checkRequiredDocuments?(applicantId: string): Promise<KycRequiredDocsCheck>;
+
+  /**
+   * Update applicant's fixed info (personal data)
+   * Used when user updates profile or submits KYC form with new data
+   * 
+   * @param applicantId - Provider's applicant ID
+   * @param userData - Updated user data
+   */
+  updateApplicant?(applicantId: string, userData: KycUserData): Promise<{
+    success: boolean;
+    error?: string;
+  }>;
 }
 
