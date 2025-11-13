@@ -35,6 +35,18 @@ export default function KycVerifyPage({ params }: VerifyPageProps) {
   useEffect(() => {
     if (!token) return;
 
+    // Set full-screen styles IMMEDIATELY (before SDK loads)
+    document.documentElement.style.height = '100%';
+    document.documentElement.style.margin = '0';
+    document.documentElement.style.padding = '0';
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.height = '100%';
+    document.body.style.margin = '0';
+    document.body.style.padding = '0';
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+
     const initializeSumsub = async () => {
       try {
         console.log('🔐 Initializing white-label KYC verification...');
@@ -124,16 +136,7 @@ export default function KycVerifyPage({ params }: VerifyPageProps) {
 
         console.log('✅ Container found, initializing SDK...');
 
-        // 5. Set body and html styles for full-screen experience
-        document.documentElement.style.height = '100%';
-        document.documentElement.style.margin = '0';
-        document.documentElement.style.padding = '0';
-        document.body.style.height = '100%';
-        document.body.style.margin = '0';
-        document.body.style.padding = '0';
-        document.body.style.overflow = 'hidden';
-
-        // 6. Initialize WebSDK
+        // 5. Initialize WebSDK
         const snsWebSdk = (window as any).snsWebSdk;
         if (!snsWebSdk) {
           throw new Error('Sumsub SDK object not available on window');
@@ -164,17 +167,41 @@ export default function KycVerifyPage({ params }: VerifyPageProps) {
               customCssStr: `
                 html, body {
                   height: 100% !important;
+                  min-height: 100vh !important;
+                  min-height: -webkit-fill-available !important;
                   margin: 0 !important;
                   padding: 0 !important;
                   overflow: hidden !important;
+                  position: fixed !important;
+                  width: 100% !important;
                 }
+                
                 #sumsub-websdk-container { 
                   height: 100vh !important;
+                  height: -webkit-fill-available !important;
                   width: 100vw !important;
+                  position: fixed !important;
+                  top: 0 !important;
+                  left: 0 !important;
+                  right: 0 !important;
+                  bottom: 0 !important;
+                  overflow: auto !important;
+                  -webkit-overflow-scrolling: touch !important;
                 }
+                
                 iframe {
-                  height: 100vh !important;
-                  width: 100vw !important;
+                  height: 100% !important;
+                  min-height: 100vh !important;
+                  min-height: -webkit-fill-available !important;
+                  width: 100% !important;
+                  border: none !important;
+                }
+                
+                /* Fix for mobile Safari address bar */
+                @supports (-webkit-touch-callout: none) {
+                  html, body, #sumsub-websdk-container {
+                    height: -webkit-fill-available !important;
+                  }
                 }
               `
             }
@@ -207,21 +234,40 @@ export default function KycVerifyPage({ params }: VerifyPageProps) {
     };
 
     initializeSumsub();
+
+    // Cleanup function to restore body styles on unmount
+    return () => {
+      document.documentElement.style.cssText = '';
+      document.body.style.cssText = '';
+    };
   }, [token, router]);
 
   // Success state
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <div className="max-w-md w-full space-y-6 text-center">
+      <div 
+        className="flex items-center justify-center bg-background p-4"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100vw',
+          height: '100vh',
+          minHeight: '-webkit-fill-available',
+          overflow: 'hidden'
+        }}
+      >
+        <div className="max-w-md w-full space-y-6 text-center px-4">
           <div className="flex justify-center">
             <div className="rounded-full bg-green-500/10 p-4">
               <CheckCircle2 className="h-16 w-16 text-green-600" />
             </div>
           </div>
           <div className="space-y-3">
-            <h1 className="text-3xl font-bold">Verification Submitted!</h1>
-            <p className="text-muted-foreground text-lg">
+            <h1 className="text-2xl sm:text-3xl font-bold">Verification Submitted!</h1>
+            <p className="text-muted-foreground text-base sm:text-lg">
               Thank you for completing the verification process.
             </p>
             <p className="text-sm text-muted-foreground">
@@ -241,16 +287,29 @@ export default function KycVerifyPage({ params }: VerifyPageProps) {
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <div className="max-w-md w-full space-y-4 text-center">
+      <div 
+        className="flex items-center justify-center bg-background p-4"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100vw',
+          height: '100vh',
+          minHeight: '-webkit-fill-available',
+          overflow: 'hidden'
+        }}
+      >
+        <div className="max-w-md w-full space-y-4 text-center px-4">
           <div className="flex justify-center">
             <div className="rounded-full bg-destructive/10 p-3">
-              <AlertCircle className="h-8 w-8 text-destructive" />
+              <AlertCircle className="h-12 w-12 sm:h-16 sm:w-16 text-destructive" />
             </div>
           </div>
           <div className="space-y-2">
-            <h1 className="text-2xl font-bold">Verification Error</h1>
-            <p className="text-muted-foreground">{error}</p>
+            <h1 className="text-xl sm:text-2xl font-bold">Verification Error</h1>
+            <p className="text-sm sm:text-base text-muted-foreground break-words">{error}</p>
           </div>
           <div className="pt-2">
             <p className="text-xs text-muted-foreground">
@@ -265,11 +324,24 @@ export default function KycVerifyPage({ params }: VerifyPageProps) {
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-4">
+      <div 
+        className="flex items-center justify-center bg-background"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100vw',
+          height: '100vh',
+          minHeight: '-webkit-fill-available',
+          overflow: 'hidden'
+        }}
+      >
+        <div className="text-center space-y-4 px-4">
           <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
           <div className="space-y-2">
-            <h2 className="text-xl font-semibold">Loading Verification</h2>
+            <h2 className="text-lg sm:text-xl font-semibold">Loading Verification</h2>
             <p className="text-sm text-muted-foreground">
               Please wait while we prepare your verification...
             </p>
@@ -291,8 +363,11 @@ export default function KycVerifyPage({ params }: VerifyPageProps) {
         bottom: 0,
         width: '100vw',
         height: '100vh',
+        minHeight: '-webkit-fill-available',
         zIndex: 9999,
-        overflow: 'auto'
+        overflow: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        backgroundColor: '#ffffff'
       }}
     />
   );
