@@ -146,7 +146,7 @@ export function PasswordTotpLogin({ email, onSuccess, onError }: PasswordTotpLog
             id="totpCode"
             type="text"
             inputMode="numeric"
-            pattern="[0-9]*"
+            pattern="[0-9]{6}"
             maxLength={6}
             placeholder="000000"
             value={totpCode}
