@@ -32,6 +32,7 @@ interface SumsubConfig extends BaseIntegrationConfig {
   secretKey?: string;
   levelName?: string;
   baseUrl?: string;
+  webhookSecret?: string; // ✅ For webhook signature verification
 }
 
 /**
@@ -62,7 +63,7 @@ export class SumsubAdapter implements IKycProvider {
       iconUrl: this.iconUrl,
       docsUrl: this.docsUrl,
       requiredFields: ['appToken', 'secretKey', 'levelName'],
-      optionalFields: ['baseUrl'],
+      optionalFields: ['baseUrl', 'webhookSecret'],
       features: [
         'KYC Verification',
         'Liveness Detection',
