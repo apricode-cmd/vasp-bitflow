@@ -209,6 +209,7 @@ export const {
               action: 'ADMIN_LOGIN',
               entity: 'Admin',
               entityId: admin.id,
+              entityType: 'Admin',
               metadata: {
                 authMethod: 'PASSWORD_TOTP',
                 email: admin.email || admin.workEmail,
