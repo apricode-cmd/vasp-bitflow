@@ -860,10 +860,6 @@ export class SumsubAdapter implements IKycProvider {
       const path = `/resources/applicants/${applicantId}/info/idDoc`;
       const method = 'POST';
       
-      // Prepare FormData FIRST (before signature calculation)
-      const FormData = require('form-data');
-      const formData = new FormData();
-      
       // Convert file to Buffer if needed
       let fileBuffer: Buffer;
       if (Buffer.isBuffer(file)) {
@@ -874,9 +870,6 @@ export class SumsubAdapter implements IKycProvider {
         fileBuffer = Buffer.from(arrayBuffer);
       }
       
-      // Add metadata as JSON string
-      formData.append('metadata', JSON.stringify(metadata));
-      
       // Detect content type from filename
       let contentType = 'application/octet-stream';
       if (fileName.endsWith('.pdf')) {
@@ -886,41 +879,55 @@ export class SumsubAdapter implements IKycProvider {
       } else if (fileName.endsWith('.jpg') || fileName.endsWith('.jpeg')) {
         contentType = 'image/jpeg';
       }
-      
-      // Add file content
-      formData.append('content', fileBuffer, {
-        filename: fileName,
-        contentType
-      });
 
-      // CRITICAL: Calculate signature AFTER form is complete
-      // For multipart/form-data, signature must include the FULL body (with boundaries and file)
-      const ts = Math.floor(Date.now() / 1000).toString();
-      const formBuffer = formData.getBuffer(); // Get EXACT body that will be sent
+      // CRITICAL: Build multipart body MANUALLY to avoid chunked encoding
+      // This ensures the signed buffer is EXACTLY what gets sent
+      const boundary = '----SumsubBoundary' + Date.now();
       
-      // Create HMAC with full body
+      // Build multipart parts (following RFC 2046)
+      const metaPart = 
+        `--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="metadata"\r\n\r\n` +
+        `${JSON.stringify(metadata)}\r\n`;
+      
+      const contentPart = 
+        `--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="content"; filename="${fileName}"\r\n` +
+        `Content-Type: ${contentType}\r\n\r\n`;
+      
+      const endPart = `\r\n--${boundary}--`;
+      
+      // Combine all parts into single buffer
+      const bodyBuffer = Buffer.concat([
+        Buffer.from(metaPart, 'utf-8'),
+        Buffer.from(contentPart, 'utf-8'),
+        fileBuffer,
+        Buffer.from(endPart, 'utf-8')
+      ]);
+
+      // Calculate signature with EXACT buffer that will be sent
+      const ts = Math.floor(Date.now() / 1000).toString();
       const crypto = require('crypto');
       const hmac = crypto.createHmac('sha256', this.config.secretKey!);
       hmac.update(ts + method.toUpperCase() + path);
-      hmac.update(formBuffer); // Add the FULL form body
+      hmac.update(bodyBuffer); // Sign the EXACT buffer we'll send
       const signature = hmac.digest('hex');
       
-      console.log('🔐 [SUMSUB] Signature calculation (with FULL body):', {
+      console.log('🔐 [SUMSUB] Signature calculation (manual multipart):', {
         timestamp: ts,
         method: method,
         path: path,
-        bodySize: formBuffer.length,
-        bodyPreview: formBuffer.slice(0, 100).toString('hex').substring(0, 40) + '...',
+        bodySize: bodyBuffer.length,
+        bodyPreview: bodyBuffer.slice(0, 100).toString('hex').substring(0, 40) + '...',
         signature: signature,
         signatureLength: signature.length,
-        secretKeyPresent: !!this.config.secretKey,
-        secretKeyLength: this.config.secretKey?.length || 0,
-        baseUrl: this.baseUrl,
-        fullUrl: `${this.baseUrl}${path}`
+        boundary: boundary
       });
 
-      // Build headers manually (don't use buildRequest - it doesn't include body)
+      // Build headers with EXACT Content-Length to avoid chunked encoding
       const headers: any = {
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': bodyBuffer.length.toString(),
         'X-App-Token': this.config.appToken!,
         'X-App-Access-Ts': ts,
         'X-App-Access-Sig': signature
@@ -930,72 +937,76 @@ export class SumsubAdapter implements IKycProvider {
         headers['X-Return-Doc-Warnings'] = 'true';
       }
 
-      // Make request using Node.js fetch with manual headers
-      const url = `${this.baseUrl}${path}`;
       console.log('📤 [SUMSUB] Uploading document:', {
         applicantId,
         fileName,
         metadata,
-        url,
         fileSize: fileBuffer.length,
-        contentType,
-        formBodySize: formBuffer.length
+        bodySize: bodyBuffer.length,
+        boundary: boundary.substring(0, 30) + '...'
       });
-
-      // Prepare headers with form-data boundary
-      const formHeaders = formData.getHeaders();
-      const finalHeaders = {
-        ...headers, // Our auth headers (X-App-Token, X-App-Access-Ts, X-App-Access-Sig)
-        ...formHeaders // Form-data headers (Content-Type with boundary)
-      };
       
       console.log('📡 [SUMSUB] Request headers:', {
-        'X-App-Token': finalHeaders['X-App-Token']?.substring(0, 20) + '...',
-        'X-App-Access-Ts': finalHeaders['X-App-Access-Ts'],
-        'X-App-Access-Sig': finalHeaders['X-App-Access-Sig']?.substring(0, 20) + '...',
-        'X-Return-Doc-Warnings': finalHeaders['X-Return-Doc-Warnings'],
-        'Content-Type': finalHeaders['content-type']?.substring(0, 70) + '...',
-        'Content-Length': formHeaders['content-length'] || formBuffer.length
+        'Content-Type': headers['Content-Type'].substring(0, 60) + '...',
+        'Content-Length': headers['Content-Length'],
+        'X-App-Token': headers['X-App-Token']?.substring(0, 20) + '...',
+        'X-App-Access-Ts': headers['X-App-Access-Ts'],
+        'X-App-Access-Sig': headers['X-App-Access-Sig']?.substring(0, 20) + '...',
+        'X-Return-Doc-Warnings': headers['X-Return-Doc-Warnings']
       });
       
-      // Use fetch with Node.js (not axios)
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: finalHeaders as any,
-        body: formData as any
+      // CRITICAL: Use https.request to send EXACT buffer (avoid chunked encoding)
+      // This ensures server receives EXACTLY what we signed
+      const https = require('https');
+      const url = new URL(`${this.baseUrl}${path}`);
+      
+      const responseData: any = await new Promise((resolve, reject) => {
+        const req = https.request(
+          {
+            hostname: url.hostname,
+            path: url.pathname,
+            method: 'POST',
+            headers: headers
+          },
+          (res: any) => {
+            let raw = '';
+            res.on('data', (chunk: any) => (raw += chunk));
+            res.on('end', () => {
+              try {
+                const data = JSON.parse(raw);
+                resolve({ status: res.statusCode, data });
+              } catch {
+                resolve({ status: res.statusCode, data: { message: raw } });
+              }
+            });
+          }
+        );
+        
+        req.on('error', reject);
+        req.write(bodyBuffer); // Send EXACT signed buffer
+        req.end();
       });
 
-      const responseText = await response.text();
-      let responseData: any;
-      
-      try {
-        responseData = JSON.parse(responseText);
-      } catch {
-        responseData = { message: responseText };
-      }
-
-      if (response.status !== 200 && response.status !== 201) {
+      if (responseData.status !== 200 && responseData.status !== 201) {
         console.error('❌ [SUMSUB] Upload failed:', {
-          status: response.status,
-          statusText: response.statusText,
-          data: responseData,
-          responseText: responseText.substring(0, 500)
+          status: responseData.status,
+          data: responseData.data
         });
 
         return {
           success: false,
-          error: responseData.description || responseData.message || `Upload failed: ${response.status}`
+          error: responseData.data.description || responseData.data.message || `Upload failed: ${responseData.status}`
         };
       }
 
-      console.log('✅ [SUMSUB] Document uploaded:', responseData);
+      console.log('✅ [SUMSUB] Document uploaded:', responseData.data);
 
       return {
         success: true,
-        documentId: responseData.documentId,
-        imageIds: responseData.imageIds || [],
-        status: responseData.reviewStatus,
-        warnings: responseData.warnings || []
+        documentId: responseData.data.documentId,
+        imageIds: responseData.data.imageIds || [],
+        status: responseData.data.reviewStatus,
+        warnings: responseData.data.warnings || []
       };
 
     } catch (error: any) {
