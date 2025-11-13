@@ -99,8 +99,8 @@ async function uploadToLocalFS(
   // Write file
   await writeFile(filePath, buffer);
 
-  // Generate public URL
-  const publicUrl = `/uploads/kyc/${folder}/${uniqueName}`;
+  // Generate public URL (folder already contains full path like 'kyc/userId')
+  const publicUrl = `/uploads/${folder}/${uniqueName}`;
 
   console.log('✅ [LOCAL] File uploaded to local filesystem:', {
     url: publicUrl,
