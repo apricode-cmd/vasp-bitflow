@@ -102,18 +102,41 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // FIRST: Get applicant details to see what's required
     console.log('🔍 Fetching applicant details from Sumsub...');
     
+    let requiredIdDocs: any = null;
     try {
       const applicantDetails = await kycProvider.getApplicant(applicantId);
       console.log('📋 Applicant details:', JSON.stringify(applicantDetails.metadata, null, 2));
       
-      // Check requiredIdDocs
+      // Check requiredIdDocs structure
       if (applicantDetails.metadata?.requiredIdDocs) {
-        console.log('📄 Required ID Docs:', JSON.stringify(applicantDetails.metadata.requiredIdDocs, null, 2));
+        requiredIdDocs = applicantDetails.metadata.requiredIdDocs;
+        console.log('📄 Required ID Docs structure:', JSON.stringify(requiredIdDocs, null, 2));
+        
+        // Check if requiredIdDocs has docSets (for SDK-only levels)
+        if (requiredIdDocs.docSets && requiredIdDocs.docSets.length > 0) {
+          console.log('⚠️ This level requires SDK verification!');
+          console.log('📱 DocSets:', JSON.stringify(requiredIdDocs.docSets, null, 2));
+          
+          // For SDK-only levels, skip document upload via API
+          return NextResponse.json({
+            success: true,
+            message: 'This level requires SDK verification. Documents cannot be uploaded via API.',
+            useSdk: true,
+            synced: 0,
+            failed: 0,
+            errors: []
+          });
+        }
       }
       
       // Check review status
       if (applicantDetails.metadata?.review) {
         console.log('📊 Review status:', JSON.stringify(applicantDetails.metadata.review, null, 2));
+      }
+      
+      // Check fixedInfo to verify APPLICANT_DATA is complete
+      if (applicantDetails.metadata?.info) {
+        console.log('👤 Fixed Info:', JSON.stringify(applicantDetails.metadata.info, null, 2));
       }
     } catch (error: any) {
       console.error('⚠️ Failed to get applicant details:', error.message);
