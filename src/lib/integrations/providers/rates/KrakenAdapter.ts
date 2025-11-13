@@ -18,6 +18,7 @@ import {
   IntegrationTestResult
 } from '../../types';
 import axios, { AxiosInstance } from 'axios';
+import { prisma } from '@/lib/prisma';
 
 /**
  * Kraken-specific configuration
@@ -278,6 +279,8 @@ export class KrakenAdapter implements IRatesProvider {
    * Fetches ticker data for all supported pairs in a single API call.
    * Results are cached for 30 seconds to optimize performance.
    * 
+   * ✅ Dynamically reads from Currency table (like CoinGecko)
+   * 
    * @param forceRefresh Skip cache and fetch fresh data
    * @returns Object with all exchange rates
    */
@@ -297,8 +300,64 @@ export class KrakenAdapter implements IRatesProvider {
       const startTime = Date.now();
       console.log('🔄 [Kraken] Fetching fresh rates' + (forceRefresh ? ' (forced refresh)' : '') + '...');
 
+      // ✅ Get active currencies from database dynamically (like CoinGecko)
+      const currencies = await prisma.currency.findMany({
+        where: { 
+          isActive: true
+        },
+        select: {
+          code: true,
+          name: true,
+          symbol: true
+        }
+      });
+
+      // ✅ Get active fiat currencies from database
+      const fiatCurrencies = await prisma.fiatCurrency.findMany({
+        where: { 
+          isActive: true
+        },
+        select: {
+          code: true
+        }
+      });
+
+      if (currencies.length === 0) {
+        throw new Error('No active currencies found in database');
+      }
+
+      if (fiatCurrencies.length === 0) {
+        throw new Error('No active fiat currencies found in database');
+      }
+
+      console.log(`💰 [Kraken] Fetching rates for ${currencies.length} cryptos × ${fiatCurrencies.length} fiats`);
+
+      // Build all pairs dynamically from database data
+      const pairsToFetch: string[] = [];
+      const pairMapping: Map<string, { crypto: string; fiat: string }> = new Map();
+
+      for (const currency of currencies) {
+        for (const fiat of fiatCurrencies) {
+          const krakenPair = this.getPairNotation(currency.code, fiat.code);
+          
+          if (krakenPair) {
+            pairsToFetch.push(krakenPair);
+            pairMapping.set(krakenPair, {
+              crypto: currency.code,
+              fiat: fiat.code
+            });
+          }
+        }
+      }
+
+      if (pairsToFetch.length === 0) {
+        throw new Error('No supported Kraken pairs found for active currencies');
+      }
+
       // Fetch all pairs at once (Kraken supports multiple pairs in one request)
-      const allPairs = Object.values(this.pairMapping).join(',');
+      const allPairs = pairsToFetch.join(',');
+      
+      console.log(`🔄 [Kraken] Fetching ${pairsToFetch.length} pairs:`, pairsToFetch.slice(0, 5).join(', '), '...');
       
       const response = await this.client!.get<KrakenTickerResponse>('/0/public/Ticker', {
         params: { pair: allPairs }
@@ -313,11 +372,11 @@ export class KrakenAdapter implements IRatesProvider {
       const rates: ExchangeRates = {};
       let pairsProcessed = 0;
       
-      for (const [ourPair, krakenPair] of Object.entries(this.pairMapping)) {
-        const ticker = response.data.result[krakenPair];
+      for (const [krakenPair, ticker] of Object.entries(response.data.result)) {
+        const mapping = pairMapping.get(krakenPair);
         
-        if (ticker) {
-          const [crypto, fiat] = ourPair.split('-');
+        if (mapping && ticker) {
+          const { crypto, fiat } = mapping;
           
           if (!rates[crypto]) {
             rates[crypto] = {};
