@@ -1,11 +1,14 @@
 /**
  * POST /api/kyc/submit-form
  * Save all KYC form data to KycFormData table
+ * AND update applicant data in Sumsub
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getClientSession } from '@/auth-client';
 import { prisma } from '@/lib/prisma';
+import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
+import { KycUserData } from '@/lib/integrations/categories/IKycProvider';
 
 export async function POST(request: NextRequest) {
   try {
@@ -108,6 +111,78 @@ export async function POST(request: NextRequest) {
 
     if (documentsLinked.count > 0) {
       console.log(`✅ Linked ${documentsLinked.count} documents to session`);
+    }
+
+    // UPDATE applicant in Sumsub with latest profile data
+    if (kycSession.applicantId && kycSession.kycProviderId) {
+      console.log('🔄 Updating applicant in provider with current profile...');
+      
+      try {
+        // Get user profile
+        const user = await prisma.user.findUnique({
+          where: { id: session.user.id },
+          include: { profile: true }
+        });
+
+        if (user?.profile) {
+          // Convert Alpha-3 to ISO-2 for provider
+          const alpha3ToIso2 = (alpha3: string): string => {
+            const mapping: Record<string, string> = {
+              'USA': 'US', 'GBR': 'GB', 'POL': 'PL', 'DEU': 'DE', 'FRA': 'FR',
+              'ESP': 'ES', 'ITA': 'IT', 'UKR': 'UA', 'NLD': 'NL', 'BEL': 'BE',
+              'ASC': 'AS', // Ascension Island
+            };
+            return mapping[alpha3] || alpha3;
+          };
+
+          // Format date
+          const formatDateForKyc = (date: Date | null): string => {
+            if (!date) return '';
+            const d = new Date(date);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          };
+
+          // Prepare user data
+          const userData: KycUserData = {
+            email: user.email,
+            firstName: user.profile.firstName,
+            lastName: user.profile.lastName,
+            dateOfBirth: formatDateForKyc(user.profile.dateOfBirth),
+            nationality: alpha3ToIso2(user.profile.nationality),
+            residenceCountry: alpha3ToIso2(user.profile.country),
+            phone: user.profile.phoneNumber,
+            city: user.profile.city || undefined,
+            postalCode: user.profile.postalCode || undefined,
+            address: user.profile.address || undefined,
+            placeOfBirth: (user.profile as any).placeOfBirth || undefined,
+            gender: (user.profile as any).gender || undefined,
+            externalId: user.id
+          };
+
+          // Get KYC provider
+          const provider = await integrationFactory.getProviderByService(kycSession.kycProviderId);
+          
+          if (provider && provider.updateApplicant) {
+            const updateResult = await provider.updateApplicant(kycSession.applicantId, userData);
+            
+            if (updateResult.success) {
+              console.log('✅ Applicant updated in provider successfully');
+            } else {
+              console.warn('⚠️ Failed to update applicant in provider:', updateResult.error);
+            }
+          } else {
+            console.log('ℹ️ Provider does not support updateApplicant or not found');
+          }
+        }
+      } catch (updateError) {
+        console.error('⚠️ Failed to update applicant (non-critical):', updateError);
+        // Don't fail the whole request if update fails
+      }
+    } else {
+      console.log('ℹ️ No applicantId yet, skipping provider update');
     }
 
     return NextResponse.json({
