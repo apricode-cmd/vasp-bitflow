@@ -243,6 +243,7 @@ export async function startKycVerification(userId: string) {
       city: user.profile.city || undefined,
       postalCode: user.profile.postalCode || undefined,
       address: user.profile.address || undefined,
+      placeOfBirth: user.profile.placeOfBirth || undefined,
       externalId: userId
     };
 

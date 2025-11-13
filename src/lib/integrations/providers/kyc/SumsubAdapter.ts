@@ -287,6 +287,22 @@ export class SumsubAdapter implements IKycProvider {
         throw new Error(`Invalid or unsupported country code: ${userData.nationality}`);
       }
       
+      // Prepare addresses array if address data available
+      const addresses = [];
+      if (userData.address || userData.city || userData.postalCode) {
+        addresses.push({
+          country: countryAlpha3,
+          postCode: userData.postalCode || undefined,
+          town: userData.city || undefined,
+          street: userData.address || undefined,
+          subStreet: undefined, // Can add if needed
+          state: undefined, // Can add if needed
+          buildingName: undefined,
+          flatNumber: undefined,
+          buildingNumber: undefined
+        });
+      }
+
       const bodyObj = {
         externalUserId: externalUserId, // May have suffix on retry
         email: userData.email,
@@ -295,7 +311,11 @@ export class SumsubAdapter implements IKycProvider {
           firstName: userData.firstName,
           lastName: userData.lastName,
           dob: userData.dateOfBirth, // YYYY-MM-DD
-          country: countryAlpha3 // ISO3 code (USA, POL, ASM, etc.)
+          placeOfBirth: (userData as any).placeOfBirth || undefined,
+          country: countryAlpha3, // Country of residence - ISO3 code (USA, POL, etc.)
+          nationality: countryAlpha3, // Nationality - same as country for now
+          gender: (userData as any).gender || undefined, // M/F if available
+          addresses: addresses.length > 0 ? addresses : undefined
         }
       };
 

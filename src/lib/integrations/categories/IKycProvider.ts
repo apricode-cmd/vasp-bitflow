@@ -30,6 +30,8 @@ export interface KycUserData {
   address?: string;
   city?: string;
   postalCode?: string;
+  placeOfBirth?: string; // Place of birth (city/country)
+  gender?: 'M' | 'F'; // Gender (Male/Female)
   externalId?: string; // Our internal user ID
 }
 
