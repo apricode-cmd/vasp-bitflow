@@ -20,12 +20,9 @@ export async function GET(): Promise<NextResponse> {
     // Check admin authentication
     const authResult = await requireAdminRole('ADMIN');
     
-    // Check if it's an error response
+    // Check if it's an error response (unauthorized/forbidden)
     if (authResult instanceof NextResponse) {
       return authResult;
-    
-    // Check if it's an error response
-    const { session } = authResult;
     }
 
     // Get all registered providers from registry
@@ -92,10 +89,10 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     // Check if it's an error response
     if (authResult instanceof NextResponse) {
       return authResult;
-    
-    // Check if it's an error response
-    const { session } = authResult;
     }
+    
+    // Extract session from authResult
+    const { session } = authResult;
 
     if (!session?.user?.id) {
       return NextResponse.json(
