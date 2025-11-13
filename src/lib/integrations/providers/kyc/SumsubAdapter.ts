@@ -315,6 +315,7 @@ export class SumsubAdapter implements IKycProvider {
           country: countryAlpha3, // Country of residence - ISO3 code (USA, POL, etc.)
           nationality: countryAlpha3, // Nationality - same as country for now
           gender: (userData as any).gender || undefined, // M/F if available
+          taxResidence: countryAlpha3, // Tax residence - use nationality/residence country
           addresses: addresses.length > 0 ? addresses : undefined
         }
       };
