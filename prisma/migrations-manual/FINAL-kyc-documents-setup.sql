@@ -359,8 +359,67 @@ END $$;
 CREATE INDEX IF NOT EXISTS "KycDocument_userId_idx" ON "KycDocument"("userId");
 
 -- ================================================================
+-- STEP 8: Add gender field to Profile (UserProfile)
+-- ================================================================
+-- Required for Sumsub APPLICANT_DATA completion
+ALTER TABLE "Profile" 
+ADD COLUMN IF NOT EXISTS "gender" TEXT;
+
+-- Add constraint for valid values
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'Profile_gender_check'
+  ) THEN
+    ALTER TABLE "Profile"
+    ADD CONSTRAINT "Profile_gender_check" 
+    CHECK ("gender" IS NULL OR "gender" IN ('M', 'F', 'O'));
+  END IF;
+END $$;
+
+-- Add gender field to Sumsub KYC form (Step 1: Personal Information)
+INSERT INTO "KycFormField" (
+  "id",
+  "fieldName",
+  "label",
+  "fieldType",
+  "category",
+  "isRequired",
+  "isEnabled",
+  "priority",
+  "validation",
+  "createdAt",
+  "updatedAt"
+)
+SELECT 
+  gen_random_uuid(),
+  'gender',
+  'Gender',
+  'select',
+  'Personal Information',
+  false,
+  true,
+  85,
+  jsonb_build_object(
+    'options', jsonb_build_array(
+      jsonb_build_object('value', 'M', 'label', 'Male'),
+      jsonb_build_object('value', 'F', 'label', 'Female'),
+      jsonb_build_object('value', 'O', 'label', 'Other')
+    )
+  ),
+  NOW(),
+  NOW()
+WHERE NOT EXISTS (
+  SELECT 1 FROM "KycFormField" 
+  WHERE "fieldName" = 'gender'
+);
+
+-- ================================================================
 -- 🎉 FINAL SUCCESS!
--- Now users can upload documents BEFORE completing KYC form
--- Documents stored in Vercel Blob → sent to Sumsub on final submit
+-- Now users can:
+-- 1. Upload documents BEFORE completing KYC form
+-- 2. Documents stored in Vercel Blob → sent to Sumsub on final submit
+-- 3. Complete APPLICANT_DATA with all required fields (including gender)
 -- ================================================================
 

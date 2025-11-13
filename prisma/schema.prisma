@@ -22,7 +22,9 @@ model User {
   auditLogs                 AuditLog[]
   emailLogs                 EmailLog[]
   blockedIPs                IPBlacklist[]              @relation("BlockedBy")
+  kycDocuments              KycDocument[]
   kycSession                KycSession?
+  Notification              Notification[]
   notificationHistory       NotificationHistory[]
   notificationQueue         NotificationQueue[]
   notificationSubscriptions NotificationSubscription[]
@@ -40,7 +42,6 @@ model User {
   userAuditLogs             UserAuditLog[]             @relation("UserAuditLogs")
   kycLevelData              UserKycLevel?              @relation("UserKycLevelRelation")
   userWallets               UserWallet[]
-  kycDocuments              KycDocument[]
 
   @@index([email])
   @@index([role])
@@ -62,7 +63,6 @@ model Profile {
   updatedAt    DateTime  @updatedAt
   phoneCountry String?
   placeOfBirth String?
-  gender       String?   // M (Male), F (Female), O (Other)
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([country])
@@ -589,6 +589,7 @@ model AuditLog {
   @@index([isReviewable])
   @@index([userRole])
   @@index([mfaEventId])
+  @@index([context], map: "AuditLog_context_gin_idx", type: Gin)
 }
 
 model MfaEvent {
@@ -645,6 +646,7 @@ model SystemLog {
   @@index([level, createdAt(sort: Desc)])
   @@index([orgId, createdAt(sort: Desc)])
   @@index([eventType])
+  @@index([payload], map: "SystemLog_payload_gin_idx", type: Gin)
 }
 
 model EmailLog {
@@ -780,13 +782,10 @@ model KycFormField {
   validation Json?
   options    Json?
   priority   Int      @default(0)
-  
-  // Conditional logic (Phase 2)
-  dependsOn  String?  // Parent field name (e.g., 'pep_status', 'employment_status')
-  showWhen   Json?    // Condition object: {"operator": "!=", "value": "NO"}
-  
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  dependsOn  String?
+  showWhen   Json?
 
   @@index([category])
   @@index([isEnabled])
@@ -795,8 +794,7 @@ model KycFormField {
 
 model KycDocument {
   id               String      @id @default(cuid())
-  userId           String      // User who uploaded (before session created)
-  kycSessionId     String?     // Nullable - linked when session is created
+  kycSessionId     String?
   documentType     String
   fileUrl          String
   fileName         String
@@ -805,8 +803,9 @@ model KycDocument {
   verifiedByAI     Boolean     @default(false)
   verificationData Json?
   uploadedAt       DateTime    @default(now())
-  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String
   kycSession       KycSession? @relation(fields: [kycSessionId], references: [id], onDelete: Cascade)
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([kycSessionId])
@@ -1180,10 +1179,12 @@ model Integration {
   rates       Json?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  category    String    @default("RATES")
 
   @@index([service])
   @@index([isEnabled])
   @@index([status])
+  @@index([category])
 }
 
 model IPBlacklist {
@@ -1811,6 +1812,70 @@ model EmailTemplate {
   @@index([isActive])
 }
 
+model Webhook {
+  id          String            @id @default(cuid())
+  apiKeyId    String
+  url         String
+  secret      String
+  events      String[]
+  isActive    Boolean           @default(true)
+  description String?
+  headers     Json?
+  retryCount  Int               @default(3)
+  timeout     Int               @default(30000)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  apiKey      ApiKey            @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  deliveries  WebhookDelivery[]
+
+  @@index([apiKeyId])
+  @@index([isActive])
+}
+
+model WebhookDelivery {
+  id             String                @id @default(cuid())
+  webhookId      String
+  event          String
+  payload        Json
+  signature      String
+  status         WebhookDeliveryStatus @default(PENDING)
+  attempts       Int                   @default(0)
+  maxAttempts    Int                   @default(3)
+  lastAttemptAt  DateTime?
+  nextAttemptAt  DateTime?
+  responseStatus Int?
+  responseBody   String?
+  responseTime   Int?
+  errorMessage   String?
+  deliveredAt    DateTime?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  webhook        Webhook               @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([status])
+  @@index([event])
+  @@index([createdAt])
+  @@index([nextAttemptAt])
+}
+
+model Notification {
+  id        String           @id
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  isRead    Boolean          @default(false)
+  link      String?
+  metadata  Json?
+  createdAt DateTime         @default(now())
+  User      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([isRead])
+  @@index([userId])
+}
+
 enum Role {
   CLIENT
   ADMIN
@@ -2001,61 +2066,17 @@ enum TemplateStatus {
   ARCHIVED
 }
 
-// ============================================================================
-// WEBHOOKS SYSTEM
-// ============================================================================
-
-model Webhook {
-  id          String             @id @default(cuid())
-  apiKeyId    String
-  url         String
-  secret      String // HMAC secret for signature verification
-  events      String[] // Array of event types (e.g., ["order.created", "order.completed"])
-  isActive    Boolean            @default(true)
-  description String?
-  headers     Json? // Custom headers to include
-  retryCount  Int                @default(3)
-  timeout     Int                @default(30000) // milliseconds
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-  apiKey      ApiKey             @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
-  deliveries  WebhookDelivery[]
-
-  @@index([apiKeyId])
-  @@index([isActive])
-}
-
-model WebhookDelivery {
-  id               String                @id @default(cuid())
-  webhookId        String
-  event            String // Event type (e.g., "order.created")
-  payload          Json // Event payload
-  signature        String // HMAC signature
-  status           WebhookDeliveryStatus @default(PENDING)
-  attempts         Int                   @default(0)
-  maxAttempts      Int                   @default(3)
-  lastAttemptAt    DateTime?
-  nextAttemptAt    DateTime?
-  responseStatus   Int? // HTTP status code
-  responseBody     String? // Response body (truncated)
-  responseTime     Int? // Response time in ms
-  errorMessage     String?
-  deliveredAt      DateTime?
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
-  webhook          Webhook               @relation(fields: [webhookId], references: [id], onDelete: Cascade)
-
-  @@index([webhookId])
-  @@index([status])
-  @@index([event])
-  @@index([createdAt])
-  @@index([nextAttemptAt])
-}
-
 enum WebhookDeliveryStatus {
   PENDING
   PROCESSING
   DELIVERED
   FAILED
   CANCELLED
+}
+
+enum NotificationType {
+  ORDER
+  KYC
+  PAYMENT
+  SYSTEM
 }
