@@ -21,10 +21,8 @@ export async function POST(
     if (authResult instanceof NextResponse) {
       console.error('❌ Admin auth failed');
       return authResult;
-    
-    // If session is NextResponse, it's an error (401/403)
-    const { session } = authResult;
     }
+    const { session } = authResult;
 
     console.log('✅ Admin auth passed, user:', session.user.email, 'id:', session.user.id);
 

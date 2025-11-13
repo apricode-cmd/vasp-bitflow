@@ -48,8 +48,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const authResult = await requireAdminRole('ADMIN');
     if (authResult instanceof NextResponse) {
       return authResult;
-    const { session } = authResult;
     }
+    const { session } = authResult;
 
     const body = await request.json();
 

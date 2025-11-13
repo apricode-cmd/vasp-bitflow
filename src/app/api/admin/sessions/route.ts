@@ -13,8 +13,8 @@ export async function GET(request: NextRequest) {
     const authResult = await requireAdminRole('ADMIN');
     if (authResult instanceof NextResponse) {
       return authResult;
-    const { session } = authResult;
     }
+    const { session } = authResult;
 
     const userId = session.user.id;
 

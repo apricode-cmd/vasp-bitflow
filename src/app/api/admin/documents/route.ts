@@ -17,8 +17,8 @@ export async function GET(request: NextRequest) {
     const authResult = await requireAdminAuth();
     if (authResult instanceof NextResponse) {
       return authResult;
-    const { session } = authResult;
     }
+    const { session } = authResult;
 
     // Parse query parameters
     const searchParams = request.nextUrl.searchParams;
@@ -124,8 +124,8 @@ export async function POST(request: NextRequest) {
     const authResult = await requireAdminAuth();
     if (authResult instanceof NextResponse) {
       return authResult;
-    const { session } = authResult;
     }
+    const { session } = authResult;
 
     const body = await request.json();
     const validated = createDocumentSchema.parse(body);

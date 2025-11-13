@@ -27,8 +27,8 @@ export async function GET(request: NextRequest) {
     const authResult = await requireAdminAuth();
     if (authResult instanceof NextResponse) {
       return authResult;
-    const { session } = authResult;
     }
+    const { session } = authResult;
 
     // Parse and validate query parameters
     const searchParams = Object.fromEntries(request.nextUrl.searchParams);

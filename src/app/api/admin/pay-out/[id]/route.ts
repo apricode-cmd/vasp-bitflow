@@ -111,8 +111,8 @@ export async function PATCH(
     const authResult = await requireAdminRole('ADMIN');
     if (authResult instanceof NextResponse) {
       return authResult;
-    const { session } = authResult;
     }
+    const { session } = authResult;
 
     const { id } = await params;
 

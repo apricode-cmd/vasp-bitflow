@@ -38,8 +38,8 @@ export async function GET(request: NextRequest) {
     const authResult = await requireAdminRole('ADMIN');
     if (authResult instanceof NextResponse) {
       return authResult;
-    const { session } = authResult;
     }
+    const { session } = authResult;
 
     const adminId = session.user.id;
 
@@ -81,8 +81,8 @@ export async function PUT(request: NextRequest) {
     const authResult = await requireAdminRole('ADMIN');
     if (authResult instanceof NextResponse) {
       return authResult;
-    const { session } = authResult;
     }
+    const { session } = authResult;
 
     const adminId = session.user.id;
     const body = await request.json();

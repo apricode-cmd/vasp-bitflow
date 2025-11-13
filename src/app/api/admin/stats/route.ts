@@ -15,9 +15,8 @@ export async function GET(request: Request): Promise<NextResponse> {
   
   if (authResult instanceof NextResponse) {
     return authResult;
-  
-  const { session } = authResult; // Return 401 error
   }
+  const { session } = authResult;
 
   try {
     // Get time range from query params

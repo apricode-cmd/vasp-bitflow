@@ -26,8 +26,8 @@ export async function POST(request: NextRequest) {
     const authResult = await requireAdminRole('ADMIN');
     if (authResult instanceof NextResponse) {
       return authResult;
-    const { session } = authResult;
     }
+    const { session } = authResult;
 
     const userId = session.user.id;
     const body = await request.json();

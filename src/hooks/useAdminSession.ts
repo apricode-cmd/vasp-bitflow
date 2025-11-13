@@ -19,6 +19,7 @@ export interface AdminSessionData {
 export interface UseAdminSessionReturn {
   session: AdminSessionData | null;
   status: 'loading' | 'authenticated' | 'unauthenticated';
+  loading: boolean;
 }
 
 export function useAdminSession(): UseAdminSessionReturn {
@@ -36,8 +37,8 @@ export function useAdminSession(): UseAdminSessionReturn {
 
         if (response.ok) {
           const data = await response.json();
-          if (data.session) {
-            setSession(data.session);
+          if (data.admin) {
+            setSession(data.admin);
             setStatus('authenticated');
           } else {
             setSession(null);
@@ -67,5 +68,5 @@ export function useAdminSession(): UseAdminSessionReturn {
     };
   }, []);
 
-  return { session, status };
+  return { session, status, loading: status === 'loading' };
 }
