@@ -310,19 +310,23 @@ export class SumsubAdapter implements IKycProvider {
         });
       }
 
+      // ⚠️ OFFICIAL SUMSUB STRUCTURE (from docs):
+      // - email/phone: TOP LEVEL (not in fixedInfo)
+      // - gender: "M"/"F"/"X" (not "MALE"/"FEMALE")
+      // - taxResidenceCountry: in fixedInfo (not taxResidence)
       const bodyObj = {
         externalUserId: externalUserId, // May have suffix on retry
+        email: userData.email,          // ✅ TOP LEVEL (official docs)
+        phone: userData.phone,          // ✅ TOP LEVEL (official docs)
         fixedInfo: {
           firstName: userData.firstName,
           lastName: userData.lastName,
-          dob: userData.dateOfBirth, // YYYY-MM-DD
+          dob: userData.dateOfBirth,    // YYYY-MM-DD
           placeOfBirth: (userData as any).placeOfBirth || undefined,
-          country: residenceAlpha3, // Country of residence (where they live)
-          nationality: nationalityAlpha3, // Nationality/citizenship (passport country)
-          email: userData.email, // ✅ MOVED to fixedInfo
-          phone: userData.phone, // ✅ MOVED to fixedInfo
-          gender: this.convertGenderForSumsub((userData as any).gender), // ✅ MALE/FEMALE/X
-          taxResidence: residenceAlpha3, // Tax residence = residence country (not nationality!)
+          country: residenceAlpha3,     // Country of residence (ISO-3)
+          nationality: nationalityAlpha3, // Nationality/citizenship (ISO-3)
+          gender: this.convertGenderForSumsub((userData as any).gender), // ✅ M/F/X
+          taxResidenceCountry: residenceAlpha3, // ✅ taxResidenceCountry (official docs)
           addresses: addresses.length > 0 ? addresses : undefined
         }
       };
@@ -1180,7 +1184,8 @@ export class SumsubAdapter implements IKycProvider {
         });
       }
       
-      // Build fixedInfo payload (EXACTLY as Sumsub expects)
+      // Build fixedInfo payload (EXACTLY as Sumsub expects for PATCH)
+      // For PATCH /fixedInfo: all fields directly in body (no fixedInfo wrapper)
       const bodyObj = {
         firstName: userData.firstName,
         lastName: userData.lastName,
@@ -1188,10 +1193,10 @@ export class SumsubAdapter implements IKycProvider {
         placeOfBirth: (userData as any).placeOfBirth || undefined,
         country: residenceAlpha3,               // ISO-3
         nationality: nationalityAlpha3,         // ISO-3
-        email: userData.email,                  // ✅ IN fixedInfo
-        phone: userData.phone,                  // ✅ IN fixedInfo
-        gender: this.convertGenderForSumsub((userData as any).gender), // ✅ MALE/FEMALE/X
-        taxResidence: residenceAlpha3,
+        email: userData.email,                  // ✅ Direct in body (for PATCH)
+        phone: userData.phone,                  // ✅ Direct in body (for PATCH)
+        gender: this.convertGenderForSumsub((userData as any).gender), // ✅ M/F/X
+        taxResidenceCountry: residenceAlpha3,   // ✅ taxResidenceCountry (official docs)
         addresses: addresses.length > 0 ? addresses : undefined
       };
       
@@ -1243,19 +1248,19 @@ export class SumsubAdapter implements IKycProvider {
 
   /**
    * Convert gender format for Sumsub
-   * Our format: M | F | O
-   * Sumsub format: MALE | FEMALE | X
+   * Our format: M | F | O | MALE | FEMALE
+   * Sumsub format (official docs): M | F | X
    */
   private convertGenderForSumsub(gender?: string): string | undefined {
     if (!gender) return undefined;
     
     const mapping: Record<string, string> = {
-      'M': 'MALE',
-      'F': 'FEMALE',
+      'M': 'M',
+      'F': 'F',
       'O': 'X',
-      'MALE': 'MALE',     // Already correct
-      'FEMALE': 'FEMALE', // Already correct
-      'X': 'X'            // Already correct
+      'MALE': 'M',        // Convert from full name
+      'FEMALE': 'F',      // Convert from full name
+      'X': 'X'
     };
     
     const result = mapping[gender.toUpperCase()];
