@@ -8,7 +8,6 @@
 'use client';
 
 import { useState } from 'react';
-import { signIn } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,6 +26,18 @@ export function PasswordTotpLogin({ email, onSuccess, onError }: PasswordTotpLog
   const [isLoading, setIsLoading] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
+  // Get CSRF token from Admin NextAuth
+  const getCsrfToken = async () => {
+    try {
+      const response = await fetch('/api/admin/auth/csrf');
+      const data = await response.json();
+      return data.csrfToken || '';
+    } catch (error) {
+      console.error('Failed to get CSRF token:', error);
+      return '';
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -34,31 +45,49 @@ export function PasswordTotpLogin({ email, onSuccess, onError }: PasswordTotpLog
     setIsLoading(true);
 
     try {
-      console.log('🔐 Attempting Password + TOTP login for:', email);
+      console.log('🔐 Attempting Admin Password + TOTP login for:', email);
 
-      // Call NextAuth signIn with password-totp provider
-      const result = await signIn('password-totp', {
-        email,
-        password,
-        totpCode,
-        redirect: false,
+      // Get CSRF token
+      const csrfToken = await getCsrfToken();
+
+      // Call ADMIN NextAuth callback endpoint with password-totp provider
+      const response = await fetch('/api/admin/auth/callback/password-totp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          email,
+          password,
+          totpCode,
+          csrfToken,
+          callbackUrl: '/admin',
+          json: 'true',
+        }).toString(),
       });
 
-      console.log('📊 SignIn result:', result);
+      const result = await response.json();
 
-      if (result?.error) {
-        console.error('❌ Login error:', result.error);
+      console.log('📊 Admin SignIn result:', result);
+
+      if (result.url) {
+        // Success - redirect to admin dashboard
+        console.log('✅ Admin login successful, redirecting to:', result.url);
+        window.location.href = result.url;
+        onSuccess();
+      } else if (result.error) {
+        console.error('❌ Admin login error:', result.error);
         const errorMessage = result.error === 'CredentialsSignin' 
           ? 'Invalid password or TOTP code. Please try again.'
           : result.error;
         setLocalError(errorMessage);
         onError(errorMessage);
-      } else if (result?.ok) {
-        console.log('✅ Login successful');
-        onSuccess();
+      } else {
+        setLocalError('Unexpected error during login');
+        onError('Unexpected error during login');
       }
     } catch (error) {
-      console.error('❌ Login exception:', error);
+      console.error('❌ Admin login exception:', error);
       const errorMessage = error instanceof Error ? error.message : 'Login failed';
       setLocalError(errorMessage);
       onError(errorMessage);
@@ -160,4 +189,3 @@ export function PasswordTotpLogin({ email, onSuccess, onError }: PasswordTotpLog
     </form>
   );
 }
-
