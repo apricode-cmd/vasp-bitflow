@@ -280,23 +280,30 @@ export class SumsubAdapter implements IKycProvider {
     try {
       const path = `/resources/applicants?levelName=${encodeURIComponent(this.config.levelName!)}`;
       
-      // Convert country code from alpha-2 (AS, US, PL) to alpha-3 (ASM, USA, POL) for Sumsub
-      const countryAlpha3 = normalizeCountryCodeForProvider(userData.nationality, 'sumsub');
+      // Convert country codes from alpha-2 to alpha-3 for Sumsub
+      // nationality: citizenship (e.g., Ukrainian = UKR)
+      // residenceCountry: where they live (e.g., Poland = POL)
+      const nationalityAlpha3 = normalizeCountryCodeForProvider(userData.nationality, 'sumsub');
+      const residenceAlpha3 = normalizeCountryCodeForProvider(userData.residenceCountry || userData.nationality, 'sumsub');
       
-      if (!countryAlpha3) {
-        throw new Error(`Invalid or unsupported country code: ${userData.nationality}`);
+      if (!nationalityAlpha3) {
+        throw new Error(`Invalid or unsupported nationality code: ${userData.nationality}`);
+      }
+      
+      if (!residenceAlpha3) {
+        throw new Error(`Invalid or unsupported residence country code: ${userData.residenceCountry}`);
       }
       
       // Prepare addresses array if address data available
       const addresses = [];
       if (userData.address || userData.city || userData.postalCode) {
         addresses.push({
-          country: countryAlpha3,
+          country: residenceAlpha3, // Use residence country for address
           postCode: userData.postalCode || undefined,
           town: userData.city || undefined,
           street: userData.address || undefined,
-          subStreet: undefined, // Can add if needed
-          state: undefined, // Can add if needed
+          subStreet: undefined,
+          state: undefined,
           buildingName: undefined,
           flatNumber: undefined,
           buildingNumber: undefined
@@ -312,10 +319,10 @@ export class SumsubAdapter implements IKycProvider {
           lastName: userData.lastName,
           dob: userData.dateOfBirth, // YYYY-MM-DD
           placeOfBirth: (userData as any).placeOfBirth || undefined,
-          country: countryAlpha3, // Country of residence - ISO3 code (USA, POL, etc.)
-          nationality: countryAlpha3, // Nationality - same as country for now
+          country: residenceAlpha3, // Country of residence (where they live)
+          nationality: nationalityAlpha3, // Nationality/citizenship (passport country)
           gender: (userData as any).gender || undefined, // M/F if available
-          taxResidence: countryAlpha3, // Tax residence - use nationality/residence country
+          taxResidence: residenceAlpha3, // Tax residence = residence country (not nationality!)
           addresses: addresses.length > 0 ? addresses : undefined
         }
       };
@@ -327,8 +334,9 @@ export class SumsubAdapter implements IKycProvider {
         email: userData.email, 
         externalId: externalUserId,
         attempt: attempt + 1,
-        countryOriginal: userData.nationality,
-        countryConverted: countryAlpha3
+        nationality: `${userData.nationality} → ${nationalityAlpha3}`,
+        residence: `${userData.residenceCountry} → ${residenceAlpha3}`,
+        taxResidence: residenceAlpha3
       });
 
       const response = await fetch(this.baseUrl + path, {
