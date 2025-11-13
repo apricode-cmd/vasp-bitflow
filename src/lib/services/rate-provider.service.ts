@@ -7,6 +7,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { coinGeckoService, type CoinGeckoRates } from './coingecko';
+import { krakenAdapter } from '@/lib/integrations/providers/rates/KrakenAdapter';
 import { integrationRegistry } from '@/lib/integrations';
 import { IntegrationCategory } from '@/lib/integrations/types';
 
@@ -74,6 +75,9 @@ class RateProviderService {
           fiat as 'EUR' | 'PLN'
         );
       
+      case 'kraken':
+        return await krakenAdapter.getRate(crypto, fiat);
+      
       // Future: Add more providers here
       // case 'coinmarketcap':
       //   return await coinMarketCapService.getRate(crypto, fiat);
@@ -99,6 +103,9 @@ class RateProviderService {
     switch (provider.service) {
       case 'coingecko':
         return await coinGeckoService.getCurrentRates();
+      
+      case 'kraken':
+        return await krakenAdapter.getCurrentRates();
       
       // Future: Add more providers here
       

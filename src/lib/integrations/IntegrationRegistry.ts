@@ -19,6 +19,7 @@ import { IBlockchainProvider } from './categories/IBlockchainProvider';
 import { kycaidAdapter } from './providers/kyc/KycaidAdapter';
 import { sumsubAdapter } from './providers/kyc/SumsubAdapter';
 import { coinGeckoAdapter } from './providers/rates/CoinGeckoAdapter';
+import { krakenAdapter } from './providers/rates/KrakenAdapter';
 import { resendAdapter } from './providers/email/ResendAdapter';
 import { tatumAdapter } from './providers/blockchain/TatumAdapter';
 
@@ -82,6 +83,16 @@ class IntegrationRegistry {
       icon: '📈',
       documentationUrl: 'https://www.coingecko.com/en/api',
       instance: coinGeckoAdapter
+    });
+
+    this.register({
+      providerId: 'kraken',
+      category: IntegrationCategory.RATES,
+      displayName: 'Kraken Exchange',
+      description: 'Professional cryptocurrency exchange rates from Kraken. No API key required.',
+      icon: '🐙',
+      documentationUrl: 'https://docs.kraken.com/api/docs/rest-api/get-ticker-information',
+      instance: krakenAdapter
     });
 
     // Email Providers
