@@ -18,6 +18,36 @@ export function shouldShowField(
   const fieldName = field.fieldName;
 
   // ============================================
+  // DATABASE-DRIVEN CONDITIONAL LOGIC (Priority 1)
+  // Check dependsOn and showWhen from database
+  // ============================================
+  if (field.dependsOn && field.showWhen) {
+    const dependsOnValue = formData[field.dependsOn];
+    const condition = field.showWhen as any;
+    
+    // Handle different operators
+    if (condition.operator === '==') {
+      if (dependsOnValue !== condition.value) {
+        return false;
+      }
+    } else if (condition.operator === '!=') {
+      if (dependsOnValue === condition.value) {
+        return false;
+      }
+    } else if (condition.operator === 'in') {
+      if (!Array.isArray(condition.value) || !condition.value.includes(dependsOnValue)) {
+        return false;
+      }
+    } else if (condition.operator === 'not_in') {
+      if (Array.isArray(condition.value) && condition.value.includes(dependsOnValue)) {
+        return false;
+      }
+    }
+    
+    // Condition met - continue to other checks
+  }
+
+  // ============================================
   // PEP (Politically Exposed Person) Fields
   // ============================================
   

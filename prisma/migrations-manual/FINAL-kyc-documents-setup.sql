@@ -150,6 +150,7 @@ SET
   "dependsOn" = 'id_type',
   "showWhen" = '{"operator": "in", "value": ["id_card", "drivers_license"]}'::jsonb,
   "isRequired" = true,
+  "isEnabled" = true,
   "updatedAt" = NOW()
 WHERE "fieldName" = 'id_scan_front';
 
@@ -161,6 +162,7 @@ SET
   "dependsOn" = 'id_type',
   "showWhen" = '{"operator": "in", "value": ["id_card", "drivers_license"]}'::jsonb,
   "isRequired" = true,
+  "isEnabled" = true,
   "updatedAt" = NOW()
 WHERE "fieldName" = 'id_scan_back';
 

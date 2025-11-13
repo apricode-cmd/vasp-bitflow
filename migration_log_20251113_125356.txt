@@ -1,0 +1,28 @@
+psql:prisma/migrations-manual/FINAL-kyc-documents-setup.sql:18: NOTICE:  column "dependsOn" of relation "KycFormField" already exists, skipping
+psql:prisma/migrations-manual/FINAL-kyc-documents-setup.sql:18: NOTICE:  column "showWhen" of relation "KycFormField" already exists, skipping
+ALTER TABLE
+psql:prisma/migrations-manual/FINAL-kyc-documents-setup.sql:21: NOTICE:  relation "KycFormField_dependsOn_idx" already exists, skipping
+CREATE INDEX
+UPDATE 1
+INSERT 0 1
+INSERT 0 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+INSERT 0 1
+INSERT 0 1
+psql:prisma/migrations-manual/FINAL-kyc-documents-setup.sql:318: NOTICE:  column "userId" of relation "KycDocument" already exists, skipping
+ALTER TABLE
+UPDATE 0
+DO
+ALTER TABLE
+DO
+psql:prisma/migrations-manual/FINAL-kyc-documents-setup.sql:359: NOTICE:  relation "KycDocument_userId_idx" already exists, skipping
+CREATE INDEX
+ALTER TABLE
+DO
+INSERT 0 1
