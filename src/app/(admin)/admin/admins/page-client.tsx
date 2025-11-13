@@ -587,6 +587,71 @@ export function AdminManagementClient({
     }
   };
 
+  // Resend invite (with Step-up MFA)
+  const handleResendInvite = async (admin: Admin) => {
+    setActionLoading(true);
+    try {
+      // First request - will trigger MFA challenge
+      const response = await fetch(`/api/admin/admins/${admin.id}/resend-invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+
+      const result = await response.json();
+
+      // If MFA is required, handle it
+      if (result.requiresMfa) {
+        toast.info('MFA verification required');
+        
+        // Import startAuthentication dynamically
+        const { startAuthentication } = await import('@simplewebauthn/browser');
+        
+        try {
+          // Prompt for MFA
+          const mfaResponse = await startAuthentication(result.options);
+          
+          // Retry with MFA response
+          const mfaVerifyResponse = await fetch(`/api/admin/admins/${admin.id}/resend-invite`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              mfaChallengeId: result.challengeId,
+              mfaResponse,
+            }),
+          });
+
+          const mfaResult = await mfaVerifyResponse.json();
+
+          if (mfaResult.success) {
+            toast.success('Invitation resent successfully! (MFA verified)');
+            setInviteLink(mfaResult.inviteLink);
+            setInviteLinkDialogOpen(true);
+            loadAdmins();
+          } else {
+            toast.error(mfaResult.error || 'MFA verification failed');
+          }
+        } catch (mfaError) {
+          console.error('MFA error:', mfaError);
+          toast.error('MFA verification cancelled or failed');
+        }
+      } else if (result.success) {
+        // Success without MFA (shouldn't happen, but handle it)
+        toast.success('Invitation resent successfully!');
+        setInviteLink(result.inviteLink);
+        setInviteLinkDialogOpen(true);
+        loadAdmins();
+      } else {
+        toast.error(result.error || 'Failed to resend invitation');
+      }
+    } catch (error) {
+      console.error('Resend invite error:', error);
+      toast.error('Failed to resend invitation');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // Reactivate (unsuspend) admin (with Step-up MFA)
   const handleReactivate = async (admin: Admin) => {
     setActionLoading(true);
@@ -872,7 +937,11 @@ export function AdminManagementClient({
                             {/* INVITED Status - Resend or Cancel */}
                             {admin.status === 'INVITED' && (
                               <>
-                                <DropdownMenuItem className="text-blue-600">
+                                <DropdownMenuItem 
+                                  className="text-blue-600"
+                                  onClick={() => handleResendInvite(admin)}
+                                  disabled={actionLoading}
+                                >
                                   <Mail className="w-4 h-4 mr-2" />
                                   Resend Invite
                                 </DropdownMenuItem>
@@ -882,6 +951,7 @@ export function AdminManagementClient({
                                     setSelectedAdmin(admin);
                                     setTerminateAlertOpen(true);
                                   }}
+                                  disabled={actionLoading}
                                 >
                                   <Trash2 className="w-4 h-4 mr-2" />
                                   Cancel Invitation

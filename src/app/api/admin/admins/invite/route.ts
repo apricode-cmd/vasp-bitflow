@@ -106,9 +106,9 @@ export async function POST(request: NextRequest) {
         department: validatedData.department,
         role: validatedData.role,
         roleCode: validatedData.role,
-        status: 'INVITED', // ✅ Invited admin awaiting Passkey registration (15 min)
+        status: 'INVITED', // ✅ Invited admin awaiting authentication setup (15 min)
         isActive: false,
-        authMethod: 'PASSKEY', // Force Passkey authentication
+        authMethod: 'PASSWORD', // Default, will be updated during setup
         setupToken: hashedToken,
         setupTokenExpiry,
         invitedBy: session.user.id,
@@ -117,9 +117,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Generate invite link
+    // Generate invite link (universal setup page)
     const origin = request.headers.get('origin') || process.env.NEXTAUTH_URL || 'http://localhost:3000';
-    const inviteLink = `${origin}/admin/auth/setup-passkey?token=${setupToken}&email=${encodeURIComponent(validatedData.email)}`;
+    const inviteLink = `${origin}/admin/auth/setup?token=${setupToken}&email=${encodeURIComponent(validatedData.email)}`;
 
     // Log to AdminAuditLog
     await prisma.adminAuditLog.create({
