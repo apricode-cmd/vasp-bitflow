@@ -202,12 +202,6 @@ class IntegrationFactory {
     }
     
     // ✅ Build config with explicit webhookSecret mapping
-    console.log(`🔍 [FACTORY] Building config for ${integration.service}:`, {
-      hasWebhookSecretInIntegrationConfig: !!integrationConfig.webhookSecret,
-      webhookSecretValue: integrationConfig.webhookSecret,
-      configKeys: Object.keys(integrationConfig)
-    });
-    
     const config: BaseIntegrationConfig = {
       ...Object.fromEntries(
         Object.entries(integrationConfig).filter(([key]) => key !== 'apiKey')
@@ -221,12 +215,6 @@ class IntegrationFactory {
         apiKey: undefined
       }
     };
-    
-    console.log(`✅ [FACTORY] Final config for ${integration.service}:`, {
-      hasWebhookSecret: !!config.webhookSecret,
-      webhookSecretPreview: config.webhookSecret ? config.webhookSecret.substring(0, 8) + '...' : 'N/A',
-      configKeys: Object.keys(config)
-    });
 
     await this.initializeProvider(provider, config);
     this.initializedProviders.set(service, provider);
