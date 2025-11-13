@@ -209,6 +209,39 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     console.log('📊 Sync results:', results);
 
+    // If all documents synced successfully, submit for review
+    if (results.synced > 0 && results.failed === 0) {
+      console.log('✅ All documents synced, submitting for review...');
+      
+      if (kycProvider.submitForReview) {
+        try {
+          const submitResult = await kycProvider.submitForReview(applicantId);
+          
+          if (submitResult.success) {
+            console.log('✅ Applicant submitted for review to Sumsub');
+            
+            // Update KYC session status to PENDING_REVIEW
+            await prisma.kycSession.update({
+              where: { id: kycSession.id },
+              data: {
+                status: 'PENDING_REVIEW',
+                submittedAt: new Date(),
+                metadata: {
+                  ...(kycSession.metadata as any || {}),
+                  submittedForReview: true,
+                  submittedAt: new Date().toISOString()
+                }
+              }
+            });
+          } else {
+            console.warn('⚠️ Failed to submit for review:', submitResult.error);
+          }
+        } catch (submitError: any) {
+          console.error('❌ Submit for review error:', submitError);
+        }
+      }
+    }
+
     // Log audit
     await auditService.logUserAction(
       userId,
