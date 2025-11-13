@@ -88,10 +88,10 @@ export class SumsubAdapter implements IKycProvider {
     const configAny = config as any;
     
     this.config = {
-      appToken: configAny.appToken || config.metadata?.appToken || config.apiKey,
-      secretKey: configAny.secretKey || config.metadata?.secretKey,
-      levelName: configAny.levelName || config.metadata?.levelName,
-      baseUrl: configAny.baseUrl || config.apiEndpoint || config.metadata?.baseUrl || 'https://api.sumsub.com'
+      appToken: (configAny.appToken || config.metadata?.appToken || config.apiKey)?.trim(),
+      secretKey: (configAny.secretKey || config.metadata?.secretKey)?.trim(),
+      levelName: (configAny.levelName || config.metadata?.levelName)?.trim(),
+      baseUrl: (configAny.baseUrl || config.apiEndpoint || config.metadata?.baseUrl || 'https://api.sumsub.com').trim()
     };
     
     console.log('🔍 SumsubAdapter extracted config:', {
@@ -927,7 +927,7 @@ export class SumsubAdapter implements IKycProvider {
       
       // Note: Do NOT add Content-Type here - it will be added by formData.getHeaders()
 
-      // Make request using axios for better FormData support
+      // Make request using Node.js fetch with manual headers
       const url = `${this.baseUrl}${path}`;
       console.log('📤 [SUMSUB] Uploading document:', {
         applicantId,
@@ -943,12 +943,11 @@ export class SumsubAdapter implements IKycProvider {
         signaturePreview: signature.substring(0, 20) + '...'
       });
 
-      // Use axios for multipart upload (better form-data support)
-      const axios = require('axios');
-      
+      // Prepare headers with form-data boundary
+      const formHeaders = formData.getHeaders();
       const finalHeaders = {
-        ...headers,
-        ...formData.getHeaders() // Add Content-Type with boundary
+        ...headers, // Our auth headers (X-App-Token, X-App-Access-Ts, X-App-Access-Sig)
+        ...formHeaders // Form-data headers (Content-Type with boundary)
       };
       
       console.log('📡 [SUMSUB] Request headers:', {
@@ -956,24 +955,32 @@ export class SumsubAdapter implements IKycProvider {
         'X-App-Access-Ts': finalHeaders['X-App-Access-Ts'],
         'X-App-Access-Sig': finalHeaders['X-App-Access-Sig']?.substring(0, 20) + '...',
         'X-Return-Doc-Warnings': finalHeaders['X-Return-Doc-Warnings'],
-        'Content-Type': finalHeaders['content-type']?.substring(0, 50) + '...'
+        'Content-Type': finalHeaders['content-type']?.substring(0, 70) + '...',
+        'Content-Length': formHeaders['content-length'] || 'auto'
       });
       
-      const response = await axios.post(url, formData, {
-        headers: finalHeaders,
-        maxBodyLength: Infinity,
-        maxContentLength: Infinity,
-        validateStatus: () => true // Don't throw on non-2xx
+      // Use fetch with Node.js (not axios)
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: finalHeaders as any,
+        body: formData as any
       });
 
-      const responseData = response.data;
+      const responseText = await response.text();
+      let responseData: any;
+      
+      try {
+        responseData = JSON.parse(responseText);
+      } catch {
+        responseData = { message: responseText };
+      }
 
       if (response.status !== 200 && response.status !== 201) {
         console.error('❌ [SUMSUB] Upload failed:', {
           status: response.status,
           statusText: response.statusText,
           data: responseData,
-          headers: response.headers
+          responseText: responseText.substring(0, 500)
         });
 
         return {
