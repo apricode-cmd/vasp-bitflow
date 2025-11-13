@@ -860,32 +860,7 @@ export class SumsubAdapter implements IKycProvider {
       const path = `/resources/applicants/${applicantId}/info/idDoc`;
       const method = 'POST';
       
-      // For multipart/form-data, signature is calculated without body (empty string)
-      // Use buildRequest() like we do for createApplicant
-      const { headers: authHeaders, ts, signature } = this.buildRequest(method, path, '');
-      
-      // Build signature payload for debugging
-      const signaturePayload = ts + method.toUpperCase() + path + '';
-      
-      console.log('🔐 [SUMSUB] Signature calculation (using buildRequest):', {
-        timestamp: ts,
-        method: method,
-        path: path,
-        body: '<empty for multipart>',
-        payload: signaturePayload,
-        payloadLength: signaturePayload.length,
-        signature: signature,
-        signatureLength: signature.length,
-        secretKeyPresent: !!this.config.secretKey,
-        secretKeyLength: this.config.secretKey?.length || 0,
-        secretKeyPreview: this.config.secretKey?.substring(0, 8) + '...',
-        appTokenPresent: !!this.config.appToken,
-        appTokenPreview: this.config.appToken?.substring(0, 20) + '...',
-        baseUrl: this.baseUrl,
-        fullUrl: `${this.baseUrl}${path}`
-      });
-
-      // Prepare FormData
+      // Prepare FormData FIRST (before signature calculation)
       const FormData = require('form-data');
       const formData = new FormData();
       
@@ -918,14 +893,42 @@ export class SumsubAdapter implements IKycProvider {
         contentType
       });
 
-      // Use auth headers from buildRequest, add optional warning header
-      const headers: any = { ...authHeaders };
+      // CRITICAL: Calculate signature AFTER form is complete
+      // For multipart/form-data, signature must include the FULL body (with boundaries and file)
+      const ts = Math.floor(Date.now() / 1000).toString();
+      const formBuffer = formData.getBuffer(); // Get EXACT body that will be sent
+      
+      // Create HMAC with full body
+      const crypto = require('crypto');
+      const hmac = crypto.createHmac('sha256', this.config.secretKey!);
+      hmac.update(ts + method.toUpperCase() + path);
+      hmac.update(formBuffer); // Add the FULL form body
+      const signature = hmac.digest('hex');
+      
+      console.log('🔐 [SUMSUB] Signature calculation (with FULL body):', {
+        timestamp: ts,
+        method: method,
+        path: path,
+        bodySize: formBuffer.length,
+        bodyPreview: formBuffer.slice(0, 100).toString('hex').substring(0, 40) + '...',
+        signature: signature,
+        signatureLength: signature.length,
+        secretKeyPresent: !!this.config.secretKey,
+        secretKeyLength: this.config.secretKey?.length || 0,
+        baseUrl: this.baseUrl,
+        fullUrl: `${this.baseUrl}${path}`
+      });
+
+      // Build headers manually (don't use buildRequest - it doesn't include body)
+      const headers: any = {
+        'X-App-Token': this.config.appToken!,
+        'X-App-Access-Ts': ts,
+        'X-App-Access-Sig': signature
+      };
       
       if (returnWarnings) {
         headers['X-Return-Doc-Warnings'] = 'true';
       }
-      
-      // Note: Do NOT add Content-Type here - it will be added by formData.getHeaders()
 
       // Make request using Node.js fetch with manual headers
       const url = `${this.baseUrl}${path}`;
@@ -936,11 +939,7 @@ export class SumsubAdapter implements IKycProvider {
         url,
         fileSize: fileBuffer.length,
         contentType,
-        timestamp: ts,
-        method,
-        path,
-        signaturePayload: `${ts}${method}${path}`,
-        signaturePreview: signature.substring(0, 20) + '...'
+        formBodySize: formBuffer.length
       });
 
       // Prepare headers with form-data boundary
@@ -956,7 +955,7 @@ export class SumsubAdapter implements IKycProvider {
         'X-App-Access-Sig': finalHeaders['X-App-Access-Sig']?.substring(0, 20) + '...',
         'X-Return-Doc-Warnings': finalHeaders['X-Return-Doc-Warnings'],
         'Content-Type': finalHeaders['content-type']?.substring(0, 70) + '...',
-        'Content-Length': formHeaders['content-length'] || 'auto'
+        'Content-Length': formHeaders['content-length'] || formBuffer.length
       });
       
       // Use fetch with Node.js (not axios)
