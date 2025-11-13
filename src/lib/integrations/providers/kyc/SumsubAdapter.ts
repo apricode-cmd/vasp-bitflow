@@ -745,7 +745,8 @@ export class SumsubAdapter implements IKycProvider {
       hasWebhookSecret: !!(this.config as any).webhookSecret,
       hasSecretKey: !!this.config.secretKey,
       usingKey: (this.config as any).webhookSecret ? 'webhookSecret' : 'secretKey (fallback)',
-      secretKeyLength: secretKey?.length || 0
+      secretKeyLength: secretKey?.length || 0,
+      secretKeyPreview: secretKey ? secretKey.substring(0, 8) + '...' : 'N/A'
     });
     
     if (!secretKey) {
@@ -785,12 +786,16 @@ export class SumsubAdapter implements IKycProvider {
       const isValid = expectedSignature.toLowerCase() === signatureValue.toLowerCase();
 
       if (!isValid) {
-        console.error('❌ Webhook signature mismatch:', {
+        console.error('❌ [WEBHOOK] Signature mismatch:', {
           expected: expectedSignature.substring(0, 20) + '...',
-          received: signatureValue.substring(0, 20) + '...'
+          received: signatureValue.substring(0, 20) + '...',
+          expectedFull: expectedSignature,
+          receivedFull: signatureValue,
+          algorithm: algorithm,
+          payloadLengthUsed: payload.length
         });
       } else {
-        console.log('✅ Webhook signature valid');
+        console.log('✅ [WEBHOOK] Signature valid');
       }
 
       return isValid;

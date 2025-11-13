@@ -22,12 +22,15 @@ export async function POST(request: NextRequest) {
                       request.headers.get('x-signature') || 
                       request.headers.get('digest') || '';
 
-    console.log('📥 Sumsub webhook received');
-    console.log('📋 Headers:', {
+    console.log('📥 [WEBHOOK] Sumsub webhook received');
+    console.log('📋 [WEBHOOK] ALL Headers:', Array.from(request.headers.entries()));
+    console.log('📋 [WEBHOOK] Signature headers:', {
       'x-payload-digest': request.headers.get('x-payload-digest'),
       'x-signature': request.headers.get('x-signature'),
       'digest': request.headers.get('digest')
     });
+    console.log('📄 [WEBHOOK] Raw body preview:', rawBody.substring(0, 200));
+    console.log('📏 [WEBHOOK] Body length:', rawBody.length);
 
     if (!signature) {
       console.error('❌ No signature header found');
@@ -36,6 +39,8 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
+    
+    console.log('🔐 [WEBHOOK] Signature received:', signature);
 
     // 3. Get Sumsub provider
     const provider = await integrationFactory.getProviderByService('sumsub');
