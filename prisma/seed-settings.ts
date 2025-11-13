@@ -173,6 +173,24 @@ const defaultSettings = [
     category: 'trading',
     description: 'Order expiration time in hours',
     isPublic: false
+  },
+
+  // Security Settings - Admin Authentication
+  {
+    key: 'adminPasswordAuthEnabled',
+    value: 'false',
+    type: 'BOOLEAN' as const,
+    category: 'security',
+    description: 'Allow administrators to use Password + TOTP authentication as an alternative to Passkey (biometric/security key). Recommended: Keep disabled for maximum security.',
+    isPublic: false
+  },
+  {
+    key: 'adminPasswordAuthForRoles',
+    value: '["ADMIN","SUPPORT","FINANCE"]',
+    type: 'JSON' as const,
+    category: 'security',
+    description: 'Admin roles allowed to use Password + TOTP (if enabled). SUPER_ADMIN always requires Passkey regardless of this setting.',
+    isPublic: false
   }
 ];
 
