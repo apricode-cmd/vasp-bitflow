@@ -114,6 +114,7 @@ export async function POST(request: NextRequest) {
         where: { id: admin.id },
         data: {
           status: 'ACTIVE',
+          isActive: true, // ✅ Activate admin
           authMethod: 'PASSWORD', // Password + TOTP method
           setupToken: null, // Clear setup token
           setupTokenExpiry: null,
