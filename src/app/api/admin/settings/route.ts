@@ -88,7 +88,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     // Validate
     const validated = updateSettingsSchema.parse(body);
 
-    // Get admin ID
+    // Get admin ID and role
     const adminId = await getCurrentUserId();
     if (!adminId) {
       return NextResponse.json(
@@ -98,6 +98,23 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
         },
         { status: 401 }
       );
+    }
+
+    // ⚠️ CRITICAL: Security settings can only be changed by SUPER_ADMIN
+    const securityKeys = ['adminPasswordAuthEnabled', 'adminPasswordAuthForRoles'];
+    const hasSecuritySettings = validated.some(s => securityKeys.includes(s.key));
+    
+    if (hasSecuritySettings) {
+      const { session } = sessionOrError;
+      if (session.user.role !== 'SUPER_ADMIN') {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Forbidden: Only SUPER_ADMIN can modify authentication security settings'
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // Update or create settings (upsert)

@@ -34,11 +34,26 @@ export default async function AdminLayout({
   if (!sessionData) {
     // Try NextAuth (Password+TOTP)
     const nextAuthSession = await getAdminSession();
+    console.log('🔍 [ADMIN LAYOUT] NextAuth session check:', {
+      hasSession: !!nextAuthSession,
+      userId: nextAuthSession?.user?.id,
+      email: nextAuthSession?.user?.email,
+      role: nextAuthSession?.user?.role
+    });
+    
     if (!nextAuthSession?.user?.id) {
       // No session found in either system
+      console.log('❌ [ADMIN LAYOUT] No session found, redirecting to login');
       redirect('/admin/auth/login');
     }
+    console.log('✅ [ADMIN LAYOUT] NextAuth session valid, allowing access');
     // NextAuth session exists, allow access
+  } else {
+    console.log('✅ [ADMIN LAYOUT] Custom JWT session valid:', {
+      adminId: sessionData.adminId,
+      email: sessionData.email,
+      role: sessionData.role
+    });
   }
 
   return <AdminLayoutClient>{children}</AdminLayoutClient>;

@@ -90,6 +90,21 @@ export async function PATCH(
       );
     }
 
+    // ⚠️ CRITICAL: Security settings can only be changed by SUPER_ADMIN
+    const securityKeys = ['adminPasswordAuthEnabled', 'adminPasswordAuthForRoles'];
+    if (securityKeys.includes(key)) {
+      const { session } = sessionOrError;
+      if (session.user.role !== 'SUPER_ADMIN') {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Forbidden: Only SUPER_ADMIN can modify authentication security settings'
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     // Get old value
     const oldSetting = await prisma.systemSettings.findUnique({
       where: { key }

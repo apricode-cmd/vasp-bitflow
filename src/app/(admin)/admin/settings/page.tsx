@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import Color from 'color';
 import { SecuritySettingsTab } from '@/components/admin/SecuritySettingsTab';
+import { useAdminSession } from '@/hooks/useAdminSession';
 
 interface SystemSettings {
   // Brand
@@ -74,6 +75,7 @@ interface SystemSettings {
 }
 
 export default function SettingsPage(): JSX.Element {
+  const { session } = useAdminSession();
   const [settings, setSettings] = useState<Partial<SystemSettings>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -82,6 +84,9 @@ export default function SettingsPage(): JSX.Element {
   const [activeTab, setActiveTab] = useState('brand');
   const [previewColor, setPreviewColor] = useState<string>('#06b6d4'); // Default cyan - ensure always defined
   const [mounted, setMounted] = useState(false);
+  
+  // Check if current admin is SUPER_ADMIN
+  const isSuperAdmin = session?.role === 'SUPER_ADMIN' || session?.roleCode === 'SUPER_ADMIN';
 
   // Mark as mounted to avoid hydration mismatch
   useEffect(() => {
@@ -299,10 +304,12 @@ export default function SettingsPage(): JSX.Element {
             <SettingsIcon className="h-4 w-4 mr-2" />
             System
           </TabsTrigger>
-          <TabsTrigger value="security">
-            <Shield className="h-4 w-4 mr-2" />
-            Security
-          </TabsTrigger>
+          {isSuperAdmin && (
+            <TabsTrigger value="security">
+              <Shield className="h-4 w-4 mr-2" />
+              Security
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* Brand Settings */}
@@ -950,10 +957,12 @@ export default function SettingsPage(): JSX.Element {
           </Card>
         </TabsContent>
 
-        {/* Security Settings */}
-        <TabsContent value="security" className="space-y-6 mt-6">
-          <SecuritySettingsTab />
-        </TabsContent>
+        {/* Security Settings - SUPER_ADMIN ONLY */}
+        {isSuperAdmin && (
+          <TabsContent value="security" className="space-y-6 mt-6">
+            <SecuritySettingsTab />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
