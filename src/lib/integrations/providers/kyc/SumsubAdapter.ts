@@ -737,6 +737,13 @@ export class SumsubAdapter implements IKycProvider {
     // Use webhookSecret if available, fallback to secretKey for backward compatibility
     const secretKey = (this.config as any).webhookSecret || this.config.secretKey;
     
+    console.log('🔐 [WEBHOOK] Checking secret config:', {
+      hasWebhookSecret: !!(this.config as any).webhookSecret,
+      hasSecretKey: !!this.config.secretKey,
+      usingKey: (this.config as any).webhookSecret ? 'webhookSecret' : 'secretKey (fallback)',
+      secretKeyLength: secretKey?.length || 0
+    });
+    
     if (!secretKey) {
       console.warn('⚠️ Sumsub webhook secret key not configured, skipping webhook verification');
       return true; // Allow in development
@@ -757,11 +764,12 @@ export class SumsubAdapter implements IKycProvider {
         signatureValue = value;
       }
 
-      console.log('🔐 Verifying webhook signature:', {
+      console.log('🔐 [WEBHOOK] Verifying signature:', {
         algorithm,
         signatureLength: signatureValue.length,
         payloadLength: payload.length,
-        usingWebhookSecret: !!(this.config as any).webhookSecret
+        payloadPreview: payload.substring(0, 100) + '...',
+        signatureReceived: signatureValue.substring(0, 20) + '...'
       });
 
       const expectedSignature = crypto

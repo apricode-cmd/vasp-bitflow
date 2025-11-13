@@ -314,9 +314,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     console.log('📊 Sync results:', results);
 
-    // If all documents synced successfully, submit for review
-    if (results.synced > 0 && results.failed === 0) {
-      console.log('✅ All documents synced, submitting for review...');
+    // IMPORTANT: Do NOT auto-submit if SDK is required!
+    // For id-and-liveness level: SDK will handle SELFIE and auto-submit after completion
+    if (results.synced > 0 && results.failed === 0 && !needsSdkForIdentity) {
+      console.log('✅ All documents synced (no SDK required), submitting for review...');
       
       if (kycProvider.submitForReview) {
         try {
@@ -345,6 +346,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           console.error('❌ Submit for review error:', submitError);
         }
       }
+    } else if (needsSdkForIdentity) {
+      console.log('ℹ️ SDK verification required - skipping auto-submit');
+      console.log('💡 User must complete SDK flow (SELFIE + liveness) for final submission');
     }
 
     // Log audit
