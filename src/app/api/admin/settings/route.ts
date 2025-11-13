@@ -101,8 +101,8 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     }
 
     // ⚠️ CRITICAL: Security settings can only be changed by SUPER_ADMIN
-    const securityKeys = ['adminPasswordAuthEnabled', 'adminPasswordAuthForRoles'];
-    const hasSecuritySettings = validated.some(s => securityKeys.includes(s.key));
+    const PROTECTED_SECURITY_KEYS = ['adminPasswordAuthEnabled', 'adminPasswordAuthForRoles'];
+    const hasSecuritySettings = validated.some(s => PROTECTED_SECURITY_KEYS.includes(s.key));
     
     if (hasSecuritySettings) {
       const { session } = sessionOrError;
@@ -183,9 +183,8 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     const updatedSettings = await Promise.all(updatePromises);
 
     // ✅ Clear admin auth features cache if security settings changed
-    const securityKeys = validated.map(s => s.key);
-    if (securityKeys.includes('adminPasswordAuthEnabled') || 
-        securityKeys.includes('adminPasswordAuthForRoles')) {
+    const updatedKeys = validated.map(s => s.key);
+    if (updatedKeys.some(key => PROTECTED_SECURITY_KEYS.includes(key))) {
       clearAdminAuthFeaturesCache();
       console.log('🔄 [Settings] Admin auth features cache cleared');
     }

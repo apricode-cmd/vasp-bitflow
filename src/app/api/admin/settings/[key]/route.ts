@@ -91,8 +91,8 @@ export async function PATCH(
     }
 
     // ⚠️ CRITICAL: Security settings can only be changed by SUPER_ADMIN
-    const securityKeys = ['adminPasswordAuthEnabled', 'adminPasswordAuthForRoles'];
-    if (securityKeys.includes(key)) {
+    const PROTECTED_SECURITY_KEYS = ['adminPasswordAuthEnabled', 'adminPasswordAuthForRoles'];
+    if (PROTECTED_SECURITY_KEYS.includes(key)) {
       const { session } = sessionOrError;
       if (session.user.role !== 'SUPER_ADMIN') {
         return NextResponse.json(
