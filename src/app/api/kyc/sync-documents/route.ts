@@ -112,20 +112,34 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         requiredIdDocs = applicantDetails.metadata.requiredIdDocs;
         console.log('📄 Required ID Docs structure:', JSON.stringify(requiredIdDocs, null, 2));
         
-        // Check if requiredIdDocs has docSets (for SDK-only levels)
+        // Check if requiredIdDocs has docSets
         if (requiredIdDocs.docSets && requiredIdDocs.docSets.length > 0) {
-          console.log('⚠️ This level requires SDK verification!');
-          console.log('📱 DocSets:', JSON.stringify(requiredIdDocs.docSets, null, 2));
+          console.log('📱 DocSets detected:', JSON.stringify(requiredIdDocs.docSets, null, 2));
           
-          // For SDK-only levels, skip document upload via API
-          return NextResponse.json({
-            success: true,
-            message: 'This level requires SDK verification. Documents cannot be uploaded via API.',
-            useSdk: true,
-            synced: 0,
-            failed: 0,
-            errors: []
-          });
+          // Check IDENTITY docSet for videoRequired
+          const identityDocSet = requiredIdDocs.docSets.find((ds: any) => ds.idDocSetType === 'IDENTITY');
+          
+          if (identityDocSet) {
+            const videoRequired = identityDocSet.videoRequired;
+            console.log(`📹 IDENTITY videoRequired: ${videoRequired}`);
+            
+            // If video capture is required (docapture, photoRequired, videoIdent), documents must be uploaded via SDK
+            if (videoRequired === 'docapture' || videoRequired === 'photoRequired' || videoRequired === 'videoIdent') {
+              console.log('⚠️ IDENTITY requires video capture - SDK only for ID documents!');
+              console.log('ℹ️ UTILITY_BILL can still be uploaded via API');
+              
+              // Filter documents: only upload non-IDENTITY documents via API (e.g. UTILITY_BILL)
+              // IDENTITY docs (PASSPORT, ID_CARD, DRIVERS) will be handled by SDK
+            } else if (videoRequired === 'disabled' || videoRequired === 'off' || !videoRequired) {
+              console.log('✅ IDENTITY video capture disabled - can upload via API!');
+            }
+          }
+          
+          // Check for SELFIE docSet (always SDK-only)
+          const selfieDocSet = requiredIdDocs.docSets.find((ds: any) => ds.idDocSetType === 'SELFIE');
+          if (selfieDocSet) {
+            console.log('📸 SELFIE detected - will use SDK for liveness');
+          }
         }
       }
       
@@ -154,10 +168,31 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // Determine which document types can be uploaded via API
+    const sdkOnlyDocTypes: string[] = ['SELFIE']; // SELFIE always SDK-only
+    let needsSdkForIdentity = false;
+    
+    if (requiredIdDocs?.docSets) {
+      const identityDocSet = requiredIdDocs.docSets.find((ds: any) => ds.idDocSetType === 'IDENTITY');
+      if (identityDocSet) {
+        const videoRequired = identityDocSet.videoRequired;
+        // If video capture required, IDENTITY docs must go through SDK
+        if (videoRequired === 'docapture' || videoRequired === 'photoRequired' || videoRequired === 'videoIdent') {
+          needsSdkForIdentity = true;
+          sdkOnlyDocTypes.push('PASSPORT', 'ID_CARD', 'DRIVERS', 'RESIDENCE_PERMIT');
+          console.log('🔒 IDENTITY documents will use SDK (video capture required)');
+        }
+      }
+    }
+    
+    console.log('📋 SDK-only document types:', sdkOnlyDocTypes);
+    console.log('✅ Can upload via API:', documents.filter(d => !sdkOnlyDocTypes.includes(d.documentType)).map(d => d.documentType));
+
     const results = {
       synced: 0,
       failed: 0,
-      errors: [] as string[]
+      errors: [] as string[],
+      skippedForSdk: 0
     };
 
     // Sync each document
@@ -179,8 +214,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           }
           continue;
         }
+        
+        // Skip SDK-only document types
+        if (sdkOnlyDocTypes.includes(doc.documentType)) {
+          console.log(`⏭️ Document ${doc.id} (${doc.documentType}) requires SDK, skipping API upload`);
+          results.skippedForSdk++;
+          
+          // Link to session if not linked
+          if (!doc.kycSessionId) {
+            await prisma.kycDocument.update({
+              where: { id: doc.id },
+              data: { kycSessionId: kycSession.id }
+            });
+          }
+          continue;
+        }
 
-        console.log(`📤 Syncing document ${doc.id} (${doc.documentType})`);
+        console.log(`📤 Syncing document ${doc.id} (${doc.documentType}) via API`);
 
         // Read file from local storage
         let fileBuffer: Buffer;
@@ -315,8 +365,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       success: true,
       synced: results.synced,
       failed: results.failed,
+      skippedForSdk: results.skippedForSdk,
       total: documents.length,
-      errors: results.errors.length > 0 ? results.errors : undefined
+      useSdk: needsSdkForIdentity, // True if IDENTITY documents need SDK
+      errors: results.errors.length > 0 ? results.errors : undefined,
+      message: needsSdkForIdentity 
+        ? `${results.synced} document(s) synced via API. ${results.skippedForSdk} IDENTITY document(s) require SDK (Mobile Link).`
+        : `${results.synced} document(s) synced successfully.`
     });
 
   } catch (error: any) {
