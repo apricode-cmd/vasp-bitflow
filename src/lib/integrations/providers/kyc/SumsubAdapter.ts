@@ -848,25 +848,41 @@ export class SumsubAdapter implements IKycProvider {
       const FormData = require('form-data');
       const formData = new FormData();
       
-      // Add metadata as JSON string
-      formData.append('metadata', JSON.stringify(metadata));
-      
-      // Add file content
+      // Convert file to Buffer if needed
+      let fileBuffer: Buffer;
       if (Buffer.isBuffer(file)) {
-        formData.append('content', file, { filename: fileName });
+        fileBuffer = file;
       } else {
         // Blob (browser File object) - convert to buffer first
         const arrayBuffer = await (file as Blob).arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        formData.append('content', buffer, { filename: fileName });
+        fileBuffer = Buffer.from(arrayBuffer);
       }
+      
+      // Add metadata as JSON string
+      formData.append('metadata', JSON.stringify(metadata));
+      
+      // Detect content type from filename
+      let contentType = 'application/octet-stream';
+      if (fileName.endsWith('.pdf')) {
+        contentType = 'application/pdf';
+      } else if (fileName.endsWith('.png')) {
+        contentType = 'image/png';
+      } else if (fileName.endsWith('.jpg') || fileName.endsWith('.jpeg')) {
+        contentType = 'image/jpeg';
+      }
+      
+      // Add file content
+      formData.append('content', fileBuffer, {
+        filename: fileName,
+        contentType
+      });
 
       // Prepare headers
       const headers: any = {
         'X-App-Token': this.config.appToken!,
         'X-App-Access-Sig': signature,
         'X-App-Access-Ts': ts,
-        ...formData.getHeaders()
+        ...formData.getHeaders() // This adds Content-Type: multipart/form-data with boundary
       };
 
       if (returnWarnings) {
@@ -879,13 +895,18 @@ export class SumsubAdapter implements IKycProvider {
         applicantId,
         fileName,
         metadata,
-        url
+        url,
+        fileSize: fileBuffer.length,
+        contentType,
+        timestamp: ts,
+        signaturePreview: signature.substring(0, 16) + '...'
       });
 
+      // Use node-fetch compatible approach - pass formData as body (it's a stream)
       const response = await fetch(url, {
         method,
         headers,
-        body: formData
+        body: formData as any // FormData from 'form-data' package is a stream
       });
 
       const responseData = await response.json();
