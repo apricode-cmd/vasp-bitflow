@@ -64,8 +64,20 @@ export function PasswordTotpLogin({ email, onSuccess, onError }: PasswordTotpLog
           callbackUrl: '/admin',
           json: 'true',
         }).toString(),
+        redirect: 'manual', // Prevent automatic redirect following
       });
 
+      console.log('📊 Admin SignIn response status:', response.status, 'type:', response.type);
+
+      // Check if we got a redirect (success)
+      if (response.status === 0 || response.status === 302 || response.type === 'opaqueredirect') {
+        console.log('✅ Admin login successful (302 redirect detected)');
+        window.location.href = '/admin';
+        onSuccess();
+        return;
+      }
+
+      // Try to parse JSON response
       const result = await response.json();
 
       console.log('📊 Admin SignIn result:', result);
