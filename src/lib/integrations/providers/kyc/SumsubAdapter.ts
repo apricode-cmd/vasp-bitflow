@@ -92,14 +92,16 @@ export class SumsubAdapter implements IKycProvider {
       appToken: (configAny.appToken || config.metadata?.appToken || config.apiKey)?.trim(),
       secretKey: (configAny.secretKey || config.metadata?.secretKey)?.trim(),
       levelName: (configAny.levelName || config.metadata?.levelName)?.trim(),
-      baseUrl: (configAny.baseUrl || config.apiEndpoint || config.metadata?.baseUrl || 'https://api.sumsub.com').trim()
+      baseUrl: (configAny.baseUrl || config.apiEndpoint || config.metadata?.baseUrl || 'https://api.sumsub.com').trim(),
+      webhookSecret: (configAny.webhookSecret || config.metadata?.webhookSecret)?.trim() // ✅ For webhook signature verification
     };
     
     console.log('🔍 SumsubAdapter extracted config:', {
       appToken: this.config.appToken ? '✅ present' : '❌ missing',
       secretKey: this.config.secretKey ? '✅ present' : '❌ missing',
       levelName: this.config.levelName ? '✅ present' : '❌ missing',
-      baseUrl: this.config.baseUrl
+      baseUrl: this.config.baseUrl,
+      webhookSecret: this.config.webhookSecret ? '✅ present' : '❌ missing' // ✅ Show in logs
     });
     
     // Remove trailing slash
