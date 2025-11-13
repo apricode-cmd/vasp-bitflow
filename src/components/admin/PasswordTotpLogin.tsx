@@ -64,39 +64,42 @@ export function PasswordTotpLogin({ email, onSuccess, onError }: PasswordTotpLog
           callbackUrl: '/admin',
           json: 'true',
         }).toString(),
-        redirect: 'manual', // Prevent automatic redirect following
+        // Don't use redirect: 'manual' - let browser handle redirect and set cookies
       });
 
-      console.log('📊 Admin SignIn response status:', response.status, 'type:', response.type);
+      console.log('📊 Admin SignIn response status:', response.status);
 
-      // Check if we got a redirect (success)
-      if (response.status === 0 || response.status === 302 || response.type === 'opaqueredirect') {
-        console.log('✅ Admin login successful (302 redirect detected)');
-        window.location.href = '/admin';
-        onSuccess();
+      // If response is ok, parse JSON for error handling
+      if (!response.ok) {
+        const result = await response.json();
+        console.error('❌ Admin login error:', result);
+        const errorMessage = result.error === 'CredentialsSignin' 
+          ? 'Invalid password or TOTP code. Please try again.'
+          : (result.error || 'Authentication failed');
+        setLocalError(errorMessage);
+        onError(errorMessage);
         return;
       }
 
-      // Try to parse JSON response
-      const result = await response.json();
+      // Success - try to get JSON response (may have redirect URL)
+      try {
+        const result = await response.json();
+        console.log('📊 Admin SignIn result:', result);
 
-      console.log('📊 Admin SignIn result:', result);
-
-      if (result.url) {
-        // Success - redirect to admin dashboard
-        console.log('✅ Admin login successful, redirecting to:', result.url);
-        window.location.href = result.url;
+        if (result.url) {
+          console.log('✅ Admin login successful, redirecting to:', result.url);
+          window.location.href = result.url;
+        } else {
+          // No url in response, redirect to default
+          console.log('✅ Admin login successful, redirecting to /admin');
+          window.location.href = '/admin';
+        }
         onSuccess();
-      } else if (result.error) {
-        console.error('❌ Admin login error:', result.error);
-        const errorMessage = result.error === 'CredentialsSignin' 
-          ? 'Invalid password or TOTP code. Please try again.'
-          : result.error;
-        setLocalError(errorMessage);
-        onError(errorMessage);
-      } else {
-        setLocalError('Unexpected error during login');
-        onError('Unexpected error during login');
+      } catch (error) {
+        // JSON parse failed, but response was OK - redirect anyway
+        console.log('✅ Admin login successful (non-JSON response), redirecting to /admin');
+        window.location.href = '/admin';
+        onSuccess();
       }
     } catch (error) {
       console.error('❌ Admin login exception:', error);
