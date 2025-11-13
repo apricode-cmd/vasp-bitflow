@@ -99,16 +99,35 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     console.log(`📦 Found ${documents.length} documents to sync`);
 
-    // FIRST: Check what documents are required by Sumsub
+    // FIRST: Get applicant details to see what's required
+    console.log('🔍 Fetching applicant details from Sumsub...');
+    
+    try {
+      const applicantDetails = await kycProvider.getApplicant(applicantId);
+      console.log('📋 Applicant details:', JSON.stringify(applicantDetails.metadata, null, 2));
+      
+      // Check requiredIdDocs
+      if (applicantDetails.metadata?.requiredIdDocs) {
+        console.log('📄 Required ID Docs:', JSON.stringify(applicantDetails.metadata.requiredIdDocs, null, 2));
+      }
+      
+      // Check review status
+      if (applicantDetails.metadata?.review) {
+        console.log('📊 Review status:', JSON.stringify(applicantDetails.metadata.review, null, 2));
+      }
+    } catch (error: any) {
+      console.error('⚠️ Failed to get applicant details:', error.message);
+    }
+    
+    // Also check required documents status
     let requiredDocs: any = null;
     if (kycProvider.checkRequiredDocuments) {
       try {
         const requiredResult = await kycProvider.checkRequiredDocuments(applicantId);
         requiredDocs = requiredResult;
-        console.log('📋 Required documents from Sumsub:', JSON.stringify(requiredResult, null, 2));
+        console.log('📋 Required documents status:', JSON.stringify(requiredResult, null, 2));
       } catch (error: any) {
         console.error('⚠️ Failed to check required documents:', error.message);
-        // Continue anyway - we'll try to upload and handle errors
       }
     }
 
