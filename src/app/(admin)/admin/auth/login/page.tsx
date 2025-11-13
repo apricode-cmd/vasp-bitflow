@@ -1,10 +1,15 @@
 /**
  * Admin Login Page
  * 
- * Passwordless authentication for administrators
- * Primary: Passkey (Face ID / Touch ID) - requires email
- * Alternative: SSO (Google Workspace / Azure AD)
- * Emergency: Break-glass access (separate page)
+ * Multi-factor authentication for administrators
+ * Primary: Passkey (Face ID / Touch ID / Security Key) - biometric/hardware-based
+ * Alternative: Password + TOTP (2FA authenticator app) - software-based
+ * Optional: SSO (Google Workspace / Azure AD) - corporate identity
+ * 
+ * Authentication method availability controlled by:
+ * - Feature flag: adminPasswordAuthEnabled (system settings)
+ * - Role permissions: adminPasswordAuthForRoles (JSON array)
+ * - Individual setup: Admin must configure TOTP or Passkey
  * 
  * Compliant with: PSD2/SCA, DORA, AML best practices
  */
@@ -127,16 +132,16 @@ export default function AdminLoginPage(): React.ReactElement {
             <h1 className="text-3xl font-bold text-white">
               Admin Login
             </h1>
-            <p className="text-sm text-blue-200/70 mt-1">Secure passwordless access</p>
+            <p className="text-sm text-blue-200/70 mt-1">Multi-factor authentication</p>
           </div>
         </div>
 
         {/* Info Alert */}
         <Alert className="border-blue-500/30 bg-blue-950/50 backdrop-blur">
           <AlertCircle className="h-4 w-4 text-blue-400" />
-          <AlertTitle className="text-blue-100">Passwordless Authentication</AlertTitle>
+          <AlertTitle className="text-blue-100">Secure Authentication</AlertTitle>
           <AlertDescription className="text-blue-200/70 text-sm">
-            Administrators use Face ID, Touch ID, or corporate SSO. No passwords required.
+            Multiple authentication methods available: Passkey (biometric/security key) or Password + 2FA.
           </AlertDescription>
         </Alert>
 
@@ -198,7 +203,7 @@ export default function AdminLoginPage(): React.ReactElement {
                         Checking...
                       </>
                     ) : (
-                      'Continue with Passkey'
+                      'Continue'
                     )}
                   </Button>
 
