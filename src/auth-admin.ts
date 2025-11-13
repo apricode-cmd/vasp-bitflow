@@ -207,7 +207,6 @@ export const {
             data: {
               adminId: admin.id,
               action: 'ADMIN_LOGIN',
-              entity: 'Admin',
               entityId: admin.id,
               entityType: 'Admin',
               metadata: {
