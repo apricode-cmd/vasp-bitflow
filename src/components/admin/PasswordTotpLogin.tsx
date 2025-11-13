@@ -64,43 +64,53 @@ export function PasswordTotpLogin({ email, onSuccess, onError }: PasswordTotpLog
           callbackUrl: '/admin',
           json: 'true',
         }).toString(),
-        // Don't use redirect: 'manual' - let browser handle redirect and set cookies
+        credentials: 'include', // Critical: ensure cookies are sent and received
+        redirect: 'manual', // Handle redirect manually to control timing
       });
 
-      console.log('📊 Admin SignIn response status:', response.status);
+      console.log('📊 Admin SignIn response:', { 
+        status: response.status, 
+        type: response.type,
+        redirected: response.redirected 
+      });
 
-      // If response is ok, parse JSON for error handling
-      if (!response.ok) {
-        const result = await response.json();
-        console.error('❌ Admin login error:', result);
-        const errorMessage = result.error === 'CredentialsSignin' 
-          ? 'Invalid password or TOTP code. Please try again.'
-          : (result.error || 'Authentication failed');
-        setLocalError(errorMessage);
-        onError(errorMessage);
+      // NextAuth returns 302 redirect on success (with Set-Cookie header)
+      // Status 0 or 302 or type 'opaqueredirect' indicates success
+      if (response.status === 0 || response.status === 302 || response.type === 'opaqueredirect') {
+        console.log('✅ Admin login successful (302 redirect detected)');
+        
+        // Critical: Wait for cookie to be set and propagate
+        console.log('⏳ Waiting for session cookie to be set...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Hard redirect to force full page reload with new session
+        console.log('🔄 Redirecting to /admin...');
+        window.location.href = '/admin';
+        onSuccess();
         return;
       }
 
-      // Success - try to get JSON response (may have redirect URL)
-      try {
-        const result = await response.json();
-        console.log('📊 Admin SignIn result:', result);
-
-        if (result.url) {
-          console.log('✅ Admin login successful, redirecting to:', result.url);
-          window.location.href = result.url;
-        } else {
-          // No url in response, redirect to default
-          console.log('✅ Admin login successful, redirecting to /admin');
-          window.location.href = '/admin';
+      // If not a redirect, check for errors
+      if (!response.ok) {
+        try {
+          const result = await response.json();
+          console.error('❌ Admin login error:', result);
+          const errorMessage = result.error === 'CredentialsSignin' 
+            ? 'Invalid password or TOTP code. Please try again.'
+            : (result.error || 'Authentication failed');
+          setLocalError(errorMessage);
+          onError(errorMessage);
+        } catch {
+          setLocalError('Authentication failed. Please try again.');
+          onError('Authentication failed');
         }
-        onSuccess();
-      } catch (error) {
-        // JSON parse failed, but response was OK - redirect anyway
-        console.log('✅ Admin login successful (non-JSON response), redirecting to /admin');
-        window.location.href = '/admin';
-        onSuccess();
+        return;
       }
+
+      // If we got here with 200 OK, something unexpected happened
+      console.warn('⚠️ Unexpected response (200 OK without redirect)');
+      setLocalError('Unexpected authentication response. Please try again.');
+      onError('Unexpected response');
     } catch (error) {
       console.error('❌ Admin login exception:', error);
       const errorMessage = error instanceof Error ? error.message : 'Login failed';
