@@ -11,7 +11,7 @@ import { getAdminSession } from '@/auth-admin';
 import { z } from 'zod';
 import { verifyTotpCode } from '@/lib/services/totp.service';
 import { prisma } from '@/lib/prisma';
-import { encrypt } from '@/lib/crypto';
+import { encrypt } from '@/lib/services/encryption.service';
 import crypto from 'crypto';
 
 const verifySchema = z.object({

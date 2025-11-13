@@ -82,9 +82,14 @@ export function getEmailUrls() {
     // Admin KYC specific
     adminKycReview: (userId: string) => `${baseUrl}/admin/kyc?userId=${encodeURIComponent(userId)}`,
     
-    // Admin setup (for invitations)
+    // Admin setup (for invitations) - universal setup page
+    adminSetup: (token: string, email?: string) => {
+      const url = `${baseUrl}/admin/auth/setup?token=${encodeURIComponent(token)}`;
+      return email ? `${url}&email=${encodeURIComponent(email)}` : url;
+    },
+    // Legacy alias for backward compatibility
     adminSetupPasskey: (token: string, email?: string) => {
-      const url = `${baseUrl}/admin/auth/setup-passkey?token=${encodeURIComponent(token)}`;
+      const url = `${baseUrl}/admin/auth/setup?token=${encodeURIComponent(token)}`;
       return email ? `${url}&email=${encodeURIComponent(email)}` : url;
     },
     

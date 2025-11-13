@@ -379,8 +379,8 @@ export async function buildAdminInviteEmailData(adminId: string, setupToken: str
     adminName,
     adminEmail: admin.workEmail,
     
-    // Setup link
-    setupUrl: emailUrls.adminSetupPasskey(setupToken, admin.workEmail),
+    // Setup link (universal setup page - user chooses method)
+    setupUrl: emailUrls.adminSetup(setupToken, admin.workEmail),
     
     // Role
     role: admin.role,

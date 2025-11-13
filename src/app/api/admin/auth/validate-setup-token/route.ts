@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { isPasswordAuthEnabledForRole } from '@/lib/features/admin-auth-features';
 import crypto from 'crypto';
 
 export async function POST(request: NextRequest) {
@@ -31,12 +32,20 @@ export async function POST(request: NextRequest) {
         id: true,
         email: true,
         workEmail: true,
+        role: true,
         setupToken: true,
         setupTokenExpiry: true,
         isActive: true,
+        status: true,
+        password: true,
         webAuthnCreds: {
           where: { isActive: true },
           select: { id: true }
+        },
+        twoFactorAuth: {
+          select: {
+            totpEnabled: true
+          }
         }
       }
     });
@@ -48,11 +57,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if admin already has passkeys registered
-    if (admin.webAuthnCreds.length > 0) {
+    // Check if admin is already fully set up
+    if (admin.status === 'ACTIVE' && (admin.webAuthnCreds.length > 0 || (admin.password && admin.twoFactorAuth?.totpEnabled))) {
       return NextResponse.json(
         { 
-          error: 'Passkey already registered',
+          error: 'Admin account already set up',
           alreadySetup: true 
         },
         { status: 400 }
@@ -91,11 +100,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check available authentication methods based on feature flags
+    const passwordTotpAllowed = await isPasswordAuthEnabledForRole(admin.role);
+    const passkeyAvailable = true; // Always available
+    const passwordTotpAvailable = passwordTotpAllowed; // Only if feature flag enabled
+
+    // Determine default method (prefer Password+TOTP if available, otherwise Passkey)
+    const defaultMethod = passwordTotpAvailable ? 'password-totp' : 'passkey';
+
     // Token is valid
     return NextResponse.json({
       valid: true,
-      email: admin.email,
-      expiresAt: admin.setupTokenExpiry?.toISOString()
+      email: admin.email || admin.workEmail,
+      expiresAt: admin.setupTokenExpiry?.toISOString(),
+      availableMethods: {
+        passkeyAvailable,
+        passwordTotpAvailable,
+        defaultMethod
+      }
     });
 
   } catch (error) {

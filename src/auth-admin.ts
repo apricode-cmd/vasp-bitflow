@@ -16,9 +16,9 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { prisma } from '@/lib/prisma';
 import { isPasswordAuthEnabledForRole } from '@/lib/features/admin-auth-features';
-import { verifyPassword } from '@/lib/auth/password';
+import { verifyPassword } from '@/lib/auth-utils';
 import { verifyTotpCode } from '@/lib/services/totp.service';
-import { decrypt } from '@/lib/crypto';
+import { decrypt } from '@/lib/services/encryption.service';
 
 export const { 
   handlers: adminHandlers, 
