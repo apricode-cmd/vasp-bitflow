@@ -732,13 +732,21 @@ export class SumsubAdapter implements IKycProvider {
   }
 
   /**
-   * Verify webhook signature
+   * Verify webhook signature (Official Sumsub implementation)
    * 
-   * Sumsub sends X-Payload-Digest header with HMAC-SHA256 or HMAC-SHA1 signature
-   * Format: "HMAC-SHA256=<hex>" or "SHA1=<hex>" or just "<hex>"
+   * According to Sumsub docs (https://docs.sumsub.com/docs/webhook-manager):
+   * 1. Get x-payload-digest header value and raw payload (no JSON parsing)
+   * 2. Get x-payload-digest-alg header (HMAC_SHA256_HEX/HMAC_SHA512_HEX/HMAC_SHA1_HEX)
+   * 3. Compute HMAC with raw bytes + algorithm from header + webhookSecret
+   * 4. Compare using timingSafeEqual
+   * 
+   * @param payload - RAW body as string (no JSON parsing/trimming)
+   * @param signature - Value from x-payload-digest header (hex string)
+   * @param algorithmHeader - Value from x-payload-digest-alg header (e.g., "HMAC_SHA256_HEX")
+   * @returns true if signature is valid, false otherwise
    */
-  verifyWebhookSignature(payload: string, signature: string): boolean {
-    // Use webhookSecret if available, fallback to secretKey for backward compatibility
+  verifyWebhookSignature(payload: string, signature: string, algorithmHeader?: string): boolean {
+    // ✅ Use webhookSecret (not secretKey)
     const secretKey = (this.config as any).webhookSecret || this.config.secretKey;
     
     console.log('🔐 [WEBHOOK] Checking secret config:', {
@@ -755,44 +763,51 @@ export class SumsubAdapter implements IKycProvider {
     }
 
     try {
-      // Parse signature format
-      let algorithm = 'sha256';
-      let signatureValue = signature;
-
-      if (signature.includes('=')) {
-        const [algo, value] = signature.split('=');
-        if (algo.includes('SHA256')) {
-          algorithm = 'sha256';
-        } else if (algo.includes('SHA1')) {
-          algorithm = 'sha1';
-        }
-        signatureValue = value;
+      // ✅ Parse algorithm from x-payload-digest-alg header (official Sumsub format)
+      const algHeader = (algorithmHeader || 'HMAC_SHA256_HEX').toUpperCase();
+      let algorithm = 'sha256'; // default
+      
+      if (algHeader.includes('512')) {
+        algorithm = 'sha512';
+      } else if (algHeader.includes('256')) {
+        algorithm = 'sha256';
+      } else if (algHeader.includes('SHA1')) {
+        algorithm = 'sha1'; // legacy
       }
 
       console.log('🔐 [WEBHOOK] Verifying signature:', {
-        algorithm,
-        signatureLength: signatureValue.length,
+        algorithmHeader: algHeader,
+        algorithmUsed: algorithm,
+        signatureLength: signature.length,
         payloadLength: payload.length,
         payloadPreview: payload.substring(0, 100) + '...',
-        signatureReceived: signatureValue.substring(0, 20) + '...'
+        signatureReceived: signature.substring(0, 20) + '...'
       });
 
+      // ✅ Compute HMAC with raw bytes (official Sumsub method)
       const expectedSignature = crypto
         .createHmac(algorithm, secretKey)
-        .update(payload)
+        .update(Buffer.from(payload, 'utf8')) // RAW bytes
         .digest('hex');
 
-      // Case-insensitive comparison
-      const isValid = expectedSignature.toLowerCase() === signatureValue.toLowerCase();
+      // ✅ timingSafeEqual for secure comparison (official Sumsub method)
+      const isValid = 
+        signature.length === expectedSignature.length &&
+        crypto.timingSafeEqual(
+          Buffer.from(signature, 'hex'),
+          Buffer.from(expectedSignature, 'hex')
+        );
 
       if (!isValid) {
         console.error('❌ [WEBHOOK] Signature mismatch:', {
           expected: expectedSignature.substring(0, 20) + '...',
-          received: signatureValue.substring(0, 20) + '...',
+          received: signature.substring(0, 20) + '...',
           expectedFull: expectedSignature,
-          receivedFull: signatureValue,
+          receivedFull: signature,
           algorithm: algorithm,
-          payloadLengthUsed: payload.length
+          algorithmHeader: algHeader,
+          payloadLengthUsed: payload.length,
+          secretKeyUsed: secretKey.substring(0, 8) + '...'
         });
       } else {
         console.log('✅ [WEBHOOK] Signature valid');

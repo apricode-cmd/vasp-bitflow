@@ -26,11 +26,13 @@ export async function POST(request: NextRequest) {
     console.log('📋 [WEBHOOK] ALL Headers:', Array.from(request.headers.entries()));
     console.log('📋 [WEBHOOK] Signature headers:', {
       'x-payload-digest': request.headers.get('x-payload-digest'),
+      'x-payload-digest-alg': request.headers.get('x-payload-digest-alg'), // ✅ Algorithm header
       'x-signature': request.headers.get('x-signature'),
       'digest': request.headers.get('digest')
     });
     console.log('📄 [WEBHOOK] Raw body preview:', rawBody.substring(0, 200));
     console.log('📏 [WEBHOOK] Body length:', rawBody.length);
+    console.log('🔐 [WEBHOOK] Expected algorithm from Sumsub:', request.headers.get('x-payload-digest-alg') || 'SHA256 (default)');
 
     if (!signature) {
       console.error('❌ No signature header found');
@@ -53,7 +55,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Verify signature
+    // 4. Verify signature (official Sumsub method)
     const sumsubAdapter = provider as any;
     
     if (!sumsubAdapter.verifyWebhookSignature) {
@@ -64,7 +66,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const isValid = sumsubAdapter.verifyWebhookSignature(rawBody, signature);
+    // ✅ Pass algorithm header to verifyWebhookSignature
+    const algorithmHeader = request.headers.get('x-payload-digest-alg') || 'HMAC_SHA256_HEX';
+    const isValid = sumsubAdapter.verifyWebhookSignature(rawBody, signature, algorithmHeader);
     
     if (!isValid) {
       console.error('❌ Invalid webhook signature');
