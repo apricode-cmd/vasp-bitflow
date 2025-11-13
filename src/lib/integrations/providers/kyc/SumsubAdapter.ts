@@ -881,15 +881,14 @@ export class SumsubAdapter implements IKycProvider {
       const headers: any = {
         'X-App-Token': this.config.appToken!,
         'X-App-Access-Sig': signature,
-        'X-App-Access-Ts': ts,
-        ...formData.getHeaders() // This adds Content-Type: multipart/form-data with boundary
+        'X-App-Access-Ts': ts
       };
 
       if (returnWarnings) {
         headers['X-Return-Doc-Warnings'] = 'true';
       }
 
-      // Make request
+      // Make request using axios for better FormData support
       const url = `${this.baseUrl}${path}`;
       console.log('📤 [SUMSUB] Uploading document:', {
         applicantId,
@@ -899,23 +898,33 @@ export class SumsubAdapter implements IKycProvider {
         fileSize: fileBuffer.length,
         contentType,
         timestamp: ts,
-        signaturePreview: signature.substring(0, 16) + '...'
-      });
-
-      // Use node-fetch compatible approach - pass formData as body (it's a stream)
-      const response = await fetch(url, {
         method,
-        headers,
-        body: formData as any // FormData from 'form-data' package is a stream
+        path,
+        signaturePayload: `${ts}${method}${path}`,
+        signaturePreview: signature.substring(0, 20) + '...'
       });
 
-      const responseData = await response.json();
+      // Use axios for multipart upload (better form-data support)
+      const axios = require('axios');
+      
+      const response = await axios.post(url, formData, {
+        headers: {
+          ...headers,
+          ...formData.getHeaders() // Add Content-Type with boundary
+        },
+        maxBodyLength: Infinity,
+        maxContentLength: Infinity,
+        validateStatus: () => true // Don't throw on non-2xx
+      });
 
-      if (!response.ok) {
+      const responseData = response.data;
+
+      if (response.status !== 200 && response.status !== 201) {
         console.error('❌ [SUMSUB] Upload failed:', {
           status: response.status,
           statusText: response.statusText,
-          data: responseData
+          data: responseData,
+          headers: response.headers
         });
 
         return {
