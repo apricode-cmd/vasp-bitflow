@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { KycField } from './KycField';
 import { KycField as KycFieldType, KYC_CATEGORIES, getFieldsForStep, KycStep } from '@/lib/kyc/config';
 import { shouldShowField } from '@/lib/kyc/conditionalLogic';
-import { Badge } from '@/components/ui/badge';
 import * as Icons from 'lucide-react';
 
 interface Props {
@@ -61,9 +60,6 @@ export function KycFormStep({ step, fields, formData, errors, onChange }: Props)
                     </p>
                   )}
                 </div>
-                <Badge variant="outline">
-                  {categoryFields.length} {categoryFields.length === 1 ? 'field' : 'fields'}
-                </Badge>
               </div>
 
               {/* Fields Grid */}
