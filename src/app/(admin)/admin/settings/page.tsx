@@ -27,9 +27,10 @@ import {
 import { toast } from 'sonner';
 import {
   Building2, Globe, Settings as SettingsIcon, Scale,
-  Save, Loader2, AlertCircle, Sparkles, Mail, Palette
+  Save, Loader2, AlertCircle, Sparkles, Mail, Palette, Shield
 } from 'lucide-react';
 import Color from 'color';
+import { SecuritySettingsTab } from '@/components/admin/SecuritySettingsTab';
 
 interface SystemSettings {
   // Brand
@@ -281,7 +282,7 @@ export default function SettingsPage(): JSX.Element {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="brand">
             <Building2 className="h-4 w-4 mr-2" />
             Brand
@@ -297,6 +298,10 @@ export default function SettingsPage(): JSX.Element {
           <TabsTrigger value="system">
             <SettingsIcon className="h-4 w-4 mr-2" />
             System
+          </TabsTrigger>
+          <TabsTrigger value="security">
+            <Shield className="h-4 w-4 mr-2" />
+            Security
           </TabsTrigger>
         </TabsList>
 
@@ -943,6 +948,11 @@ export default function SettingsPage(): JSX.Element {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Security Settings */}
+        <TabsContent value="security" className="space-y-6 mt-6">
+          <SecuritySettingsTab />
         </TabsContent>
       </Tabs>
     </div>

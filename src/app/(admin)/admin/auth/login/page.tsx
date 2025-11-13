@@ -12,16 +12,19 @@
 'use client';
 
 import { useState } from 'react';
-import { Shield, AlertCircle, Loader2 } from 'lucide-react';
+import { Shield, AlertCircle, Loader2, Key } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PasskeyLoginButton } from '@/components/admin/PasskeyLoginButton';
+import { PasswordTotpLogin } from '@/components/admin/PasswordTotpLogin';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import {
   Form,
   FormControl,
@@ -37,11 +40,16 @@ const emailSchema = z.object({
 
 type EmailInput = z.infer<typeof emailSchema>;
 
+interface AuthMethods {
+  passkey: { available: boolean; required: boolean; recommended: boolean; deviceCount?: number };
+  passwordTotp: { available: boolean; required: boolean; enabled: boolean; configured?: boolean };
+}
+
 export default function AdminLoginPage(): React.ReactElement {
   const [error, setError] = useState<string | null>(null);
   const [adminEmail, setAdminEmail] = useState<string | null>(null);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
-  const [hasPasskeys, setHasPasskeys] = useState(false);
+  const [availableMethods, setAvailableMethods] = useState<AuthMethods | null>(null);
 
   const form = useForm<EmailInput>({
     resolver: zodResolver(emailSchema),
@@ -55,12 +63,12 @@ export default function AdminLoginPage(): React.ReactElement {
     setError(null);
 
     try {
-      // Check if admin exists and has passkeys
-      const response = await fetch('/api/admin/auth/check-passkey', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: data.email }),
-      });
+      console.log('🔍 Checking auth methods for:', data.email);
+
+      // Check available authentication methods
+      const response = await fetch(
+        `/api/admin/auth/check-methods?email=${encodeURIComponent(data.email)}`
+      );
 
       const result = await response.json();
 
@@ -70,18 +78,21 @@ export default function AdminLoginPage(): React.ReactElement {
         return;
       }
 
-      if (!result.hasPasskeys) {
-        setError('No passkeys registered for this email. Please contact your administrator.');
+      console.log('📊 Available methods:', result.methods);
+
+      // Check if at least one method is available
+      if (!result.methods.passkey.available && !result.methods.passwordTotp.available) {
+        setError('No authentication methods configured. Please contact your administrator.');
         setIsCheckingEmail(false);
         return;
       }
 
-      // Email valid and has passkeys
+      // Save available methods and email
+      setAvailableMethods(result.methods);
       setAdminEmail(data.email);
-      setHasPasskeys(true);
       setIsCheckingEmail(false);
     } catch (error) {
-      console.error('Email check error:', error);
+      console.error('❌ Email check error:', error);
       setError('An unexpected error occurred. Please try again.');
       setIsCheckingEmail(false);
     }
@@ -94,7 +105,7 @@ export default function AdminLoginPage(): React.ReactElement {
 
   const handleBack = () => {
     setAdminEmail(null);
-    setHasPasskeys(false);
+    setAvailableMethods(null);
     setError(null);
     form.reset();
   };
@@ -197,24 +208,77 @@ export default function AdminLoginPage(): React.ReactElement {
                 </form>
               </Form>
             ) : (
-              /* Step 2: Passkey Authentication */
+              /* Step 2: Authentication Methods */
               <div className="space-y-4">
-                <div className="text-sm text-blue-200/80 bg-blue-950/30 border border-blue-500/20 rounded-lg p-3">
-                  <p className="font-semibold mb-1">Ready to authenticate</p>
-                  <p className="text-xs text-blue-200/60">
-                    Click below to sign in with your biometric or security key
-                  </p>
-                </div>
+                {/* Show method selection if both are available */}
+                {availableMethods && 
+                 availableMethods.passkey.available && 
+                 availableMethods.passwordTotp.available ? (
+                  <Tabs defaultValue="passkey" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="passkey">
+                        <Shield className="w-4 h-4 mr-2" />
+                        Passkey
+                        {availableMethods.passkey.recommended && (
+                          <Badge variant="secondary" className="ml-2 text-xs">Recommended</Badge>
+                        )}
+                      </TabsTrigger>
+                      <TabsTrigger value="password">
+                        <Key className="w-4 h-4 mr-2" />
+                        Password + 2FA
+                      </TabsTrigger>
+                    </TabsList>
 
-                <PasskeyLoginButton
-                  email={adminEmail}
-                  onSuccess={() => {
-                    window.location.href = '/admin';
-                  }}
-                  onError={(err) => {
-                    setError(err);
-                  }}
-                />
+                    <TabsContent value="passkey" className="space-y-4">
+                      <div className="text-sm text-blue-200/80 bg-blue-950/30 border border-blue-500/20 rounded-lg p-3">
+                        <p className="font-semibold mb-1">Biometric / Security Key</p>
+                        <p className="text-xs text-blue-200/60">
+                          Most secure method - phishing resistant
+                        </p>
+                      </div>
+                      <PasskeyLoginButton
+                        email={adminEmail}
+                        onSuccess={() => window.location.href = '/admin'}
+                        onError={(err) => setError(err)}
+                      />
+                    </TabsContent>
+
+                    <TabsContent value="password" className="space-y-4">
+                      <PasswordTotpLogin
+                        email={adminEmail}
+                        onSuccess={() => window.location.href = '/admin'}
+                        onError={(err) => setError(err)}
+                      />
+                    </TabsContent>
+                  </Tabs>
+                ) : availableMethods && availableMethods.passkey.available ? (
+                  /* Only Passkey available */
+                  <div className="space-y-4">
+                    <div className="text-sm text-blue-200/80 bg-blue-950/30 border border-blue-500/20 rounded-lg p-3">
+                      <p className="font-semibold mb-1">Biometric / Security Key</p>
+                      <p className="text-xs text-blue-200/60">
+                        Click below to sign in with your biometric or security key
+                      </p>
+                    </div>
+                    <PasskeyLoginButton
+                      email={adminEmail}
+                      onSuccess={() => window.location.href = '/admin'}
+                      onError={(err) => setError(err)}
+                    />
+                    {availableMethods.passkey.required && (
+                      <p className="text-xs text-blue-200/50 text-center">
+                        🔒 Passkey authentication required for your role
+                      </p>
+                    )}
+                  </div>
+                ) : availableMethods && availableMethods.passwordTotp.available ? (
+                  /* Only Password + TOTP available */
+                  <PasswordTotpLogin
+                    email={adminEmail}
+                    onSuccess={() => window.location.href = '/admin'}
+                    onError={(err) => setError(err)}
+                  />
+                ) : null}
 
                 <Button
                   type="button"

@@ -10,6 +10,7 @@ import { requireAdminRole, getCurrentUserId } from '@/lib/middleware/admin-auth'
 import { prisma } from '@/lib/prisma';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 import { z } from 'zod';
+import { clearAdminAuthFeaturesCache } from '@/lib/features/admin-auth-features';
 
 const updateSettingsSchema = z.array(
   z.object({
@@ -163,6 +164,14 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     });
 
     const updatedSettings = await Promise.all(updatePromises);
+
+    // ✅ Clear admin auth features cache if security settings changed
+    const securityKeys = validated.map(s => s.key);
+    if (securityKeys.includes('adminPasswordAuthEnabled') || 
+        securityKeys.includes('adminPasswordAuthForRoles')) {
+      clearAdminAuthFeaturesCache();
+      console.log('🔄 [Settings] Admin auth features cache cleared');
+    }
 
     return NextResponse.json({
       success: true,
