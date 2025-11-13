@@ -140,14 +140,17 @@ export async function POST(request: NextRequest) {
     await prisma.adminAuditLog.create({
       data: {
         adminId: admin.id,
+        adminEmail: email,
+        adminRole: admin.role,
         action: 'ADMIN_2FA_ENABLED',
-        entity: 'AdminTwoFactorAuth',
+        entityType: 'AdminTwoFactorAuth',
         entityId: admin.id,
-        metadata: {
+        context: {
           method: 'TOTP',
           email: email,
           setupType: 'first-time'
-        }
+        },
+        severity: 'INFO',
       }
     });
 
