@@ -114,11 +114,13 @@ export async function POST(request: NextRequest) {
     await prisma.adminAuditLog.create({
       data: {
         adminId: admin.id,
+        adminEmail: admin.email || admin.workEmail || '',
+        adminRole: admin.role,
         action: 'EMERGENCY_ACCESS',
-        entity: 'ADMIN',
+        entityType: 'Admin',
         entityId: admin.id,
-        details: {
-          email: admin.email,
+        severity: 'CRITICAL',
+        context: {
           timestamp: new Date().toISOString(),
           ip: request.headers.get('x-forwarded-for') || 'unknown',
         },

@@ -206,13 +206,15 @@ export const {
           await prisma.adminAuditLog.create({
             data: {
               adminId: admin.id,
+              adminEmail: admin.email || admin.workEmail || '',
+              adminRole: admin.role,
               action: 'ADMIN_LOGIN',
               entityId: admin.id,
               entityType: 'Admin',
-              metadata: {
+              severity: 'INFO',
+              context: {
                 authMethod: 'PASSWORD_TOTP',
-                email: admin.email || admin.workEmail,
-                ipAddress: 'unknown', // Will be set by middleware
+                ipAddress: 'unknown',
                 userAgent: 'unknown'
               }
             }

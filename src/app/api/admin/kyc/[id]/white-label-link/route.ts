@@ -98,10 +98,13 @@ export async function POST(
     await prisma.adminAuditLog.create({
       data: {
         adminId: session.user.id,
+        adminEmail: session.user.email || '',
+        adminRole: session.user.role,
         action: 'KYC_WHITE_LABEL_LINK_GENERATED',
-        resourceType: 'KYC_SESSION',
-        resourceId: kycSession.id,
-        metadata: {
+        entityType: 'KycSession',
+        entityId: kycSession.id,
+        severity: 'INFO',
+        context: {
           targetUserId: userId,
           expiresInHours,
           kycProvider: kycSession.kycProviderId
