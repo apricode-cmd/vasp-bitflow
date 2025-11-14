@@ -19,8 +19,7 @@ import {
   AlertTriangle, 
   FileCheck, 
   ArrowDownCircle, 
-  DollarSign, 
-  Plus,
+  DollarSign,
   ExternalLink,
   MoreHorizontal,
   Receipt
@@ -425,10 +424,6 @@ export default function PayInPage(): JSX.Element {
           <h1 className="text-3xl font-bold">Pay In Management</h1>
           <p className="text-muted-foreground">Manage incoming payments from customers</p>
         </div>
-        <Button onClick={() => router.push('/admin/pay-in/create')}>
-          <Plus className="h-4 w-4 mr-2" />
-          Create PayIn
-        </Button>
       </div>
 
       {/* Quick Stats */}
