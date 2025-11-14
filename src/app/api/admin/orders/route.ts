@@ -27,6 +27,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Filters
     const status = searchParams.get('status');
     const currencyCode = searchParams.get('currency');
+    const withoutPayIn = searchParams.get('withoutPayIn') === 'true';
 
     // Build where clause
     const where: Record<string, unknown> = {};
@@ -35,6 +36,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
     if (currencyCode) {
       where.currencyCode = currencyCode;
+    }
+    if (withoutPayIn) {
+      where.payIn = null;
     }
 
     // Get orders

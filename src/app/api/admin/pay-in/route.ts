@@ -16,13 +16,20 @@ const payInFiltersSchema = z.object({
 
 const createPayInSchema = z.object({
   orderId: z.string(),
-  userId: z.string(),
-  amount: z.number().positive(),
-  currency: z.string(),
   currencyType: z.enum(['FIAT', 'CRYPTO']),
+  fiatCurrencyCode: z.string().optional(),
+  cryptocurrencyCode: z.string().optional(),
+  expectedAmount: z.number().positive(),
+  receivedAmount: z.number().positive(),
   paymentMethodCode: z.string().optional(),
   networkCode: z.string().optional(),
-  expectedAmount: z.number().positive().optional()
+  senderName: z.string().optional(),
+  senderAccount: z.string().optional(),
+  senderBank: z.string().optional(),
+  reference: z.string().optional(),
+  transactionId: z.string().optional(),
+  verificationNotes: z.string().optional(),
+  status: z.enum(['PENDING', 'RECEIVED', 'VERIFIED', 'PARTIAL', 'MISMATCH', 'RECONCILED', 'FAILED', 'REFUNDED', 'EXPIRED']).optional()
 });
 
 // Generate cache key for pay-in list
@@ -218,22 +225,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (sessionOrError instanceof NextResponse) {
       return sessionOrError;
     }
+    const { session } = sessionOrError;
 
     const body = await request.json();
     const validated = createPayInSchema.parse(body);
 
-    console.log('🔍 Creating PayIn with data:', {
-      currency: validated.currency,
-      currencyType: validated.currencyType,
-      orderId: validated.orderId,
-      userId: validated.userId,
-      amount: validated.amount
-    });
+    console.log('🔍 Creating PayIn with data:', validated);
 
-    // Validate order exists
+    // Validate order exists and get order details
     const order = await prisma.order.findUnique({
       where: { id: validated.orderId },
-      select: { id: true, userId: true }
+      select: { 
+        id: true, 
+        userId: true,
+        fiatCurrencyCode: true,
+        currencyCode: true
+      }
     });
 
     if (!order) {
@@ -243,47 +250,64 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Validate user exists
-    const user = await prisma.user.findUnique({
-      where: { id: validated.userId },
-      select: { id: true }
-    });
+    // Calculate amount mismatch
+    const amountMismatch = Math.abs(validated.receivedAmount - validated.expectedAmount) > 0.01;
+    const amountDifference = validated.receivedAmount - validated.expectedAmount;
 
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: 'User not found' },
-        { status: 404 }
-      );
+    // Determine auto-status based on amount
+    let autoStatus = validated.status || 'RECEIVED';
+    if (amountMismatch) {
+      if (validated.receivedAmount < validated.expectedAmount) {
+        autoStatus = 'PARTIAL';
+      } else if (validated.receivedAmount > validated.expectedAmount) {
+        autoStatus = 'MISMATCH';
+      }
     }
 
     // Prepare data based on currency type
     const payInData: any = {
       order: { connect: { id: validated.orderId } },
-      user: { connect: { id: validated.userId } },
-      amount: validated.amount,
+      user: { connect: { id: order.userId } },
+      expectedAmount: validated.expectedAmount,
+      receivedAmount: validated.receivedAmount,
       currencyType: validated.currencyType,
-      expectedAmount: validated.expectedAmount || validated.amount,
-      status: 'PENDING',
-      amountMismatch: false,
-      confirmations: 0
+      status: autoStatus,
+      amountMismatch,
+      amountDifference,
+      confirmations: 0,
+      senderName: validated.senderName,
+      senderAccount: validated.senderAccount,
+      senderBank: validated.senderBank,
+      reference: validated.reference,
+      transactionId: validated.transactionId,
+      verificationNotes: validated.verificationNotes,
+      initiatedBy: session.user.id,
+      initiatedAt: new Date(),
+      // Auto-verify if status is RECEIVED and amounts match
+      ...(autoStatus === 'RECEIVED' && !amountMismatch ? {
+        verifiedBy: session.user.id,
+        verifiedAt: new Date()
+      } : {})
     };
 
     // Connect currency relations explicitly based on type
     if (validated.currencyType === 'FIAT') {
+      const fiatCode = validated.fiatCurrencyCode || order.fiatCurrencyCode;
+      
       // Verify fiat currency exists
       const fiatCurrency = await prisma.fiatCurrency.findUnique({
-        where: { code: validated.currency },
+        where: { code: fiatCode },
         select: { code: true }
       });
       
       if (!fiatCurrency) {
         return NextResponse.json(
-          { success: false, error: `Fiat currency '${validated.currency}' not found` },
+          { success: false, error: `Fiat currency '${fiatCode}' not found` },
           { status: 404 }
         );
       }
       
-      payInData.fiatCurrency = { connect: { code: validated.currency } };
+      payInData.fiatCurrency = { connect: { code: fiatCode } };
       
       // Connect payment method only if provided and exists
       if (validated.paymentMethodCode) {
@@ -295,30 +319,30 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           payInData.paymentMethod = { connect: { code: validated.paymentMethodCode } };
         }
       }
-    } else {
-      // Verify cryptocurrency exists
+    }
+    
+    // Always add cryptocurrency from order
+    if (validated.cryptocurrencyCode || order.currencyCode) {
+      const cryptoCode = validated.cryptocurrencyCode || order.currencyCode;
+      
       const cryptocurrency = await prisma.currency.findUnique({
-        where: { code: validated.currency },
+        where: { code: cryptoCode },
         select: { code: true }
       });
       
-      if (!cryptocurrency) {
-        return NextResponse.json(
-          { success: false, error: `Cryptocurrency '${validated.currency}' not found` },
-          { status: 404 }
-        );
+      if (cryptocurrency) {
+        payInData.cryptocurrency = { connect: { code: cryptoCode } };
       }
-      
-      payInData.cryptocurrency = { connect: { code: validated.currency } };
-      
-      if (validated.networkCode) {
-        const networkExists = await prisma.blockchainNetwork.findUnique({
-          where: { code: validated.networkCode },
-          select: { code: true }
-        });
-        if (networkExists) {
-          payInData.network = { connect: { code: validated.networkCode } };
-        }
+    }
+    
+    // Connect blockchain network if provided
+    if (validated.networkCode) {
+      const networkExists = await prisma.blockchainNetwork.findUnique({
+        where: { code: validated.networkCode },
+        select: { code: true }
+      });
+      if (networkExists) {
+        payInData.network = { connect: { code: validated.networkCode } };
       }
     }
 

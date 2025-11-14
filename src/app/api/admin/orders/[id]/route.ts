@@ -19,6 +19,94 @@ interface RouteContext {
   };
 }
 
+export async function GET(request: NextRequest, { params }: RouteContext): Promise<NextResponse> {
+  // Check admin authorization
+  const authResult = await requireAdminRole('ADMIN');
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+
+  try {
+    // Fetch order by ID or paymentReference
+    const order = await prisma.order.findFirst({
+      where: {
+        OR: [
+          { id: params.id },
+          { paymentReference: params.id }
+        ]
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            profile: {
+              select: {
+                firstName: true,
+                lastName: true,
+                phoneNumber: true,
+                country: true
+              }
+            }
+          }
+        },
+        currency: {
+          select: {
+            code: true,
+            name: true
+          }
+        },
+        fiatCurrency: {
+          select: {
+            code: true,
+            symbol: true,
+            name: true
+          }
+        },
+        blockchain: {
+          select: {
+            code: true,
+            name: true
+          }
+        },
+        paymentMethod: {
+          select: {
+            code: true,
+            name: true
+          }
+        },
+        payIn: true,
+        payOut: true,
+        paymentProofs: true
+      }
+    });
+
+    if (!order) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Order not found' 
+        },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: order
+    });
+  } catch (error) {
+    console.error('Fetch order error:', error);
+    return NextResponse.json(
+      { 
+        success: false,
+        error: 'Failed to fetch order' 
+      },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PATCH(request: NextRequest, { params }: RouteContext): Promise<NextResponse> {
   // Check admin authorization
   const authResult = await requireAdminRole('ADMIN');

@@ -13,7 +13,8 @@ import {
   XCircle, 
   FileCheck,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  RotateCcw
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -38,6 +39,7 @@ interface PayInHeaderProps {
   onVerify: () => void;
   onReconcile: () => void;
   onFail: () => void;
+  onRefund: () => void;
   onRefresh: () => void;
   isLoading?: boolean;
 }
@@ -59,6 +61,7 @@ export function PayInHeader({
   onVerify, 
   onReconcile,
   onFail,
+  onRefund,
   onRefresh,
   isLoading = false 
 }: PayInHeaderProps): JSX.Element {

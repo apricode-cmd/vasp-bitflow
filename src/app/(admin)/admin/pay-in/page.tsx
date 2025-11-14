@@ -22,12 +22,24 @@ import {
   DollarSign,
   ExternalLink,
   MoreHorizontal,
-  Receipt
+  Receipt,
+  RotateCcw
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { format } from 'date-fns';
 import { DataTableAdvanced } from '@/components/admin/DataTableAdvanced';
 import { QuickStats } from '@/components/admin/QuickStats';
+import { CreatePayInSheet } from './_components/CreatePayInSheet';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -108,6 +120,21 @@ export default function PayInPage(): JSX.Element {
   const [filters, setFilters] = useState({
     status: 'all',
     search: ''
+  });
+  
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+    variant?: 'default' | 'destructive';
+  }>({
+    open: false,
+    title: '',
+    description: '',
+    onConfirm: () => {},
+    variant: 'default',
   });
 
   useEffect(() => {
@@ -424,10 +451,40 @@ export default function PayInPage(): JSX.Element {
           <h1 className="text-3xl font-bold">Pay In Management</h1>
           <p className="text-muted-foreground">Manage incoming payments from customers</p>
         </div>
+        <CreatePayInSheet 
+          onSuccess={async () => {
+            await fetchPayIns();
+            await fetchStats();
+          }} 
+        />
       </div>
 
       {/* Quick Stats */}
       {quickStats && <QuickStats stats={quickStats} />}
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog({ ...confirmDialog, open })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmDialog.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDialog.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                confirmDialog.onConfirm();
+                setConfirmDialog({ ...confirmDialog, open: false });
+              }}
+              className={confirmDialog.variant === 'destructive' ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
+            >
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Data Table */}
       <DataTableAdvanced
@@ -440,42 +497,101 @@ export default function PayInPage(): JSX.Element {
         exportFilename="pay-in-transactions"
         enableExport={true}
         enableRowSelection={true}
-        bulkActions={[
-          {
-            label: 'Mark as Verified',
-            icon: <CheckCircle className="h-4 w-4" />,
-            onClick: async (selectedRows: PayIn[]) => {
-              const receivedRows = selectedRows.filter(r => r.status === 'RECEIVED');
-              if (receivedRows.length === 0) {
-                toast.error('No RECEIVED payments selected');
-                return;
-              }
-              
-              for (const row of receivedRows) {
-                await updateStatus(row.id, 'VERIFIED');
-              }
-              toast.success(`Verified ${receivedRows.length} payment(s)`);
-            },
-            variant: 'default',
-          },
-          {
-            label: 'Mark as Reconciled',
-            icon: <FileCheck className="h-4 w-4" />,
-            onClick: async (selectedRows: PayIn[]) => {
-              const verifiedRows = selectedRows.filter(r => r.status === 'VERIFIED');
-              if (verifiedRows.length === 0) {
-                toast.error('No VERIFIED payments selected');
-                return;
-              }
-              
-              for (const row of verifiedRows) {
-                await updateStatus(row.id, 'RECONCILED');
-              }
-              toast.success(`Reconciled ${verifiedRows.length} payment(s)`);
-            },
-            variant: 'outline',
-          },
-        ]}
+                bulkActions={[
+                  {
+                    label: 'Mark as Verified',
+                    icon: <CheckCircle className="h-4 w-4" />,
+                    onClick: async (selectedRows: PayIn[]) => {
+                      const receivedRows = selectedRows.filter(r => r.status === 'RECEIVED');
+                      if (receivedRows.length === 0) {
+                        toast.error('No RECEIVED payments selected');
+                        return;
+                      }
+                      
+                      setConfirmDialog({
+                        open: true,
+                        title: 'Verify Payments',
+                        description: `Are you sure you want to mark ${receivedRows.length} payment(s) as VERIFIED? This confirms the payment has been received and amount matches.`,
+                        variant: 'default',
+                        onConfirm: async () => {
+                          for (const row of receivedRows) {
+                            await updateStatus(row.id, 'VERIFIED');
+                          }
+                          toast.success(`Verified ${receivedRows.length} payment(s)`);
+                          await fetchPayIns();
+                          await fetchStats();
+                        },
+                      });
+                    },
+                    variant: 'default',
+                  },
+                  {
+                    label: 'Mark as Reconciled',
+                    icon: <FileCheck className="h-4 w-4" />,
+                    onClick: async (selectedRows: PayIn[]) => {
+                      const verifiedRows = selectedRows.filter(r => r.status === 'VERIFIED');
+                      if (verifiedRows.length === 0) {
+                        toast.error('No VERIFIED payments selected');
+                        return;
+                      }
+                      
+                      setConfirmDialog({
+                        open: true,
+                        title: 'Reconcile Payments',
+                        description: `Are you sure you want to mark ${verifiedRows.length} payment(s) as RECONCILED? This finalizes the accounting for these transactions.`,
+                        variant: 'default',
+                        onConfirm: async () => {
+                          for (const row of verifiedRows) {
+                            await updateStatus(row.id, 'RECONCILED');
+                          }
+                          toast.success(`Reconciled ${verifiedRows.length} payment(s)`);
+                          await fetchPayIns();
+                          await fetchStats();
+                        },
+                      });
+                    },
+                    variant: 'outline',
+                  },
+                  {
+                    label: 'Refund Payments',
+                    icon: <RotateCcw className="h-4 w-4" />,
+                    onClick: async (selectedRows: PayIn[]) => {
+                      const refundableRows = selectedRows.filter(r => 
+                        r.status === 'RECEIVED' || r.status === 'VERIFIED'
+                      );
+                      
+                      if (refundableRows.length === 0) {
+                        toast.error('No refundable payments selected (must be RECEIVED or VERIFIED)');
+                        return;
+                      }
+                      
+                      setConfirmDialog({
+                        open: true,
+                        title: 'Refund Payments',
+                        description: `Are you sure you want to refund ${refundableRows.length} payment(s)? This action will initiate the refund process. Make sure you have already processed the bank refund before marking it here.`,
+                        variant: 'destructive',
+                        onConfirm: async () => {
+                          let successCount = 0;
+                          for (const row of refundableRows) {
+                            try {
+                              await updateStatus(row.id, 'REFUNDED');
+                              successCount++;
+                            } catch (error) {
+                              console.error(`Failed to refund ${row.id}:`, error);
+                            }
+                          }
+                          
+                          if (successCount > 0) {
+                            toast.success(`Refunded ${successCount} payment(s)`);
+                            await fetchPayIns();
+                            await fetchStats();
+                          }
+                        },
+                      });
+                    },
+                    variant: 'destructive',
+                  },
+                ]}
       />
     </div>
   );
