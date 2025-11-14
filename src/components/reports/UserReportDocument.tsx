@@ -198,14 +198,14 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // Badge - Enhanced with better colors
+  // Badge - Compact professional style
   badge: {
-    fontSize: 8,
-    padding: '3 8',
-    borderRadius: 4,
+    fontSize: 6.5,
+    padding: '2 6',
+    borderRadius: 3,
     textTransform: 'uppercase',
     fontWeight: 'bold',
-    letterSpacing: 0.3,
+    letterSpacing: 0.5,
   },
   badgeSuccess: {
     backgroundColor: '#d1fae5',
@@ -747,8 +747,8 @@ export const UserReportDocument: React.FC<{ data: UserReportData }> = ({ data })
                     <Text style={[styles.tableCell, { width: '18%', fontSize: 7, textAlign: 'right', fontWeight: 'bold' }]}>
                       {formatCurrency(order.fiatAmount, order.fiatCurrency)}
                     </Text>
-                    <Text style={[styles.tableCell, getStatusBadgeStyle(order.status), { width: '20%', fontSize: 7, textAlign: 'center' }]}>
-                      {order.status}
+                    <Text style={[styles.tableCell, getStatusBadgeStyle(order.status), { width: '20%', textAlign: 'center' }]}>
+                      {order.status.replace('PAYMENT_', '').replace('_', ' ')}
                     </Text>
                   </View>
                 );
