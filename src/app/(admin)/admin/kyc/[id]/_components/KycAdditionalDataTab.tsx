@@ -126,11 +126,11 @@ export function KycAdditionalDataTab({ session }: KycAdditionalDataTabProps): JS
                   try {
                     const date = new Date(field.fieldValue);
                     if (!isNaN(date.getTime())) {
-                      displayValue = date.toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric'
-                      });
+                      // Use UTC date to avoid timezone shifting
+                      const year = date.getUTCFullYear();
+                      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+                      const day = String(date.getUTCDate()).padStart(2, '0');
+                      displayValue = `${day}/${month}/${year}`;
                     }
                   } catch (e) {
                     // Keep original value if parsing fails
