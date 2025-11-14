@@ -72,7 +72,8 @@ export function KycProviderInfo({ session }: KycProviderInfoProps): JSX.Element 
         break;
       case 'sumsub':
         if (session.applicantId) {
-          return `https://cockpit.sumsub.com/checkus/applicants/${session.applicantId}`;
+          // Sumsub format: https://cockpit.sumsub.com/checkus/applicant/{applicantId}/basicInfo
+          return `https://cockpit.sumsub.com/checkus/applicant/${session.applicantId}/basicInfo`;
         }
         break;
     }
