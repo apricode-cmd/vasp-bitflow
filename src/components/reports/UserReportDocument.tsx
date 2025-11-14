@@ -390,7 +390,7 @@ export const UserReportDocument: React.FC<{ data: UserReportData }> = ({ data })
 
   // Helper for section titles with brand color
   const sectionTitleWithBrand = {
-    ...sectionTitleWithBrand,
+    ...styles.sectionTitle,
     borderLeft: `3 solid ${data.primaryBrandColor}`,
   };
 
