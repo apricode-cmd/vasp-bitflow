@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
+import { redis } from '@/lib/services/cache.service';
 import { z } from 'zod';
 
 const usersQuerySchema = z.object({
@@ -39,6 +40,26 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Validate
     const validated = usersQuerySchema.parse(params);
+
+    // Generate cache key (не кешируем если есть поиск - динамично)
+    const cacheKey = validated.search 
+      ? null 
+      : `users-list:${validated.role || 'all'}:${validated.isActive ?? 'all'}:${validated.kycStatus || 'all'}:${validated.page}:${validated.limit}`;
+    
+    // Try to get from cache (only if no search query)
+    if (cacheKey) {
+      try {
+        const cached = await redis.get(cacheKey);
+        if (cached) {
+          console.log(`📦 [Redis] Cache HIT: ${cacheKey}`);
+          return NextResponse.json(JSON.parse(cached));
+        }
+      } catch (cacheError) {
+        console.error('Redis get error:', cacheError);
+      }
+
+      console.log(`📦 [Redis] Cache MISS: ${cacheKey}`);
+    }
 
     // Build where clause
     const where: Record<string, unknown> = {};
@@ -74,12 +95,26 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Calculate pagination
     const skip = (validated.page - 1) * validated.limit;
 
-    // Fetch users with totalSpent calculation
+    // Optimized query with select instead of include
     const [users, total] = await Promise.all([
       prisma.user.findMany({
         where,
-        include: {
-          profile: true,
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          isActive: true,
+          emailVerified: true,
+          createdAt: true,
+          updatedAt: true,
+          profile: {
+            select: {
+              firstName: true,
+              lastName: true,
+              phoneNumber: true,
+              country: true,
+            }
+          },
           kycSession: {
             select: {
               status: true,
@@ -120,19 +155,28 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       };
     });
 
-    // Remove password from results
-    const safeUsers = usersWithStats.map(({ password, ...user }) => user);
-
-    return NextResponse.json({
+    const response = {
       success: true,
-      data: safeUsers,
+      data: usersWithStats,
       pagination: {
         page: validated.page,
         limit: validated.limit,
         total,
         totalPages: Math.ceil(total / validated.limit)
       }
-    });
+    };
+
+    // Cache the result for 2 minutes (only if no search query)
+    if (cacheKey) {
+      try {
+        await redis.setex(cacheKey, 120, JSON.stringify(response));
+        console.log(`📦 [Redis] Cached: ${cacheKey} (TTL: 120s)`);
+      } catch (cacheError) {
+        console.error('Redis set error:', cacheError);
+      }
+    }
+
+    return NextResponse.json(response);
   } catch (error) {
     console.error('Get users error:', error);
 

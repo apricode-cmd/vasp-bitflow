@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
+import { redis } from '@/lib/services/cache.service';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   // Check admin authorization
@@ -32,6 +33,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Sorting
     const sortBy = searchParams.get('sortBy') || 'createdAt';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
+
+    // Generate cache key
+    const cacheKey = `kyc-list:${status || 'all'}:${country || 'all'}:${provider || 'all'}:${pepStatus || 'all'}:${page}:${limit}:${sortBy}:${sortOrder}:${dateFrom || ''}:${dateTo || ''}`;
+    
+    // Try to get from cache
+    try {
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        console.log(`📦 [Redis] Cache HIT: ${cacheKey}`);
+        return NextResponse.json(JSON.parse(cached));
+      }
+    } catch (cacheError) {
+      console.error('Redis get error:', cacheError);
+    }
+
+    console.log(`📦 [Redis] Cache MISS: ${cacheKey}`);
 
     // Build where clause
     const where: any = {};
@@ -72,31 +89,75 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       };
     }
 
-    // Get total count for pagination
-    const total = await prisma.kycSession.count({ where });
-
-    // Get KYC sessions with explicit error handling
-    const kycSessions = await prisma.kycSession.findMany({
-      where,
-      include: {
-        user: {
-          include: { 
-            profile: true 
+    // Optimized query - get count and data in parallel
+    const [total, kycSessions] = await Promise.all([
+      prisma.kycSession.count({ where }),
+      prisma.kycSession.findMany({
+        where,
+        select: {
+          id: true,
+          userId: true,
+          status: true,
+          kycProviderId: true,
+          applicantId: true,
+          verificationId: true,
+          submittedAt: true,
+          reviewedAt: true,
+          rejectionReason: true,
+          reviewedBy: true,
+          reviewNotes: true,
+          completedAt: true,
+          expiresAt: true,
+          webhookData: true,
+          attempts: true,
+          lastAttemptAt: true,
+          createdAt: true,
+          updatedAt: true,
+          metadata: true,
+          user: {
+            select: {
+              id: true,
+              email: true,
+              profile: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  country: true,
+                  phoneNumber: true,
+                }
+              }
+            }
+          },
+          profile: {
+            select: {
+              firstName: true,
+              lastName: true,
+              dateOfBirth: true,
+              nationality: true,
+              documentType: true,
+              documentNumber: true,
+              pepStatus: true,
+              sanctionsStatus: true,
+              riskLevel: true,
+            }
+          },
+          documents: {
+            select: {
+              id: true,
+              documentType: true,
+              fileName: true,
+              uploadedAt: true,
+              status: true,
+            },
+            orderBy: { uploadedAt: 'desc' },
+            take: 3 // Limit documents for list view
           }
         },
-        formData: {
-          orderBy: { fieldName: 'asc' }
-        },
-        documents: {
-          orderBy: { uploadedAt: 'desc' }
-        },
-        profile: true
-        // Note: provider relation removed - we use metadata.provider instead
-      },
-      orderBy: { [sortBy]: sortOrder },
-      skip,
-      take: limit,
-    });
+        orderBy: { [sortBy]: sortOrder },
+        skip,
+        take: limit,
+      })
+    ]);
 
     // Transform data to include provider metadata from Integration
     const sessionsWithProvider = await Promise.all(
@@ -127,7 +188,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       })
     );
 
-    return NextResponse.json({ 
+    const response = { 
       success: true,
       data: sessionsWithProvider,
       pagination: {
@@ -136,7 +197,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         total,
         totalPages: Math.ceil(total / limit),
       },
-    });
+    };
+
+    // Cache the result for 3 minutes
+    try {
+      await redis.setex(cacheKey, 180, JSON.stringify(response));
+      console.log(`📦 [Redis] Cached: ${cacheKey} (TTL: 180s)`);
+    } catch (cacheError) {
+      console.error('Redis set error:', cacheError);
+    }
+
+    return NextResponse.json(response);
   } catch (error) {
     console.error('Admin get KYC sessions error:', error);
     return NextResponse.json(

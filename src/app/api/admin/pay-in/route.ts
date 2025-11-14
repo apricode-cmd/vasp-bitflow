@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
+import { redis } from '@/lib/services/cache.service';
 import { z } from 'zod';
 
 const payInFiltersSchema = z.object({
@@ -24,6 +25,19 @@ const createPayInSchema = z.object({
   expectedAmount: z.number().positive().optional()
 });
 
+// Generate cache key for pay-in list
+function generateCacheKey(filters: any): string {
+  const parts = ['pay-in-list'];
+  if (filters.status) parts.push(`status:${filters.status}`);
+  if (filters.orderId) parts.push(`order:${filters.orderId}`);
+  if (filters.userId) parts.push(`user:${filters.userId}`);
+  if (filters.fromDate) parts.push(`from:${filters.fromDate}`);
+  if (filters.toDate) parts.push(`to:${filters.toDate}`);
+  parts.push(`page:${filters.page}`);
+  parts.push(`limit:${filters.limit}`);
+  return parts.join(':');
+}
+
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     // Check admin permission
@@ -36,6 +50,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const filters = payInFiltersSchema.parse(Object.fromEntries(searchParams.entries()));
 
     const { status, orderId, userId, fromDate, toDate, page, limit } = filters;
+
+    // Try to get from cache
+    const cacheKey = generateCacheKey(filters);
+    
+    try {
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        console.log(`📦 [Redis] Cache HIT: ${cacheKey}`);
+        return NextResponse.json(JSON.parse(cached));
+      }
+    } catch (cacheError) {
+      console.error('Redis get error:', cacheError);
+      // Continue without cache
+    }
+
+    console.log(`📦 [Redis] Cache MISS: ${cacheKey}`);
 
     const skip = (page - 1) * limit;
 
@@ -64,19 +94,37 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // Fetch PayIn records
+    // Optimized query with select to reduce data transfer
     const [payIns, total] = await Promise.all([
       prisma.payIn.findMany({
         where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: {
+        select: {
+          id: true,
+          orderId: true,
+          userId: true,
+          amount: true,
+          currency: true,
+          currencyType: true,
+          paymentMethodCode: true,
+          status: true,
+          expectedAmount: true,
+          receivedAmount: true,
+          amountMismatch: true,
+          senderName: true,
+          transactionId: true,
+          verifiedBy: true,
+          verifiedAt: true,
+          paymentDate: true,
+          createdAt: true,
           order: {
             select: {
               id: true,
               paymentReference: true,
-              status: true
+              cryptoAmount: true,
+              currencyCode: true
             }
           },
           user: {
@@ -116,7 +164,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       prisma.payIn.count({ where })
     ]);
 
-    return NextResponse.json({
+    const response = {
       success: true,
       data: payIns,
       pagination: {
@@ -125,7 +173,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         total,
         totalPages: Math.ceil(total / limit)
       }
-    });
+    };
+
+    // Cache the result for 2 minutes (shorter TTL for financial data)
+    try {
+      await redis.setex(cacheKey, 120, JSON.stringify(response));
+      console.log(`📦 [Redis] Cached: ${cacheKey} (TTL: 120s)`);
+    } catch (cacheError) {
+      console.error('Redis set error:', cacheError);
+      // Continue without caching
+    }
+
+    return NextResponse.json(response);
   } catch (error) {
     console.error('Get PayIns error:', error);
 
@@ -278,6 +337,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         paymentMethod: true
       }
     });
+
+    // Invalidate cache for pay-in list
+    try {
+      const pattern = 'pay-in-list:*';
+      const keys = await redis.keys(pattern);
+      if (keys.length > 0) {
+        await redis.del(...keys);
+        console.log(`📦 [Redis] Invalidated ${keys.length} cache keys`);
+      }
+    } catch (cacheError) {
+      console.error('Redis cache invalidation error:', cacheError);
+    }
 
     return NextResponse.json({
       success: true,
