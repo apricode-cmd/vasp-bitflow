@@ -37,8 +37,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (currencyCode) {
       where.currencyCode = currencyCode;
     }
+    
+    // Filter orders without PayIn (for manual PayIn creation)
     if (withoutPayIn) {
       where.payIn = null;
+      // Only show orders that are waiting for payment or have payment received
+      where.status = {
+        in: ['PENDING', 'PAYMENT_RECEIVED', 'AWAITING_PAYMENT']
+      };
     }
 
     // Get orders
@@ -78,7 +84,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     ]);
 
     return NextResponse.json({
-      orders,
+      success: true,
+      data: orders,
       pagination: {
         page,
         limit,

@@ -252,7 +252,7 @@ export function CreatePayInSheet({ onSuccess }: CreatePayInSheetProps): JSX.Elem
               </div>
               
               <div>
-                <Label>Order (without PayIn)</Label>
+                <Label>Order</Label>
                 <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
                   <PopoverTrigger asChild>
                     <Button
@@ -274,7 +274,7 @@ export function CreatePayInSheet({ onSuccess }: CreatePayInSheetProps): JSX.Elem
                     <Command>
                       <CommandInput placeholder="Search by reference, email, or amount..." />
                       <CommandEmpty>
-                        {ordersLoading ? 'Loading...' : 'No orders without PayIn found.'}
+                        {ordersLoading ? 'Loading...' : 'No available orders found.'}
                       </CommandEmpty>
                       <CommandGroup>
                         <ScrollArea className="h-[300px]">
@@ -316,7 +316,7 @@ export function CreatePayInSheet({ onSuccess }: CreatePayInSheetProps): JSX.Elem
                 </Popover>
                 {availableOrders.length > 0 && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    {availableOrders.length} order(s) without PayIn available
+                    {availableOrders.length} order(s) available
                   </p>
                 )}
               </div>
