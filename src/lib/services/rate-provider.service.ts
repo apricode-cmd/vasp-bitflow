@@ -7,7 +7,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { coinGeckoService, type CoinGeckoRates } from './coingecko';
-import { krakenAdapter } from '@/lib/integrations/providers/rates/KrakenAdapter';
+import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
 import { integrationRegistry } from '@/lib/integrations';
 import { IntegrationCategory } from '@/lib/integrations/types';
 
@@ -61,57 +61,34 @@ class RateProviderService {
    * Get current exchange rate for a specific pair
    */
   async getRate(crypto: string, fiat: string): Promise<number> {
-    const provider = await this.getActiveProvider();
+    const providerInfo = await this.getActiveProvider();
 
-    if (!provider) {
+    if (!providerInfo) {
       throw new Error('No active rate provider found. Please enable a rate provider integration (e.g., CoinGecko) in Settings → Integrations.');
     }
 
-    // Route to the correct provider service
-    switch (provider.service) {
-      case 'coingecko':
-        return await coinGeckoService.getRate(
-          crypto as 'BTC' | 'ETH' | 'USDT' | 'SOL',
-          fiat as 'EUR' | 'PLN'
-        );
-      
-      case 'kraken':
-        return await krakenAdapter.getRate(crypto, fiat);
-      
-      // Future: Add more providers here
-      // case 'coinmarketcap':
-      //   return await coinMarketCapService.getRate(crypto, fiat);
-      // case 'binance':
-      //   return await binanceService.getRate(crypto, fiat);
-      
-      default:
-        throw new Error(`Unknown rate provider: ${provider.service}`);
-    }
+    // Get initialized provider from IntegrationFactory
+    const provider = await integrationFactory.getRatesProvider();
+    
+    // Use the provider's getRate method directly
+    return await provider.getRate(crypto, fiat);
   }
 
   /**
    * Get all exchange rates
    */
   async getAllRates(): Promise<CoinGeckoRates> {
-    const provider = await this.getActiveProvider();
+    const providerInfo = await this.getActiveProvider();
 
-    if (!provider) {
+    if (!providerInfo) {
       throw new Error('No active rate provider found. Please enable a rate provider integration (e.g., CoinGecko) in Settings → Integrations.');
     }
 
-    // Route to the correct provider service
-    switch (provider.service) {
-      case 'coingecko':
-        return await coinGeckoService.getCurrentRates();
-      
-      case 'kraken':
-        return await krakenAdapter.getCurrentRates();
-      
-      // Future: Add more providers here
-      
-      default:
-        throw new Error(`Unknown rate provider: ${provider.service}`);
-    }
+    // Get initialized provider from IntegrationFactory
+    const provider = await integrationFactory.getRatesProvider();
+    
+    // Use the provider's getCurrentRates method directly
+    return await provider.getCurrentRates();
   }
 
   /**
