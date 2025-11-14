@@ -57,6 +57,7 @@ import type { ComboboxOption } from '@/components/shared/Combobox';
 import { DynamicKycForm } from '@/components/forms/DynamicKycForm';
 import { KycQuickStats } from './_components/KycQuickStats';
 import { KycFilters, type KycFiltersState } from './_components/KycFilters';
+import { KycBulkActions } from './_components/KycBulkActions';
 import { formatDateTime } from '@/lib/formatters';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -182,6 +183,7 @@ export default function AdminKycPage(): JSX.Element {
   const [filters, setFilters] = useState<KycFiltersState>({});
   const [availableCountries, setAvailableCountries] = useState<string[]>([]);
   const [availableProviders, setAvailableProviders] = useState<Array<{ value: string; label: string }>>([]);
+  const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
@@ -789,6 +791,17 @@ export default function AdminKycPage(): JSX.Element {
           </div>
       </Card>
 
+      {/* Bulk Actions Bar */}
+      <KycBulkActions
+        selectedIds={selectedSessionIds}
+        selectedSessions={kycSessions.filter(s => selectedSessionIds.includes(s.id))}
+        onClearSelection={() => setSelectedSessionIds([])}
+        onActionComplete={() => {
+          fetchKycSessions();
+          setSelectedSessionIds([]);
+        }}
+      />
+
       {/* KYC Sessions Table */}
       <DataTableAdvanced
         columns={columns}
@@ -798,6 +811,9 @@ export default function AdminKycPage(): JSX.Element {
         onRowClick={(row) => viewKycDetails(row)}
         pageSize={20}
         exportFilename="kyc-sessions"
+        enableRowSelection={true}
+        selectedRowIds={selectedSessionIds}
+        onRowSelectionChange={setSelectedSessionIds}
       />
 
       {/* KYC Details Sheet */}
