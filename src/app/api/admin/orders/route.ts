@@ -43,7 +43,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       where.payIn = null;
       // Only show orders that are waiting for payment or have payment received
       where.status = {
-        in: ['PENDING', 'PAYMENT_RECEIVED', 'AWAITING_PAYMENT']
+        in: ['PENDING', 'PAYMENT_PENDING', 'PAYMENT_RECEIVED']
       };
     }
 
