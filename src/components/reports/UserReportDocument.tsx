@@ -15,20 +15,23 @@ import {
   Image,
 } from '@react-pdf/renderer';
 
-// Styles
+// Styles - Enhanced Professional Design
 const styles = StyleSheet.create({
   page: {
-    padding: 30,
-    fontSize: 9,
+    padding: 40,
+    fontSize: 10,
     fontFamily: 'Helvetica',
     color: '#1f2937',
+    backgroundColor: '#ffffff',
   },
   
-  // Header
+  // Header - Enhanced with gradient-like effect
   header: {
-    marginBottom: 20,
-    borderBottom: '2 solid #e5e7eb',
-    paddingBottom: 15,
+    marginBottom: 25,
+    backgroundColor: '#f8fafc',
+    padding: 20,
+    borderRadius: 8,
+    borderLeft: '4 solid #3b82f6',
   },
   headerRow: {
     flexDirection: 'row',
@@ -36,192 +39,220 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   logo: {
-    width: 120,
-    height: 40,
-    marginBottom: 10,
+    width: 140,
+    height: 45,
+    marginBottom: 12,
   },
   companyInfo: {
     flex: 1,
   },
   companyName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 4,
-    color: '#111827',
+    marginBottom: 6,
+    color: '#0f172a',
+    letterSpacing: 0.5,
   },
   companyDetails: {
-    fontSize: 8,
-    lineHeight: 1.4,
-    color: '#6b7280',
+    fontSize: 9,
+    lineHeight: 1.6,
+    color: '#64748b',
   },
   reportTitle: {
     textAlign: 'right',
   },
   reportTitleText: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 4,
+    color: '#0f172a',
+    marginBottom: 6,
+    letterSpacing: 0.5,
   },
   reportId: {
-    fontSize: 10,
-    color: '#6b7280',
+    fontSize: 11,
+    color: '#3b82f6',
+    fontWeight: 'bold',
+    marginBottom: 4,
   },
   reportDate: {
-    fontSize: 8,
-    color: '#9ca3af',
+    fontSize: 9,
+    color: '#94a3b8',
     marginTop: 2,
   },
 
-  // Section
+  // Section - Enhanced with colored accent
   section: {
-    marginBottom: 15,
+    marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#111827',
+    marginBottom: 12,
+    color: '#0f172a',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    borderBottom: '1 solid #e5e7eb',
-    paddingBottom: 4,
+    letterSpacing: 1,
+    backgroundColor: '#f1f5f9',
+    padding: 8,
+    paddingLeft: 12,
+    borderLeft: '3 solid #3b82f6',
   },
 
-  // User Info Box
+  // User Info Box - Enhanced card design
   userBox: {
-    backgroundColor: '#f3f4f6',
-    padding: 12,
-    borderRadius: 4,
-    marginBottom: 15,
+    backgroundColor: '#f8fafc',
+    padding: 16,
+    borderRadius: 6,
+    marginBottom: 18,
+    border: '1 solid #e2e8f0',
   },
   userRow: {
     flexDirection: 'row',
-    marginBottom: 6,
+    marginBottom: 8,
+    paddingBottom: 6,
+    borderBottom: '0.5 solid #e2e8f0',
   },
   label: {
-    fontSize: 8,
-    color: '#6b7280',
+    fontSize: 9,
+    color: '#64748b',
     width: '40%',
     fontWeight: 'bold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   value: {
-    fontSize: 9,
-    color: '#111827',
+    fontSize: 10,
+    color: '#0f172a',
     width: '60%',
+    fontWeight: 'normal',
   },
 
-  // Grid layout (2 columns)
+  // Grid layout (2 columns) - Enhanced spacing
   grid: {
     flexDirection: 'row',
-    gap: 15,
-    marginBottom: 15,
+    gap: 20,
+    marginBottom: 18,
   },
   gridCol: {
     flex: 1,
   },
 
-  // Stats cards
+  // Stats cards - Enhanced design with shadows
   statsRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 15,
+    gap: 12,
+    marginBottom: 20,
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#f9fafb',
-    padding: 10,
-    borderRadius: 4,
-    border: '1 solid #e5e7eb',
+    backgroundColor: '#ffffff',
+    padding: 14,
+    borderRadius: 6,
+    border: '1.5 solid #e2e8f0',
+    borderTop: '3 solid #3b82f6',
   },
   statLabel: {
-    fontSize: 7,
-    color: '#6b7280',
+    fontSize: 8,
+    color: '#64748b',
     textTransform: 'uppercase',
-    marginBottom: 4,
+    marginBottom: 6,
+    letterSpacing: 0.5,
+    fontWeight: 'bold',
   },
   statValue: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#0f172a',
   },
 
-  // Table
+  // Table - Enhanced professional design
   table: {
-    marginBottom: 15,
+    marginBottom: 18,
+    border: '1 solid #e2e8f0',
+    borderRadius: 6,
+    overflow: 'hidden',
   },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: '#f3f4f6',
-    padding: 6,
-    borderBottom: '1 solid #d1d5db',
+    backgroundColor: '#f1f5f9',
+    padding: 10,
+    borderBottom: '2 solid #cbd5e1',
   },
   tableRow: {
     flexDirection: 'row',
-    padding: 6,
-    borderBottom: '1 solid #e5e7eb',
+    padding: 10,
+    borderBottom: '0.5 solid #f1f5f9',
+    backgroundColor: '#ffffff',
   },
   tableCell: {
-    fontSize: 7,
-    color: '#374151',
+    fontSize: 9,
+    color: '#1e293b',
+    lineHeight: 1.4,
   },
   tableHeaderCell: {
-    fontSize: 7,
+    fontSize: 9,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#475569',
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 
-  // Badge
+  // Badge - Enhanced with better colors
   badge: {
-    fontSize: 7,
-    padding: '2 6',
+    fontSize: 8,
+    padding: '3 8',
     borderRadius: 4,
     textTransform: 'uppercase',
     fontWeight: 'bold',
+    letterSpacing: 0.3,
   },
   badgeSuccess: {
     backgroundColor: '#d1fae5',
     color: '#065f46',
+    border: '0.5 solid #10b981',
   },
   badgeWarning: {
     backgroundColor: '#fef3c7',
     color: '#92400e',
+    border: '0.5 solid #f59e0b',
   },
   badgeDanger: {
     backgroundColor: '#fee2e2',
     color: '#991b1b',
+    border: '0.5 solid #ef4444',
   },
   badgeInfo: {
     backgroundColor: '#dbeafe',
     color: '#1e40af',
+    border: '0.5 solid #3b82f6',
   },
 
-  // Footer
+  // Footer - Enhanced
   footer: {
     position: 'absolute',
-    bottom: 20,
-    left: 30,
-    right: 30,
-    fontSize: 7,
-    color: '#9ca3af',
+    bottom: 30,
+    left: 40,
+    right: 40,
+    fontSize: 8,
+    color: '#94a3b8',
     textAlign: 'center',
-    borderTop: '1 solid #e5e7eb',
-    paddingTop: 10,
+    borderTop: '1.5 solid #e2e8f0',
+    paddingTop: 12,
   },
 
-  // Warning box (for PEP)
+  // Warning box (for PEP) - Enhanced
   warningBox: {
-    backgroundColor: '#fef3c7',
-    border: '1 solid #fbbf24',
-    padding: 10,
-    borderRadius: 4,
-    marginBottom: 15,
+    backgroundColor: '#fef9c3',
+    border: '1.5 solid #fbbf24',
+    padding: 12,
+    borderRadius: 6,
+    marginBottom: 18,
+    borderLeft: '4 solid #f59e0b',
   },
   warningText: {
-    fontSize: 8,
+    fontSize: 9,
     color: '#92400e',
     fontWeight: 'bold',
+    lineHeight: 1.5,
   },
 });
 
