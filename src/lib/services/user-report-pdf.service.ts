@@ -86,13 +86,13 @@ export async function generateUserReportPDF(userId: string): Promise<Buffer> {
     legalData[setting.key] = setting.value;
   });
 
-  // 3. Fetch branding settings (logo, colors)
+  // 3. Fetch branding settings (logo dark mode + primary color)
   const brandSettings = await prisma.systemSettings.findMany({
     where: {
       OR: [
         { key: 'brandName' },
-        { key: 'brandLogo' },
-        { key: 'primaryColor' },
+        { key: 'brandLogoDark' }, // Dark mode logo for PDF
+        { key: 'primaryBrandColor' }, // Primary brand color
       ],
     },
   });
@@ -104,14 +104,15 @@ export async function generateUserReportPDF(userId: string): Promise<Buffer> {
 
   console.log(`[USER_REPORT] Settings loaded - Legal: ${Object.keys(legalData).length}, Brand: ${Object.keys(brandData).length}`);
 
-  // Prepare logo URL (must be absolute URL for PDF)
-  let logoUrl = brandData.brandLogo;
+  // Prepare logo URL (use dark mode logo for PDF, must be absolute URL)
+  let logoUrl = brandData.brandLogoDark;
   if (logoUrl && !logoUrl.startsWith('http')) {
     // Convert relative URL to absolute
     const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
     logoUrl = `${baseUrl}${logoUrl.startsWith('/') ? '' : '/'}${logoUrl}`;
   }
   console.log(`[USER_REPORT] Logo URL: ${logoUrl || 'No logo'}`);
+  console.log(`[USER_REPORT] Primary Color: ${brandData.primaryBrandColor || 'Default blue'}`);
 
   // 4. Calculate financial statistics
   const completedOrders = user.orders.filter(o => o.status === 'COMPLETED');
@@ -139,6 +140,7 @@ export async function generateUserReportPDF(userId: string): Promise<Buffer> {
     companyWebsite: legalData.companyWebsite,
     brandLogo: logoUrl, // Absolute URL to logo
     brandName: brandData.brandName || 'Apricode Exchange',
+    primaryBrandColor: brandData.primaryBrandColor || '#3b82f6', // Brand color or default blue
 
     // User account info
     userId: user.id,

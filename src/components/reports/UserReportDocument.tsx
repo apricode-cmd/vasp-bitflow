@@ -272,6 +272,7 @@ export interface UserReportData {
   companyWebsite?: string;
   brandLogo?: string;
   brandName: string;
+  primaryBrandColor: string; // Brand color for accents
 
   // User account info
   userId: string;
@@ -387,37 +388,110 @@ export const UserReportDocument: React.FC<{ data: UserReportData }> = ({ data })
     return [styles.badge, styles.badgeInfo];
   };
 
+  // Helper for section titles with brand color
+  const sectionTitleWithBrand = {
+    ...sectionTitleWithBrand,
+    borderLeft: `3 solid ${data.primaryBrandColor}`,
+  };
+
+  // Helper for stat cards with brand color
+  const statCardWithBrand = {
+    ...styles.statCard,
+    borderTop: `3 solid ${data.primaryBrandColor}`,
+  };
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* Header */}
-        <View style={styles.header}>
+        {/* Enhanced Header with Brand Color */}
+        <View style={{
+          ...styles.header,
+          borderLeft: `4 solid ${data.primaryBrandColor}`,
+        }}>
           <View style={styles.headerRow}>
+            {/* Left Side - Company Info */}
             <View style={styles.companyInfo}>
               {data.brandLogo && (
                 <Image src={data.brandLogo} style={styles.logo} />
               )}
               <Text style={styles.companyName}>{data.companyLegalName}</Text>
-              <Text style={styles.companyDetails}>
-                {data.companyRegistrationNumber && `Reg: ${data.companyRegistrationNumber}\n`}
-                {data.companyTaxNumber && `Tax: ${data.companyTaxNumber}\n`}
-                {data.companyLicenseNumber && `License: ${data.companyLicenseNumber}\n`}
-                {data.companyAddress && `${data.companyAddress}\n`}
-                {data.companyEmail && `${data.companyEmail} | `}
-                {data.companyPhone && data.companyPhone}
-              </Text>
+              <View style={{ 
+                marginTop: 8,
+                paddingTop: 8,
+                borderTop: `1 solid ${data.primaryBrandColor}20`,
+              }}>
+                <Text style={styles.companyDetails}>
+                  {data.companyRegistrationNumber && `Reg: ${data.companyRegistrationNumber}\n`}
+                  {data.companyTaxNumber && `Tax: ${data.companyTaxNumber}\n`}
+                  {data.companyLicenseNumber && `License: ${data.companyLicenseNumber}\n`}
+                </Text>
+                {(data.companyAddress || data.companyEmail || data.companyPhone) && (
+                  <Text style={[styles.companyDetails, { marginTop: 4 }]}>
+                    {data.companyAddress && `${data.companyAddress}\n`}
+                    {data.companyEmail && data.companyEmail}
+                    {data.companyEmail && data.companyPhone && ' | '}
+                    {data.companyPhone && data.companyPhone}
+                  </Text>
+                )}
+              </View>
             </View>
+            
+            {/* Right Side - Report Info */}
             <View style={styles.reportTitle}>
-              <Text style={styles.reportTitleText}>USER REPORT</Text>
-              <Text style={styles.reportId}>Report ID: {data.reportId}</Text>
-              <Text style={styles.reportDate}>Generated: {formatDate(data.reportDate)}</Text>
+              <View style={{
+                backgroundColor: data.primaryBrandColor,
+                padding: 12,
+                borderRadius: 6,
+                marginBottom: 10,
+              }}>
+                <Text style={{
+                  fontSize: 22,
+                  fontWeight: 'bold',
+                  color: '#ffffff',
+                  textAlign: 'center',
+                  letterSpacing: 1,
+                }}>
+                  USER REPORT
+                </Text>
+              </View>
+              <View style={{
+                backgroundColor: '#ffffff',
+                border: `1.5 solid ${data.primaryBrandColor}`,
+                borderRadius: 6,
+                padding: 10,
+              }}>
+                <Text style={{
+                  fontSize: 9,
+                  color: '#64748b',
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                  marginBottom: 4,
+                }}>
+                  Report ID
+                </Text>
+                <Text style={{
+                  fontSize: 10,
+                  fontWeight: 'bold',
+                  color: data.primaryBrandColor,
+                  marginBottom: 8,
+                  fontFamily: 'Courier',
+                }}>
+                  {data.reportId}
+                </Text>
+                <Text style={{
+                  fontSize: 8,
+                  color: '#94a3b8',
+                }}>
+                  Generated: {formatDate(data.reportDate)}
+                </Text>
+              </View>
             </View>
           </View>
         </View>
 
         {/* User Account Information */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>User Account Information</Text>
+          <Text style={sectionTitleWithBrand}>User Account Information</Text>
           <View style={styles.userBox}>
             <View style={styles.userRow}>
               <Text style={styles.label}>Full Name:</Text>
@@ -452,21 +526,21 @@ export const UserReportDocument: React.FC<{ data: UserReportData }> = ({ data })
 
         {/* Financial Summary Stats */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Financial Summary</Text>
+          <Text style={sectionTitleWithBrand}>Financial Summary</Text>
           <View style={styles.statsRow}>
-            <View style={styles.statCard}>
+            <View style={statCardWithBrand}>
               <Text style={styles.statLabel}>Total Volume</Text>
               <Text style={styles.statValue}>€{data.totalVolume.toFixed(2)}</Text>
             </View>
-            <View style={styles.statCard}>
+            <View style={statCardWithBrand}>
               <Text style={styles.statLabel}>Total Orders</Text>
               <Text style={styles.statValue}>{data.totalOrders}</Text>
             </View>
-            <View style={styles.statCard}>
+            <View style={statCardWithBrand}>
               <Text style={styles.statLabel}>Completed</Text>
               <Text style={styles.statValue}>{data.completedOrders}</Text>
             </View>
-            <View style={styles.statCard}>
+            <View style={statCardWithBrand}>
               <Text style={styles.statLabel}>Avg Order</Text>
               <Text style={styles.statValue}>€{data.averageOrderValue.toFixed(2)}</Text>
             </View>
@@ -475,7 +549,7 @@ export const UserReportDocument: React.FC<{ data: UserReportData }> = ({ data })
 
         {/* KYC Verification Status */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>KYC Verification Status</Text>
+          <Text style={sectionTitleWithBrand}>KYC Verification Status</Text>
           <View style={styles.grid}>
             <View style={styles.gridCol}>
               <View style={styles.userRow}>
@@ -514,7 +588,7 @@ export const UserReportDocument: React.FC<{ data: UserReportData }> = ({ data })
 
         {/* Personal Information */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Personal Information</Text>
+          <Text style={sectionTitleWithBrand}>Personal Information</Text>
           <View style={styles.grid}>
             <View style={styles.gridCol}>
               <View style={styles.userRow}>
@@ -557,7 +631,7 @@ export const UserReportDocument: React.FC<{ data: UserReportData }> = ({ data })
 
         {/* Identity Document */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Identity Document</Text>
+          <Text style={sectionTitleWithBrand}>Identity Document</Text>
           <View style={styles.grid}>
             <View style={styles.gridCol}>
               <View style={styles.userRow}>
@@ -601,7 +675,7 @@ export const UserReportDocument: React.FC<{ data: UserReportData }> = ({ data })
       <Page size="A4" style={styles.page}>
         {/* Employment & Financial Information */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Employment & Source of Funds</Text>
+          <Text style={sectionTitleWithBrand}>Employment & Source of Funds</Text>
           <View style={styles.grid}>
             <View style={styles.gridCol}>
               <View style={styles.userRow}>
@@ -642,7 +716,7 @@ export const UserReportDocument: React.FC<{ data: UserReportData }> = ({ data })
 
         {/* Transaction History */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Transaction History (Last 20 Orders)</Text>
+          <Text style={sectionTitleWithBrand}>Transaction History (Last 20 Orders)</Text>
           {data.orders.length > 0 ? (
             <View style={styles.table}>
               <View style={styles.tableHeader}>
@@ -681,7 +755,7 @@ export const UserReportDocument: React.FC<{ data: UserReportData }> = ({ data })
 
         {/* Crypto Wallets */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Registered Crypto Wallets</Text>
+          <Text style={sectionTitleWithBrand}>Registered Crypto Wallets</Text>
           {data.wallets.length > 0 ? (
             <View style={styles.table}>
               <View style={styles.tableHeader}>
@@ -716,7 +790,7 @@ export const UserReportDocument: React.FC<{ data: UserReportData }> = ({ data })
 
         {/* Login History */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Login Activity (Last 5 Sessions)</Text>
+          <Text style={sectionTitleWithBrand}>Recent Login Activity (Last 5 Sessions)</Text>
           {data.loginHistory.length > 0 ? (
             <View style={styles.table}>
               <View style={styles.tableHeader}>
