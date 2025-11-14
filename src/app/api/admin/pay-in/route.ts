@@ -263,39 +263,33 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // Prepare PayIn data matching Prisma schema exactly
+    // Prepare PayIn data - ONLY fields that exist in schema
+    // Based on prisma/schema.prisma lines 328-377
     const payInData: any = {
-      // Relations (connect)
+      // Required relations
       order: { connect: { id: validated.orderId } },
       user: { connect: { id: order.userId } },
       
-      // Required fields
+      // Required scalar fields
       amount: validated.receivedAmount,
       expectedAmount: validated.expectedAmount,
       currencyType: validated.currencyType,
       status: autoStatus,
-      
-      // Optional scalar fields (match schema exactly)
-      receivedAmount: validated.receivedAmount,
       amountMismatch,
       confirmations: 0,
+      
+      // Optional scalar fields we have data for
+      receivedAmount: validated.receivedAmount,
       senderName: validated.senderName || null,
       senderAccount: validated.senderAccount || null,
       senderBank: validated.senderBank || null,
       reference: validated.reference || null,
       transactionId: validated.transactionId || null,
       verificationNotes: validated.verificationNotes || null,
-      
-      // Dates and admin tracking
-      initiatedBy: session.user.id,
       initiatedAt: new Date(),
       
-      // Arrays (schema has String[] with default)
-      proofUrls: [],
-      
-      // Auto-verify if status is RECEIVED and amounts match
+      // Auto-verify if amounts match
       ...(autoStatus === 'RECEIVED' && !amountMismatch ? {
-        verifiedBy: session.user.id,
         verifiedAt: new Date()
       } : {})
     };
