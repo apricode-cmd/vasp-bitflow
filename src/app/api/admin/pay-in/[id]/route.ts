@@ -1,83 +1,82 @@
 /**
- * PayIn API - /api/admin/pay-in/[id]
- * GET - Get specific payment details
- * PATCH - Update payment status (verify, reconcile, etc.)
+ * PayIn Details API
+ * GET /api/admin/pay-in/[id] - Get single PayIn
+ * PATCH /api/admin/pay-in/[id] - Update PayIn status
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminRole, getCurrentUserId } from '@/lib/middleware/admin-auth';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
-import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
+import { redis } from '@/lib/services/cache.service';
 import { z } from 'zod';
 
 const updatePayInSchema = z.object({
-  status: z.enum(['PENDING', 'RECEIVED', 'VERIFIED', 'PARTIAL', 'MISMATCH', 'RECONCILED', 'FAILED', 'REFUNDED', 'EXPIRED']).optional(),
+  status: z.enum(['PENDING', 'RECEIVED', 'VERIFIED', 'PARTIAL', 'MISMATCH', 'RECONCILED', 'FAILED', 'REFUNDED', 'EXPIRED']),
   receivedAmount: z.number().optional(),
-  senderName: z.string().optional(),
-  senderAccount: z.string().optional(),
-  senderBank: z.string().optional(),
-  reference: z.string().optional(),
-  transactionId: z.string().optional(),
   verificationNotes: z.string().optional(),
-  reconciledWith: z.string().optional(),
-  paymentDate: z.string().datetime().optional(),
-  receivedDate: z.string().datetime().optional()
+  senderName: z.string().optional(),
+  transactionId: z.string().optional(),
 });
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   try {
+    // Check admin permission
     const sessionOrError = await requireAdminRole('ADMIN');
     if (sessionOrError instanceof NextResponse) {
       return sessionOrError;
     }
 
-    const { id } = await params;
+    const { id } = params;
 
     const payIn = await prisma.payIn.findUnique({
       where: { id },
       include: {
         order: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true
-              }
-            },
-            currency: true,
-            fiatCurrency: true
+          select: {
+            id: true,
+            paymentReference: true,
+            cryptoAmount: true,
+            currencyCode: true,
+            status: true,
           }
         },
         user: {
           select: {
             id: true,
             email: true,
-            profile: true
+            profile: {
+              select: {
+                firstName: true,
+                lastName: true,
+              }
+            }
           }
         },
         fiatCurrency: true,
+        cryptocurrency: true,
+        network: true,
         paymentMethod: true,
         verifier: {
           select: {
             id: true,
-            email: true
+            email: true,
           }
         },
         reconciler: {
           select: {
             id: true,
-            email: true
+            email: true,
           }
-        }
+        },
       }
     });
 
     if (!payIn) {
       return NextResponse.json(
-        { success: false, error: 'Payment not found' },
+        { success: false, error: 'PayIn not found' },
         { status: 404 }
       );
     }
@@ -87,9 +86,9 @@ export async function GET(
       data: payIn
     });
   } catch (error) {
-    console.error('Get PayIn details error:', error);
+    console.error('Get PayIn error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to retrieve payment details' },
+      { success: false, error: 'Failed to fetch PayIn' },
       { status: 500 }
     );
   }
@@ -97,102 +96,113 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   try {
+    // Check admin permission
     const sessionOrError = await requireAdminRole('ADMIN');
     if (sessionOrError instanceof NextResponse) {
       return sessionOrError;
     }
 
-    const { id } = await params;
-    const adminId = await getCurrentUserId();
-    if (!adminId) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
+    const { id } = params;
     const body = await request.json();
     const validated = updatePayInSchema.parse(body);
 
-    // Get existing payment
-    const existing = await prisma.payIn.findUnique({
-      where: { id }
-    });
-
-    if (!existing) {
-      return NextResponse.json(
-        { success: false, error: 'Payment not found' },
-        { status: 404 }
-      );
-    }
+    // Get current session for verifiedBy
+    const session = sessionOrError;
+    const userId = session.user?.id;
 
     // Build update data
-    const updateData: any = {};
+    const updateData: any = {
+      status: validated.status,
+    };
 
-    if (validated.status !== undefined) {
-      updateData.status = validated.status;
-
-      // Auto-set verification fields if status is VERIFIED
-      if (validated.status === 'VERIFIED' && !existing.verifiedBy) {
-        updateData.verifiedBy = adminId;
-        updateData.verifiedAt = new Date();
-      }
-
-      // Auto-set reconciliation fields if status is RECONCILED
-      if (validated.status === 'RECONCILED' && !existing.reconciledBy) {
-        updateData.reconciledBy = adminId;
-        updateData.reconciledAt = new Date();
-      }
-    }
-
+    // Add receivedAmount if provided
     if (validated.receivedAmount !== undefined) {
       updateData.receivedAmount = validated.receivedAmount;
+      
       // Check for amount mismatch
-      updateData.amountMismatch = Math.abs(validated.receivedAmount - existing.expectedAmount) > 0.01;
+      const payIn = await prisma.payIn.findUnique({
+        where: { id },
+        select: { expectedAmount: true }
+      });
+      
+      if (payIn) {
+        updateData.amountMismatch = Math.abs(validated.receivedAmount - payIn.expectedAmount) > 0.01;
+      }
     }
 
-    if (validated.senderName) updateData.senderName = validated.senderName;
-    if (validated.senderAccount) updateData.senderAccount = validated.senderAccount;
-    if (validated.senderBank) updateData.senderBank = validated.senderBank;
-    if (validated.reference) updateData.reference = validated.reference;
-    if (validated.transactionId) updateData.transactionId = validated.transactionId;
-    if (validated.verificationNotes) updateData.verificationNotes = validated.verificationNotes;
-    if (validated.reconciledWith) updateData.reconciledWith = validated.reconciledWith;
-    if (validated.paymentDate) updateData.paymentDate = new Date(validated.paymentDate);
-    if (validated.receivedDate) updateData.receivedDate = new Date(validated.receivedDate);
+    // Add verification info if status is VERIFIED
+    if (validated.status === 'VERIFIED' && userId) {
+      updateData.verifiedBy = userId;
+      updateData.verifiedAt = new Date();
+    }
 
-    // Update payment
-    const updated = await prisma.payIn.update({
+    // Add reconciliation info if status is RECONCILED
+    if (validated.status === 'RECONCILED' && userId) {
+      updateData.reconciledBy = userId;
+      updateData.reconciledAt = new Date();
+    }
+
+    // Add verification notes if provided
+    if (validated.verificationNotes) {
+      updateData.verificationNotes = validated.verificationNotes;
+    }
+
+    // Add sender info if provided
+    if (validated.senderName) {
+      updateData.senderName = validated.senderName;
+    }
+
+    if (validated.transactionId) {
+      updateData.transactionId = validated.transactionId;
+    }
+
+    // Update PayIn
+    const updatedPayIn = await prisma.payIn.update({
       where: { id },
       data: updateData,
       include: {
-        order: true,
+        order: {
+          select: {
+            id: true,
+            paymentReference: true,
+          }
+        },
         user: {
           select: {
             id: true,
-            email: true
+            email: true,
           }
-        }
+        },
+        fiatCurrency: true,
+        cryptocurrency: true,
+        network: true,
+        paymentMethod: true,
       }
     });
 
-    // Log audit
-    await auditService.logAdminAction(
-      adminId,
-      AUDIT_ACTIONS.ORDER_STATUS_CHANGED,
-      AUDIT_ENTITIES.ORDER,
-      updated.orderId,
-      { payInStatus: existing.status },
-      { payInStatus: updated.status }
-    );
+    // Invalidate cache
+    try {
+      // Delete all pay-in list cache keys (they have patterns like pay-in-list:*)
+      const keys = await redis.keys('pay-in-list:*');
+      if (keys.length > 0) {
+        await redis.del(...keys);
+        console.log(`📦 [Redis] Invalidated ${keys.length} pay-in cache keys`);
+      }
+      
+      // Also invalidate stats cache
+      await redis.del('payin-stats');
+      console.log(`📦 [Redis] Invalidated payin-stats cache`);
+    } catch (cacheError) {
+      console.error('Redis cache invalidation error:', cacheError);
+    }
 
     return NextResponse.json({
       success: true,
-      data: updated,
-      message: 'Payment updated successfully'
+      data: updatedPayIn,
+      message: `PayIn status updated to ${validated.status}`
     });
   } catch (error) {
     console.error('Update PayIn error:', error);
@@ -209,9 +219,11 @@ export async function PATCH(
     }
 
     return NextResponse.json(
-      { success: false, error: 'Failed to update payment' },
+      {
+        success: false,
+        error: 'Failed to update PayIn'
+      },
       { status: 500 }
     );
   }
 }
-

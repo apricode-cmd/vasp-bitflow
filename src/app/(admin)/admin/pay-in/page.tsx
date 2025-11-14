@@ -25,6 +25,7 @@ import {
   MoreHorizontal,
   Receipt
 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { format } from 'date-fns';
 import { DataTableAdvanced } from '@/components/admin/DataTableAdvanced';
 import { QuickStats } from '@/components/admin/QuickStats';
@@ -43,9 +44,11 @@ interface PayIn {
   orderId: string;
   userId: string;
   amount: number;
-  currency: string;
+  fiatCurrencyCode: string | null;
+  cryptocurrencyCode: string | null;
   currencyType: string;
-  paymentMethodCode: string;
+  paymentMethodCode: string | null;
+  networkCode: string | null;
   status: string;
   expectedAmount: number;
   receivedAmount: number | null;
@@ -214,6 +217,27 @@ export default function PayInPage(): JSX.Element {
 
   // Define table columns
   const columns: ColumnDef<PayIn>[] = [
+    // Row selection checkbox
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected()}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+          onClick={(e) => e.stopPropagation()}
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
     {
       id: 'reference',
       header: 'Reference',
@@ -251,11 +275,18 @@ export default function PayInPage(): JSX.Element {
     {
       id: 'currency',
       header: 'Currency',
-      cell: ({ row }) => (
-        <Badge variant="outline">
-          {row.original.currency}
-        </Badge>
-      ),
+      cell: ({ row }) => {
+        const payIn = row.original;
+        const currencyCode = payIn.currencyType === 'FIAT' 
+          ? payIn.fiatCurrencyCode 
+          : payIn.cryptocurrencyCode;
+        
+        return (
+          <Badge variant="outline" className="font-mono">
+            {currencyCode || 'N/A'}
+          </Badge>
+        );
+      },
     },
     {
       id: 'method',
