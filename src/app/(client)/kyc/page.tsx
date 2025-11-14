@@ -51,6 +51,20 @@ export default function KycPage(): React.ReactElement {
       setStatusLoading(true);
       const response = await fetch('/api/kyc/status');
       
+      // Handle session expired/invalid (JWT error from Sumsub webhook)
+      if (response.status === 401) {
+        const data = await response.json();
+        
+        if (data.code === 'SESSION_INVALID') {
+          toast.error('Session expired. Please log in again.');
+          // Redirect to login after a short delay
+          setTimeout(() => {
+            window.location.href = '/login?redirect=/kyc';
+          }, 1500);
+          return;
+        }
+      }
+      
       if (response.ok) {
         const data = await response.json();
         

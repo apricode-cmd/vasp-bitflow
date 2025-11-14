@@ -30,59 +30,15 @@ export function isValidEthereumAddress(address: string): boolean {
     return false;
   }
 
-  // If address is all lowercase or all uppercase, it's valid (no checksum)
-  if (address === address.toLowerCase() || address === address.toUpperCase()) {
-    return true;
-  }
-
-  // If mixed case, validate EIP-55 checksum
-  return isValidEIP55Checksum(address);
-}
-
-/**
- * EIP-55 Checksum validation (catches typos in mixed-case addresses)
- * https://eips.ethereum.org/EIPS/eip-55
- */
-function isValidEIP55Checksum(address: string): boolean {
-  // Remove 0x prefix
-  const addr = address.slice(2);
-  
-  // Create hash of lowercase address
-  const hash = keccak256(addr.toLowerCase());
-  
-  for (let i = 0; i < 40; i++) {
-    const hashByte = parseInt(hash[i], 16);
-    const char = addr[i];
-    
-    // If hash byte >= 8, character should be uppercase
-    if (hashByte >= 8) {
-      if (char !== char.toUpperCase()) {
-        return false;
-      }
-    } else {
-      // If hash byte < 8, character should be lowercase
-      if (char !== char.toLowerCase()) {
-        return false;
-      }
-    }
-  }
-  
+  // Accept all valid hex addresses (lowercase, uppercase, or mixed case)
+  // Note: EIP-55 checksum validation requires proper keccak256 implementation
+  // For now, we trust user input if it matches the format
   return true;
 }
 
-/**
- * Simple Keccak-256 implementation for checksum validation
- * Note: For production, consider using a library like 'js-sha3'
- */
-function keccak256(str: string): string {
-  // Simplified implementation - for production use a proper library
-  // This is a placeholder that returns the input for now
-  // In real implementation, you'd use: require('js-sha3').keccak256
-  
-  // For now, if address has mixed case, we'll assume it's intentional
-  // and skip strict checksum validation
-  return str;
-}
+// Note: EIP-55 checksum validation is disabled because it requires
+// a proper keccak256 implementation. If you want to enable it in the future,
+// install 'js-sha3' library and implement proper checksum validation.
 
 /**
  * Validate Solana address

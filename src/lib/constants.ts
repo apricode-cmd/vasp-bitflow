@@ -5,7 +5,7 @@
  */
 
 // Supported cryptocurrencies
-export const SUPPORTED_CURRENCIES = ['BTC', 'ETH', 'USDT', 'SOL'] as const;
+export const SUPPORTED_CURRENCIES = ['BTC', 'ETH', 'USDT', 'USDC', 'SOL'] as const;
 export type SupportedCurrency = (typeof SUPPORTED_CURRENCIES)[number];
 
 // Supported fiat currencies
@@ -31,6 +31,12 @@ export const CURRENCY_INFO = {
     symbol: '₮',
     decimals: 2,
     color: '#26A17B'
+  },
+  USDC: {
+    name: 'USD Coin',
+    symbol: '$',
+    decimals: 2,
+    color: '#2775CA'
   },
   SOL: {
     name: 'Solana',
@@ -112,6 +118,7 @@ export const WALLET_PATTERNS = {
   BTC: /^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,62}$/,
   ETH: /^0x[a-fA-F0-9]{40}$/,
   USDT: /^0x[a-fA-F0-9]{40}$/, // ERC-20 address
+  USDC: /^0x[a-fA-F0-9]{40}$/, // ERC-20 address (same as ETH/USDT)
   SOL: /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
 } as const;
 

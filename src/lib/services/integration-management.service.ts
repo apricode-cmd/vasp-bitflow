@@ -303,10 +303,12 @@ export async function updateIntegrationConfig(params: UpdateIntegrationParams) {
         
         // When enabling, set to active if API key exists (including new one)
         // OR if config has required fields (for multi-param integrations like Sumsub)
+        // OR if it's a RATES provider (they don't require API keys - use public APIs)
         const hasApiKey = integration.apiKey || updates.apiKey;
         const hasConfigData = updates.config && Object.keys(updates.config).length > 0;
+        const isRatesProvider = provider && provider.category === 'RATES';
         
-        if (hasApiKey || hasConfigData) {
+        if (hasApiKey || hasConfigData || isRatesProvider) {
           updateData.status = 'active';
         } else {
           updateData.status = 'inactive'; // No API key yet

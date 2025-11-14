@@ -14,7 +14,23 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   
   try {
     // Check authentication - use client session (NextAuth v5)
-    session = await getClientSession();
+    try {
+      session = await getClientSession();
+    } catch (jwtError: any) {
+      // Handle JWT decode errors (e.g., after deployment with new secret)
+      console.error('❌ JWT decode error:', jwtError.message);
+      console.log('💡 Session token may be invalid or expired - returning 401');
+      
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Session expired or invalid',
+          code: 'SESSION_INVALID',
+          message: 'Please log in again'
+        },
+        { status: 401 }
+      );
+    }
     
     if (!session?.user?.id) {
       console.log('⚠️ Unauthorized KYC status check attempt');

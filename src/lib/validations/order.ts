@@ -11,7 +11,7 @@ import { WALLET_PATTERNS } from '@/lib/constants';
  * Create order schema
  */
 export const createOrderSchema = z.object({
-  currencyCode: z.enum(['BTC', 'ETH', 'USDT', 'SOL'], {
+  currencyCode: z.enum(['BTC', 'ETH', 'USDT', 'USDC', 'SOL'], {
     required_error: 'Cryptocurrency is required'
   }),
   fiatCurrencyCode: z.enum(['EUR', 'PLN'], {
