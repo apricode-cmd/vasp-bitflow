@@ -91,21 +91,6 @@ export function KycAddressTab({ session }: KycAddressTabProps): JSX.Element {
             <p className="font-medium">{addressCountry}</p>
           </div>
         )}
-
-        {/* Full Address Block */}
-        <div className="mt-6 p-4 bg-muted rounded-lg">
-          <p className="text-sm font-semibold mb-2">Full Address:</p>
-          <address className="text-sm not-italic leading-relaxed">
-            {addressStreet && <>{addressStreet}<br /></>}
-            {(addressCity || addressRegion || addressPostal) && (
-              <>
-                {addressCity}{addressRegion && `, ${addressRegion}`}{addressPostal && ` ${addressPostal}`}
-                <br />
-              </>
-            )}
-            {addressCountry}
-          </address>
-        </div>
       </div>
     </Card>
   );
