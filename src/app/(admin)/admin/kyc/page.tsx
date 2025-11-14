@@ -56,6 +56,7 @@ import { Combobox } from '@/components/shared/Combobox';
 import type { ComboboxOption } from '@/components/shared/Combobox';
 import { DynamicKycForm } from '@/components/forms/DynamicKycForm';
 import { KycQuickStats } from './_components/KycQuickStats';
+import { KycFilters, type KycFiltersState } from './_components/KycFilters';
 import { formatDateTime } from '@/lib/formatters';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -178,6 +179,9 @@ export default function AdminKycPage(): JSX.Element {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string>('PENDING');
   const [selectedSession, setSelectedSession] = useState<KycSession | null>(null);
+  const [filters, setFilters] = useState<KycFiltersState>({});
+  const [availableCountries, setAvailableCountries] = useState<string[]>([]);
+  const [availableProviders, setAvailableProviders] = useState<Array<{ value: string; label: string }>>([]);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
@@ -192,7 +196,11 @@ export default function AdminKycPage(): JSX.Element {
 
   useEffect(() => {
     fetchKycSessions();
-  }, [selectedStatus]);
+  }, [selectedStatus, filters]);
+
+  useEffect(() => {
+    fetchFilterOptions();
+  }, []);
 
   useEffect(() => {
     if (createDialogOpen) {
@@ -220,8 +228,27 @@ export default function AdminKycPage(): JSX.Element {
     setRefreshing(true);
     try {
       const url = new URL('/api/admin/kyc', window.location.origin);
+      
+      // Status filter
       if (selectedStatus && selectedStatus !== 'all') {
         url.searchParams.set('status', selectedStatus);
+      }
+
+      // Advanced filters
+      if (filters.country) {
+        url.searchParams.set('country', filters.country);
+      }
+      if (filters.provider) {
+        url.searchParams.set('provider', filters.provider);
+      }
+      if (filters.pepStatus) {
+        url.searchParams.set('pepStatus', filters.pepStatus);
+      }
+      if (filters.dateFrom) {
+        url.searchParams.set('dateFrom', filters.dateFrom.toISOString());
+      }
+      if (filters.dateTo) {
+        url.searchParams.set('dateTo', filters.dateTo.toISOString());
       }
 
       const response = await fetch(url.toString());
@@ -243,6 +270,40 @@ export default function AdminKycPage(): JSX.Element {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const fetchFilterOptions = async (): Promise<void> => {
+    try {
+      // Fetch unique countries
+      const countriesResponse = await fetch('/api/admin/users?limit=1000&role=CLIENT');
+      if (countriesResponse.ok) {
+        const result = await countriesResponse.json();
+        if (result.success && result.data) {
+          const countries = [...new Set(
+            result.data
+              .map((u: any) => u.profile?.country)
+              .filter(Boolean)
+          )].sort();
+          setAvailableCountries(countries as string[]);
+        }
+      }
+
+      // Fetch available KYC providers from integrations
+      const providersResponse = await fetch('/api/admin/integrations?category=kyc');
+      if (providersResponse.ok) {
+        const result = await providersResponse.json();
+        if (result.success && result.data) {
+          setAvailableProviders(
+            result.data.map((integration: any) => ({
+              value: integration.service,
+              label: integration.name || integration.service.toUpperCase(),
+            }))
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch filter options:', error);
     }
   };
 
@@ -693,6 +754,15 @@ export default function AdminKycPage(): JSX.Element {
 
       {/* Quick Stats */}
       <KycQuickStats />
+
+      {/* Advanced Filters */}
+      <KycFilters
+        filters={filters}
+        onFiltersChange={setFilters}
+        onReset={() => setFilters({})}
+        availableCountries={availableCountries}
+        availableProviders={availableProviders}
+      />
 
       {/* Status Tabs */}
       <Card>
