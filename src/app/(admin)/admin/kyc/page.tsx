@@ -183,6 +183,7 @@ export default function AdminKycPage(): JSX.Element {
   const [filters, setFilters] = useState<KycFiltersState>({});
   const [availableCountries, setAvailableCountries] = useState<string[]>([]);
   const [availableProviders, setAvailableProviders] = useState<Array<{ value: string; label: string }>>([]);
+  const [statusCounts, setStatusCounts] = useState({ pending: 0, approved: 0, rejected: 0, total: 0 });
   const [sheetOpen, setSheetOpen] = useState(false);
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
@@ -201,7 +202,27 @@ export default function AdminKycPage(): JSX.Element {
 
   useEffect(() => {
     fetchFilterOptions();
+    fetchStatusCounts();
   }, []);
+
+  // Fetch status counts (always fetch total counts, not filtered)
+  const fetchStatusCounts = async (): Promise<void> => {
+    try {
+      const response = await fetch('/api/admin/kyc?limit=1000');
+      if (response.ok) {
+        const result = await response.json();
+        const allSessions = result.data || [];
+        setStatusCounts({
+          pending: allSessions.filter((s: any) => s.status === 'PENDING').length,
+          approved: allSessions.filter((s: any) => s.status === 'APPROVED').length,
+          rejected: allSessions.filter((s: any) => s.status === 'REJECTED').length,
+          total: allSessions.length,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch status counts:', error);
+    }
+  };
 
   useEffect(() => {
     if (createDialogOpen) {
@@ -783,18 +804,35 @@ export default function AdminKycPage(): JSX.Element {
           <TabsList>
             <TabsTrigger value="PENDING">
               Pending
-              <Badge variant="secondary" className="ml-2">
-                {kycSessions.filter(s => s.status === 'PENDING').length}
-              </Badge>
+              {statusCounts.pending > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {statusCounts.pending}
+                </Badge>
+              )}
             </TabsTrigger>
             <TabsTrigger value="APPROVED">
               Approved
+              {statusCounts.approved > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {statusCounts.approved}
+                </Badge>
+              )}
             </TabsTrigger>
             <TabsTrigger value="REJECTED">
               Rejected
+              {statusCounts.rejected > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {statusCounts.rejected}
+                </Badge>
+              )}
             </TabsTrigger>
             <TabsTrigger value="all">
               All
+              {statusCounts.total > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {statusCounts.total}
+                </Badge>
+              )}
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -844,6 +882,7 @@ export default function AdminKycPage(): JSX.Element {
                 if (response.ok && result.success) {
                   toast.success(`Approved ${result.affected} session(s)`);
                   fetchKycSessions();
+                  fetchStatusCounts();
                 } else {
                   toast.error(result.error || 'Failed to approve sessions');
                 }
@@ -884,6 +923,7 @@ export default function AdminKycPage(): JSX.Element {
                 if (response.ok && result.success) {
                   toast.success(`Rejected ${result.affected} session(s)`);
                   fetchKycSessions();
+                  fetchStatusCounts();
                 } else {
                   toast.error(result.error || 'Failed to reject sessions');
                 }
