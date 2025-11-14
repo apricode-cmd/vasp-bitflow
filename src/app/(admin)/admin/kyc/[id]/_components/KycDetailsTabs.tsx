@@ -8,7 +8,6 @@
 'use client';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
 import { 
   User, 
   MapPin, 
@@ -31,8 +30,6 @@ interface KycDetailsTabsProps {
 }
 
 export function KycDetailsTabs({ session, onUpdate }: KycDetailsTabsProps): JSX.Element {
-  const additionalDataCount = session.formData?.length || 0;
-
   return (
     <Tabs defaultValue="overview" className="space-y-6">
       <TabsList className="grid w-full grid-cols-6">
@@ -55,11 +52,6 @@ export function KycDetailsTabs({ session, onUpdate }: KycDetailsTabsProps): JSX.
         <TabsTrigger value="additional" className="flex items-center gap-2">
           <Layers className="h-4 w-4" />
           <span className="hidden sm:inline">Additional</span>
-          {additionalDataCount > 0 && (
-            <Badge variant="secondary" className="ml-1 text-xs">
-              {additionalDataCount}
-            </Badge>
-          )}
         </TabsTrigger>
         <TabsTrigger value="history" className="flex items-center gap-2">
           <Clock className="h-4 w-4" />

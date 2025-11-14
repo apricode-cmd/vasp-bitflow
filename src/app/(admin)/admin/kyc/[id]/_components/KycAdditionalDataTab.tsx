@@ -28,8 +28,14 @@ export function KycAdditionalDataTab({ session }: KycAdditionalDataTabProps): JS
   }
 
   // Group fields by category (simple heuristic based on field names)
-  const categorizeField = (fieldName: string): string => {
+  const categorizeField = (fieldName: string): string | null => {
     const name = fieldName.toLowerCase();
+    
+    // Skip address fields (they have dedicated Address tab)
+    if (name.includes('address') || name.includes('street') || name.includes('city') || 
+        name.includes('postal') || (name.includes('country') && name.includes('address'))) {
+      return null; // Exclude from Additional Data tab
+    }
     
     // Personal Information
     if (name.includes('first_name') || name.includes('last_name') || name.includes('date_of_birth') || 
@@ -40,12 +46,6 @@ export function KycAdditionalDataTab({ session }: KycAdditionalDataTabProps): JS
     // Contact Details
     if (name.includes('email') || name.includes('phone') || name.includes('contact')) {
       return '📧 Contact Details';
-    }
-    
-    // Address Information
-    if (name.includes('address') || name.includes('street') || name.includes('city') || 
-        name.includes('postal') || name.includes('country') && name.includes('address')) {
-      return '📍 Address Information';
     }
     
     // Identity Documents
@@ -69,9 +69,15 @@ export function KycAdditionalDataTab({ session }: KycAdditionalDataTabProps): JS
     return '📋 Other Information';
   };
 
-  // Group fields by category
+  // Group fields by category (exclude address fields)
   const groupedData = session.formData.reduce((acc, field) => {
     const category = categorizeField(field.fieldName);
+    
+    // Skip fields without category (e.g., address fields)
+    if (category === null) {
+      return acc;
+    }
+    
     if (!acc[category]) {
       acc[category] = [];
     }
@@ -84,19 +90,14 @@ export function KycAdditionalDataTab({ session }: KycAdditionalDataTabProps): JS
   return (
     <div className="space-y-6">
       <Card className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="font-semibold flex items-center gap-2">
-              <Layers className="h-4 w-4" />
-              Additional KYC Data
-            </h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              Dynamic form fields submitted during KYC process
-            </p>
-          </div>
-          <Badge variant="secondary">
-            {session.formData.length} field{session.formData.length !== 1 ? 's' : ''}
-          </Badge>
+        <div className="mb-6">
+          <h3 className="font-semibold flex items-center gap-2">
+            <Layers className="h-4 w-4" />
+            Additional KYC Data
+          </h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            Dynamic form fields submitted during KYC process
+          </p>
         </div>
 
         {categories.map((category) => (
