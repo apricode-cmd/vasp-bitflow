@@ -5,7 +5,7 @@
  * - Header with actions
  * - Quick stats (4 metrics)
  * - Profile & Financial summary
- * - Tabs: Overview, Orders, Pay-In, Pay-Out, KYC, Activity
+ * - Tabs: Overview, Orders, Wallets, Pay-In, Pay-Out, KYC, Activity
  */
 
 'use client';
@@ -33,6 +33,7 @@ import { OrdersTab } from './_components/OrdersTab';
 import { PayInTab } from './_components/PayInTab';
 import { PayOutTab } from './_components/PayOutTab';
 import { KycTab } from './_components/KycTab';
+import { WalletsTab } from './_components/WalletsTab';
 import { ActivityTab } from './_components/ActivityTab';
 import { toast } from 'sonner';
 import type { KycStatus } from '@prisma/client';
@@ -264,13 +265,21 @@ export default function UserDetailPage({ params }: { params: { id: string } }): 
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="orders">
             Orders
             <Badge variant="secondary" className="ml-2">
               {user._count.orders}
             </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="wallets">
+            Wallets
+            {user.userWallets.length > 0 && (
+              <Badge variant="secondary" className="ml-2">
+                {user.userWallets.length}
+              </Badge>
+            )}
           </TabsTrigger>
           <TabsTrigger value="pay-in">Pay-In</TabsTrigger>
           <TabsTrigger value="pay-out">Pay-Out</TabsTrigger>
@@ -285,6 +294,10 @@ export default function UserDetailPage({ params }: { params: { id: string } }): 
 
         <TabsContent value="orders">
           <OrdersTab userId={id} />
+        </TabsContent>
+
+        <TabsContent value="wallets">
+          <WalletsTab wallets={user.userWallets} />
         </TabsContent>
 
         <TabsContent value="pay-in">
