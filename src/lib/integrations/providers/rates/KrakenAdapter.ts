@@ -75,32 +75,36 @@ export class KrakenAdapter implements IRatesProvider {
    * - Z prefix for fiat currencies (EUR = ZEUR, USD = ZUSD)
    * 
    * Our format: BTC-EUR → Kraken format: XXBTZEUR
+   * 
+   * Note: Kraken does NOT support PLN (Polish Zloty) directly.
+   * For PLN pairs, use cross-rate calculation: BTC/PLN = BTC/EUR × EUR/PLN
    */
   private readonly pairMapping: Record<string, string> = {
     // Bitcoin pairs
     'BTC-EUR': 'XXBTZEUR',
     'BTC-USD': 'XXBTZUSD',
-    'BTC-PLN': 'XBTPLN',
+    // 'BTC-PLN': Not available on Kraken
     
     // Ethereum pairs
     'ETH-EUR': 'XETHZEUR',
     'ETH-USD': 'XETHZUSD',
-    'ETH-PLN': 'ETHPLN',
+    // 'ETH-PLN': Not available on Kraken
     
     // Solana pairs
     'SOL-EUR': 'SOLEUR',
     'SOL-USD': 'SOLUSD',
-    'SOL-PLN': 'SOLPLN',
+    // 'SOL-PLN': Not available on Kraken
     
-    // Tether pairs
-    'USDT-EUR': 'USDTZEUR',
+    // Tether pairs (stablecoin)
+    'USDT-EUR': 'USDTEUR',  // Fixed: was USDTZEUR
     'USDT-USD': 'USDTZUSD',
-    'USDT-PLN': 'USDTPLN'
+    // 'USDT-PLN': Not available on Kraken
   };
 
   // Supported currencies
+  // Note: These are what we TRY to fetch. Pairs not in pairMapping will be skipped gracefully.
   private readonly supportedCryptos = ['BTC', 'ETH', 'USDT', 'SOL'];
-  private readonly supportedFiats = ['EUR', 'USD', 'PLN'];
+  private readonly supportedFiats = ['EUR', 'USD']; // PLN not directly supported on Kraken
 
   // Cache for rates
   private ratesCache: {
