@@ -178,7 +178,7 @@ export default function AdminKycPage(): JSX.Element {
   const [kycSessions, setKycSessions] = useState<KycSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<string>('PENDING');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedSession, setSelectedSession] = useState<KycSession | null>(null);
   const [filters, setFilters] = useState<KycFiltersState>({});
   const [availableCountries, setAvailableCountries] = useState<string[]>([]);
@@ -802,6 +802,14 @@ export default function AdminKycPage(): JSX.Element {
         {/* Status Tabs */}
         <Tabs value={selectedStatus} onValueChange={setSelectedStatus} className="flex-1">
           <TabsList>
+            <TabsTrigger value="all">
+              All
+              {statusCounts.total > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {statusCounts.total}
+                </Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="PENDING">
               Pending
               {statusCounts.pending > 0 && (
@@ -823,14 +831,6 @@ export default function AdminKycPage(): JSX.Element {
               {statusCounts.rejected > 0 && (
                 <Badge variant="secondary" className="ml-2">
                   {statusCounts.rejected}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="all">
-              All
-              {statusCounts.total > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {statusCounts.total}
                 </Badge>
               )}
             </TabsTrigger>
