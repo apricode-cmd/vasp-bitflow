@@ -294,7 +294,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       } : {})
     };
 
-    // Set currency codes and relations based on type
+    // Set ONLY relations (NO scalar code fields - they don't exist in create!)
     if (validated.currencyType === 'FIAT') {
       const fiatCode = validated.fiatCurrencyCode || order.fiatCurrencyCode;
       
@@ -311,8 +311,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         );
       }
       
-      // Set both scalar field AND relation
-      payInData.fiatCurrencyCode = fiatCode;
+      // ONLY relation, NO scalar field
       payInData.fiatCurrency = { connect: { code: fiatCode } };
       
       // Set payment method if provided
@@ -322,7 +321,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           select: { code: true }
         });
         if (paymentMethodExists) {
-          payInData.paymentMethodCode = validated.paymentMethodCode;
+          // ONLY relation, NO scalar field
           payInData.paymentMethod = { connect: { code: validated.paymentMethodCode } };
         }
       }
@@ -336,7 +335,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
     
     if (cryptocurrency) {
-      payInData.cryptocurrencyCode = cryptoCode;
+      // ONLY relation, NO scalar field
       payInData.cryptocurrency = { connect: { code: cryptoCode } };
     }
     
@@ -347,7 +346,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         select: { code: true }
       });
       if (networkExists) {
-        payInData.networkCode = validated.networkCode;
+        // ONLY relation, NO scalar field
         payInData.network = { connect: { code: validated.networkCode } };
       }
     }
