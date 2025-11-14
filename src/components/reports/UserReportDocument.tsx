@@ -314,6 +314,15 @@ export interface UserReportData {
     status: string;
   }>;
 
+  // Crypto wallets
+  wallets: Array<{
+    address: string;
+    label: string | null;
+    currency: string;
+    blockchain: string;
+    isDefault: boolean;
+  }>;
+
   // Security & login history
   loginHistory: Array<{
     date: string;
@@ -635,6 +644,41 @@ export const UserReportDocument: React.FC<{ data: UserReportData }> = ({ data })
           ) : (
             <Text style={{ fontSize: 8, color: '#6b7280', textAlign: 'center' }}>
               No transaction history available
+            </Text>
+          )}
+        </View>
+
+        {/* Crypto Wallets */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Registered Crypto Wallets</Text>
+          {data.wallets.length > 0 ? (
+            <View style={styles.table}>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.tableHeaderCell, { width: '10%' }]}>Currency</Text>
+                <Text style={[styles.tableHeaderCell, { width: '15%' }]}>Blockchain</Text>
+                <Text style={[styles.tableHeaderCell, { width: '55%' }]}>Wallet Address</Text>
+                <Text style={[styles.tableHeaderCell, { width: '20%' }]}>Label / Status</Text>
+              </View>
+              {data.wallets.map((wallet, index) => (
+                <View key={index} style={styles.tableRow}>
+                  <Text style={[styles.tableCell, { width: '10%', fontWeight: 'bold' }]}>
+                    {wallet.currency}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: '15%', fontSize: 7 }]}>
+                    {wallet.blockchain}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: '55%', fontSize: 7, fontFamily: 'Courier' }]}>
+                    {wallet.address}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: '20%', fontSize: 7 }]}>
+                    {wallet.label || (wallet.isDefault ? 'Default' : '-')}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={{ fontSize: 8, color: '#6b7280', textAlign: 'center' }}>
+              No crypto wallets registered
             </Text>
           )}
         </View>

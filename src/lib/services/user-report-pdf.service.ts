@@ -36,6 +36,15 @@ export async function generateUserReportPDF(userId: string): Promise<Buffer> {
         },
         take: 20, // Last 20 orders
       },
+      userWallets: {
+        include: {
+          currency: true,
+          blockchain: true,
+        },
+        orderBy: {
+          isDefault: 'desc', // Default wallet first
+        },
+      },
       // Note: No direct relation to UserAuditLog in User model
       // We'll fetch it separately below
     },
@@ -45,7 +54,7 @@ export async function generateUserReportPDF(userId: string): Promise<Buffer> {
     throw new Error(`User ${userId} not found`);
   }
 
-  console.log(`[USER_REPORT] User found: ${user.email}, Orders: ${user.orders.length}`);
+  console.log(`[USER_REPORT] User found: ${user.email}, Orders: ${user.orders.length}, Wallets: ${user.userWallets.length}`);
 
   // 2. Fetch login history from UserAuditLog (separate table)
   const loginHistory = await prisma.userAuditLog.findMany({
@@ -201,6 +210,15 @@ export async function generateUserReportPDF(userId: string): Promise<Buffer> {
       fiatAmount: order.totalFiat,
       fiatCurrency: order.fiatCurrencyCode,
       status: order.status,
+    })),
+
+    // Crypto wallets
+    wallets: user.userWallets.map(wallet => ({
+      address: wallet.address,
+      label: wallet.label || null,
+      currency: wallet.currency.code,
+      blockchain: wallet.blockchain.name,
+      isDefault: wallet.isDefault,
     })),
 
     // Security & login history (from separate UserAuditLog table)
