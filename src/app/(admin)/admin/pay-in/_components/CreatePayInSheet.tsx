@@ -117,9 +117,22 @@ export function CreatePayInSheet({ onSuccess }: CreatePayInSheetProps): JSX.Elem
       if (data.success && data.data) {
         setOrderData(data.data);
         
-        // Auto-fill reference if available
+        // Auto-fill payment reference
         if (data.data.paymentReference) {
           setReference(data.data.paymentReference);
+        }
+        
+        // Auto-fill sender name from user profile (firstName + lastName)
+        if (data.data.user?.profile) {
+          const { firstName, lastName } = data.data.user.profile;
+          if (firstName || lastName) {
+            setSenderName(`${firstName || ''} ${lastName || ''}`.trim());
+          }
+        }
+        
+        // Auto-fill received amount from order total (rounded to 2 decimals)
+        if (data.data.totalFiat) {
+          setReceivedAmount(data.data.totalFiat.toFixed(2));
         }
       } else {
         toast.error('Order not found');
