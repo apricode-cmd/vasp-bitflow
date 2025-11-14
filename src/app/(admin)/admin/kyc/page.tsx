@@ -685,18 +685,12 @@ export default function AdminKycPage(): JSX.Element {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href={`/admin/kyc/${session.id}`} onClick={(e) => e.stopPropagation()}>
-                    <Eye className="h-4 w-4 mr-2" />
-                    View Details
-                  </Link>
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={(e) => {
                   e.stopPropagation();
                   viewKycDetails(session);
                 }}>
                   <Eye className="h-4 w-4 mr-2" />
-                  Quick View (Sheet)
+                  Quick View
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={(e) => {
                   e.stopPropagation();
@@ -853,7 +847,7 @@ export default function AdminKycPage(): JSX.Element {
         data={kycSessions}
         searchPlaceholder="Search by name or email..."
         isLoading={loading}
-        onRowClick={(row) => viewKycDetails(row)}
+        onRowClick={(row) => router.push(`/admin/kyc/${row.id}`)}
         pageSize={20}
         exportFilename="kyc-sessions"
         enableRowSelection={true}
