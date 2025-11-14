@@ -1,19 +1,41 @@
 /**
- * User Detail Page
+ * User Details Page - REDESIGNED
  * 
- * Detailed view of user with orders, activity, and management options
+ * Complete user profile with:
+ * - Header with actions
+ * - Quick stats (4 metrics)
+ * - Profile & Financial summary
+ * - Tabs: Overview, Orders, Pay-In, Pay-Out, KYC, Activity
  */
 
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { UserHeader } from './_components/UserHeader';
+import { UserQuickStats } from './_components/UserQuickStats';
+import { ProfileSummary } from './_components/ProfileSummary';
+import { FinancialSummary } from './_components/FinancialSummary';
+import { OverviewTab } from './_components/OverviewTab';
+import { OrdersTab } from './_components/OrdersTab';
+import { PayInTab } from './_components/PayInTab';
+import { PayOutTab } from './_components/PayOutTab';
+import { KycTab } from './_components/KycTab';
+import { ActivityTab } from './_components/ActivityTab';
 import { toast } from 'sonner';
-import Link from 'next/link';
-import { formatCurrency } from '@/lib/formatters';
-import { format } from 'date-fns';
+import type { KycStatus } from '@prisma/client';
 
 interface UserDetails {
   id: string;
@@ -28,46 +50,34 @@ interface UserDetails {
     phoneNumber: string | null;
     country: string;
     city: string | null;
-    // Extended KYC fields
+    // All KYC fields
     dateOfBirth?: string | null;
     placeOfBirth?: string | null;
     nationality?: string | null;
-    phone?: string | null;
-    phoneCountry?: string | null;
     addressStreet?: string | null;
     addressCity?: string | null;
     addressRegion?: string | null;
     addressPostalCode?: string | null;
     addressCountry?: string | null;
-    // Identity
     idType?: string | null;
     idNumber?: string | null;
     idIssuingCountry?: string | null;
     idIssueDate?: string | null;
     idExpiryDate?: string | null;
-    // PEP
     isPep?: boolean | null;
     pepRole?: string | null;
-    // Employment
     employmentStatus?: string | null;
     occupation?: string | null;
     employerName?: string | null;
-    // Funds
     sourceOfFunds?: string | null;
     sourceOfWealth?: string | null;
-    // Purpose
     purposeOfAccount?: string | null;
     intendedUse?: string | null;
   } | null;
   kycSession: {
-    status: string;
+    status: KycStatus;
     submittedAt: string | null;
     reviewedAt: string | null;
-    documents: Array<{
-      documentType: string;
-      fileName: string;
-      uploadedAt: string;
-    }>;
   } | null;
   orders: Array<{
     id: string;
@@ -76,8 +86,8 @@ interface UserDetails {
     totalFiat: number;
     status: string;
     createdAt: string;
-    currency: { code: string; symbol: string };
-    fiatCurrency: { code: string; symbol: string };
+    currency: { code: string };
+    fiatCurrency: { code: string };
   }>;
   userWallets: Array<{
     id: string;
@@ -89,7 +99,6 @@ interface UserDetails {
   }>;
   _count: {
     orders: number;
-    auditLogs: number;
   };
 }
 
@@ -97,12 +106,11 @@ export default function UserDetailPage({ params }: { params: { id: string } }): 
   const { id } = params;
   const [user, setUser] = useState<UserDetails | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activity, setActivity] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'activity' | 'kyc'>('overview');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     fetchUserDetails();
-    fetchActivity();
   }, [id]);
 
   const fetchUserDetails = async (): Promise<void> => {
@@ -124,20 +132,7 @@ export default function UserDetailPage({ params }: { params: { id: string } }): 
     }
   };
 
-  const fetchActivity = async (): Promise<void> => {
-    try {
-      const response = await fetch(`/api/admin/users/${id}/activity?limit=20`);
-      const data = await response.json();
-
-      if (data.success) {
-        setActivity(data.data);
-      }
-    } catch (error) {
-      console.error('Fetch activity error:', error);
-    }
-  };
-
-  const toggleUserStatus = async (): Promise<void> => {
+  const handleToggleStatus = async (): Promise<void> => {
     if (!user) return;
 
     try {
@@ -157,15 +152,45 @@ export default function UserDetailPage({ params }: { params: { id: string } }): 
       }
     } catch (error) {
       console.error('Toggle user status error:', error);
-      toast.error('Failed to update user');
+      toast.error('Failed to update user status');
     }
   };
 
+  const handleDelete = async (): Promise<void> => {
+    try {
+      const response = await fetch(`/api/admin/users/${id}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('User deleted successfully');
+        window.location.href = '/admin/users';
+      } else {
+        toast.error(data.error || 'Failed to delete user');
+      }
+    } catch (error) {
+      console.error('Delete user error:', error);
+      toast.error('An error occurred');
+    } finally {
+      setDeleteDialogOpen(false);
+    }
+  };
+
+  // Loading state
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="text-lg">Loading user details...</div>
+      <div className="space-y-6 animate-in">
+        <Skeleton className="h-32 w-full" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-32" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
         </div>
       </div>
     );
@@ -173,479 +198,133 @@ export default function UserDetailPage({ params }: { params: { id: string } }): 
 
   if (!user) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center h-[50vh]">
         <div className="text-center">
-          <div className="text-lg">User not found</div>
-          <Link href="/admin/users">
-            <Button className="mt-4">Back to Users</Button>
-          </Link>
+          <h2 className="text-2xl font-bold mb-2">User not found</h2>
+          <p className="text-muted-foreground">The requested user could not be found.</p>
         </div>
       </div>
     );
   }
 
+  // Calculate stats
+  const completedOrders = user.orders.filter(o => o.status === 'COMPLETED').length;
+  const processingOrders = user.orders.filter(o => o.status === 'PROCESSING' || o.status === 'PAYMENT_PENDING').length;
+  const cancelledOrders = user.orders.filter(o => o.status === 'CANCELLED' || o.status === 'FAILED').length;
+  const pendingOrders = user.orders.filter(o => o.status === 'PENDING').length;
+  const totalSpent = user.orders
+    .filter(o => o.status === 'COMPLETED')
+    .reduce((sum, o) => sum + Number(o.totalFiat), 0);
+  const averageOrderValue = completedOrders > 0 ? totalSpent / completedOrders : 0;
+
+  const quickStats = {
+    totalOrders: user._count.orders,
+    totalSpent,
+    pendingOrders,
+    kycStatus: user.kycSession?.status || 'Not Started',
+    completedOrders,
+  };
+
+  const financialStats = {
+    totalSpent,
+    totalOrders: user._count.orders,
+    completedOrders,
+    processingOrders,
+    cancelledOrders,
+    averageOrderValue,
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">{user.profile?.firstName} {user.profile?.lastName}</h1>
-          <p className="text-muted-foreground">{user.email}</p>
-        </div>
-        <div className="flex gap-2">
-          <Link href="/admin/users">
-            <Button variant="outline">Back</Button>
-          </Link>
-          <Button
-            variant={user.isActive ? 'destructive' : 'default'}
-            onClick={toggleUserStatus}
-          >
-            {user.isActive ? 'Block User' : 'Unblock User'}
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-6 animate-in">
+      {/* Header */}
+      <UserHeader
+        user={{
+          ...user,
+          createdAt: new Date(user.createdAt),
+          lastLogin: user.lastLogin ? new Date(user.lastLogin) : null,
+        }}
+        onToggleStatus={handleToggleStatus}
+        onDelete={() => setDeleteDialogOpen(true)}
+      />
 
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Role</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Badge variant={user.role === 'ADMIN' ? 'destructive' : 'default'}>
-              {user.role}
-            </Badge>
-          </CardContent>
-        </Card>
+      {/* Quick Stats */}
+      <UserQuickStats stats={quickStats} />
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Badge variant={user.isActive ? 'default' : 'secondary'}>
-              {user.isActive ? 'Active' : 'Blocked'}
-            </Badge>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{user._count.orders}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">KYC Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {user.kycSession ? (
-              <Badge
-                variant={
-                  user.kycSession.status === 'APPROVED'
-                    ? 'default'
-                    : user.kycSession.status === 'REJECTED'
-                    ? 'destructive'
-                    : 'secondary'
-                }
-              >
-                {user.kycSession.status}
-              </Badge>
-            ) : (
-              <span className="text-muted-foreground">Not started</span>
-            )}
-          </CardContent>
-        </Card>
+      {/* Profile & Financial Summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <ProfileSummary
+          user={{
+            ...user,
+            createdAt: new Date(user.createdAt),
+            lastLogin: user.lastLogin ? new Date(user.lastLogin) : null,
+          }}
+        />
+        <FinancialSummary stats={financialStats} />
       </div>
 
       {/* Tabs */}
-      <div className="border-b">
-        <div className="flex gap-4">
-          {['overview', 'orders', 'activity', 'kyc'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab as any)}
-              className={`px-4 py-2 font-medium transition-colors ${
-                activeTab === tab
-                  ? 'border-b-2 border-primary text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="orders">
+            Orders
+            <Badge variant="secondary" className="ml-2">
+              {user._count.orders}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="pay-in">Pay-In</TabsTrigger>
+          <TabsTrigger value="pay-out">Pay-Out</TabsTrigger>
+          <TabsTrigger value="kyc">KYC</TabsTrigger>
+          <TabsTrigger value="activity">Activity</TabsTrigger>
+        </TabsList>
+
+        {/* Tab Contents */}
+        <TabsContent value="overview">
+          <OverviewTab userId={id} />
+        </TabsContent>
+
+        <TabsContent value="orders">
+          <OrdersTab userId={id} />
+        </TabsContent>
+
+        <TabsContent value="pay-in">
+          <PayInTab userId={id} />
+        </TabsContent>
+
+        <TabsContent value="pay-out">
+          <PayOutTab userId={id} />
+        </TabsContent>
+
+        <TabsContent value="kyc">
+          <KycTab user={user} />
+        </TabsContent>
+
+        <TabsContent value="activity">
+          <ActivityTab userId={id} />
+        </TabsContent>
+      </Tabs>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the user account,
+              including all related data (profile, KYC session, orders history).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive hover:bg-destructive/90"
             >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Tab Content */}
-      {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Profile Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {user.profile ? (
-                <>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Name:</span>
-                    <span className="font-medium">{user.profile.firstName} {user.profile.lastName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Phone:</span>
-                    <span className="font-medium">{user.profile.phoneNumber || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Country:</span>
-                    <span className="font-medium">{user.profile.country}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">City:</span>
-                    <span className="font-medium">{user.profile.city || 'N/A'}</span>
-                  </div>
-                </>
-              ) : (
-                <p className="text-muted-foreground">No profile information</p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Account Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Email:</span>
-                <span className="font-medium">{user.email}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Created:</span>
-                <span className="font-medium">{format(new Date(user.createdAt), 'PPP')}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Last Login:</span>
-                <span className="font-medium">
-                  {user.lastLogin ? format(new Date(user.lastLogin), 'PPP') : 'Never'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Activity Logs:</span>
-                <span className="font-medium">{user._count.auditLogs}</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle>Wallets</CardTitle>
-              <CardDescription>User cryptocurrency wallets</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {user.userWallets.length > 0 ? (
-                <div className="space-y-2">
-                  {user.userWallets.map((wallet) => (
-                    <div key={wallet.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <div className="font-medium">{wallet.currency.code} - {wallet.blockchain.name}</div>
-                        <div className="text-sm text-muted-foreground">{wallet.address}</div>
-                        {wallet.label && <div className="text-sm text-muted-foreground">{wallet.label}</div>}
-                      </div>
-                      {wallet.isDefault && (
-                        <Badge variant="secondary">Default</Badge>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-muted-foreground">No wallets added</p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {activeTab === 'orders' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Orders</CardTitle>
-            <CardDescription>All orders created by this user</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {user.orders.length > 0 ? (
-              <div className="space-y-4">
-                {user.orders.map((order) => (
-                  <div key={order.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <div className="font-medium">{order.paymentReference}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {order.cryptoAmount} {order.currency.code} = {formatCurrency(order.totalFiat, order.fiatCurrency.code)}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {format(new Date(order.createdAt), 'PPP')}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge>{order.status}</Badge>
-                      <Link href={`/admin/orders`}>
-                        <Button variant="outline" size="sm">View</Button>
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground">No orders yet</p>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {activeTab === 'activity' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Activity History</CardTitle>
-            <CardDescription>Recent actions performed by this user</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {activity.length > 0 ? (
-              <div className="space-y-4">
-                {activity.map((log) => (
-                  <div key={log.id} className="flex items-start gap-4 p-4 border rounded-lg">
-                    <div className="flex-1">
-                      <div className="font-medium">{log.action.replace(/_/g, ' ')}</div>
-                      <div className="text-sm text-muted-foreground">{log.entity}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {format(new Date(log.createdAt), 'PPP p')}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground">No activity yet</p>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {activeTab === 'kyc' && (
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>KYC Status</CardTitle>
-              <CardDescription>Verification status and timeline</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {user.kycSession ? (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Status:</span>
-                    <Badge
-                      variant={
-                        user.kycSession.status === 'APPROVED'
-                          ? 'default'
-                          : user.kycSession.status === 'REJECTED'
-                          ? 'destructive'
-                          : 'secondary'
-                      }
-                    >
-                      {user.kycSession.status}
-                    </Badge>
-                  </div>
-                  {user.kycSession.submittedAt && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Submitted:</span>
-                      <span>{format(new Date(user.kycSession.submittedAt), 'PPP')}</span>
-                    </div>
-                  )}
-                  {user.kycSession.reviewedAt && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Reviewed:</span>
-                      <span>{format(new Date(user.kycSession.reviewedAt), 'PPP')}</span>
-                    </div>
-                  )}
-                  <div className="mt-4">
-                    <Link href={`/admin/kyc?userId=${user.id}&autoOpen=true`}>
-                      <Button variant="outline" size="sm">
-                        View Full KYC Review
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-muted-foreground">KYC not started</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Identity Document */}
-          {user.profile && user.profile.idType && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Identity Document</CardTitle>
-                <CardDescription>Official identification</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-sm text-muted-foreground">Document Type</span>
-                    <p className="font-medium">{user.profile.idType}</p>
-                  </div>
-                  {user.profile.idNumber && (
-                    <div>
-                      <span className="text-sm text-muted-foreground">ID Number</span>
-                      <p className="font-medium">{user.profile.idNumber}</p>
-                    </div>
-                  )}
-                  {user.profile.idIssuingCountry && (
-                    <div>
-                      <span className="text-sm text-muted-foreground">Issuing Country</span>
-                      <p className="font-medium">{user.profile.idIssuingCountry}</p>
-                    </div>
-                  )}
-                  {user.profile.idIssueDate && (
-                    <div>
-                      <span className="text-sm text-muted-foreground">Issue Date</span>
-                      <p className="font-medium">{format(new Date(user.profile.idIssueDate), 'dd.MM.yyyy')}</p>
-                    </div>
-                  )}
-                  {user.profile.idExpiryDate && (
-                    <div>
-                      <span className="text-sm text-muted-foreground">Expiry Date</span>
-                      <p className="font-medium">{format(new Date(user.profile.idExpiryDate), 'dd.MM.yyyy')}</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* PEP Status */}
-          {user.profile && user.profile.isPep !== null && user.profile.isPep !== undefined && (
-            <Card>
-              <CardHeader>
-                <CardTitle>PEP Status</CardTitle>
-                <CardDescription>Politically Exposed Person declaration</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Is PEP?</span>
-                    <Badge variant={user.profile.isPep ? 'destructive' : 'secondary'}>
-                      {user.profile.isPep ? 'Yes' : 'No'}
-                    </Badge>
-                  </div>
-                  {user.profile.isPep && user.profile.pepRole && (
-                    <div>
-                      <span className="text-sm text-muted-foreground">PEP Role</span>
-                      <p className="font-medium">{user.profile.pepRole}</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Employment & Source of Funds */}
-          {user.profile && (user.profile.employmentStatus || user.profile.sourceOfFunds) && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Employment & Financial Information</CardTitle>
-                <CardDescription>Occupation and fund sources</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  {user.profile.employmentStatus && (
-                    <div>
-                      <span className="text-sm text-muted-foreground">Employment Status</span>
-                      <p className="font-medium">{user.profile.employmentStatus}</p>
-                    </div>
-                  )}
-                  {user.profile.occupation && (
-                    <div>
-                      <span className="text-sm text-muted-foreground">Occupation</span>
-                      <p className="font-medium">{user.profile.occupation}</p>
-                    </div>
-                  )}
-                  {user.profile.employerName && (
-                    <div>
-                      <span className="text-sm text-muted-foreground">Employer</span>
-                      <p className="font-medium">{user.profile.employerName}</p>
-                    </div>
-                  )}
-                  {user.profile.sourceOfFunds && (
-                    <div>
-                      <span className="text-sm text-muted-foreground">Source of Funds</span>
-                      <p className="font-medium">{user.profile.sourceOfFunds}</p>
-                    </div>
-                  )}
-                  {user.profile.sourceOfWealth && (
-                    <div>
-                      <span className="text-sm text-muted-foreground">Source of Wealth</span>
-                      <p className="font-medium">{user.profile.sourceOfWealth}</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Purpose of Account */}
-          {user.profile && (user.profile.purposeOfAccount || user.profile.intendedUse) && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Account Purpose</CardTitle>
-                <CardDescription>Intended use of the platform</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {user.profile.purposeOfAccount && (
-                    <div>
-                      <span className="text-sm text-muted-foreground">Purpose</span>
-                      <p className="font-medium">{user.profile.purposeOfAccount}</p>
-                    </div>
-                  )}
-                  {user.profile.intendedUse && (
-                    <div>
-                      <span className="text-sm text-muted-foreground">Intended Use</span>
-                      <p className="font-medium">{user.profile.intendedUse}</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Documents */}
-          {user.kycSession && user.kycSession.documents.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Uploaded Documents</CardTitle>
-                <CardDescription>KYC verification documents</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {user.kycSession.documents.map((doc, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <div className="font-medium">{doc.documentType}</div>
-                        <div className="text-sm text-muted-foreground">{doc.fileName}</div>
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {format(new Date(doc.uploadedAt), 'PPP')}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
+              Delete User
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

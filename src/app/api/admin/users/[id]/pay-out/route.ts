@@ -1,7 +1,7 @@
 /**
- * GET /api/admin/users/[id]/orders
+ * GET /api/admin/users/[id]/pay-out
  * 
- * Fetch all orders for a specific user
+ * Fetch all Pay-Out (outgoing crypto payments) for a specific user
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -26,26 +26,27 @@ export async function GET(
   try {
     const { id: userId } = params;
 
-    const orders = await prisma.order.findMany({
+    const payOuts = await prisma.payOut.findMany({
       where: {
-        userId,
+        order: {
+          userId,
+        },
       },
       select: {
         id: true,
-        paymentReference: true,
-        cryptoAmount: true,
-        totalFiat: true,
+        amount: true,
+        cryptocurrencyCode: true,
+        destinationAddress: true,
         status: true,
+        transactionHash: true,
         createdAt: true,
-        currency: {
+        processedAt: true,
+        confirmedAt: true,
+        networkCode: true,
+        order: {
           select: {
-            code: true,
-            name: true,
-          },
-        },
-        fiatCurrency: {
-          select: {
-            code: true,
+            id: true,
+            paymentReference: true,
           },
         },
       },
@@ -56,16 +57,17 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      data: orders,
+      data: payOuts,
     });
   } catch (error) {
-    console.error('❌ Failed to fetch user orders:', error);
+    console.error('❌ Failed to fetch user pay-out:', error);
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to fetch orders',
+        error: 'Failed to fetch pay-out data',
       },
       { status: 500 }
     );
   }
 }
+

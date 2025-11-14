@@ -1,72 +1,55 @@
 /**
- * User Activity History API
+ * GET /api/admin/users/[id]/activity
  * 
- * GET /api/admin/users/[id]/activity - Get user's activity history
+ * Fetch complete audit log for a specific user (Client Actions Log)
+ * Uses userAuditLogService for consistency with /admin/audit page
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminRole } from '@/lib/middleware/admin-auth';
-import { auditService } from '@/lib/services/audit.service';
-import { z } from 'zod';
+import { requireAdminAuth } from '@/lib/middleware/admin-auth';
+import { userAuditLogService } from '@/lib/services/user-audit-log.service';
 
-const activityQuerySchema = z.object({
-  limit: z.coerce.number().min(1).max(200).optional().default(100)
-});
+interface RouteContext {
+  params: {
+    id: string;
+  };
+}
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: RouteContext
 ): Promise<NextResponse> {
+  const authResult = await requireAdminAuth();
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+
   try {
-    // Check admin permission
-    const sessionOrError = await requireAdminRole('ADMIN');
-    if (sessionOrError instanceof NextResponse) {
-      return sessionOrError;
-    }
+    const { id: userId } = params;
 
-    const { id: userId } = await params;
-    const searchParams = request.nextUrl.searchParams;
-
-    // Parse and validate query
-    const query = {
-      limit: searchParams.get('limit') || undefined
-    };
-
-    const validated = activityQuerySchema.parse(query);
-
-    // Get user activity from audit logs
-    const activity = await auditService.getUserActivity(userId, validated.limit);
+    // Use userAuditLogService (same as /admin/audit page)
+    const result = await userAuditLogService.getLogs(
+      { userId }, // Filter by this specific user
+      {
+        page: 1,
+        limit: 1000, // Get all logs for this user
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+      }
+    );
 
     return NextResponse.json({
       success: true,
-      data: activity
+      data: result.logs,
     });
   } catch (error) {
-    console.error('Get user activity error:', error);
-
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Invalid query parameters',
-          details: error.errors
-        },
-        { status: 400 }
-      );
-    }
-
+    console.error('❌ Failed to fetch user activity logs:', error);
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to retrieve user activity'
+        error: 'Failed to fetch activity logs',
       },
       { status: 500 }
     );
   }
 }
-
-
-
-
-
-

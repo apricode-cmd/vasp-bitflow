@@ -1,7 +1,14 @@
 /**
- * Admin Users Management Page
+ * Admin Users Management Page - REDESIGNED
  * 
- * Full CRUD operations for user management with DataTable and Sheet
+ * Enhanced user management with:
+ * - Advanced data table with sorting & filtering
+ * - Quick stats dashboard
+ * - Bulk actions
+ * - Export functionality
+ * - Extended columns (Total Spent, Last Login, Country)
+ * 
+ * Reference design for all data pages
  */
 
 'use client';
@@ -12,13 +19,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+// Sheet removed - using full page instead
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,17 +30,28 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+// Tabs removed - using full page instead
 import { Separator } from '@/components/ui/separator';
-import { DataTable } from '@/components/admin/DataTable';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DataTableAdvanced } from '@/components/admin/DataTableAdvanced';
+import { QuickStats, QuickStat } from '@/components/admin/QuickStats';
 import { KycStatusBadge } from '@/components/features/KycStatusBadge';
-import { Combobox, type ComboboxOption } from '@/components/shared/Combobox';
-import { formatDateTime } from '@/lib/formatters';
+import { formatDateTime, formatCurrency } from '@/lib/formatters';
+import { getCountryFlag, getCountryName } from '@/lib/utils/country-utils';
+import { exportToCSV, formatDateTimeForExport, formatCurrencyForExport } from '@/lib/utils/export-utils';
 import { toast } from 'sonner';
 import type { Role, KycStatus } from '@prisma/client';
 import { 
-  MoreHorizontal, Eye, Edit, UserX, UserCheck, Shield,
-  ShoppingCart, Mail, RefreshCw, UserPlus, Ban
+  MoreHorizontal, Eye, UserX, UserCheck, Shield,
+  ShoppingCart, RefreshCw, Users, UserPlus, Ban,
+  CheckCircle, Clock, XCircle, TrendingUp, Mail, Download,
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -58,6 +70,7 @@ interface User {
   isActive: boolean;
   createdAt: Date;
   lastLogin: Date | null;
+  totalSpent: number;
   profile: {
     firstName: string;
     lastName: string;
@@ -74,25 +87,34 @@ interface User {
 
 export default function UsersPage(): JSX.Element {
   const [users, setUsers] = useState<User[]>([]);
+  const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
-  const [roleFilter, setRoleFilter] = useState<string>('all');
+  
+  // Filters
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [kycFilter, setKycFilter] = useState<string>('all');
 
   useEffect(() => {
     fetchUsers();
-  }, [roleFilter, kycFilter]);
+    fetchStats();
+  }, [statusFilter, kycFilter]);
 
   const fetchUsers = async (): Promise<void> => {
     setRefreshing(true);
     try {
       const params = new URLSearchParams();
-      if (roleFilter && roleFilter !== 'all') {
-        params.append('role', roleFilter);
+      
+      // Only show CLIENT users (not admins)
+      params.append('role', 'CLIENT');
+      
+      if (statusFilter === 'active') {
+        params.append('isActive', 'true');
+      } else if (statusFilter === 'inactive') {
+        params.append('isActive', 'false');
       }
       if (kycFilter && kycFilter !== 'all') {
         params.append('kycStatus', kycFilter);
@@ -119,6 +141,20 @@ export default function UsersPage(): JSX.Element {
     }
   };
 
+  const fetchStats = async (): Promise<void> => {
+    try {
+      const response = await fetch('/api/admin/users/stats');
+      const data = await response.json();
+      if (data.success) {
+        setStats(data.data);
+      }
+    } catch (error) {
+      console.error('Fetch stats error:', error);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
   const toggleUserStatus = async (userId: string, currentStatus: boolean): Promise<void> => {
     try {
       const response = await fetch(`/api/admin/users/${userId}`, {
@@ -132,6 +168,7 @@ export default function UsersPage(): JSX.Element {
       if (data.success) {
         toast.success(currentStatus ? 'User deactivated' : 'User activated');
         await fetchUsers();
+        await fetchStats();
         setSheetOpen(false);
       } else {
         toast.error(data.error || 'Failed to update user');
@@ -155,6 +192,7 @@ export default function UsersPage(): JSX.Element {
       if (data.success) {
         toast.success('User deleted successfully');
         await fetchUsers();
+        await fetchStats();
       } else {
         toast.error(data.error || 'Failed to delete user');
       }
@@ -167,33 +205,162 @@ export default function UsersPage(): JSX.Element {
     }
   };
 
+  const handleBulkActivate = async (selectedUsers: User[]): Promise<void> => {
+    toast.promise(
+      Promise.all(
+        selectedUsers.map(user => 
+          fetch(`/api/admin/users/${user.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ isActive: true })
+          })
+        )
+      ),
+      {
+        loading: 'Activating users...',
+        success: () => {
+          fetchUsers();
+          fetchStats();
+          return `Activated ${selectedUsers.length} users`;
+        },
+        error: 'Failed to activate users'
+      }
+    );
+  };
+
+  const handleBulkDeactivate = async (selectedUsers: User[]): Promise<void> => {
+    toast.promise(
+      Promise.all(
+        selectedUsers.map(user => 
+          fetch(`/api/admin/users/${user.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ isActive: false })
+          })
+        )
+      ),
+      {
+        loading: 'Deactivating users...',
+        success: () => {
+          fetchUsers();
+          fetchStats();
+          return `Deactivated ${selectedUsers.length} users`;
+        },
+        error: 'Failed to deactivate users'
+      }
+    );
+  };
+
   const openDeleteDialog = (userId: string) => {
     setUserToDelete(userId);
     setDeleteDialogOpen(true);
   };
 
+  // Navigate to user details page
   const viewUserDetails = (user: User) => {
-    setSelectedUser(user);
-    setSheetOpen(true);
+    window.location.href = `/admin/users/${user.id}`;
   };
 
-  // Role filter options
-  const roleOptions: ComboboxOption[] = [
-    { value: 'all', label: 'All Roles' },
-    { value: 'CLIENT', label: 'Clients' },
-    { value: 'ADMIN', label: 'Admins' },
+  // Export columns definition (reusable)
+  const getExportColumns = () => [
+    { key: 'name', header: 'Name', formatter: (_: any, row: User) => 
+      `${row.profile?.firstName || ''} ${row.profile?.lastName || ''}`.trim() 
+    },
+    { key: 'email', header: 'Email' },
+    { key: 'phoneNumber', header: 'Phone', formatter: (_: any, row: User) => 
+      row.profile?.phoneNumber || '' 
+    },
+    { key: 'country', header: 'Country', formatter: (_: any, row: User) => 
+      getCountryName(row.profile?.country || '') 
+    },
+    { key: 'ordersCount', header: 'Orders', formatter: (_: any, row: User) => 
+      row._count.orders.toString() 
+    },
+    { key: 'totalSpent', header: 'Total Spent (EUR)', formatter: (_: any, row: User) => 
+      formatCurrencyForExport(row.totalSpent)
+    },
+    { key: 'kycStatus', header: 'KYC Status', formatter: (_: any, row: User) => 
+      row.kycSession?.status || 'Not Started' 
+    },
+    { key: 'status', header: 'Status', formatter: (_: any, row: User) => 
+      row.isActive ? 'Active' : 'Inactive' 
+    },
+    { key: 'lastLogin', header: 'Last Login', formatter: (_: any, row: User) => 
+      row.lastLogin ? formatDateTimeForExport(row.lastLogin) : 'Never' 
+    },
+    { key: 'createdAt', header: 'Joined', formatter: (_: any, row: User) => 
+      formatDateTimeForExport(row.createdAt) 
+    },
   ];
 
-  // KYC filter options
-  const kycOptions: ComboboxOption[] = [
-    { value: 'all', label: 'All KYC Statuses' },
-    { value: 'PENDING', label: 'Pending' },
-    { value: 'APPROVED', label: 'Approved' },
-    { value: 'REJECTED', label: 'Rejected' },
+  // Export all users
+  const handleExportAll = () => {
+    exportToCSV(users, getExportColumns(), 'users-all');
+    toast.success(`Exported ${users.length} users`);
+  };
+
+  // Export selected users (bulk action)
+  const handleExportSelected = (selectedUsers: User[]) => {
+    if (selectedUsers.length === 0) {
+      toast.error('No users selected');
+      return;
+    }
+    
+    exportToCSV(selectedUsers, getExportColumns(), 'users-selected');
+    toast.success(`Exported ${selectedUsers.length} selected users`);
+  };
+
+  // Quick stats
+  const quickStats: QuickStat[] = [
+    {
+      label: 'Total Users',
+      value: stats?.totalUsers?.toLocaleString() || '0',
+      icon: <Users className="h-4 w-4" />,
+      color: 'default',
+    },
+    {
+      label: 'Active Users',
+      value: stats?.activeUsers?.toLocaleString() || '0',
+      icon: <CheckCircle className="h-4 w-4" />,
+      color: 'success',
+    },
+    {
+      label: 'New (7 days)',
+      value: stats?.newUsersThisWeek?.toLocaleString() || '0',
+      icon: <TrendingUp className="h-4 w-4" />,
+      color: 'info',
+    },
+    {
+      label: 'Pending KYC',
+      value: stats?.pendingKyc?.toLocaleString() || '0',
+      icon: <Clock className="h-4 w-4" />,
+      color: 'warning',
+    },
   ];
 
   // Define table columns
   const columns: ColumnDef<User>[] = [
+    // Row selection checkbox
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected()}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+          onClick={(e) => e.stopPropagation()}
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
     {
       accessorKey: 'email',
       header: 'User',
@@ -201,54 +368,90 @@ export default function UsersPage(): JSX.Element {
         const user = row.original;
         const initials = `${user.profile?.firstName?.charAt(0) || ''}${user.profile?.lastName?.charAt(0) || 'U'}`;
         return (
-          <div className="flex items-center gap-3">
-            <Avatar className="h-10 w-10">
-              <AvatarFallback className="bg-primary/10 text-primary">
+          <div className="flex items-center gap-3 min-w-[200px]">
+            <Avatar className="h-9 w-9 shrink-0">
+              <AvatarFallback className="bg-primary/10 text-primary text-sm">
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <div>
-              <div className="font-medium">
+            <div className="min-w-0">
+              <div className="font-medium truncate">
                 {user.profile?.firstName} {user.profile?.lastName}
               </div>
-              <div className="text-sm text-muted-foreground">{user.email}</div>
+              <div className="text-xs text-muted-foreground truncate">{user.email}</div>
             </div>
           </div>
         );
       },
+      enableSorting: true,
     },
     {
-      accessorKey: 'role',
-      header: 'Role',
+      accessorKey: 'profile.phoneNumber',
+      header: 'Phone',
       cell: ({ row }) => (
-        <Badge variant={row.original.role === 'ADMIN' ? 'default' : 'secondary'}>
-          {row.original.role}
-        </Badge>
+        <span className="text-sm">
+          {row.original.profile?.phoneNumber || '-'}
+        </span>
       ),
+      enableSorting: false,
     },
     {
-      accessorKey: 'kycSession.status',
-      header: 'KYC Status',
+      accessorKey: 'profile.country',
+      header: 'Country',
       cell: ({ row }) => {
-        const user = row.original;
-        return user.kycSession ? (
-          <KycStatusBadge status={user.kycSession.status} />
-        ) : (
-          <Badge variant="outline">Not Started</Badge>
+        const country = row.original.profile?.country;
+        if (!country) return '-';
+        return (
+          <div className="flex items-center gap-2">
+            <span className="text-lg">{getCountryFlag(country)}</span>
+            <span className="text-sm">{getCountryName(country)}</span>
+          </div>
         );
       },
+      enableSorting: true,
     },
     {
       accessorKey: '_count.orders',
       header: 'Orders',
       cell: ({ row }) => (
         <Link href={`/admin/orders?userId=${row.original.id}`}>
-          <Badge variant="outline" className="cursor-pointer hover:bg-accent">
+          <Badge variant="outline" className="cursor-pointer hover:bg-accent font-medium">
             <ShoppingCart className="h-3 w-3 mr-1" />
             {row.original._count.orders}
           </Badge>
         </Link>
       ),
+      enableSorting: true,
+    },
+    {
+      accessorKey: 'totalSpent',
+      header: 'Total Spent',
+      cell: ({ row }) => {
+        const amount = row.original.totalSpent;
+        return (
+          <span className={`font-semibold ${
+            amount > 10000 ? 'text-green-600 dark:text-green-400' : 
+            amount > 1000 ? 'text-blue-600 dark:text-blue-400' : 
+            'text-muted-foreground'
+          }`}>
+            {formatCurrency(amount, 'EUR')}
+          </span>
+        );
+      },
+      enableSorting: true,
+    },
+    {
+      accessorKey: 'kycSession.status',
+      header: 'KYC',
+      cell: ({ row }) => {
+        const user = row.original;
+        return user.kycSession ? (
+          <KycStatusBadge status={user.kycSession.status} />
+        ) : (
+          <Badge variant="outline" className="text-xs">Not Started</Badge>
+        );
+      },
+      enableSorting: true,
     },
     {
       accessorKey: 'isActive',
@@ -258,15 +461,27 @@ export default function UsersPage(): JSX.Element {
           {row.original.isActive ? 'Active' : 'Inactive'}
         </Badge>
       ),
+      enableSorting: true,
+    },
+    {
+      accessorKey: 'lastLogin',
+      header: 'Last Login',
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground whitespace-nowrap">
+          {row.original.lastLogin ? formatDateTime(row.original.lastLogin) : 'Never'}
+        </span>
+      ),
+      enableSorting: true,
     },
     {
       accessorKey: 'createdAt',
       header: 'Joined',
       cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">
+        <span className="text-sm text-muted-foreground whitespace-nowrap">
           {formatDateTime(row.original.createdAt)}
         </span>
       ),
+      enableSorting: true,
     },
     {
       id: 'actions',
@@ -277,14 +492,17 @@ export default function UsersPage(): JSX.Element {
           <div className="text-right">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => viewUserDetails(user)}>
+                <DropdownMenuItem onClick={(e) => {
+                  e.stopPropagation();
+                  viewUserDetails(user);
+                }}>
                   <Eye className="h-4 w-4 mr-2" />
                   View Details
                 </DropdownMenuItem>
@@ -303,7 +521,10 @@ export default function UsersPage(): JSX.Element {
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => toggleUserStatus(user.id, user.isActive)}>
+                <DropdownMenuItem onClick={(e) => {
+                  e.stopPropagation();
+                  toggleUserStatus(user.id, user.isActive);
+                }}>
                   {user.isActive ? (
                     <>
                       <UserX className="h-4 w-4 mr-2" />
@@ -320,7 +541,10 @@ export default function UsersPage(): JSX.Element {
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem 
-                      onClick={() => openDeleteDialog(user.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openDeleteDialog(user.id);
+                      }}
                       className="text-destructive"
                     >
                       <Ban className="h-4 w-4 mr-2" />
@@ -333,6 +557,8 @@ export default function UsersPage(): JSX.Element {
           </div>
         );
       },
+      enableSorting: false,
+      enableHiding: false,
     },
   ];
 
@@ -343,14 +569,17 @@ export default function UsersPage(): JSX.Element {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Users Management</h1>
           <p className="text-muted-foreground mt-1">
-            View and manage all platform users
+            View and manage all client users (customers)
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button 
             variant="outline" 
             size="icon"
-            onClick={fetchUsers}
+            onClick={() => {
+              fetchUsers();
+              fetchStats();
+            }}
             disabled={refreshing}
           >
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -358,212 +587,69 @@ export default function UsersPage(): JSX.Element {
         </div>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <div className="p-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <label className="text-sm font-medium mb-2 block">Role</label>
-              <Combobox
-                options={roleOptions}
-                value={roleFilter}
-                onValueChange={setRoleFilter}
-                placeholder="Filter by role..."
-              />
-            </div>
-            <div className="flex-1">
-              <label className="text-sm font-medium mb-2 block">KYC Status</label>
-              <Combobox
-                options={kycOptions}
-                value={kycFilter}
-                onValueChange={setKycFilter}
-                placeholder="Filter by KYC status..."
-              />
-            </div>
-          </div>
-        </div>
-      </Card>
+      {/* Quick Stats */}
+      <QuickStats stats={quickStats} isLoading={statsLoading} />
 
-      {/* Users Table */}
-      <DataTable
+      {/* Data Table with Advanced Features */}
+      <DataTableAdvanced
         columns={columns}
         data={users}
         searchKey="email"
-        searchPlaceholder="Search by email or name..."
+        searchPlaceholder="Search by name or email..."
         isLoading={loading}
         onRowClick={viewUserDetails}
         pageSize={20}
+        enableRowSelection={true}
+        enableExport={true}
+        exportFileName="users"
+        onExport={handleExportAll}
+        bulkActions={[
+          {
+            label: 'Export Selected',
+            icon: <Download className="h-4 w-4 mr-2" />,
+            onClick: handleExportSelected,
+            variant: 'outline',
+          },
+          {
+            label: 'Activate',
+            icon: <UserCheck className="h-4 w-4 mr-2" />,
+            onClick: handleBulkActivate,
+            variant: 'default',
+          },
+          {
+            label: 'Deactivate',
+            icon: <UserX className="h-4 w-4 mr-2" />,
+            onClick: handleBulkDeactivate,
+            variant: 'outline',
+          },
+        ]}
+        filters={
+          <>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[140px] h-9">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={kycFilter} onValueChange={setKycFilter}>
+              <SelectTrigger className="w-[140px] h-9">
+                <SelectValue placeholder="KYC" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All KYC</SelectItem>
+                <SelectItem value="PENDING">Pending</SelectItem>
+                <SelectItem value="APPROVED">Approved</SelectItem>
+                <SelectItem value="REJECTED">Rejected</SelectItem>
+              </SelectContent>
+            </Select>
+          </>
+        }
       />
-
-      {/* User Details Sheet */}
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="sm:max-w-2xl overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>User Details</SheetTitle>
-            <SheetDescription>
-              View and manage user information
-            </SheetDescription>
-          </SheetHeader>
-          
-          {selectedUser && (
-            <div className="mt-6">
-              <Tabs defaultValue="profile" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="profile">Profile</TabsTrigger>
-                  <TabsTrigger value="orders">
-                    Orders
-                    <Badge variant="secondary" className="ml-2">
-                      {selectedUser._count.orders}
-                    </Badge>
-                  </TabsTrigger>
-                  <TabsTrigger value="kyc">KYC</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="profile" className="space-y-6 mt-6">
-                  {/* User Info */}
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-20 w-20">
-                      <AvatarFallback className="bg-primary/10 text-primary text-2xl">
-                        {selectedUser.profile?.firstName?.charAt(0)}
-                        {selectedUser.profile?.lastName?.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <h3 className="text-xl font-bold">
-                        {selectedUser.profile?.firstName} {selectedUser.profile?.lastName}
-                      </h3>
-                      <p className="text-muted-foreground">{selectedUser.email}</p>
-                      <div className="flex gap-2 mt-2">
-                        <Badge variant={selectedUser.role === 'ADMIN' ? 'default' : 'secondary'}>
-                          {selectedUser.role}
-                        </Badge>
-                        <Badge variant={selectedUser.isActive ? 'success' : 'destructive'}>
-                          {selectedUser.isActive ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Profile Details */}
-                  <div className="space-y-4">
-                    <h4 className="font-semibold">Contact Information</h4>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-muted-foreground">Phone</p>
-                        <p className="font-medium">
-                          {selectedUser.profile?.phoneNumber || 'Not provided'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Country</p>
-                        <p className="font-medium">{selectedUser.profile?.country}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Joined</p>
-                        <p className="font-medium">{formatDateTime(selectedUser.createdAt)}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Last Login</p>
-                        <p className="font-medium">
-                          {selectedUser.lastLogin ? formatDateTime(selectedUser.lastLogin) : 'Never'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Quick Actions */}
-                  <div className="space-y-2">
-                    <h4 className="font-semibold">Actions</h4>
-                    <Button 
-                      variant={selectedUser.isActive ? 'destructive' : 'default'}
-                      className="w-full"
-                      onClick={() => toggleUserStatus(selectedUser.id, selectedUser.isActive)}
-                    >
-                      {selectedUser.isActive ? (
-                        <>
-                          <UserX className="h-4 w-4 mr-2" />
-                          Deactivate User
-                        </>
-                      ) : (
-                        <>
-                          <UserCheck className="h-4 w-4 mr-2" />
-                          Activate User
-                        </>
-                      )}
-                    </Button>
-                    {selectedUser.role !== 'ADMIN' && (
-                      <Button 
-                        variant="outline"
-                        className="w-full text-destructive hover:text-destructive"
-                        onClick={() => {
-                          openDeleteDialog(selectedUser.id);
-                          setSheetOpen(false);
-                        }}
-                      >
-                        <Ban className="h-4 w-4 mr-2" />
-                        Delete User
-                      </Button>
-                    )}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="orders" className="mt-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-muted-foreground">
-                        Total orders: {selectedUser._count.orders}
-                      </p>
-                      <Link href={`/admin/orders?userId=${selectedUser.id}`}>
-                        <Button size="sm" variant="outline">
-                          View All Orders
-                        </Button>
-                      </Link>
-                    </div>
-                    {selectedUser._count.orders === 0 ? (
-                      <div className="text-center py-12">
-                        <ShoppingCart className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-                        <p className="text-sm text-muted-foreground">No orders yet</p>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        Click "View All Orders" to see detailed order history
-                      </p>
-                    )}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="kyc" className="mt-6">
-                  <div className="space-y-4">
-                    {selectedUser.kycSession ? (
-                      <>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">KYC Status</span>
-                          <KycStatusBadge status={selectedUser.kycSession.status} />
-                        </div>
-                        <Link href={`/admin/kyc?userId=${selectedUser.id}`}>
-                          <Button variant="outline" className="w-full">
-                            <Shield className="h-4 w-4 mr-2" />
-                            View KYC Details
-                          </Button>
-                        </Link>
-                      </>
-                    ) : (
-                      <div className="text-center py-12">
-                        <Shield className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-                        <p className="text-sm text-muted-foreground">KYC not started</p>
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

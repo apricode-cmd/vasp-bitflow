@@ -74,7 +74,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Calculate pagination
     const skip = (validated.page - 1) * validated.limit;
 
-    // Fetch users
+    // Fetch users with totalSpent calculation
     const [users, total] = await Promise.all([
       prisma.user.findMany({
         where,
@@ -85,6 +85,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
               status: true,
               submittedAt: true,
               reviewedAt: true
+            }
+          },
+          orders: {
+            select: {
+              totalFiat: true,
+              status: true
             }
           },
           _count: {
@@ -100,8 +106,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       prisma.user.count({ where })
     ]);
 
+    // Calculate totalSpent for each user
+    const usersWithStats = users.map(user => {
+      const totalSpent = user.orders
+        .filter(order => order.status === 'COMPLETED')
+        .reduce((sum, order) => sum + Number(order.totalFiat), 0);
+
+      const { orders, ...userWithoutOrders } = user;
+
+      return {
+        ...userWithoutOrders,
+        totalSpent,
+      };
+    });
+
     // Remove password from results
-    const safeUsers = users.map(({ password, ...user }) => user);
+    const safeUsers = usersWithStats.map(({ password, ...user }) => user);
 
     return NextResponse.json({
       success: true,
