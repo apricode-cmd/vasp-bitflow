@@ -11,6 +11,7 @@ import { prisma } from '@/lib/prisma';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 import { z } from 'zod';
 import { clearAdminAuthFeaturesCache } from '@/lib/features/admin-auth-features';
+import { CacheService } from '@/lib/services/cache.service';
 
 const updateSettingsSchema = z.array(
   z.object({
@@ -182,8 +183,14 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
 
     const updatedSettings = await Promise.all(updatePromises);
 
-    // ✅ Clear admin auth features cache if security settings changed
+    // ✅ Clear Redis cache for updated settings
     const updatedKeys = validated.map(s => s.key);
+    for (const key of updatedKeys) {
+      await CacheService.clearSetting(key);
+    }
+    console.log(`🔄 [Settings] Redis cache cleared for ${updatedKeys.length} settings`);
+
+    // ✅ Clear admin auth features cache if security settings changed
     if (updatedKeys.some(key => PROTECTED_SECURITY_KEYS.includes(key))) {
       clearAdminAuthFeaturesCache();
       console.log('🔄 [Settings] Admin auth features cache cleared');

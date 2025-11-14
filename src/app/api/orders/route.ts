@@ -15,6 +15,7 @@ import { orderLimitService } from '@/lib/services/order-limit.service';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 import { userActivityService } from '@/lib/services/user-activity.service';
 import { eventEmitter } from '@/lib/services/event-emitter.service';
+import { CacheService } from '@/lib/services/cache.service';
 import { z } from 'zod';
 
 /**
@@ -137,6 +138,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     });
 
+    // Clear admin stats cache (new order created)
+    await CacheService.clearAdminStats();
+    
     // Log order creation with FULL details
     await userActivityService.logOrderCreated(
       userId,

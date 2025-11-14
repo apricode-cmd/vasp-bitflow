@@ -10,6 +10,7 @@ import { coinGeckoService, type CoinGeckoRates } from './coingecko';
 import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
 import { integrationRegistry } from '@/lib/integrations';
 import { IntegrationCategory } from '@/lib/integrations/types';
+import { CacheService } from './cache.service';
 
 class RateProviderService {
   /**
@@ -59,23 +60,37 @@ class RateProviderService {
 
   /**
    * Get current exchange rate for a specific pair
+   * With Redis caching layer
    */
   async getRate(crypto: string, fiat: string): Promise<number> {
+    // 1. Try Redis cache first
+    const cached = await CacheService.getRate(crypto, fiat);
+    if (cached !== null) {
+      return cached;
+    }
+
+    // 2. Cache miss - check provider
     const providerInfo = await this.getActiveProvider();
 
     if (!providerInfo) {
       throw new Error('No active rate provider found. Please enable a rate provider integration (e.g., CoinGecko) in Settings → Integrations.');
     }
 
-    // Get initialized provider from IntegrationFactory
+    // 3. Get initialized provider from IntegrationFactory
     const provider = await integrationFactory.getRatesProvider();
     
-    // Use the provider's getRate method directly
-    return await provider.getRate(crypto, fiat);
+    // 4. Fetch from provider
+    const rate = await provider.getRate(crypto, fiat);
+    
+    // 5. Store in Redis cache (30 seconds TTL)
+    await CacheService.setRate(crypto, fiat, rate, 30);
+    
+    return rate;
   }
 
   /**
    * Get all exchange rates
+   * With Redis bulk caching
    */
   async getAllRates(): Promise<CoinGeckoRates> {
     const providerInfo = await this.getActiveProvider();
@@ -87,8 +102,24 @@ class RateProviderService {
     // Get initialized provider from IntegrationFactory
     const provider = await integrationFactory.getRatesProvider();
     
-    // Use the provider's getCurrentRates method directly
-    return await provider.getCurrentRates();
+    // Fetch all rates from provider
+    const rates = await provider.getCurrentRates();
+    
+    // Cache all rates in bulk (30 seconds TTL)
+    await CacheService.setAllRates(rates, 30);
+    
+    return rates;
+  }
+
+  /**
+   * Force refresh rates (clears cache and fetches fresh)
+   */
+  async forceRefresh(): Promise<CoinGeckoRates> {
+    // Clear Redis cache
+    await CacheService.clearRatesCache();
+    
+    // Fetch fresh rates (will be cached automatically)
+    return await this.getAllRates();
   }
 
   /**

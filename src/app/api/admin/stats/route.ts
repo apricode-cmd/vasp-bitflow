@@ -2,12 +2,15 @@
  * Admin Statistics API Route
  * 
  * GET /api/admin/stats - Returns comprehensive platform statistics
+ * 
+ * Caching: 2 minutes TTL in Redis per time range
  */
 
 import { NextResponse } from 'next/server';
 import { requireAdminAuth } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { auditService } from '@/lib/services/audit.service';
+import { CacheService } from '@/lib/services/cache.service';
 
 export async function GET(request: Request): Promise<NextResponse> {
   // Check admin authorization
@@ -22,6 +25,16 @@ export async function GET(request: Request): Promise<NextResponse> {
     // Get time range from query params
     const { searchParams } = new URL(request.url);
     const timeRange = searchParams.get('range') || 'week';
+    
+    // Try Redis cache first
+    const cached = await CacheService.getAdminStats(timeRange);
+    if (cached !== null) {
+      return NextResponse.json({
+        success: true,
+        data: cached,
+        cached: true
+      });
+    }
     
     // Calculate date range
     const now = new Date();
@@ -164,33 +177,63 @@ export async function GET(request: Request): Promise<NextResponse> {
       }
     });
 
-    // Get daily volume data for charts (last 7 days)
-    let dailyVolume: Array<{ date: Date; volume: number; orders: number }> = [];
+    // Get daily order flow data with statuses (last 7 days)
+    let dailyOrderFlow: Array<{
+      date: Date;
+      completed: number;
+      processing: number;
+      cancelled: number;
+      pending: number;
+      total_revenue: number;
+      avg_order_value: number;
+    }> = [];
     
     try {
-      dailyVolume = await prisma.$queryRaw<Array<{ date: Date; volume: number; orders: number }>>`
+      dailyOrderFlow = await prisma.$queryRaw<Array<{
+        date: Date;
+        completed: number;
+        processing: number;
+        cancelled: number;
+        pending: number;
+        total_revenue: number;
+        avg_order_value: number;
+      }>>`
         SELECT 
           DATE("createdAt") as date,
-          COALESCE(SUM("totalFiat"), 0)::float as volume,
-          COUNT(*)::int as orders
+          COUNT(*) FILTER (WHERE status = 'COMPLETED')::int as completed,
+          COUNT(*) FILTER (WHERE status IN ('PROCESSING', 'PAYMENT_PENDING'))::int as processing,
+          COUNT(*) FILTER (WHERE status IN ('CANCELLED', 'FAILED', 'EXPIRED'))::int as cancelled,
+          COUNT(*) FILTER (WHERE status = 'PENDING')::int as pending,
+          COALESCE(SUM("totalFiat") FILTER (WHERE status = 'COMPLETED'), 0)::float as total_revenue,
+          COALESCE(AVG("totalFiat") FILTER (WHERE status = 'COMPLETED'), 0)::float as avg_order_value
         FROM "Order"
-        WHERE status = 'COMPLETED'
-          AND "createdAt" >= ${startDate}
+        WHERE "createdAt" >= ${startDate}
         GROUP BY DATE("createdAt")
         ORDER BY DATE("createdAt") ASC
       `;
     } catch (error) {
-      console.error('Daily volume query error:', error);
+      console.error('Daily order flow query error:', error);
       // Fallback to empty array if query fails
-      dailyVolume = [];
+      dailyOrderFlow = [];
     }
 
-    // Format volume chart data
-    const volumeChartData = dailyVolume.map(d => ({
-      date: new Date(d.date).toLocaleDateString('en-US', { weekday: 'short' }),
-      volume: Number(d.volume),
-      orders: Number(d.orders)
-    }));
+    // Format order flow chart data
+    const orderFlowChartData = dailyOrderFlow.map(d => {
+      const total = Number(d.completed) + Number(d.processing) + Number(d.cancelled) + Number(d.pending);
+      const conversionRate = total > 0 ? Math.round((Number(d.completed) / total) * 100) : 0;
+      
+      return {
+        date: new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        completed: Number(d.completed),
+        processing: Number(d.processing),
+        cancelled: Number(d.cancelled),
+        pending: Number(d.pending),
+        total: total,
+        revenue: Number(d.total_revenue),
+        avgOrderValue: Number(d.avg_order_value),
+        conversionRate: conversionRate
+      };
+    });
 
     // Get currency distribution
     const currencyStats = await prisma.order.groupBy({
@@ -266,69 +309,148 @@ export async function GET(request: Request): Promise<NextResponse> {
       kyc: calculateTrend(currentPeriodKyc, previousKyc)
     };
 
+    // ============================================================
+    // PERFORMANCE INDICATORS (KPIs)
+    // ============================================================
+    
+    // Calculate completion rate
+    const completionRate = totalOrders > 0 
+      ? Math.round((completedOrders / totalOrders) * 100) 
+      : 0;
+    
+    // Calculate average processing time (placeholder for now)
+    // TODO: Calculate actual avg time from processedAt - createdAt
+    const avgProcessingTime = 4.2;
+    
+    // Calculate revenue per order
+    const revenuePerOrder = completedOrders > 0
+      ? Math.round((volumeResult._sum.totalFiat || 0) / completedOrders)
+      : 0;
+    
+    // Calculate KYC approval rate
+    const totalKycProcessed = approvedKyc + rejectedKyc;
+    const kycApprovalRate = totalKycProcessed > 0
+      ? Math.round((approvedKyc / totalKycProcessed) * 100)
+      : 0;
+    
+    // Calculate failed orders rate
+    const failedOrdersCount = await prisma.order.count({
+      where: {
+        status: { in: ['CANCELLED', 'EXPIRED', 'FAILED'] },
+        createdAt: { gte: startDate }
+      }
+    });
+    const totalOrdersInPeriod = currentPeriodOrders;
+    const failedOrdersRate = totalOrdersInPeriod > 0
+      ? Math.round((failedOrdersCount / totalOrdersInPeriod) * 100)
+      : 0;
+    
+    const performanceIndicators = {
+      completionRate: {
+        value: completionRate,
+        label: 'Order Completion Rate',
+        status: completionRate >= 80 ? 'good' : completionRate >= 60 ? 'warning' : 'poor',
+        trend: calculateTrend(currentPeriodOrders, previousOrders)
+      },
+      avgProcessingTime: {
+        value: avgProcessingTime,
+        label: 'Avg. Processing Time',
+        unit: 'hours',
+        status: avgProcessingTime <= 6 ? 'good' : avgProcessingTime <= 12 ? 'warning' : 'poor',
+        trend: 0 // Calculate later with historical data
+      },
+      revenuePerOrder: {
+        value: revenuePerOrder,
+        label: 'Revenue per Order',
+        unit: '€',
+        status: 'neutral',
+        trend: trends.volume
+      },
+      kycApprovalRate: {
+        value: kycApprovalRate,
+        label: 'KYC Approval Rate',
+        status: kycApprovalRate >= 90 ? 'good' : kycApprovalRate >= 70 ? 'warning' : 'poor',
+        trend: trends.kyc
+      },
+      failedOrdersRate: {
+        value: failedOrdersRate,
+        label: 'Failed Orders Rate',
+        status: failedOrdersRate <= 5 ? 'good' : failedOrdersRate <= 10 ? 'warning' : 'poor',
+        trend: 0 // Lower is better
+      }
+    };
+
+    // Build response data
+    const responseData = {
+      orders: {
+        total: totalOrders,
+        pending: pendingOrders,
+        paymentPending: paymentPendingOrders,
+        processing: processingOrders,
+        completed: completedOrders,
+        byStatus: {
+          PENDING: pendingOrders,
+          PAYMENT_PENDING: paymentPendingOrders,
+          PROCESSING: processingOrders,
+          COMPLETED: completedOrders
+        }
+      },
+      users: {
+        total: totalUsers,
+        active: activeUsers,
+        inactive: totalUsers - activeUsers
+      },
+      kyc: {
+        pending: pendingKyc,
+        approved: approvedKyc,
+        rejected: rejectedKyc,
+        total: pendingKyc + approvedKyc + rejectedKyc
+      },
+      payIn: {
+        pending: pendingPayIn,
+        received: receivedPayIn,
+        total: pendingPayIn + receivedPayIn
+      },
+      payOut: {
+        pending: pendingPayOut,
+        sent: sentPayOut,
+        total: pendingPayOut + sentPayOut
+      },
+      volume: {
+        totalFiat: volumeResult._sum.totalFiat || 0,
+        totalCrypto: volumeResult._sum.cryptoAmount || 0,
+        byCurrency: volumeByCurrency
+      },
+      systemHealth: {
+        tradingPairs: activeTradingPairs,
+        paymentMethods: activePaymentMethods,
+        platformWallets: platformWallets,
+        apiKeys: apiKeys,
+        integrations: integrations.map(i => ({
+          service: i.service,
+          status: i.status,
+          isEnabled: i.isEnabled,
+          lastTested: i.lastTested
+        }))
+      },
+      chartData: {
+        currencies: currencyChartData
+      },
+      orderFlowChartData, // NEW: Added order flow data
+      trends,
+      performanceIndicators,
+      recentOrders,
+      recentKyc,
+      recentActivity
+    };
+
+    // Cache the result (2 minutes TTL)
+    await CacheService.setAdminStats(timeRange, responseData, 120);
+
     return NextResponse.json({
       success: true,
-      data: {
-        orders: {
-          total: totalOrders,
-          pending: pendingOrders,
-          paymentPending: paymentPendingOrders,
-          processing: processingOrders,
-          completed: completedOrders,
-          byStatus: {
-            PENDING: pendingOrders,
-            PAYMENT_PENDING: paymentPendingOrders,
-            PROCESSING: processingOrders,
-            COMPLETED: completedOrders
-          }
-        },
-        users: {
-          total: totalUsers,
-          active: activeUsers,
-          inactive: totalUsers - activeUsers
-        },
-        kyc: {
-          pending: pendingKyc,
-          approved: approvedKyc,
-          rejected: rejectedKyc,
-          total: pendingKyc + approvedKyc + rejectedKyc
-        },
-        payIn: {
-          pending: pendingPayIn,
-          received: receivedPayIn,
-          total: pendingPayIn + receivedPayIn
-        },
-        payOut: {
-          pending: pendingPayOut,
-          sent: sentPayOut,
-          total: pendingPayOut + sentPayOut
-        },
-        volume: {
-          totalFiat: volumeResult._sum.totalFiat || 0,
-          totalCrypto: volumeResult._sum.cryptoAmount || 0,
-          byCurrency: volumeByCurrency
-        },
-        systemHealth: {
-          tradingPairs: activeTradingPairs,
-          paymentMethods: activePaymentMethods,
-          platformWallets: platformWallets,
-          apiKeys: apiKeys,
-          integrations: integrations.map(i => ({
-            service: i.service,
-            status: i.status,
-            isEnabled: i.isEnabled,
-            lastTested: i.lastTested
-          }))
-        },
-        chartData: {
-          volume: volumeChartData,
-          currencies: currencyChartData
-        },
-        trends,
-        recentOrders,
-        recentKyc,
-        recentActivity
-      }
+      data: responseData,
+      cached: false
     });
   } catch (error) {
     console.error('Admin stats error:', error);

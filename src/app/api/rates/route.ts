@@ -16,21 +16,34 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const { searchParams } = new URL(request.url);
     const forceRefresh = searchParams.get('force') === 'true';
 
+    let rates;
+    
     if (forceRefresh) {
-      console.log('🔄 Force refresh requested - clearing cache');
+      console.log('🔄 Force refresh requested - clearing all caches');
       coinGeckoService.clearCache();
+      // Use forceRefresh method which clears Redis cache
+      rates = await rateProviderService.forceRefresh();
+    } else {
+      // Normal fetch (will use Redis cache if available)
+      rates = await rateProviderService.getAllRates();
     }
-
-    // Get rates from active provider
-    const rates = await rateProviderService.getAllRates();
 
     // Add metadata
     const response = {
       ...rates,
-      feePercentage: PLATFORM_CONFIG.FEE_PERCENTAGE
+      feePercentage: PLATFORM_CONFIG.FEE_PERCENTAGE,
+      timestamp: new Date().toISOString(),
+      cached: !forceRefresh
     };
 
-    return NextResponse.json(response);
+    // Add HTTP cache headers for CDN
+    const nextResponse = NextResponse.json(response);
+    nextResponse.headers.set(
+      'Cache-Control',
+      'public, s-maxage=30, stale-while-revalidate=60'
+    );
+
+    return nextResponse;
   } catch (error: any) {
     console.error('❌ Error fetching rates:', error);
     return NextResponse.json(

@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma';
 import { updateOrderStatusSchema } from '@/lib/validations/order';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 import { eventEmitter } from '@/lib/services/event-emitter.service';
+import { CacheService } from '@/lib/services/cache.service';
 import { z } from 'zod';
 
 interface RouteContext {
@@ -187,6 +188,9 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
       return updated;
     });
 
+    // Clear admin stats cache (order status changed)
+    await CacheService.clearAdminStats();
+    
     // Log admin action
     await auditService.logAdminAction(
       session.user.id,

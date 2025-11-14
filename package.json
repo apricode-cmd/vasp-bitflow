@@ -70,6 +70,7 @@
     "culori": "^4.0.2",
     "date-fns": "^3.6.0",
     "input-otp": "^1.4.2",
+    "ioredis": "^5.8.2",
     "jose": "^6.1.0",
     "jsonwebtoken": "^9.0.2",
     "lexical": "^0.38.1",

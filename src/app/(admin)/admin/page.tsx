@@ -16,14 +16,16 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { formatCurrency } from '@/lib/formatters';
+import { ActionCenter } from '@/components/admin/dashboard/ActionCenter';
+import { PerformanceIndicators } from '@/components/admin/dashboard/PerformanceIndicators';
 import { 
   Users, ShoppingCart, Activity, Settings, CreditCard, Coins, Shield, 
   Database, ArrowUpRight, ArrowDownRight, DollarSign, Clock, 
-  Zap, RefreshCw, Wallet, TrendingUp, Globe, Key
+  Zap, RefreshCw, Wallet, TrendingUp, Globe, Key, ArrowRight
 } from 'lucide-react';
 import Link from 'next/link';
 import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, 
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
   ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
 
@@ -93,7 +95,7 @@ export default function AdminDashboardPage(): JSX.Element {
   const kycTrend = stats.trends?.kyc || 0;
 
   // Prepare chart data from stats
-  const volumeChartData = stats.chartData?.volume || [];
+  const orderFlowChartData = stats.orderFlowChartData || [];
   const currencyDistribution = stats.chartData?.currencies || [];
 
   return (
@@ -104,6 +106,7 @@ export default function AdminDashboardPage(): JSX.Element {
           <h1 className="text-3xl font-bold tracking-tight">CRM Dashboard</h1>
           <p className="text-muted-foreground mt-1">
             Real-time platform analytics and insights
+            {stats.cached && <Badge variant="secondary" className="ml-2">Cached</Badge>}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -125,6 +128,9 @@ export default function AdminDashboardPage(): JSX.Element {
           </Button>
         </div>
       </div>
+
+      {/* Action Center - Priority #1 */}
+      <ActionCenter />
 
       {/* Main Stats with Trends */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -312,96 +318,94 @@ export default function AdminDashboardPage(): JSX.Element {
         </HoverCard>
       </div>
 
-      {/* Quick Access Navigation */}
+      {/* Performance Indicators - Compact */}
+      {stats.performanceIndicators && (
+        <div>
+          <h2 className="text-lg font-semibold mb-3">Performance Indicators</h2>
+          <PerformanceIndicators data={stats.performanceIndicators} />
+        </div>
+      )}
+
+      {/* Quick Access Navigation - Compact Single Row */}
       <div>
         <h2 className="text-lg font-semibold mb-4">Quick Access</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
           <Link href="/admin/users">
-            <Card className="hover:bg-accent cursor-pointer transition-colors">
-              <CardContent className="p-6">
-                <Users className="w-8 h-8 mb-2 text-primary" />
-                <div className="font-medium">Users</div>
-                <div className="text-xs text-muted-foreground">CRM & Management</div>
+            <Card className="hover:bg-accent cursor-pointer transition-all hover:shadow-md group">
+              <CardContent className="p-4">
+                <Users className="w-6 h-6 mb-2 text-primary group-hover:scale-110 transition-transform" />
+                <div className="font-medium text-sm">Users</div>
+                <div className="text-xs text-muted-foreground">CRM</div>
               </CardContent>
             </Card>
           </Link>
 
           <Link href="/admin/orders">
-            <Card className="hover:bg-accent cursor-pointer transition-colors hover-lift">
-              <CardContent className="p-6">
-                <ShoppingCart className="w-8 h-8 mb-2 text-primary" />
-                <div className="font-medium">Orders</div>
-                <div className="text-xs text-muted-foreground">Kanban & Table View</div>
+            <Card className="hover:bg-accent cursor-pointer transition-all hover:shadow-md group">
+              <CardContent className="p-4">
+                <ShoppingCart className="w-6 h-6 mb-2 text-primary group-hover:scale-110 transition-transform" />
+                <div className="font-medium text-sm">Orders</div>
+                <div className="text-xs text-muted-foreground">Kanban</div>
               </CardContent>
             </Card>
           </Link>
 
           <Link href="/admin/kyc">
-            <Card className="hover:bg-accent cursor-pointer transition-colors">
-              <CardContent className="p-6">
-                <Shield className="w-8 h-8 mb-2 text-primary" />
-                <div className="font-medium">KYC Reviews</div>
+            <Card className="hover:bg-accent cursor-pointer transition-all hover:shadow-md group">
+              <CardContent className="p-4">
+                <Shield className="w-6 h-6 mb-2 text-primary group-hover:scale-110 transition-transform" />
+                <div className="font-medium text-sm">KYC</div>
                 <div className="text-xs text-muted-foreground">{stats.kyc.pending} pending</div>
               </CardContent>
             </Card>
           </Link>
 
-          <Link href="/admin/pairs">
-            <Card className="hover:bg-accent cursor-pointer transition-colors hover-lift">
-              <CardContent className="p-6">
-                <Coins className="w-8 h-8 mb-2 text-primary" />
-                <div className="font-medium">Trading Pairs</div>
-                <div className="text-xs text-muted-foreground">Crypto/Fiat Pairs</div>
+          <Link href="/admin/pay-in">
+            <Card className="hover:bg-accent cursor-pointer transition-all hover:shadow-md group">
+              <CardContent className="p-4">
+                <ArrowDownRight className="w-6 h-6 mb-2 text-green-600 group-hover:scale-110 transition-transform" />
+                <div className="font-medium text-sm">Pay-In</div>
+                <div className="text-xs text-muted-foreground">Incoming</div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/admin/pay-out">
+            <Card className="hover:bg-accent cursor-pointer transition-all hover:shadow-md group">
+              <CardContent className="p-4">
+                <ArrowUpRight className="w-6 h-6 mb-2 text-red-600 group-hover:scale-110 transition-transform" />
+                <div className="font-medium text-sm">Pay-Out</div>
+                <div className="text-xs text-muted-foreground">Outgoing</div>
               </CardContent>
             </Card>
           </Link>
 
           <Link href="/admin/currencies">
-            <Card className="hover:bg-accent cursor-pointer transition-colors hover-lift">
-              <CardContent className="p-6">
-                <Database className="w-8 h-8 mb-2 text-primary" />
-                <div className="font-medium">Currencies</div>
-                <div className="text-xs text-muted-foreground">Crypto & Fiat</div>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link href="/admin/payments">
-            <Card className="hover:bg-accent cursor-pointer transition-colors hover-lift">
-              <CardContent className="p-6">
-                <CreditCard className="w-8 h-8 mb-2 text-primary" />
-                <div className="font-medium">Payments</div>
-                <div className="text-xs text-muted-foreground">PSP & Banks</div>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link href="/admin/wallets">
-            <Card className="hover:bg-accent cursor-pointer transition-colors hover-lift">
-              <CardContent className="p-6">
-                <Wallet className="w-8 h-8 mb-2 text-primary" />
-                <div className="font-medium">Platform Wallets</div>
-                <div className="text-xs text-muted-foreground">Crypto Wallets</div>
+            <Card className="hover:bg-accent cursor-pointer transition-all hover:shadow-md group">
+              <CardContent className="p-4">
+                <Coins className="w-6 h-6 mb-2 text-primary group-hover:scale-110 transition-transform" />
+                <div className="font-medium text-sm">Currencies</div>
+                <div className="text-xs text-muted-foreground">Crypto</div>
               </CardContent>
             </Card>
           </Link>
 
           <Link href="/admin/integrations">
-            <Card className="hover:bg-accent cursor-pointer transition-colors hover-lift">
-              <CardContent className="p-6">
-                <Globe className="w-8 h-8 mb-2 text-primary" />
-                <div className="font-medium">Integrations</div>
-                <div className="text-xs text-muted-foreground">CoinGecko, KYCAID</div>
+            <Card className="hover:bg-accent cursor-pointer transition-all hover:shadow-md group">
+              <CardContent className="p-4">
+                <Globe className="w-6 h-6 mb-2 text-primary group-hover:scale-110 transition-transform" />
+                <div className="font-medium text-sm">Integrations</div>
+                <div className="text-xs text-muted-foreground">APIs</div>
               </CardContent>
             </Card>
           </Link>
 
           <Link href="/admin/settings">
-            <Card className="hover:bg-accent cursor-pointer transition-colors hover-lift">
-              <CardContent className="p-6">
-                <Settings className="w-8 h-8 mb-2 text-primary" />
-                <div className="font-medium">Settings</div>
-                <div className="text-xs text-muted-foreground">Brand, SEO, Legal</div>
+            <Card className="hover:bg-accent cursor-pointer transition-all hover:shadow-md group">
+              <CardContent className="p-4">
+                <Settings className="w-6 h-6 mb-2 text-primary group-hover:scale-110 transition-transform" />
+                <div className="font-medium text-sm">Settings</div>
+                <div className="text-xs text-muted-foreground">System</div>
               </CardContent>
             </Card>
           </Link>
@@ -409,273 +413,208 @@ export default function AdminDashboardPage(): JSX.Element {
       </div>
 
       {/* Analytics Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Volume Chart */}
-        <Card className="lg:col-span-2">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Order Flow & Conversion Chart */}
+        <Card>
           <CardHeader>
-            <CardTitle>Trading Volume</CardTitle>
-            <CardDescription>Daily volume and order count for the past week</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Order Flow & Conversion</CardTitle>
+                <CardDescription>Daily order statuses and success rate</CardDescription>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-green-600">
+                  {orderFlowChartData.length > 0 
+                    ? Math.round(
+                        orderFlowChartData.reduce((sum: number, d: any) => sum + d.conversionRate, 0) / 
+                        orderFlowChartData.length
+                      )
+                    : 0}%
+                </div>
+                <div className="text-xs text-muted-foreground">Avg Conversion</div>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            {volumeChartData.length > 0 ? (
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={volumeChartData}>
-                  <defs>
-                    <linearGradient id="colorVolume" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor={COLORS.primary} stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis 
-                    dataKey="date" 
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={12}
-                  />
-                  <YAxis 
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={12}
-                  />
-                  <Tooltip 
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="volume" 
-                    stroke={COLORS.primary}
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#colorVolume)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+            {orderFlowChartData.length > 0 ? (
+              <div className="space-y-4">
+                {/* Legend */}
+                <div className="flex flex-wrap gap-4 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                    <span>Completed</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded-full bg-yellow-500"></div>
+                    <span>Processing</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded-full bg-red-500"></div>
+                    <span>Cancelled</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+                    <span>Pending</span>
+                  </div>
+                </div>
+
+                {/* Stacked Bar Chart */}
+                <div className="h-[280px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={orderFlowChartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis 
+                        dataKey="date" 
+                        stroke="hsl(var(--muted-foreground))"
+                        fontSize={11}
+                      />
+                      <YAxis 
+                        stroke="hsl(var(--muted-foreground))"
+                        fontSize={11}
+                      />
+                      <Tooltip 
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px',
+                          fontSize: '12px'
+                        }}
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
+                                <p className="font-semibold mb-2">{data.date}</p>
+                                <div className="space-y-1 text-xs">
+                                  <div className="flex items-center justify-between gap-4">
+                                    <span className="flex items-center gap-2">
+                                      <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                                      Completed
+                                    </span>
+                                    <span className="font-semibold">{data.completed}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-4">
+                                    <span className="flex items-center gap-2">
+                                      <div className="h-2 w-2 rounded-full bg-yellow-500"></div>
+                                      Processing
+                                    </span>
+                                    <span className="font-semibold">{data.processing}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-4">
+                                    <span className="flex items-center gap-2">
+                                      <div className="h-2 w-2 rounded-full bg-red-500"></div>
+                                      Cancelled
+                                    </span>
+                                    <span className="font-semibold">{data.cancelled}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-4">
+                                    <span className="flex items-center gap-2">
+                                      <div className="h-2 w-2 rounded-full bg-blue-500"></div>
+                                      Pending
+                                    </span>
+                                    <span className="font-semibold">{data.pending}</span>
+                                  </div>
+                                  <div className="border-t pt-2 mt-2">
+                                    <div className="flex justify-between">
+                                      <span>Total Orders:</span>
+                                      <span className="font-bold">{data.total}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Conversion:</span>
+                                      <span className="font-bold text-green-600">{data.conversionRate}%</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Revenue:</span>
+                                      <span className="font-bold">€{data.revenue.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Avg Order:</span>
+                                      <span className="font-bold">€{data.avgOrderValue.toFixed(2)}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Bar dataKey="completed" stackId="a" fill="#22c55e" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="processing" stackId="a" fill="#eab308" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="cancelled" stackId="a" fill="#ef4444" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="pending" stackId="a" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             ) : (
               <div className="h-[300px] flex items-center justify-center">
                 <div className="text-center text-muted-foreground">
                   <TrendingUp className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p className="text-sm">No volume data available for this period</p>
+                  <p className="text-sm">No order data available for this period</p>
                 </div>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Currency Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Currency Distribution</CardTitle>
-            <CardDescription>Orders by cryptocurrency</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {currencyDistribution.length > 0 ? (
-              <>
-                <div className="h-[300px] w-full flex items-center justify-center">
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                  <Pie
-                    data={currencyDistribution}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {currencyDistribution.map((_entry: any, index: number) => (
-                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="mt-4 space-y-2">
-              {currencyDistribution.map((currency: any, index: number) => (
-                <div key={currency.name} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className="w-3 h-3 rounded-full" 
-                      style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
-                    />
-                    <span>{currency.name}</span>
-                  </div>
-                  <span className="font-medium">{currency.value}%</span>
-                </div>
-              ))}
-            </div>
-          </>
-            ) : (
-              <div className="h-[300px] flex items-center justify-center">
-                <div className="text-center text-muted-foreground">
-                  <Coins className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p className="text-sm">No currency data available</p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Activity & Orders */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Orders with Actions */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Recent Orders</CardTitle>
-              <Link href="/admin/orders"><Button variant="outline" size="sm">View All</Button></Link>
+              <Link href="/admin/orders">
+                <Button variant="outline" size="sm">View All</Button>
+              </Link>
             </div>
           </CardHeader>
           <CardContent>
             <ScrollArea className="h-[400px]">
               <div className="space-y-3 pr-4">
-                {stats.recentOrders?.slice(0, 8).map((order: any) => (
-                  <div 
-                    key={order.id} 
-                    className="flex items-center gap-4 p-3 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
+                {stats.recentOrders?.slice(0, 10).map((order: any) => (
+                  <Link 
+                    key={order.id}
+                    href={`/admin/orders?id=${order.id}`}
+                    scroll={false}
                   >
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-primary/10 text-primary">
-                        {order.user?.profile?.firstName?.charAt(0)}
-                        {order.user?.profile?.lastName?.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-medium text-sm truncate">
-                          {order.paymentReference}
+                    <div className="flex items-center gap-4 p-3 border rounded-lg hover:bg-accent/50 hover:shadow-sm transition-all cursor-pointer group">
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback className="bg-primary/10 text-primary">
+                          {order.user?.profile?.firstName?.charAt(0)}
+                          {order.user?.profile?.lastName?.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">
+                            {order.paymentReference}
+                          </p>
+                          <Badge variant="outline" className="text-xs">
+                            {order.currencyCode}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {order.user?.profile?.firstName} {order.user?.profile?.lastName}
                         </p>
-                        <Badge variant="outline" className="text-xs">
-                          {order.currencyCode}
-                        </Badge>
                       </div>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {order.user?.profile?.firstName} {order.user?.profile?.lastName}
-                      </p>
+                      <div className="text-right space-y-1">
+                        <Badge variant={
+                          order.status === 'COMPLETED' ? 'success' : 
+                          order.status === 'PENDING' ? 'warning' : 
+                          order.status === 'CANCELLED' ? 'destructive' : 'default'
+                        }>
+                          {order.status}
+                        </Badge>
+                        <p className="text-xs font-medium">
+                          {formatCurrency(order.totalFiat, order.fiatCurrencyCode)}
+                        </p>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
                     </div>
-                    <div className="text-right space-y-1">
-                      <Badge variant={
-                        order.status === 'COMPLETED' ? 'success' : 
-                        order.status === 'PENDING' ? 'warning' : 
-                        order.status === 'CANCELLED' ? 'destructive' : 'default'
-                      }>
-                        {order.status}
-                      </Badge>
-                      <p className="text-xs font-medium">
-                        {formatCurrency(order.totalFiat, order.fiatCurrencyCode)}
-                      </p>
-                    </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </ScrollArea>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>System Health</CardTitle>
-            <CardDescription>Platform status and integrations</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Resource Status */}
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <div className="flex items-center gap-2">
-                    <Coins className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Trading Pairs</span>
-                  </div>
-                  <Badge variant="success">{stats.systemHealth.tradingPairs} active</Badge>
-                </div>
-                <Progress value={95} className="h-2" />
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <div className="flex items-center gap-2">
-                    <CreditCard className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Payment Methods</span>
-                  </div>
-                  <Badge variant="success">{stats.systemHealth.paymentMethods} active</Badge>
-                </div>
-                <Progress value={100} className="h-2" />
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <div className="flex items-center gap-2">
-                    <Wallet className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Platform Wallets</span>
-                  </div>
-                  <Badge variant="success">{stats.systemHealth.platformWallets} active</Badge>
-                </div>
-                <Progress value={100} className="h-2" />
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <div className="flex items-center gap-2">
-                    <Key className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">API Keys</span>
-                  </div>
-                  <Badge variant="success">{stats.systemHealth.apiKeys} active</Badge>
-                </div>
-                <Progress value={85} className="h-2" />
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Integrations Status */}
-            <div>
-              <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                <Activity className="h-4 w-4" />
-                External Services
-              </h4>
-              <div className="space-y-3">
-                {stats.systemHealth.integrations?.map((int: any) => (
-                  <div key={int.service} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-2 h-2 rounded-full ${
-                        int.status === 'active' ? 'bg-green-500 animate-pulse' : 'bg-gray-300'
-                      }`} />
-                      <span className="text-sm font-medium capitalize">{int.service}</span>
-                    </div>
-                    <Badge variant={int.status === 'active' ? 'success' : 'secondary'}>
-                      {int.status}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Quick Stats */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center p-3 rounded-lg bg-muted/50">
-                <Clock className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-                <p className="text-2xl font-bold">99.9%</p>
-                <p className="text-xs text-muted-foreground">Uptime</p>
-              </div>
-              <div className="text-center p-3 rounded-lg bg-muted/50">
-                <Zap className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-                <p className="text-2xl font-bold">124ms</p>
-                <p className="text-xs text-muted-foreground">Avg Response</p>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>

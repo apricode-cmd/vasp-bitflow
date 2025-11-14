@@ -66,8 +66,15 @@ const navigation = [
     priority: 'high'
   },
   {
-    section: 'Core Operations',
+    section: 'Daily Operations',
     items: [
+      { 
+        name: 'Users', 
+        href: '/admin/users', 
+        icon: Users,
+        description: 'Customer management',
+        requiredPermission: 'users:read'
+      },
       { 
         name: 'Orders', 
         href: '/admin/orders', 
@@ -77,13 +84,6 @@ const navigation = [
         requiredPermission: 'orders:read'
       },
       { 
-        name: 'Users', 
-        href: '/admin/users', 
-        icon: Users,
-        description: 'Customer management',
-        requiredPermission: 'users:read'
-      },
-      { 
         name: 'KYC Reviews', 
         href: '/admin/kyc', 
         icon: Shield,
@@ -91,40 +91,8 @@ const navigation = [
         badge: 'pending',
         requiredPermission: 'kyc:read'
       },
-    ],
-    defaultOpen: true,
-    priority: 'high'
-  },
-  {
-    section: 'Trading',
-    items: [
       { 
-        name: 'Trading Pairs', 
-        href: '/admin/pairs', 
-        icon: Coins,
-        description: 'Manage trading pairs'
-      },
-      { 
-        name: 'Currencies', 
-        href: '/admin/currencies', 
-        icon: Database,
-        description: 'Crypto & Fiat'
-      },
-      { 
-        name: 'Fees', 
-        href: '/admin/fees', 
-        icon: TrendingUp,
-        description: 'Fee profiles'
-      },
-    ],
-    defaultOpen: false,
-    priority: 'medium'
-  },
-  {
-    section: 'Payments & Wallets',
-    items: [
-      { 
-        name: 'Pay In', 
+        name: 'Pay-In', 
         href: '/admin/pay-in', 
         icon: ArrowDownCircle,
         description: 'Incoming fiat payments',
@@ -132,7 +100,7 @@ const navigation = [
         requiredPermission: 'finance:read'
       },
       { 
-        name: 'Pay Out', 
+        name: 'Pay-Out', 
         href: '/admin/pay-out', 
         icon: ArrowUpCircle,
         description: 'Outgoing crypto payments',
@@ -140,18 +108,43 @@ const navigation = [
         requiredPermission: 'payouts:read'
       },
       { 
-        name: 'Payment Accounts', 
-        href: '/admin/payments', 
-        icon: CreditCard,
-        description: 'Banks, Wallets, Methods',
-        requiredPermission: 'finance:read'
-      },
-      { 
         name: 'User Wallets', 
         href: '/admin/user-wallets', 
         icon: Wallet,
         description: 'Customer wallets',
         requiredPermission: 'users:read'
+      },
+    ],
+    defaultOpen: true,
+    priority: 'high'
+  },
+  {
+    section: 'Financial Setup',
+    items: [
+      { 
+        name: 'Currencies', 
+        href: '/admin/currencies', 
+        icon: Database,
+        description: 'Crypto & Fiat'
+      },
+      { 
+        name: 'Trading Pairs', 
+        href: '/admin/pairs', 
+        icon: Coins,
+        description: 'Manage trading pairs'
+      },
+      { 
+        name: 'Payment Methods', 
+        href: '/admin/payment-methods', 
+        icon: CreditCard,
+        description: 'Banks, PSP, Wallets',
+        requiredPermission: 'finance:read'
+      },
+      { 
+        name: 'Fees & Pricing', 
+        href: '/admin/fees', 
+        icon: TrendingUp,
+        description: 'Fee profiles'
       },
       { 
         name: 'Blockchain Networks', 
@@ -162,68 +155,11 @@ const navigation = [
       },
     ],
     defaultOpen: false,
-    priority: 'high'
-  },
-  {
-    section: 'Legal & Compliance',
-    items: [
-      { 
-        name: 'Legal Library', 
-        href: '/admin/documents', 
-        icon: BookOpen,
-        description: 'Policies, Terms, Agreements',
-        requiredPermission: 'settings:read'
-      },
-    ],
-    defaultOpen: false,
     priority: 'medium'
   },
   {
-    section: 'Communications',
+    section: 'System & Configuration',
     items: [
-      { 
-        name: 'Notifications', 
-        href: '/admin/notifications', 
-        icon: Bell,
-        description: 'Admin notifications & alerts',
-        badge: 'unread'
-      },
-      { 
-        name: 'Email Templates', 
-        href: '/admin/email-templates', 
-        icon: Mail,
-        description: 'Manage email templates',
-        requiredPermission: 'settings:read'
-      },
-      { 
-        name: 'Notification Events', 
-        href: '/admin/notification-events', 
-        icon: MessageSquare,
-        description: 'Configure notification events',
-        requiredPermission: 'settings:system'
-      },
-      { 
-        name: 'Notification Queue', 
-        href: '/admin/notification-queue', 
-        icon: Send,
-        description: 'Monitor notification delivery',
-        requiredPermission: 'settings:system'
-      },
-    ],
-    defaultOpen: false,
-    priority: 'medium'
-  },
-  {
-    section: 'System & Settings',
-    items: [
-      { 
-        name: 'Administrators', 
-        href: '/admin/admins', 
-        icon: Shield,
-        description: 'Admins, roles & permissions',
-        superAdminOnly: true,
-        requiredPermission: 'admins:read'
-      },
       { 
         name: 'Settings', 
         href: '/admin/settings', 
@@ -235,14 +171,43 @@ const navigation = [
         name: 'Integrations', 
         href: '/admin/integrations', 
         icon: Plug,
-        description: 'CoinGecko, KYCAID, Sumsub, Tatum'
+        description: 'APIs & Services'
       },
       { 
-        name: 'KYC Form Fields', 
-        href: '/admin/kyc-fields', 
-        icon: FileText,
-        description: 'Configure KYC fields',
-        requiredPermission: 'settings:system'
+        name: 'Email Templates', 
+        href: '/admin/email-templates', 
+        icon: Mail,
+        description: 'Manage email templates',
+        requiredPermission: 'settings:read'
+      },
+      { 
+        name: 'Notifications', 
+        href: '/admin/notifications', 
+        icon: Bell,
+        description: 'Admin alerts',
+        badge: 'unread'
+      },
+      { 
+        name: 'Legal Documents', 
+        href: '/admin/documents', 
+        icon: BookOpen,
+        description: 'Policies, Terms, Agreements',
+        requiredPermission: 'settings:read'
+      },
+    ],
+    defaultOpen: false,
+    priority: 'low'
+  },
+  {
+    section: 'Security & Administration',
+    items: [
+      { 
+        name: 'Administrators', 
+        href: '/admin/admins', 
+        icon: User,
+        description: 'Roles & Permissions',
+        superAdminOnly: true,
+        requiredPermission: 'admins:read'
       },
       { 
         name: 'API Keys', 
@@ -257,6 +222,13 @@ const navigation = [
         icon: Activity,
         description: 'System activity',
         requiredPermission: 'audit:read'
+      },
+      { 
+        name: 'KYC Form Fields', 
+        href: '/admin/kyc-fields', 
+        icon: FileText,
+        description: 'Configure KYC forms',
+        requiredPermission: 'settings:system'
       },
     ],
     defaultOpen: false,
@@ -443,6 +415,13 @@ export function AdminSidebar(): JSX.Element {
                     const isActive = pathname === item.href || 
                                     (item.href !== '/admin' && pathname?.startsWith(item.href));
                     const badgeCount = getBadgeCount(item.name);
+                    
+                    // Color for Pay-In/Pay-Out icons
+                    const iconColorClass = item.name === 'Pay-In' 
+                      ? 'text-green-600 dark:text-green-400'
+                      : item.name === 'Pay-Out'
+                      ? 'text-red-600 dark:text-red-400'
+                      : '';
 
                     return (
                       <Link
@@ -457,7 +436,7 @@ export function AdminSidebar(): JSX.Element {
                       >
                         <Icon className={cn(
                           "w-5 h-5 shrink-0 transition-transform group-hover:scale-110",
-                          isActive && "drop-shadow"
+                          isActive ? "drop-shadow" : iconColorClass
                         )} />
                         
                         <div className="flex-1 min-w-0">
@@ -491,57 +470,11 @@ export function AdminSidebar(): JSX.Element {
         </nav>
       </ScrollArea>
 
-      {/* Footer Info */}
-      <>
-        <Separator />
-        <div className="p-4 space-y-3">
-            {/* Quick Stats */}
-            {stats && (stats.pendingOrders > 0 || stats.pendingKyc > 0) && (
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase">
-                  Pending Actions
-                </p>
-                <div className="space-y-1">
-                  {stats.pendingOrders > 0 && (
-                    <Link href="/admin/orders?status=PENDING">
-                      <div className="flex items-center justify-between p-2 rounded-lg bg-yellow-50 dark:bg-yellow-950/20 hover:bg-yellow-100 dark:hover:bg-yellow-950/30 transition-colors cursor-pointer">
-                        <div className="flex items-center gap-2">
-                          <ShoppingCart className="h-4 w-4 text-yellow-600" />
-                          <span className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
-                            Orders
-                          </span>
-                        </div>
-                        <Badge variant="warning" className="font-bold">
-                          {stats.pendingOrders}
-                        </Badge>
-                      </div>
-                    </Link>
-                  )}
-                  {stats.pendingKyc > 0 && (
-                    <Link href="/admin/kyc?status=PENDING">
-                      <div className="flex items-center justify-between p-2 rounded-lg bg-blue-50 dark:bg-blue-950/20 hover:bg-blue-100 dark:hover:bg-blue-950/30 transition-colors cursor-pointer">
-                        <div className="flex items-center gap-2">
-                          <Shield className="h-4 w-4 text-blue-600" />
-                          <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                            KYC
-                          </span>
-                        </div>
-                        <Badge variant="info" className="font-bold">
-                          {stats.pendingKyc}
-                        </Badge>
-                      </div>
-                    </Link>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <Separator />
-
-            {/* User Menu */}
-            <UserMenu />
-          </div>
-        </>
+      {/* Footer - User Menu Only */}
+      <Separator />
+      <div className="p-4">
+        <UserMenu />
+      </div>
       </aside>
   );
 }

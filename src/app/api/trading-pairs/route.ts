@@ -5,10 +5,13 @@
  * Query params:
  *   - cryptoCode: filter by crypto (e.g., BTC)
  *   - fiatCode: filter by fiat (e.g., EUR)
+ * 
+ * Caching: 10 minutes TTL in Redis
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { CacheService } from '@/lib/services/cache.service';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
@@ -16,17 +19,42 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const cryptoCode = searchParams.get('cryptoCode');
     const fiatCode = searchParams.get('fiatCode');
 
-    // Build where clause
+    // Normalize filters
+    const filters = {
+      cryptoCode: cryptoCode?.toUpperCase(),
+      fiatCode: fiatCode?.toUpperCase(),
+    };
+
+    // Try Redis cache first
+    const cached = await CacheService.getTradingPairs(filters);
+    if (cached !== null) {
+      // If specific pair requested, return single object
+      if (filters.cryptoCode && filters.fiatCode && cached.length === 1) {
+        return NextResponse.json({
+          success: true,
+          pair: cached[0],
+          cached: true
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        pairs: cached,
+        cached: true
+      });
+    }
+
+    // Cache miss - fetch from database
     const where: any = {
       isActive: true // Only active pairs
     };
 
-    if (cryptoCode) {
-      where.cryptoCode = cryptoCode.toUpperCase();
+    if (filters.cryptoCode) {
+      where.cryptoCode = filters.cryptoCode;
     }
 
-    if (fiatCode) {
-      where.fiatCode = fiatCode.toUpperCase();
+    if (filters.fiatCode) {
+      where.fiatCode = filters.fiatCode;
     }
 
     // Get trading pairs
@@ -52,17 +80,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       orderBy: { priority: 'asc' }
     });
 
+    // Cache the result (10 minutes TTL)
+    await CacheService.setTradingPairs(pairs, filters, 600);
+
     // If specific pair requested, return single object
-    if (cryptoCode && fiatCode && pairs.length === 1) {
+    if (filters.cryptoCode && filters.fiatCode && pairs.length === 1) {
       return NextResponse.json({
         success: true,
-        pair: pairs[0]
+        pair: pairs[0],
+        cached: false
       });
     }
 
     return NextResponse.json({
       success: true,
-      pairs
+      pairs,
+      cached: false
     });
   } catch (error) {
     console.error('Get trading pairs error:', error);

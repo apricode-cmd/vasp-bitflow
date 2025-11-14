@@ -7,6 +7,7 @@
 import { prisma } from '@/lib/prisma';
 import { encrypt, decrypt, maskApiKey } from './encryption.service';
 import { integrationRegistry } from '@/lib/integrations';
+import { CacheService } from './cache.service';
 
 interface ActivateIntegrationParams {
   service: string;
@@ -119,6 +120,13 @@ export async function deactivateIntegration(service: string, userId: string) {
         updatedAt: new Date()
       }
     });
+
+    // Clear Redis cache for this integration's category
+    const provider = integrationRegistry.getProvider(service);
+    if (provider) {
+      await CacheService.clearActiveIntegration(provider.category);
+      console.log(`🔄 [Integration] Cleared cache for ${provider.category}`);
+    }
 
     // Log deactivation
     await prisma.auditLog.create({
@@ -324,6 +332,13 @@ export async function updateIntegrationConfig(params: UpdateIntegrationParams) {
       where: { service },
       data: updateData
     });
+
+    // Clear Redis cache for this integration's category
+    const provider = integrationRegistry.getProvider(service);
+    if (provider) {
+      await CacheService.clearActiveIntegration(provider.category);
+      console.log(`🔄 [Integration] Cleared cache for ${provider.category}`);
+    }
 
     // Log update
     await prisma.auditLog.create({

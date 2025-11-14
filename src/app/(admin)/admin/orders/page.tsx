@@ -96,7 +96,31 @@ export default function AdminOrdersPage(): JSX.Element {
   useEffect(() => {
     fetchOrders();
     fetchReferenceData();
+    
+    // Check if order ID is in URL params
+    const params = new URLSearchParams(window.location.search);
+    const orderId = params.get('id');
+    if (orderId && orders.length > 0) {
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+        viewOrderDetails(order);
+      }
+    }
   }, [selectedStatus, dateRange]);
+  
+  // Handle opening order from URL on initial load
+  useEffect(() => {
+    if (orders.length === 0) return;
+    
+    const params = new URLSearchParams(window.location.search);
+    const orderId = params.get('id');
+    if (orderId) {
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+        viewOrderDetails(order);
+      }
+    }
+  }, [orders]);
 
   const fetchOrders = async (): Promise<void> => {
     setRefreshing(true);
