@@ -250,9 +250,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Calculate amount mismatch
+    // Calculate amount mismatch (stored as boolean in DB)
     const amountMismatch = Math.abs(validated.receivedAmount - validated.expectedAmount) > 0.01;
-    const amountDifference = validated.receivedAmount - validated.expectedAmount;
 
     // Determine auto-status based on amount
     let autoStatus = validated.status || 'RECEIVED';
@@ -274,7 +273,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       currencyType: validated.currencyType,
       status: autoStatus,
       amountMismatch,
-      amountDifference,
       confirmations: 0,
       senderName: validated.senderName,
       senderAccount: validated.senderAccount,
