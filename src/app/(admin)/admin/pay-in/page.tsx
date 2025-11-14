@@ -412,6 +412,7 @@ export default function PayInPage(): JSX.Element {
         onRowClick={(row) => router.push(`/admin/pay-in/${row.id}`)}
         pageSize={20}
         exportFilename="pay-in-transactions"
+        enableExport={true}
         enableRowSelection={true}
         bulkActions={[
           {
