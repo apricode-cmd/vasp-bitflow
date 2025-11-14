@@ -104,7 +104,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           email: true,
           role: true,
           isActive: true,
-          emailVerified: true,
+          lastLogin: true,
           createdAt: true,
           updatedAt: true,
           profile: {

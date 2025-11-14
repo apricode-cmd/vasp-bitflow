@@ -137,8 +137,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
               idType: true,
               idNumber: true,
               pepStatus: true,
-              sanctionsStatus: true,
-              riskLevel: true,
+              sanctionsScreeningDone: true,
+              riskScore: true,
             }
           },
           documents: {
@@ -147,7 +147,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
               documentType: true,
               fileName: true,
               uploadedAt: true,
-              status: true,
+              verifiedByAI: true,
             },
             orderBy: { uploadedAt: 'desc' },
             take: 3 // Limit documents for list view

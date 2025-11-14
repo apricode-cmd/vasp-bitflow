@@ -636,17 +636,12 @@ export default function AdminKycPage(): JSX.Element {
         }
         
         return (
-          <div className="flex items-center gap-2">
-            <Badge 
-              variant={provider.isEnabled ? 'default' : 'secondary'}
-              className="font-mono text-xs"
-            >
-              {provider.name}
-            </Badge>
-            {provider.status === 'active' && (
-              <CheckCircle className="h-3 w-3 text-green-600" />
-            )}
-          </div>
+          <Badge 
+            variant="outline"
+            className="font-mono text-xs"
+          >
+            {provider.name}
+          </Badge>
         );
       },
     },
