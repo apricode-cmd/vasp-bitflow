@@ -282,11 +282,11 @@ export function CreatePayInSheet({ onSuccess }: CreatePayInSheetProps): JSX.Elem
                             <CommandItem
                               key={order.id}
                               value={`${order.paymentReference} ${order.user.email} ${order.id}`}
-                              onSelect={(currentValue) => {
-                                // Extract order ID from the value (last part after space)
-                                const orderId = currentValue.split(' ').pop() || '';
-                                handleOrderSelect(orderId);
+                              onSelect={() => {
+                                handleOrderSelect(order.id);
                               }}
+                              style={{ pointerEvents: 'auto' }}
+                              className="cursor-pointer [&>*]:pointer-events-none"
                             >
                               <Check
                                 className={cn(
