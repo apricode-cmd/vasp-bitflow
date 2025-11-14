@@ -99,11 +99,16 @@ export class KrakenAdapter implements IRatesProvider {
     'USDT-EUR': 'USDTEUR',  // Fixed: was USDTZEUR
     'USDT-USD': 'USDTZUSD',
     // 'USDT-PLN': Not available on Kraken
+    
+    // USDC pairs (stablecoin)
+    'USDC-EUR': 'USDCEUR',
+    'USDC-USD': 'USDCUSD',
+    // 'USDC-PLN': Not available on Kraken
   };
 
   // Supported currencies
   // Note: These are what we TRY to fetch. Pairs not in pairMapping will be skipped gracefully.
-  private readonly supportedCryptos = ['BTC', 'ETH', 'USDT', 'SOL'];
+  private readonly supportedCryptos = ['BTC', 'ETH', 'USDT', 'USDC', 'SOL'];
   private readonly supportedFiats = ['EUR', 'USD']; // PLN not directly supported on Kraken
 
   // Cache for rates
