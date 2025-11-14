@@ -38,10 +38,13 @@ export async function GET(
             profile: true,
           },
         },
-        provider: true,
         profile: true,
-        formData: true,
-        documents: true,
+        formData: {
+          orderBy: { fieldName: 'asc' }
+        },
+        documents: {
+          orderBy: { uploadedAt: 'desc' }
+        },
       },
     });
 
@@ -52,9 +55,33 @@ export async function GET(
       );
     }
 
+    // Get provider info from Integration if available
+    let providerInfo = null;
+    const providerId = (kycSession.metadata as any)?.provider;
+    if (providerId) {
+      const integration = await prisma.integration.findUnique({
+        where: { service: providerId }
+      });
+
+      if (integration) {
+        providerInfo = {
+          name: integration.service.toUpperCase(),
+          service: integration.service,
+          status: integration.status,
+          isEnabled: integration.isEnabled
+        };
+      }
+    }
+
+    // Add provider info to response
+    const sessionWithProvider = {
+      ...kycSession,
+      provider: providerInfo
+    };
+
     return NextResponse.json({
       success: true,
-      data: kycSession,
+      data: sessionWithProvider,
     });
   } catch (error) {
     console.error('Failed to fetch KYC session:', error);
