@@ -418,7 +418,16 @@ export const UserReportDocument: React.FC<{ data: UserReportData }> = ({ data })
   );
 
   return (
-    <Document>
+    <Document
+      title={`User Report - ${data.userEmail} - ${data.reportId}`}
+      author={data.companyLegalName}
+      subject={`Comprehensive User Report for ${data.firstName || ''} ${data.lastName || ''} (${data.userEmail})`}
+      keywords={`user report, KYC, compliance, ${data.reportId}, ${data.userEmail}, ${data.kycStatus}, financial report`}
+      creator={`${data.brandName} Platform`}
+      producer={`${data.brandName} Compliance System`}
+      creationDate={new Date(data.reportDate)}
+      language="en-US"
+    >
       <Page size="A4" style={styles.page}>
         {/* Compact Professional Header */}
         <View style={{
