@@ -3,30 +3,29 @@
 
 SELECT
     schemaname,
-    tablename,
-    indexname,
-    indexdef,
+    relname as tablename,
+    indexrelname as indexname,
     pg_size_pretty(pg_relation_size(indexrelid)) AS index_size
 FROM pg_stat_user_indexes
 WHERE schemaname = 'public'
 ORDER BY
-    tablename,
-    indexname;
+    relname,
+    indexrelname;
 
 -- Count indexes per table
 SELECT
-    tablename,
+    relname as tablename,
     COUNT(*) as index_count,
     pg_size_pretty(SUM(pg_relation_size(indexrelid))) AS total_index_size
 FROM pg_stat_user_indexes
 WHERE schemaname = 'public'
-GROUP BY tablename
+GROUP BY relname
 ORDER BY COUNT(*) DESC;
 
 -- Show most frequently scanned tables (candidates for indexing)
 SELECT
     schemaname,
-    tablename,
+    relname as tablename,
     seq_scan as sequential_scans,
     seq_tup_read as rows_read_seq,
     idx_scan as index_scans,
