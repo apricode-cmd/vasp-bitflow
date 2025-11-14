@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { KycStatusBadge } from '@/components/features/KycStatusBadge';
 import { formatDateTime } from '@/lib/formatters';
+import { toast } from 'sonner';
 import { 
   User, 
   Mail, 
@@ -200,9 +201,18 @@ export function KycOverviewTab({ session, onUpdate }: KycOverviewTabProps): JSX.
               </div>
             )}
             {session.verificationId && (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Verification ID</span>
-                <span className="font-mono text-xs">{session.verificationId.slice(0, 16)}...</span>
+              <div className="text-sm">
+                <p className="text-muted-foreground mb-1">Verification ID</p>
+                <div 
+                  className="font-mono text-xs bg-muted px-2 py-1.5 rounded cursor-pointer hover:bg-accent transition-colors break-all"
+                  onClick={() => {
+                    navigator.clipboard.writeText(session.verificationId!);
+                    toast.success('Verification ID copied to clipboard');
+                  }}
+                  title="Click to copy"
+                >
+                  {session.verificationId}
+                </div>
               </div>
             )}
             {/* Provider Dashboard Link */}
