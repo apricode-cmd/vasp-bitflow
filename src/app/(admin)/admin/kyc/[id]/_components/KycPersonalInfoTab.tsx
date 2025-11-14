@@ -220,24 +220,6 @@ export function KycPersonalInfoTab({ session }: KycPersonalInfoTabProps): JSX.El
         </Card>
       )}
 
-      {/* Dynamic Form Data (if available) */}
-      {session.formData && session.formData.length > 0 && (
-        <Card className="p-6">
-          <h3 className="font-semibold mb-4">Additional KYC Form Data</h3>
-          <div className="space-y-3">
-            {session.formData.map((field) => (
-              <div key={field.id} className="flex justify-between items-start py-2 border-b last:border-0">
-                <span className="text-sm text-muted-foreground capitalize">
-                  {field.fieldName.replace(/_/g, ' ')}
-                </span>
-                <span className="text-sm font-medium text-right max-w-[60%]">
-                  {field.fieldValue}
-                </span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
     </div>
   );
 }
