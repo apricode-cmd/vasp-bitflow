@@ -721,31 +721,38 @@ export const UserReportDocument: React.FC<{ data: UserReportData }> = ({ data })
           {data.orders.length > 0 ? (
             <View style={styles.table}>
               <View style={styles.tableHeader}>
-                <Text style={[styles.tableHeaderCell, { width: '15%' }]}>Date</Text>
-                <Text style={[styles.tableHeaderCell, { width: '20%' }]}>Reference</Text>
-                <Text style={[styles.tableHeaderCell, { width: '20%' }]}>Crypto Amount</Text>
-                <Text style={[styles.tableHeaderCell, { width: '20%' }]}>Fiat Amount</Text>
-                <Text style={[styles.tableHeaderCell, { width: '25%' }]}>Status</Text>
+                <Text style={[styles.tableHeaderCell, { width: '12%' }]}>Date</Text>
+                <Text style={[styles.tableHeaderCell, { width: '28%' }]}>Reference</Text>
+                <Text style={[styles.tableHeaderCell, { width: '22%', textAlign: 'right' }]}>Crypto</Text>
+                <Text style={[styles.tableHeaderCell, { width: '18%', textAlign: 'right' }]}>Fiat</Text>
+                <Text style={[styles.tableHeaderCell, { width: '20%', textAlign: 'center' }]}>Status</Text>
               </View>
-              {data.orders.map((order, index) => (
-                <View key={index} style={styles.tableRow}>
-                  <Text style={[styles.tableCell, { width: '15%' }]}>
-                    {formatDate(order.date)}
-                  </Text>
-                  <Text style={[styles.tableCell, { width: '20%' }]}>
-                    {order.paymentReference}
-                  </Text>
-                  <Text style={[styles.tableCell, { width: '20%' }]}>
-                    {order.cryptoAmount} {order.cryptoCurrency}
-                  </Text>
-                  <Text style={[styles.tableCell, { width: '20%' }]}>
-                    {formatCurrency(order.fiatAmount, order.fiatCurrency)}
-                  </Text>
-                  <Text style={[styles.tableCell, getStatusBadgeStyle(order.status), { width: '25%' }]}>
-                    {order.status}
-                  </Text>
-                </View>
-              ))}
+              {data.orders.map((order, index) => {
+                // Truncate long reference for better display
+                const shortRef = order.paymentReference.length > 20 
+                  ? `${order.paymentReference.substring(0, 10)}...${order.paymentReference.slice(-7)}`
+                  : order.paymentReference;
+                
+                return (
+                  <View key={index} style={styles.tableRow}>
+                    <Text style={[styles.tableCell, { width: '12%', fontSize: 7 }]}>
+                      {formatDate(order.date)}
+                    </Text>
+                    <Text style={[styles.tableCell, { width: '28%', fontSize: 6.5, fontFamily: 'Courier' }]}>
+                      {shortRef}
+                    </Text>
+                    <Text style={[styles.tableCell, { width: '22%', fontSize: 7, textAlign: 'right' }]}>
+                      {order.cryptoAmount} {order.cryptoCurrency}
+                    </Text>
+                    <Text style={[styles.tableCell, { width: '18%', fontSize: 7, textAlign: 'right', fontWeight: 'bold' }]}>
+                      {formatCurrency(order.fiatAmount, order.fiatCurrency)}
+                    </Text>
+                    <Text style={[styles.tableCell, getStatusBadgeStyle(order.status), { width: '20%', fontSize: 7, textAlign: 'center' }]}>
+                      {order.status}
+                    </Text>
+                  </View>
+                );
+              })}
             </View>
           ) : (
             <Text style={{ fontSize: 8, color: '#6b7280', textAlign: 'center' }}>
