@@ -18,12 +18,62 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     
     // Filters
     const status = searchParams.get('status');
+    const country = searchParams.get('country');
+    const provider = searchParams.get('provider');
+    const dateFrom = searchParams.get('dateFrom');
+    const dateTo = searchParams.get('dateTo');
+    const pepStatus = searchParams.get('pepStatus');
+    
+    // Pagination
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '50');
+    const skip = (page - 1) * limit;
+
+    // Sorting
+    const sortBy = searchParams.get('sortBy') || 'createdAt';
+    const sortOrder = searchParams.get('sortOrder') || 'desc';
 
     // Build where clause
-    const where: Record<string, unknown> = {};
-    if (status) {
+    const where: any = {};
+    
+    if (status && status !== 'all') {
       where.status = status;
     }
+
+    // Filter by country (from user profile)
+    if (country) {
+      where.user = {
+        profile: {
+          country,
+        },
+      };
+    }
+
+    // Filter by KYC provider
+    if (provider && provider !== 'all') {
+      where.kycProviderId = provider;
+    }
+
+    // Filter by date range
+    if (dateFrom || dateTo) {
+      where.submittedAt = {};
+      if (dateFrom) {
+        where.submittedAt.gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        where.submittedAt.lte = new Date(dateTo);
+      }
+    }
+
+    // Filter by PEP status
+    if (pepStatus === 'yes' || pepStatus === 'no') {
+      where.profile = {
+        pepStatus: pepStatus === 'yes',
+      };
+    }
+
+    // Get total count for pagination
+    const total = await prisma.kycSession.count({ where });
 
     // Get KYC sessions with explicit error handling
     const kycSessions = await prisma.kycSession.findMany({
@@ -43,7 +93,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         profile: true
         // Note: provider relation removed - we use metadata.provider instead
       },
-      orderBy: status === 'PENDING' ? { submittedAt: 'desc' } : { createdAt: 'desc' }
+      orderBy: { [sortBy]: sortOrder },
+      skip,
+      take: limit,
     });
 
     // Transform data to include provider metadata from Integration
@@ -75,11 +127,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       })
     );
 
-    return NextResponse.json({ kycSessions: sessionsWithProvider });
+    return NextResponse.json({ 
+      success: true,
+      data: sessionsWithProvider,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
     console.error('Admin get KYC sessions error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch KYC sessions' },
+      { success: false, error: 'Failed to fetch KYC sessions' },
       { status: 500 }
     );
   }

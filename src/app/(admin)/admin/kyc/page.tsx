@@ -49,12 +49,13 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { DataTable } from '@/components/admin/DataTable';
+import { DataTableAdvanced } from '@/components/admin/DataTableAdvanced';
 import { KycFormDataDisplay } from '@/components/admin/KycFormDataDisplay';
 import { KycStatusBadge } from '@/components/features/KycStatusBadge';
 import { Combobox } from '@/components/shared/Combobox';
 import type { ComboboxOption } from '@/components/shared/Combobox';
 import { DynamicKycForm } from '@/components/forms/DynamicKycForm';
+import { KycQuickStats } from './_components/KycQuickStats';
 import { formatDateTime } from '@/lib/formatters';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -225,8 +226,10 @@ export default function AdminKycPage(): JSX.Element {
 
       const response = await fetch(url.toString());
       if (response.ok) {
-        const data = await response.json();
-        setKycSessions(data.kycSessions.map((s: any) => ({
+        const result = await response.json();
+        // Support both old and new API response format
+        const sessions = result.data || result.kycSessions || [];
+        setKycSessions(sessions.map((s: any) => ({
           ...s,
           submittedAt: s.submittedAt ? new Date(s.submittedAt) : null,
           reviewedAt: s.reviewedAt ? new Date(s.reviewedAt) : null,
@@ -580,12 +583,18 @@ export default function AdminKycPage(): JSX.Element {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href={`/admin/kyc/${session.id}`} onClick={(e) => e.stopPropagation()}>
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Details
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={(e) => {
                   e.stopPropagation();
                   viewKycDetails(session);
                 }}>
                   <Eye className="h-4 w-4 mr-2" />
-                  View Details
+                  Quick View (Sheet)
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={(e) => {
                   e.stopPropagation();
@@ -682,6 +691,9 @@ export default function AdminKycPage(): JSX.Element {
         </div>
       </div>
 
+      {/* Quick Stats */}
+      <KycQuickStats />
+
       {/* Status Tabs */}
       <Card>
         <div className="p-6">
@@ -708,13 +720,14 @@ export default function AdminKycPage(): JSX.Element {
       </Card>
 
       {/* KYC Sessions Table */}
-      <DataTable
+      <DataTableAdvanced
         columns={columns}
         data={kycSessions}
         searchPlaceholder="Search by name or email..."
         isLoading={loading}
-        onRowClick={viewKycDetails}
+        onRowClick={(row) => viewKycDetails(row)}
         pageSize={20}
+        exportFilename="kyc-sessions"
       />
 
       {/* KYC Details Sheet */}
