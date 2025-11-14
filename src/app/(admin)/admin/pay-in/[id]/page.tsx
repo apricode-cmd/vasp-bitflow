@@ -29,22 +29,66 @@ interface PayInDetails {
   amountMismatch: boolean;
   currencyType: string;
   status: string;
+  
+  // Sender information
   senderName: string | null;
+  senderAccount: string | null;
+  senderBank: string | null;
+  reference: string | null;
+  
+  // Blockchain information
+  senderAddress: string | null;
+  transactionHash: string | null;
+  blockNumber: number | null;
+  confirmations: number;
+  explorerUrl: string | null;
+  
   transactionId: string | null;
   paymentDate: string | null;
+  receivedDate: string | null;
+  
+  // Verification
   verifiedBy: string | null;
   verifiedAt: string | null;
   reconciledBy: string | null;
   reconciledAt: string | null;
   verificationNotes: string | null;
+  
+  // Approval workflow
+  approvalRequired: boolean;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  initiatedBy: string | null;
+  initiatedAt: string | null;
+  
+  // Proofs
+  proofUrls: string[];
+  
   createdAt: string;
   updatedAt: string;
+  
   order: {
     id: string;
     paymentReference: string;
     cryptoAmount: number;
     currencyCode: string;
     status: string;
+    fiatAmount: number;
+    rate: number;
+    feePercent: number;
+    feeAmount: number;
+    totalFiat: number;
+    paymentProofs: Array<{
+      id: string;
+      fileUrl: string;
+      fileName: string;
+      fileSize: number;
+      mimeType: string;
+      uploadedAt: string;
+      user: {
+        email: string;
+      };
+    }>;
   };
   user: {
     id: string;
@@ -52,6 +96,8 @@ interface PayInDetails {
     profile: {
       firstName: string;
       lastName: string;
+      phoneNumber: string | null;
+      country: string;
     } | null;
   };
   fiatCurrency: {
@@ -67,6 +113,37 @@ interface PayInDetails {
   paymentMethod: {
     code: string;
     name: string;
+    description: string | null;
+    type: string;
+    instructions: string | null;
+    bankAccount: {
+      id: string;
+      currency: string;
+      bankName: string;
+      bankAddress: string | null;
+      accountHolder: string;
+      iban: string;
+      swift: string | null;
+      bic: string | null;
+      sortCode: string | null;
+      referenceTemplate: string;
+      instructions: string | null;
+    } | null;
+    paymentAccount: {
+      id: string;
+      code: string;
+      name: string;
+      type: string;
+      bankName: string | null;
+      bankAddress: string | null;
+      accountHolder: string | null;
+      iban: string | null;
+      swift: string | null;
+      bic: string | null;
+      sortCode: string | null;
+      address: string | null;
+      instructions: string | null;
+    } | null;
   } | null;
   network: {
     code: string;
@@ -77,6 +154,14 @@ interface PayInDetails {
     email: string;
   } | null;
   reconciler: {
+    id: string;
+    email: string;
+  } | null;
+  approver: {
+    id: string;
+    email: string;
+  } | null;
+  initiator: {
     id: string;
     email: string;
   } | null;

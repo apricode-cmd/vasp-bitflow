@@ -41,6 +41,26 @@ export async function GET(
             cryptoAmount: true,
             currencyCode: true,
             status: true,
+            fiatAmount: true,
+            rate: true,
+            feePercent: true,
+            feeAmount: true,
+            totalFiat: true,
+            paymentProofs: {
+              select: {
+                id: true,
+                fileUrl: true,
+                fileName: true,
+                fileSize: true,
+                mimeType: true,
+                uploadedAt: true,
+                user: {
+                  select: {
+                    email: true
+                  }
+                }
+              }
+            }
           }
         },
         user: {
@@ -51,6 +71,8 @@ export async function GET(
               select: {
                 firstName: true,
                 lastName: true,
+                phoneNumber: true,
+                country: true,
               }
             }
           }
@@ -58,7 +80,12 @@ export async function GET(
         fiatCurrency: true,
         cryptocurrency: true,
         network: true,
-        paymentMethod: true,
+        paymentMethod: {
+          include: {
+            bankAccount: true,
+            paymentAccount: true,
+          }
+        },
         verifier: {
           select: {
             id: true,
@@ -66,6 +93,18 @@ export async function GET(
           }
         },
         reconciler: {
+          select: {
+            id: true,
+            email: true,
+          }
+        },
+        approver: {
+          select: {
+            id: true,
+            email: true,
+          }
+        },
+        initiator: {
           select: {
             id: true,
             email: true,
