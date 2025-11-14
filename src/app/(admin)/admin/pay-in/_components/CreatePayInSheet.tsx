@@ -276,43 +276,41 @@ export function CreatePayInSheet({ onSuccess }: CreatePayInSheetProps): JSX.Elem
                       <CommandEmpty>
                         {ordersLoading ? 'Loading...' : 'No available orders found.'}
                       </CommandEmpty>
-                      <CommandGroup>
-                        <ScrollArea className="h-[300px]">
-                          {availableOrders.map((order) => (
-                            <CommandItem
-                              key={order.id}
-                              value={`${order.paymentReference}-${order.user.email}-${order.id}`}
-                              onSelect={() => {
-                                handleOrderSelect(order.id);
-                              }}
-                              className="cursor-pointer"
-                            >
-                              <Check
-                                className={cn(
-                                  'mr-2 h-4 w-4',
-                                  selectedOrderId === order.id ? 'opacity-100' : 'opacity-0'
-                                )}
-                              />
-                              <div className="flex flex-col gap-1 flex-1">
-                                <div className="flex items-center justify-between">
-                                  <span className="font-mono text-sm font-semibold">
-                                    {order.paymentReference}
-                                  </span>
-                                  <Badge variant="outline" className="text-xs">
-                                    {order.status}
-                                  </Badge>
-                                </div>
-                                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                  <span>{order.user.email}</span>
-                                  <span className="font-semibold">
-                                    {order.cryptoAmount} {order.currency.code} → {order.fiatCurrency.symbol}
-                                    {order.totalFiat.toFixed(2)} {order.fiatCurrency.code}
-                                  </span>
-                                </div>
+                      <CommandGroup className="max-h-[300px] overflow-auto">
+                        {availableOrders.map((order) => (
+                          <CommandItem
+                            key={order.id}
+                            value={`${order.paymentReference}-${order.user.email}-${order.id}`}
+                            onSelect={() => {
+                              handleOrderSelect(order.id);
+                            }}
+                            className="cursor-pointer aria-selected:bg-accent"
+                          >
+                            <Check
+                              className={cn(
+                                'mr-2 h-4 w-4 shrink-0',
+                                selectedOrderId === order.id ? 'opacity-100' : 'opacity-0'
+                              )}
+                            />
+                            <div className="flex flex-col gap-1 flex-1 pointer-events-none">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-mono text-sm font-semibold">
+                                  {order.paymentReference}
+                                </span>
+                                <Badge variant="outline" className="text-xs shrink-0">
+                                  {order.status}
+                                </Badge>
                               </div>
-                            </CommandItem>
-                          ))}
-                        </ScrollArea>
+                              <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                                <span className="truncate">{order.user.email}</span>
+                                <span className="font-semibold shrink-0">
+                                  {order.cryptoAmount} {order.currency.code} → {order.fiatCurrency.symbol}
+                                  {order.totalFiat.toFixed(2)} {order.fiatCurrency.code}
+                                </span>
+                              </div>
+                            </div>
+                          </CommandItem>
+                        ))}
                       </CommandGroup>
                     </Command>
                   </PopoverContent>
