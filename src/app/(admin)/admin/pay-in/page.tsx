@@ -22,7 +22,8 @@ import {
   DollarSign, 
   Plus,
   ExternalLink,
-  MoreHorizontal
+  MoreHorizontal,
+  Receipt
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { DataTableAdvanced } from '@/components/admin/DataTableAdvanced';
@@ -101,6 +102,7 @@ export default function PayInPage(): JSX.Element {
   const router = useRouter();
   const [payIns, setPayIns] = useState<PayIn[]>([]);
   const [loading, setLoading] = useState(true);
+  const [quickStats, setQuickStats] = useState<any>(null);
   const [filters, setFilters] = useState({
     status: 'all',
     search: ''
@@ -108,6 +110,7 @@ export default function PayInPage(): JSX.Element {
 
   useEffect(() => {
     fetchPayIns();
+    fetchStats();
   }, [filters.status]);
 
   const fetchPayIns = async (): Promise<void> => {
@@ -130,6 +133,61 @@ export default function PayInPage(): JSX.Element {
       toast.error('Failed to load payments');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchStats = async (): Promise<void> => {
+    try {
+      const response = await fetch('/api/admin/pay-in/stats');
+      const data = await response.json();
+
+      if (data.success) {
+        // Transform stats to QuickStats format
+        setQuickStats([
+          {
+            label: 'Total Payments',
+            value: data.data.total.toString(),
+            icon: <Receipt className="h-4 w-4" />,
+            trend: {
+              value: data.data.recentCount,
+              label: 'today'
+            },
+            color: 'default' as const,
+          },
+          {
+            label: 'Pending Review',
+            value: (data.data.pending + data.data.received).toString(),
+            icon: <Clock className="h-4 w-4" />,
+            trend: {
+              value: data.data.pending > 0 ? data.data.pending : 0,
+              label: 'needs attention'
+            },
+            color: data.data.pending > 0 ? 'warning' as const : 'default' as const,
+          },
+          {
+            label: 'Verified',
+            value: data.data.verified.toString(),
+            icon: <CheckCircle className="h-4 w-4" />,
+            trend: {
+              value: data.data.successRate,
+              label: 'success rate'
+            },
+            color: 'success' as const,
+          },
+          {
+            label: 'Issues',
+            value: (data.data.failed + data.data.amountMismatches).toString(),
+            icon: <AlertTriangle className="h-4 w-4" />,
+            trend: {
+              value: data.data.amountMismatches,
+              label: 'mismatches'
+            },
+            color: (data.data.failed + data.data.amountMismatches) > 0 ? 'danger' as const : 'default' as const,
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch stats:', error);
     }
   };
 
@@ -328,44 +386,6 @@ export default function PayInPage(): JSX.Element {
     },
   ];
 
-  // Calculate stats
-  const stats = [
-    {
-      title: 'Total',
-      value: payIns.length.toString(),
-      icon: DollarSign,
-      description: 'All payments'
-    },
-    {
-      title: 'Pending',
-      value: payIns.filter(p => p.status === 'PENDING').length.toString(),
-      icon: Clock,
-      description: 'Awaiting receipt',
-      trend: { value: 0, isPositive: true }
-    },
-    {
-      title: 'Received',
-      value: payIns.filter(p => p.status === 'RECEIVED').length.toString(),
-      icon: ArrowDownCircle,
-      description: 'Need verification',
-      variant: 'default' as const
-    },
-    {
-      title: 'Verified',
-      value: payIns.filter(p => p.status === 'VERIFIED').length.toString(),
-      icon: CheckCircle,
-      description: 'Confirmed payments',
-      variant: 'default' as const
-    },
-    {
-      title: 'Mismatches',
-      value: payIns.filter(p => p.amountMismatch).length.toString(),
-      icon: AlertTriangle,
-      description: 'Amount issues',
-      variant: 'destructive' as const
-    },
-  ];
-
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
@@ -381,7 +401,7 @@ export default function PayInPage(): JSX.Element {
       </div>
 
       {/* Quick Stats */}
-      <QuickStats stats={stats} />
+      {quickStats && <QuickStats stats={quickStats} />}
 
       {/* Data Table */}
       <DataTableAdvanced
