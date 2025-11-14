@@ -284,7 +284,11 @@ export default function PayInDetailsPage(): JSX.Element {
       />
 
       {/* Quick Stats */}
-      <PayInQuickStats payIn={payIn} />
+      <PayInQuickStats 
+        payIn={payIn} 
+        onVerify={handleVerify}
+        onFail={handleFail}
+      />
 
       {/* Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
