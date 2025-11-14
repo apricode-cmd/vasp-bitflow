@@ -268,6 +268,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const payInData: any = {
       order: { connect: { id: validated.orderId } },
       user: { connect: { id: order.userId } },
+      amount: validated.receivedAmount, // Main amount field (required by schema)
       expectedAmount: validated.expectedAmount,
       receivedAmount: validated.receivedAmount,
       currencyType: validated.currencyType,
