@@ -281,8 +281,11 @@ export function CreatePayInSheet({ onSuccess }: CreatePayInSheetProps): JSX.Elem
                           {availableOrders.map((order) => (
                             <CommandItem
                               key={order.id}
-                              value={`${order.paymentReference} ${order.user.email} ${order.cryptoAmount} ${order.totalFiat}`}
-                              onSelect={() => handleOrderSelect(order.id)}
+                              value={`${order.paymentReference}-${order.user.email}-${order.id}`}
+                              onSelect={() => {
+                                handleOrderSelect(order.id);
+                              }}
+                              className="cursor-pointer"
                             >
                               <Check
                                 className={cn(
