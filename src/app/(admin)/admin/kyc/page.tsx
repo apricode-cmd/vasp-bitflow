@@ -275,14 +275,14 @@ export default function AdminKycPage(): JSX.Element {
 
   const fetchFilterOptions = async (): Promise<void> => {
     try {
-      // Fetch unique countries
-      const countriesResponse = await fetch('/api/admin/users?limit=1000&role=CLIENT');
-      if (countriesResponse.ok) {
-        const result = await countriesResponse.json();
+      // Fetch unique countries from KYC sessions (more efficient)
+      const kycResponse = await fetch('/api/admin/kyc?limit=1000');
+      if (kycResponse.ok) {
+        const result = await kycResponse.json();
         if (result.success && result.data) {
           const countries = [...new Set(
             result.data
-              .map((u: any) => u.profile?.country)
+              .map((s: any) => s.user?.profile?.country)
               .filter(Boolean)
           )].sort();
           setAvailableCountries(countries as string[]);
