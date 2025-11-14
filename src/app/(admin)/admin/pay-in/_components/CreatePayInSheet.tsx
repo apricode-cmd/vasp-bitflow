@@ -2,6 +2,18 @@
  * Create PayIn Sheet Component
  * Sheet (drawer) for manually creating PayIn transactions
  * PayIn must be linked to an existing Order
+ * 
+ * 🔄 IMPORTANT: PayIn Direction Logic
+ * 
+ * BUY Order (покупка криптовалюты):
+ * - Customer PAYS: Fiat (EUR/PLN) → Platform ✅ THIS IS PAYIN
+ * - Customer RECEIVES: Crypto (BTC/USDC) → This is PayOut
+ * 
+ * SELL Order (продажа криптовалюты - будущая фаза):
+ * - Customer SENDS: Crypto → Platform → This is PayOut
+ * - Customer RECEIVES: Fiat → Platform ✅ THIS IS PAYIN
+ * 
+ * Currently only BUY orders are supported in this component.
  */
 
 'use client';
@@ -360,14 +372,20 @@ export function CreatePayInSheet({ onSuccess }: CreatePayInSheetProps): JSX.Elem
                       <div className="flex items-start gap-2 text-sm">
                         <CreditCard className="h-4 w-4 mt-0.5 text-green-600" />
                         <div className="space-y-1">
-                          <div>
-                            <span className="font-medium">{orderData.cryptoAmount} {orderData.currency.code}</span>
-                            {' → '}
-                            <span className="font-medium">
-                              {orderData.fiatCurrency.symbol}{orderData.totalFiat.toFixed(2)} {orderData.fiatCurrency.code}
+                          <div className="flex items-center gap-2">
+                            <Badge variant="default" className="bg-blue-600">
+                              BUY Crypto
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              (Customer pays fiat, receives crypto)
                             </span>
                           </div>
-                          <div className="flex gap-2">
+                          <div className="font-mono text-xs bg-muted px-2 py-1 rounded">
+                            💰 PayIn: {orderData.fiatCurrency.symbol}{orderData.totalFiat.toFixed(2)} {orderData.fiatCurrency.code}
+                            {' → '}
+                            ₿ PayOut: {orderData.cryptoAmount} {orderData.currency.code}
+                          </div>
+                          <div className="flex gap-2 flex-wrap">
                             <Badge variant="outline">{orderData.status}</Badge>
                             {orderData.blockchain && (
                               <Badge variant="secondary">{orderData.blockchain.name}</Badge>
@@ -432,7 +450,8 @@ export function CreatePayInSheet({ onSuccess }: CreatePayInSheetProps): JSX.Elem
                     </div>
 
                     {/* Amount Mismatch Warning */}
-                    {receivedAmount && parseFloat(receivedAmount) !== orderData.totalFiat && (
+                    {receivedAmount && 
+                      Math.abs(parseFloat(receivedAmount) - orderData.totalFiat) > 0.01 && (
                       <Alert variant="destructive">
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription>
