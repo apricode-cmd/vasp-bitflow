@@ -85,57 +85,39 @@ export function KycFilters({
   };
 
   return (
-    <Card className="border-2">
-      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <div className="flex items-center justify-between p-4">
-          <div className="flex items-center gap-3">
-            <Search className="h-5 w-5 text-muted-foreground" />
-            <div>
-              <h3 className="font-semibold">Advanced Filters</h3>
-              <p className="text-sm text-muted-foreground">
-                Filter KYC sessions by multiple criteria
-              </p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            {activeFiltersCount > 0 && (
-              <>
-                <Badge variant="secondary" className="font-semibold">
-                  {activeFiltersCount} active
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <CollapsibleTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2">
+              <Search className="h-4 w-4" />
+              Filters
+              {activeFiltersCount > 0 && (
+                <Badge variant="secondary" className="ml-1">
+                  {activeFiltersCount}
                 </Badge>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleReset}
-                  className="h-8"
-                >
-                  <FilterX className="h-4 w-4 mr-1" />
-                  Clear
-                </Button>
-              </>
-            )}
-            
-            <CollapsibleTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                {isOpen ? (
-                  <>
-                    <ChevronUp className="h-4 w-4" />
-                    Hide
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown className="h-4 w-4" />
-                    Show
-                  </>
-                )}
-              </Button>
-            </CollapsibleTrigger>
-          </div>
+              )}
+              {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </CollapsibleTrigger>
+          
+          {activeFiltersCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleReset}
+              className="h-9"
+            >
+              <FilterX className="h-4 w-4 mr-1" />
+              Clear all
+            </Button>
+          )}
         </div>
+      </div>
 
-        <CollapsibleContent>
-          <div className="border-t p-4">
+      <CollapsibleContent className="mb-4">
+        <Card className="p-4">
+          <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               {/* Country Filter */}
               <div className="space-y-2">
@@ -269,74 +251,71 @@ export function KycFilters({
                 </Popover>
               </div>
             </div>
-
-            {/* Active Filters Summary */}
-            {activeFiltersCount > 0 && (
-              <div className="mt-4 pt-4 border-t">
-                <div className="flex flex-wrap gap-2">
-                  <span className="text-sm text-muted-foreground">Active filters:</span>
-                  {filters.country && (
-                    <Badge variant="secondary" className="gap-1">
-                      Country: {filters.country}
-                      <button
-                        onClick={() => handleFilterChange('country', undefined)}
-                        className="ml-1 hover:bg-secondary-foreground/20 rounded-full p-0.5"
-                      >
-                        ×
-                      </button>
-                    </Badge>
-                  )}
-                  {filters.provider && (
-                    <Badge variant="secondary" className="gap-1">
-                      Provider: {filters.provider.toUpperCase()}
-                      <button
-                        onClick={() => handleFilterChange('provider', undefined)}
-                        className="ml-1 hover:bg-secondary-foreground/20 rounded-full p-0.5"
-                      >
-                        ×
-                      </button>
-                    </Badge>
-                  )}
-                  {filters.pepStatus && (
-                    <Badge variant="secondary" className="gap-1">
-                      PEP: {filters.pepStatus === 'yes' ? 'Yes' : 'No'}
-                      <button
-                        onClick={() => handleFilterChange('pepStatus', undefined)}
-                        className="ml-1 hover:bg-secondary-foreground/20 rounded-full p-0.5"
-                      >
-                        ×
-                      </button>
-                    </Badge>
-                  )}
-                  {filters.dateFrom && (
-                    <Badge variant="secondary" className="gap-1">
-                      From: {format(filters.dateFrom, 'PP')}
-                      <button
-                        onClick={() => handleFilterChange('dateFrom', undefined)}
-                        className="ml-1 hover:bg-secondary-foreground/20 rounded-full p-0.5"
-                      >
-                        ×
-                      </button>
-                    </Badge>
-                  )}
-                  {filters.dateTo && (
-                    <Badge variant="secondary" className="gap-1">
-                      To: {format(filters.dateTo, 'PP')}
-                      <button
-                        onClick={() => handleFilterChange('dateTo', undefined)}
-                        className="ml-1 hover:bg-secondary-foreground/20 rounded-full p-0.5"
-                      >
-                        ×
-                      </button>
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
-        </CollapsibleContent>
-      </Collapsible>
-    </Card>
+        </Card>
+      </CollapsibleContent>
+      
+      {/* Active Filters Summary - outside collapsible */}
+      {activeFiltersCount > 0 && !isOpen && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {filters.country && (
+            <Badge variant="secondary" className="gap-1">
+              Country: {filters.country}
+              <button
+                onClick={() => handleFilterChange('country', undefined)}
+                className="ml-1 hover:bg-secondary-foreground/20 rounded-full p-0.5"
+              >
+                ×
+              </button>
+            </Badge>
+          )}
+          {filters.provider && (
+            <Badge variant="secondary" className="gap-1">
+              Provider: {filters.provider.toUpperCase()}
+              <button
+                onClick={() => handleFilterChange('provider', undefined)}
+                className="ml-1 hover:bg-secondary-foreground/20 rounded-full p-0.5"
+              >
+                ×
+              </button>
+            </Badge>
+          )}
+          {filters.pepStatus && (
+            <Badge variant="secondary" className="gap-1">
+              PEP: {filters.pepStatus === 'yes' ? 'Yes' : 'No'}
+              <button
+                onClick={() => handleFilterChange('pepStatus', undefined)}
+                className="ml-1 hover:bg-secondary-foreground/20 rounded-full p-0.5"
+              >
+                ×
+              </button>
+            </Badge>
+          )}
+          {filters.dateFrom && (
+            <Badge variant="secondary" className="gap-1">
+              From: {format(filters.dateFrom, 'PP')}
+              <button
+                onClick={() => handleFilterChange('dateFrom', undefined)}
+                className="ml-1 hover:bg-secondary-foreground/20 rounded-full p-0.5"
+              >
+                ×
+              </button>
+            </Badge>
+          )}
+          {filters.dateTo && (
+            <Badge variant="secondary" className="gap-1">
+              To: {format(filters.dateTo, 'PP')}
+              <button
+                onClick={() => handleFilterChange('dateTo', undefined)}
+                className="ml-1 hover:bg-secondary-foreground/20 rounded-full p-0.5"
+              >
+                ×
+              </button>
+            </Badge>
+          )}
+        </div>
+      )}
+    </Collapsible>
   );
 }
 

@@ -57,7 +57,6 @@ import type { ComboboxOption } from '@/components/shared/Combobox';
 import { DynamicKycForm } from '@/components/forms/DynamicKycForm';
 import { KycQuickStats } from './_components/KycQuickStats';
 import { KycFilters, type KycFiltersState } from './_components/KycFilters';
-import { KycBulkActions } from './_components/KycBulkActions';
 import { formatDateTime } from '@/lib/formatters';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -183,7 +182,6 @@ export default function AdminKycPage(): JSX.Element {
   const [filters, setFilters] = useState<KycFiltersState>({});
   const [availableCountries, setAvailableCountries] = useState<string[]>([]);
   const [availableProviders, setAvailableProviders] = useState<Array<{ value: string; label: string }>>([]);
-  const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
@@ -791,17 +789,6 @@ export default function AdminKycPage(): JSX.Element {
           </div>
       </Card>
 
-      {/* Bulk Actions Bar */}
-      <KycBulkActions
-        selectedIds={selectedSessionIds}
-        selectedSessions={kycSessions.filter(s => selectedSessionIds.includes(s.id))}
-        onClearSelection={() => setSelectedSessionIds([])}
-        onActionComplete={() => {
-          fetchKycSessions();
-          setSelectedSessionIds([]);
-        }}
-      />
-
       {/* KYC Sessions Table */}
       <DataTableAdvanced
         columns={columns}
@@ -812,8 +799,81 @@ export default function AdminKycPage(): JSX.Element {
         pageSize={20}
         exportFilename="kyc-sessions"
         enableRowSelection={true}
-        selectedRowIds={selectedSessionIds}
-        onRowSelectionChange={setSelectedSessionIds}
+        bulkActions={[
+          {
+            label: 'Approve',
+            icon: <CheckCircle className="h-4 w-4" />,
+            onClick: async (selectedRows: KycSession[]) => {
+              const pendingRows = selectedRows.filter(r => r.status === 'PENDING');
+              if (pendingRows.length === 0) {
+                toast.error('No PENDING sessions selected');
+                return;
+              }
+              
+              try {
+                const response = await fetch('/api/admin/kyc/bulk', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    action: 'approve',
+                    sessionIds: pendingRows.map(r => r.id),
+                  }),
+                });
+
+                const result = await response.json();
+                if (response.ok && result.success) {
+                  toast.success(`Approved ${result.affected} session(s)`);
+                  fetchKycSessions();
+                } else {
+                  toast.error(result.error || 'Failed to approve sessions');
+                }
+              } catch (error) {
+                toast.error('An error occurred');
+              }
+            },
+            variant: 'default',
+          },
+          {
+            label: 'Reject',
+            icon: <XCircle className="h-4 w-4" />,
+            onClick: async (selectedRows: KycSession[]) => {
+              const pendingRows = selectedRows.filter(r => r.status === 'PENDING');
+              if (pendingRows.length === 0) {
+                toast.error('No PENDING sessions selected');
+                return;
+              }
+              
+              const reason = prompt('Rejection reason:');
+              if (!reason?.trim()) {
+                toast.error('Rejection reason is required');
+                return;
+              }
+              
+              try {
+                const response = await fetch('/api/admin/kyc/bulk', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    action: 'reject',
+                    sessionIds: pendingRows.map(r => r.id),
+                    rejectionReason: reason,
+                  }),
+                });
+
+                const result = await response.json();
+                if (response.ok && result.success) {
+                  toast.success(`Rejected ${result.affected} session(s)`);
+                  fetchKycSessions();
+                } else {
+                  toast.error(result.error || 'Failed to reject sessions');
+                }
+              } catch (error) {
+                toast.error('An error occurred');
+              }
+            },
+            variant: 'destructive',
+          },
+        ]}
       />
 
       {/* KYC Details Sheet */}
