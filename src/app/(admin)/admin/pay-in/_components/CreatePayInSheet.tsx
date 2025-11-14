@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
 import { Plus, Loader2, AlertCircle, CheckCircle2, User, CreditCard, Banknote, Check, ChevronsUpDown } from 'lucide-react';
@@ -273,45 +273,48 @@ export function CreatePayInSheet({ onSuccess }: CreatePayInSheetProps): JSX.Elem
                   <PopoverContent className="w-[500px] p-0">
                     <Command>
                       <CommandInput placeholder="Search by reference, email, or amount..." />
-                      <CommandEmpty>
-                        {ordersLoading ? 'Loading...' : 'No available orders found.'}
-                      </CommandEmpty>
-                      <CommandGroup className="max-h-[300px] overflow-auto">
-                        {availableOrders.map((order) => (
-                          <CommandItem
-                            key={order.id}
-                            value={`${order.paymentReference}-${order.user.email}-${order.id}`}
-                            onSelect={() => {
-                              handleOrderSelect(order.id);
-                            }}
-                            className="cursor-pointer aria-selected:bg-accent"
-                          >
-                            <Check
-                              className={cn(
-                                'mr-2 h-4 w-4 shrink-0',
-                                selectedOrderId === order.id ? 'opacity-100' : 'opacity-0'
-                              )}
-                            />
-                            <div className="flex flex-col gap-1 flex-1 pointer-events-none">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="font-mono text-sm font-semibold">
-                                  {order.paymentReference}
-                                </span>
-                                <Badge variant="outline" className="text-xs shrink-0">
-                                  {order.status}
-                                </Badge>
+                      <CommandList>
+                        <CommandEmpty>
+                          {ordersLoading ? 'Loading...' : 'No available orders found.'}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {availableOrders.map((order) => (
+                            <CommandItem
+                              key={order.id}
+                              value={`${order.paymentReference} ${order.user.email} ${order.id}`}
+                              onSelect={(currentValue) => {
+                                // Extract order ID from the value (last part after space)
+                                const orderId = currentValue.split(' ').pop() || '';
+                                handleOrderSelect(orderId);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  'mr-2 h-4 w-4 shrink-0',
+                                  selectedOrderId === order.id ? 'opacity-100' : 'opacity-0'
+                                )}
+                              />
+                              <div className="flex flex-col gap-1 flex-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-mono text-sm font-semibold">
+                                    {order.paymentReference}
+                                  </span>
+                                  <Badge variant="outline" className="text-xs shrink-0">
+                                    {order.status}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                                  <span className="truncate">{order.user.email}</span>
+                                  <span className="font-semibold shrink-0 whitespace-nowrap">
+                                    {order.cryptoAmount} {order.currency.code} → {order.fiatCurrency.symbol}
+                                    {order.totalFiat.toFixed(2)} {order.fiatCurrency.code}
+                                  </span>
+                                </div>
                               </div>
-                              <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                                <span className="truncate">{order.user.email}</span>
-                                <span className="font-semibold shrink-0">
-                                  {order.cryptoAmount} {order.currency.code} → {order.fiatCurrency.symbol}
-                                  {order.totalFiat.toFixed(2)} {order.fiatCurrency.code}
-                                </span>
-                              </div>
-                            </div>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
                     </Command>
                   </PopoverContent>
                 </Popover>
