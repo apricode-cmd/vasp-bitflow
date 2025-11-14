@@ -91,7 +91,7 @@ export function KycTab({ user }: KycTabProps): JSX.Element {
               <CardTitle>KYC Verification Status</CardTitle>
               <CardDescription>Identity verification details</CardDescription>
             </div>
-            <Link href={`/admin/kyc?userId=${user.id}`}>
+            <Link href={`/admin/kyc/${kycSession.id}`}>
               <Button>
                 Full Review
                 <ArrowRight className="h-4 w-4 ml-2" />
