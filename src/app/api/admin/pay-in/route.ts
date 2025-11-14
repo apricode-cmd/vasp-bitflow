@@ -263,25 +263,36 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // Prepare data based on currency type
+    // Prepare PayIn data matching Prisma schema exactly
     const payInData: any = {
+      // Relations (connect)
       order: { connect: { id: validated.orderId } },
       user: { connect: { id: order.userId } },
-      amount: validated.receivedAmount, // Main amount field (required by schema)
+      
+      // Required fields
+      amount: validated.receivedAmount,
       expectedAmount: validated.expectedAmount,
-      receivedAmount: validated.receivedAmount,
       currencyType: validated.currencyType,
       status: autoStatus,
+      
+      // Optional scalar fields (match schema exactly)
+      receivedAmount: validated.receivedAmount,
       amountMismatch,
       confirmations: 0,
-      senderName: validated.senderName,
-      senderAccount: validated.senderAccount,
-      senderBank: validated.senderBank,
-      reference: validated.reference,
-      transactionId: validated.transactionId,
-      verificationNotes: validated.verificationNotes,
+      senderName: validated.senderName || null,
+      senderAccount: validated.senderAccount || null,
+      senderBank: validated.senderBank || null,
+      reference: validated.reference || null,
+      transactionId: validated.transactionId || null,
+      verificationNotes: validated.verificationNotes || null,
+      
+      // Dates and admin tracking
       initiatedBy: session.user.id,
       initiatedAt: new Date(),
+      
+      // Arrays (schema has String[] with default)
+      proofUrls: [],
+      
       // Auto-verify if status is RECEIVED and amounts match
       ...(autoStatus === 'RECEIVED' && !amountMismatch ? {
         verifiedBy: session.user.id,
@@ -289,7 +300,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       } : {})
     };
 
-    // Connect currency relations explicitly based on type
+    // Set currency codes and relations based on type
     if (validated.currencyType === 'FIAT') {
       const fiatCode = validated.fiatCurrencyCode || order.fiatCurrencyCode;
       
@@ -306,41 +317,43 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         );
       }
       
+      // Set both scalar field AND relation
+      payInData.fiatCurrencyCode = fiatCode;
       payInData.fiatCurrency = { connect: { code: fiatCode } };
       
-      // Connect payment method only if provided and exists
+      // Set payment method if provided
       if (validated.paymentMethodCode) {
         const paymentMethodExists = await prisma.paymentMethod.findUnique({
           where: { code: validated.paymentMethodCode },
           select: { code: true }
         });
         if (paymentMethodExists) {
+          payInData.paymentMethodCode = validated.paymentMethodCode;
           payInData.paymentMethod = { connect: { code: validated.paymentMethodCode } };
         }
       }
     }
     
     // Always add cryptocurrency from order
-    if (validated.cryptocurrencyCode || order.currencyCode) {
-      const cryptoCode = validated.cryptocurrencyCode || order.currencyCode;
-      
-      const cryptocurrency = await prisma.currency.findUnique({
-        where: { code: cryptoCode },
-        select: { code: true }
-      });
-      
-      if (cryptocurrency) {
-        payInData.cryptocurrency = { connect: { code: cryptoCode } };
-      }
+    const cryptoCode = validated.cryptocurrencyCode || order.currencyCode;
+    const cryptocurrency = await prisma.currency.findUnique({
+      where: { code: cryptoCode },
+      select: { code: true }
+    });
+    
+    if (cryptocurrency) {
+      payInData.cryptocurrencyCode = cryptoCode;
+      payInData.cryptocurrency = { connect: { code: cryptoCode } };
     }
     
-    // Connect blockchain network if provided
+    // Set blockchain network if provided
     if (validated.networkCode) {
       const networkExists = await prisma.blockchainNetwork.findUnique({
         where: { code: validated.networkCode },
         select: { code: true }
       });
       if (networkExists) {
+        payInData.networkCode = validated.networkCode;
         payInData.network = { connect: { code: validated.networkCode } };
       }
     }
