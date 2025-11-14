@@ -40,6 +40,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -540,6 +541,25 @@ export default function AdminKycPage(): JSX.Element {
   // Define table columns
   const columns: ColumnDef<KycSession>[] = [
     {
+      id: 'select',
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected()}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
       id: 'user',
       header: 'User',
       cell: ({ row }) => {
@@ -756,38 +776,38 @@ export default function AdminKycPage(): JSX.Element {
       <KycQuickStats />
 
       {/* Advanced Filters */}
-      <KycFilters
-        filters={filters}
-        onFiltersChange={setFilters}
-        onReset={() => setFilters({})}
-        availableCountries={availableCountries}
-        availableProviders={availableProviders}
-      />
+      {/* Unified Filters Row */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        {/* Status Tabs */}
+        <Tabs value={selectedStatus} onValueChange={setSelectedStatus} className="flex-1">
+          <TabsList>
+            <TabsTrigger value="PENDING">
+              Pending
+              <Badge variant="secondary" className="ml-2">
+                {kycSessions.filter(s => s.status === 'PENDING').length}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="APPROVED">
+              Approved
+            </TabsTrigger>
+            <TabsTrigger value="REJECTED">
+              Rejected
+            </TabsTrigger>
+            <TabsTrigger value="all">
+              All
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-      {/* Status Tabs */}
-      <Card>
-        <div className="p-6">
-          <Tabs value={selectedStatus} onValueChange={setSelectedStatus}>
-            <TabsList>
-              <TabsTrigger value="PENDING">
-                Pending
-                <Badge variant="secondary" className="ml-2">
-                  {kycSessions.filter(s => s.status === 'PENDING').length}
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger value="APPROVED">
-                Approved
-              </TabsTrigger>
-              <TabsTrigger value="REJECTED">
-                Rejected
-              </TabsTrigger>
-              <TabsTrigger value="all">
-                All
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-          </div>
-      </Card>
+        {/* Advanced Filters */}
+        <KycFilters
+          filters={filters}
+          onFiltersChange={setFilters}
+          onReset={() => setFilters({})}
+          availableCountries={availableCountries}
+          availableProviders={availableProviders}
+        />
+      </div>
 
       {/* KYC Sessions Table */}
       <DataTableAdvanced
