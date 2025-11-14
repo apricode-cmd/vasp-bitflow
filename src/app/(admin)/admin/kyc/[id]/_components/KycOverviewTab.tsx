@@ -191,11 +191,11 @@ export function KycOverviewTab({ session, onUpdate }: KycOverviewTabProps): JSX.
                 )}
               </span>
             </div>
-            {session.providerInfo && (
+            {(session.kycProviderId || session.providerInfo) && (
               <div className="flex items-center justify-between text-sm pt-2 border-t">
                 <span className="text-muted-foreground">KYC Provider</span>
                 <Badge variant="outline" className="uppercase text-xs">
-                  {session.providerInfo.name || session.kycProviderId}
+                  {session.providerInfo?.name || session.kycProviderId || 'N/A'}
                 </Badge>
               </div>
             )}
@@ -205,6 +205,31 @@ export function KycOverviewTab({ session, onUpdate }: KycOverviewTabProps): JSX.
                 <span className="font-mono text-xs">{session.verificationId.slice(0, 16)}...</span>
               </div>
             )}
+            {/* Provider Dashboard Link */}
+            {(() => {
+              const providerId = session.kycProviderId || (session.metadata as any)?.provider;
+              let dashboardUrl = null;
+              
+              if (providerId?.toLowerCase() === 'kycaid' && session.kycaidApplicantId) {
+                dashboardUrl = `https://dashboard.kycaid.com/applicants/${session.kycaidApplicantId}`;
+              } else if (providerId?.toLowerCase() === 'sumsub' && session.applicantId) {
+                dashboardUrl = `https://cockpit.sumsub.com/checkus/applicant/${session.applicantId}/basicInfo`;
+              }
+
+              return dashboardUrl ? (
+                <div className="pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-xs"
+                    onClick={() => window.open(dashboardUrl, '_blank')}
+                  >
+                    <ExternalLink className="h-3 w-3 mr-1" />
+                    View in Provider Dashboard
+                  </Button>
+                </div>
+              ) : null;
+            })()}
           </div>
         </Card>
       </div>
