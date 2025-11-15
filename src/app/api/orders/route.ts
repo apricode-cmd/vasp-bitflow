@@ -113,6 +113,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
 
+    // Find existing UserWallet by address and currency (case-insensitive)
+    const userWallet = await prisma.userWallet.findFirst({
+      where: {
+        userId,
+        address: {
+          equals: validatedData.walletAddress,
+          mode: 'insensitive'
+        },
+        currencyCode: validatedData.currencyCode
+      }
+    });
+
     // Create order
     const order = await prisma.order.create({
       data: {
@@ -127,6 +139,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         feeAmount: calculation.fee,
         totalFiat: calculation.totalFiat,
         walletAddress: validatedData.walletAddress,
+        userWalletId: userWallet?.id, // ✅ Link to existing wallet
         paymentMethodCode: validatedData.paymentMethodCode,
         blockchainCode: validatedData.blockchainCode,
         status: 'PENDING',
