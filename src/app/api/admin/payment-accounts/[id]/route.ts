@@ -1,3 +1,6 @@
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic';
+
 /**
  * Payment Account by ID API
  * GET: Get single payment account

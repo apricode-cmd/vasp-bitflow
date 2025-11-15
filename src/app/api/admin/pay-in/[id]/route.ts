@@ -1,3 +1,6 @@
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic';
+
 /**
  * PayIn Details API
  * GET /api/admin/pay-in/[id] - Get single PayIn

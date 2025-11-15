@@ -1,3 +1,6 @@
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminRole } from '@/lib/middleware/admin-auth';

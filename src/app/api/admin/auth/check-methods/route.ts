@@ -1,3 +1,6 @@
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic';
+
 /**
  * Check available authentication methods for admin
  * 

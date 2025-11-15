@@ -1,3 +1,6 @@
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic';
+
 /**
  * PayOut API - GET /api/admin/pay-out
  * List all outgoing payments with filtering

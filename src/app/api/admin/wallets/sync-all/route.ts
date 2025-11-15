@@ -1,3 +1,6 @@
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic';
+
 /**
  * API: Sync All Wallet Balances
  * POST /api/admin/wallets/sync-all

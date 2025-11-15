@@ -10,6 +10,9 @@ import { getAdminSessionData } from '@/lib/services/admin-session.service';
 import { getAdminSession } from '@/auth-admin';
 import { prisma } from '@/lib/prisma';
 
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     // Try Custom JWT (Passkey) first

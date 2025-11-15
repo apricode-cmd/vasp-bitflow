@@ -1,3 +1,6 @@
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic';
+
 /**
  * Currency Resource API
  * Supports many-to-many relationships with blockchain networks

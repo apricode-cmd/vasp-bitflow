@@ -1,3 +1,6 @@
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic';
+
 /**
  * Create KYC Session API
  * POST /api/admin/kyc/create - Manually create a KYC session for a user

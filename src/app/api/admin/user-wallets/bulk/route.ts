@@ -1,3 +1,6 @@
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic';
+
 /**
  * User Wallets Bulk Actions API
  * POST /api/admin/user-wallets/bulk - Perform bulk operations on wallets

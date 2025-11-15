@@ -4,7 +4,7 @@
  * Main application layout with global styles and providers.
  */
 
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Toaster } from 'sonner';
@@ -21,7 +21,15 @@ export async function generateMetadata(): Promise<Metadata> {
     description: settings.seoDescription || 'Buy Bitcoin, Ethereum, Tether, and Solana with EUR or PLN after KYC verification',
     keywords: settings.seoKeywords ? settings.seoKeywords.split(',').map(k => k.trim()) : ['cryptocurrency', 'bitcoin', 'ethereum', 'buy crypto', 'KYC', 'exchange'],
     authors: [{ name: settings.brandName || 'Apricode Exchange' }],
-    viewport: 'width=device-width, initial-scale=1',
+  };
+}
+
+export async function generateViewport(): Promise<Viewport> {
+  const settings = await getPublicSettings();
+
+  return {
+    width: 'device-width',
+    initialScale: 1,
     themeColor: settings.primaryColor || '#3b82f6'
   };
 }

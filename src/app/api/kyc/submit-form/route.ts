@@ -1,3 +1,6 @@
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/kyc/submit-form
  * Save all KYC form data to KycFormData table

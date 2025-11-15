@@ -1,3 +1,6 @@
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic';
+
 /**
  * API: Sync KYC Documents from KYCAID
  * POST /api/admin/kyc/[id]/sync-documents

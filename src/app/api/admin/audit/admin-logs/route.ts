@@ -1,3 +1,6 @@
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic';
+
 /**
  * Admin Audit Logs API
  * GET /api/admin/audit/admin-logs - Retrieve admin action logs

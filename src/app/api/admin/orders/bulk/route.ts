@@ -1,3 +1,6 @@
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic';
+
 /**
  * Orders Bulk Actions API
  * POST /api/admin/orders/bulk - Perform bulk operations on orders

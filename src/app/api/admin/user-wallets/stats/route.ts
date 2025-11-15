@@ -1,3 +1,6 @@
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic';
+
 /**
  * User Wallets Statistics API
  * GET /api/admin/user-wallets/stats - Get wallet statistics
