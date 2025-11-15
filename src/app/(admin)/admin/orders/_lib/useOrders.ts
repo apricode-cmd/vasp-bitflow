@@ -26,6 +26,7 @@ export interface Order {
   feePercent: number;
   walletAddress: string;
   blockchainCode?: string | null;
+  paymentMethodCode?: string | null;
   createdAt: string;
   updatedAt: string;
   expiresAt: string;

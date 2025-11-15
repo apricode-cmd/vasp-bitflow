@@ -165,13 +165,18 @@ export function OrderTransitionDialog({
 
   if (!order) return null;
 
-  const filteredPayInMethods = paymentMethods.filter(m => 
-    m.direction === 'IN' || m.direction === 'BOTH'
-  );
+  // Filter PayIn methods by direction AND currency
+  const filteredPayInMethods = paymentMethods.filter(m => {
+    const hasCorrectDirection = m.direction === 'IN' || m.direction === 'BOTH';
+    const hasCorrectCurrency = m.fiatCurrencyCode === order.fiatCurrencyCode;
+    return hasCorrectDirection && hasCorrectCurrency && m.isActive;
+  });
 
-  const filteredPayOutMethods = paymentMethods.filter(m => 
-    m.direction === 'OUT' || m.direction === 'BOTH'
-  );
+  // Filter PayOut methods by direction
+  const filteredPayOutMethods = paymentMethods.filter(m => {
+    const hasCorrectDirection = m.direction === 'OUT' || m.direction === 'BOTH';
+    return hasCorrectDirection && m.isActive;
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -233,19 +238,15 @@ export function OrderTransitionDialog({
                 </div>
 
                 <div>
-                  <Label>Currency Type *</Label>
-                  <Select 
-                    value={formData.payInCurrencyType} 
-                    onValueChange={(value: 'FIAT' | 'CRYPTO') => setFormData({ ...formData, payInCurrencyType: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="FIAT">Fiat (EUR, PLN)</SelectItem>
-                      <SelectItem value="CRYPTO">Cryptocurrency</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label>Currency *</Label>
+                  <Input
+                    value={`${formData.payInFiatCurrency} (Fiat)`}
+                    disabled
+                    className="bg-muted"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Auto-filled from order
+                  </p>
                 </div>
               </div>
 
