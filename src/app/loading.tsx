@@ -2,18 +2,12 @@
  * Global Loading Component
  * 
  * Displayed while pages are loading.
+ * Uses branded loader with logo from system settings
  */
 
-import { Loader2 } from 'lucide-react';
+import { BrandLoaderPage } from '@/components/ui/brand-loader';
 
 export default function Loading(): React.ReactElement {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
-        <p className="text-gray-600">Loading...</p>
-      </div>
-    </div>
-  );
+  return <BrandLoaderPage text="Loading..." />;
 }
 
