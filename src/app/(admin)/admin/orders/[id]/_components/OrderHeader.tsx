@@ -161,10 +161,6 @@ export function OrderHeader({ order, onAction, loading = false }: OrderHeaderPro
         break;
     }
 
-    // Always available actions
-    actions.push({ label: 'Export Order', action: 'export', icon: Download });
-    actions.push({ label: 'View User Profile', action: 'view-user', icon: ExternalLink });
-
     return actions;
   };
 
@@ -255,14 +251,16 @@ export function OrderHeader({ order, onAction, loading = false }: OrderHeaderPro
 
         {/* Quick Actions */}
         <div className="flex items-center gap-2">
+          {/* Export Button */}
           <Button 
             variant="outline"
-            onClick={() => onAction('view-user')}
+            onClick={() => onAction('export')}
           >
-            <ExternalLink className="h-4 w-4 mr-2" />
-            User Profile
+            <Download className="h-4 w-4 mr-2" />
+            Export
           </Button>
 
+          {/* Order Actions Dropdown */}
           {availableActions.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
