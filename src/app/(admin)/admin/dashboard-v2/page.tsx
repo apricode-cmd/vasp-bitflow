@@ -284,20 +284,25 @@ export default function DashboardV2Page(): JSX.Element {
           <CardContent>
             <div className="space-y-3">
               {stats.recentOrders.slice(0, 5).map((order: any) => (
-                <div key={order.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <div className="font-medium text-sm">{order.paymentReference}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {order.user?.profile?.firstName} {order.user?.profile?.lastName}
+                <Link 
+                  key={order.id}
+                  href={`/admin/orders/${order.id}`}
+                >
+                  <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 hover:shadow-sm transition-all cursor-pointer group">
+                    <div className="flex-1">
+                      <div className="font-medium text-sm group-hover:text-primary transition-colors">{order.paymentReference}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {order.user?.profile?.firstName} {order.user?.profile?.lastName}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <Badge>{order.status}</Badge>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {formatCurrency(order.totalFiat, order.fiatCurrencyCode)}
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <Badge>{order.status}</Badge>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {formatCurrency(order.totalFiat, order.fiatCurrencyCode)}
-                    </div>
-                  </div>
-                </div>
+                </Link>
               ))}
 
               {stats.recentOrders.length === 0 && (

@@ -574,8 +574,7 @@ export default function AdminDashboardPage(): JSX.Element {
                 {stats.recentOrders?.slice(0, 10).map((order: any) => (
                   <Link 
                     key={order.id}
-                    href={`/admin/orders?id=${order.id}`}
-                    scroll={false}
+                    href={`/admin/orders/${order.id}`}
                   >
                     <div className="flex items-center gap-4 p-3 border rounded-lg hover:bg-accent/50 hover:shadow-sm transition-all cursor-pointer group">
                       <Avatar className="h-10 w-10">

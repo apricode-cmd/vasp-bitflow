@@ -309,8 +309,37 @@ export default function OrderDetailsPage(): JSX.Element {
   };
 
   const exportOrder = async (): Promise<void> => {
-    // TODO: Implement order export (PDF/CSV)
-    toast.info('Export functionality coming soon');
+    try {
+      toast.loading('Generating order report...');
+      
+      // Call API to generate PDF
+      const response = await fetch(`/api/admin/orders/${orderId}/report`);
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.details || 'Failed to generate report');
+      }
+      
+      // Get PDF blob
+      const blob = await response.blob();
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `order-report-${order.paymentReference}-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Cleanup
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast.success('Order report downloaded successfully');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to export order');
+    }
   };
 
   const handleTransitionConfirm = async (data: any): Promise<void> => {
