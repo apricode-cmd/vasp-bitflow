@@ -42,9 +42,9 @@ export function WalletFilters({
   const activeFilterCount = Object.values(filters).filter(v => v !== '').length;
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex items-center gap-2 overflow-x-auto">
       {/* Search */}
-      <div className="relative flex-1 min-w-[240px]">
+      <div className="relative w-[280px] flex-shrink-0">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search by address, email, or label..."
@@ -59,7 +59,7 @@ export function WalletFilters({
         value={filters.currencyCode || 'all'}
         onValueChange={(value) => onFilterChange('currencyCode', value === 'all' ? '' : value)}
       >
-        <SelectTrigger className="w-[140px] h-9">
+        <SelectTrigger className="w-[140px] h-9 flex-shrink-0">
           <SelectValue placeholder="All Currencies" />
         </SelectTrigger>
         <SelectContent>
@@ -77,7 +77,7 @@ export function WalletFilters({
         value={filters.blockchainCode || 'all'}
         onValueChange={(value) => onFilterChange('blockchainCode', value === 'all' ? '' : value)}
       >
-        <SelectTrigger className="w-[140px] h-9">
+        <SelectTrigger className="w-[140px] h-9 flex-shrink-0">
           <SelectValue placeholder="All Networks" />
         </SelectTrigger>
         <SelectContent>
@@ -95,7 +95,7 @@ export function WalletFilters({
         value={filters.isVerified || 'all'}
         onValueChange={(value) => onFilterChange('isVerified', value === 'all' ? '' : value)}
       >
-        <SelectTrigger className="w-[120px] h-9">
+        <SelectTrigger className="w-[120px] h-9 flex-shrink-0">
           <SelectValue placeholder="All Status" />
         </SelectTrigger>
         <SelectContent>
@@ -110,7 +110,7 @@ export function WalletFilters({
         value={filters.isDefault || 'all'}
         onValueChange={(value) => onFilterChange('isDefault', value === 'all' ? '' : value)}
       >
-        <SelectTrigger className="w-[120px] h-9">
+        <SelectTrigger className="w-[120px] h-9 flex-shrink-0">
           <SelectValue placeholder="All Wallets" />
         </SelectTrigger>
         <SelectContent>
@@ -123,14 +123,14 @@ export function WalletFilters({
       {/* Active Filters Badge & Reset */}
       {activeFilterCount > 0 && (
         <>
-          <Badge variant="secondary" className="h-9 px-3">
+          <Badge variant="secondary" className="h-9 px-3 flex-shrink-0">
             {activeFilterCount}
           </Badge>
           <Button
             variant="ghost"
             size="sm"
             onClick={onReset}
-            className="h-9 px-3"
+            className="h-9 px-3 flex-shrink-0"
           >
             <X className="h-4 w-4" />
           </Button>
