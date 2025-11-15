@@ -1,0 +1,25 @@
+{
+  "version": "1.0.0",
+  "buildNumber": 1,
+  "buildDate": "2025-11-15T00:00:00.000Z",
+  "releaseNotes": {
+    "1.0.0": {
+      "date": "2025-11-15",
+      "type": "major",
+      "features": [
+        "Initial release",
+        "User registration and authentication",
+        "KYC verification (KYCAID, Sumsub)",
+        "Cryptocurrency purchase (BTC, ETH, USDT, SOL)",
+        "Payment processing (SEPA, Bank Transfer)",
+        "Admin panel with full order management",
+        "Real-time rates from Kraken",
+        "Email notifications",
+        "Multi-language support"
+      ],
+      "improvements": [],
+      "fixes": []
+    }
+  }
+}
+

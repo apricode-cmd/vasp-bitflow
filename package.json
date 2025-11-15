@@ -17,7 +17,12 @@
     "db:push": "npm run db:backup && prisma db push",
     "db:migrate": "npm run db:backup && prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "version:bump": "bash scripts/bump-version.sh",
+    "version:notes": "bash scripts/update-release-notes.sh",
+    "version:major": "npm run version:bump major",
+    "version:minor": "npm run version:bump minor",
+    "version:patch": "npm run version:bump patch"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
