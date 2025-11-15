@@ -141,12 +141,6 @@ const navigation = [
         requiredPermission: 'finance:read'
       },
       { 
-        name: 'Fees & Pricing', 
-        href: '/admin/fees', 
-        icon: TrendingUp,
-        description: 'Fee profiles'
-      },
-      { 
         name: 'Blockchain Networks', 
         href: '/admin/blockchains', 
         icon: Globe,

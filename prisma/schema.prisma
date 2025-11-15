@@ -141,7 +141,6 @@ model FiatCurrency {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   bankDetails     BankDetails[]
-  feeProfiles     FeeProfile[]
   limitsMatrix    LimitsMatrix[]
   orders          Order[]
   payIns          PayIn[]
@@ -1008,25 +1007,6 @@ model RateSnapshot {
 
   @@index([assetCode, fiatCode, timestamp])
   @@index([providerId, timestamp])
-}
-
-model FeeProfile {
-  code              String        @id @unique
-  name              String
-  spreadBps         Int
-  fixedFeeFiat      Float         @default(0)
-  fiatCurrency      String?
-  networkFeePolicy  String        @default("pass-through")
-  networkFeeAmount  Float?
-  networkFeePercent Float?
-  isActive          Boolean       @default(true)
-  priority          Int           @default(0)
-  description       String?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  fiat              FiatCurrency? @relation(fields: [fiatCurrency], references: [code])
-
-  @@index([isActive])
 }
 
 model KycLevel {
