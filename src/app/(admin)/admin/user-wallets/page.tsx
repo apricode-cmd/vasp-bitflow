@@ -471,13 +471,12 @@ export default function UserWalletsPage(): JSX.Element {
         />
       ),
       cell: ({ row }) => (
-        <div onClickCapture={(e) => e.stopPropagation()}>
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={(value) => row.toggleSelected(!!value)}
-            aria-label="Select row"
-          />
-        </div>
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+          onClick={(e) => e.stopPropagation()}
+        />
       ),
       enableSorting: false,
       enableHiding: false,
