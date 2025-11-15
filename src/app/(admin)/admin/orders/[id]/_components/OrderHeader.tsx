@@ -61,13 +61,13 @@ interface OrderHeaderProps {
 }
 
 export function OrderHeader({ order, onAction, loading = false }: OrderHeaderProps): JSX.Element {
-  const userName = order.user.profile 
+  const userName = order.user?.profile 
     ? `${order.user.profile.firstName} ${order.user.profile.lastName}`
-    : order.user.email;
+    : order.user?.email || 'Unknown User';
 
-  const initials = order.user.profile
+  const initials = order.user?.profile
     ? `${order.user.profile.firstName[0]}${order.user.profile.lastName[0]}`
-    : order.user.email[0].toUpperCase();
+    : order.user?.email?.[0]?.toUpperCase() || 'U';
 
   // Determine available actions based on status
   const getAvailableActions = () => {

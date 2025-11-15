@@ -83,13 +83,32 @@ interface OrderData {
     id: string;
     status: string;
     amount: number;
-    currencyCode: string;
+    currencyType: string;
+    fiatCurrencyCode?: string | null;
+    cryptocurrencyCode?: string | null;
+    senderName?: string | null;
+    paymentMethodCode?: string | null;
+    fiatCurrency?: { code: string; name: string; symbol: string } | null;
+    cryptocurrency?: { code: string; name: string; symbol: string } | null;
+    paymentMethod?: { code: string; name: string } | null;
+    network?: { code: string; name: string } | null;
+    createdAt: string;
+    updatedAt: string;
   } | null;
   payOut?: {
     id: string;
     status: string;
     amount: number;
-    currencyCode: string;
+    currencyType: string;
+    fiatCurrencyCode?: string | null;
+    cryptocurrencyCode?: string | null;
+    transactionHash?: string | null;
+    fiatCurrency?: { code: string; name: string; symbol: string } | null;
+    cryptocurrency?: { code: string; name: string; symbol: string } | null;
+    paymentMethod?: { code: string; name: string } | null;
+    network?: { code: string; name: string; explorerUrl?: string } | null;
+    createdAt: string;
+    updatedAt: string;
   } | null;
   statusHistory?: Array<{
     id: string;
@@ -133,7 +152,12 @@ export default function OrderDetailsPage(): JSX.Element {
       }
 
       const data = await response.json();
-      setOrder(data);
+      
+      if (data.success && data.data) {
+        setOrder(data.data);
+      } else {
+        throw new Error(data.error || 'Invalid response format');
+      }
     } catch (error) {
       console.error('Error fetching order:', error);
       toast.error('Failed to load order details');
