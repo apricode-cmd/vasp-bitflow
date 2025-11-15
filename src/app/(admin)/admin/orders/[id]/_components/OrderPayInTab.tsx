@@ -33,9 +33,15 @@ interface OrderPayInTabProps {
       id: string;
       status: string;
       amount: number;
-      currencyCode: string;
+      currencyType: string;
+      fiatCurrencyCode?: string | null;
+      cryptocurrencyCode?: string | null;
       senderName?: string | null;
       paymentMethodCode?: string | null;
+      fiatCurrency?: { code: string; name: string; symbol: string } | null;
+      cryptocurrency?: { code: string; name: string; symbol: string } | null;
+      paymentMethod?: { code: string; name: string } | null;
+      network?: { code: string; name: string } | null;
       createdAt: string;
       updatedAt: string;
     } | null;
@@ -197,7 +203,11 @@ export function OrderPayInTab({ order, onCreatePayIn }: OrderPayInTabProps): JSX
             <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
               <span className="text-sm text-muted-foreground">Received Amount</span>
               <span className="font-semibold">
-                {formatCurrency(order.payIn.amount, order.payIn.currencyType === 'FIAT' ? order.payIn.fiatCurrencyCode : order.payIn.cryptocurrencyCode)}
+                {order.payIn.currencyType === 'FIAT' && order.payIn.fiatCurrency
+                  ? formatCurrency(order.payIn.amount, order.payIn.fiatCurrency.code)
+                  : order.payIn.cryptocurrency
+                  ? `${order.payIn.amount} ${order.payIn.cryptocurrency.code}`
+                  : `${order.payIn.amount}`}
               </span>
             </div>
 

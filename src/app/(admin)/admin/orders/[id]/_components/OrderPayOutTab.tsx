@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { formatDateTime, formatCryptoAmount } from '@/lib/formatters';
+import { formatDateTime, formatCryptoAmount, formatCurrency } from '@/lib/formatters';
 import { 
   TrendingUp,
   CheckCircle,
@@ -41,8 +41,14 @@ interface OrderPayOutTabProps {
       id: string;
       status: string;
       amount: number;
-      currencyCode: string;
+      currencyType: string;
+      fiatCurrencyCode?: string | null;
+      cryptocurrencyCode?: string | null;
       transactionHash?: string | null;
+      fiatCurrency?: { code: string; name: string; symbol: string } | null;
+      cryptocurrency?: { code: string; name: string; symbol: string } | null;
+      paymentMethod?: { code: string; name: string } | null;
+      network?: { code: string; name: string; explorerUrl?: string } | null;
       createdAt: string;
       updatedAt: string;
     } | null;
@@ -208,7 +214,11 @@ export function OrderPayOutTab({ order, onCreatePayOut }: OrderPayOutTabProps): 
             <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
               <span className="text-sm text-muted-foreground">PayOut Amount</span>
               <span className="font-semibold">
-                {formatCryptoAmount(order.payOut.amount)} {order.payOut.currencyType === 'FIAT' ? order.payOut.fiatCurrencyCode : order.payOut.cryptocurrencyCode}
+                {order.payOut.currencyType === 'FIAT' && order.payOut.fiatCurrency
+                  ? formatCurrency(order.payOut.amount, order.payOut.fiatCurrency.code)
+                  : order.payOut.cryptocurrency
+                  ? `${formatCryptoAmount(order.payOut.amount)} ${order.payOut.cryptocurrency.code}`
+                  : `${formatCryptoAmount(order.payOut.amount)}`}
               </span>
             </div>
 

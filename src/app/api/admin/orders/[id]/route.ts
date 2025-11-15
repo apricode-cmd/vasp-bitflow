@@ -27,7 +27,7 @@ export async function GET(request: NextRequest, { params }: RouteContext): Promi
   }
 
   try {
-    // Fetch order by ID or paymentReference
+    // Fetch order by ID or paymentReference with all relations
     const order = await prisma.order.findFirst({
       where: {
         OR: [
@@ -37,103 +37,34 @@ export async function GET(request: NextRequest, { params }: RouteContext): Promi
       },
       include: {
         user: {
-          select: {
-            id: true,
-            email: true,
-            profile: {
-              select: {
-                firstName: true,
-                lastName: true,
-                phoneNumber: true,
-                country: true
-              }
-            },
-            kycSession: {
-              select: {
-                status: true
-              }
-            }
+          include: {
+            profile: true,
+            kycSession: true
           }
         },
-        currency: {
-          select: {
-            code: true,
-            name: true,
-            symbol: true
-          }
-        },
-        fiatCurrency: {
-          select: {
-            code: true,
-            symbol: true,
-            name: true
-          }
-        },
-        blockchain: {
-          select: {
-            code: true,
-            name: true,
-            explorerUrl: true
-          }
-        },
-        paymentMethod: {
-          select: {
-            code: true,
-            name: true
-          }
-        },
-        userWallet: {
-          select: {
-            id: true,
-            address: true,
-            label: true,
-            isVerified: true
-          }
-        },
+        currency: true,
+        fiatCurrency: true,
+        blockchain: true,
+        paymentMethod: true,
+        userWallet: true,
         payIn: {
-          select: {
-            id: true,
-            status: true,
-            amount: true,
-            fiatCurrencyCode: true,
-            cryptocurrencyCode: true,
-            currencyType: true,
-            senderName: true,
-            paymentMethodCode: true,
-            createdAt: true,
-            updatedAt: true
+          include: {
+            fiatCurrency: true,
+            cryptocurrency: true,
+            paymentMethod: true,
+            network: true
           }
         },
         payOut: {
-          select: {
-            id: true,
-            status: true,
-            amount: true,
-            fiatCurrencyCode: true,
-            cryptocurrencyCode: true,
-            currencyType: true,
-            transactionHash: true,
-            createdAt: true,
-            updatedAt: true
+          include: {
+            fiatCurrency: true,
+            cryptocurrency: true,
+            paymentMethod: true,
+            network: true
           }
         },
-        paymentProofs: {
-          select: {
-            id: true,
-            proofUrl: true,
-            status: true,
-            createdAt: true
-          }
-        },
+        paymentProofs: true,
         statusHistory: {
-          select: {
-            id: true,
-            oldStatus: true,
-            newStatus: true,
-            changedBy: true,
-            note: true,
-            createdAt: true
-          },
           orderBy: {
             createdAt: 'desc'
           },

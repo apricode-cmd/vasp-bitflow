@@ -63,13 +63,21 @@ interface OrderOverviewTabProps {
       id: string;
       status: string;
       amount: number;
-      currencyCode: string;
+      currencyType: string;
+      fiatCurrencyCode?: string | null;
+      cryptocurrencyCode?: string | null;
+      fiatCurrency?: { code: string; name: string; symbol: string } | null;
+      cryptocurrency?: { code: string; name: string; symbol: string } | null;
     } | null;
     payOut?: {
       id: string;
       status: string;
       amount: number;
-      currencyCode: string;
+      currencyType: string;
+      fiatCurrencyCode?: string | null;
+      cryptocurrencyCode?: string | null;
+      fiatCurrency?: { code: string; name: string; symbol: string } | null;
+      cryptocurrency?: { code: string; name: string; symbol: string } | null;
     } | null;
   };
 }
@@ -206,7 +214,13 @@ export function OrderOverviewTab({ order }: OrderOverviewTabProps): JSX.Element 
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Amount</span>
-                  <span>{order.payIn.amount} {order.payIn.currencyType === 'FIAT' ? order.payIn.fiatCurrencyCode : order.payIn.cryptocurrencyCode}</span>
+                  <span>
+                    {order.payIn.currencyType === 'FIAT' && order.payIn.fiatCurrency
+                      ? `${order.payIn.amount} ${order.payIn.fiatCurrency.code}`
+                      : order.payIn.cryptocurrency
+                      ? `${order.payIn.amount} ${order.payIn.cryptocurrency.code}`
+                      : order.payIn.amount}
+                  </span>
                 </div>
                 <Button variant="outline" size="sm" className="w-full" asChild>
                   <a href={`/admin/pay-in/${order.payIn.id}`}>View PayIn Details</a>
@@ -222,7 +236,13 @@ export function OrderOverviewTab({ order }: OrderOverviewTabProps): JSX.Element 
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Amount</span>
-                  <span>{order.payOut.amount} {order.payOut.currencyType === 'FIAT' ? order.payOut.fiatCurrencyCode : order.payOut.cryptocurrencyCode}</span>
+                  <span>
+                    {order.payOut.currencyType === 'FIAT' && order.payOut.fiatCurrency
+                      ? `${order.payOut.amount} ${order.payOut.fiatCurrency.code}`
+                      : order.payOut.cryptocurrency
+                      ? `${order.payOut.amount} ${order.payOut.cryptocurrency.code}`
+                      : order.payOut.amount}
+                  </span>
                 </div>
                 <Button variant="outline" size="sm" className="w-full" asChild>
                   <a href={`/admin/pay-out/${order.payOut.id}`}>View PayOut Details</a>
