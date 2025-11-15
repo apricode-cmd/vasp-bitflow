@@ -99,10 +99,12 @@ export const updateOrderStatusSchema = z.object({
   status: z.enum([
     'PENDING',
     'PAYMENT_PENDING',
+    'PAYMENT_RECEIVED',
     'PROCESSING',
     'COMPLETED',
     'CANCELLED',
     'REFUNDED',
+    'FAILED',
     'EXPIRED'
   ]),
   adminNotes: z.string().max(500).optional(),
@@ -111,7 +113,7 @@ export const updateOrderStatusSchema = z.object({
     .regex(/^(0x)?[a-fA-F0-9]{64}$/, 'Invalid transaction hash')
     .optional()
     .nullable(), // Allow null for non-crypto orders
-  payInData: payInDataSchema.optional(), // For PENDING → PAYMENT_PENDING
+  payInData: payInDataSchema.optional(), // For PENDING → PAYMENT_PENDING or PAYMENT_RECEIVED
   payOutData: payOutDataSchema.optional() // For PROCESSING → COMPLETED
 });
 
