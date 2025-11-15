@@ -33,7 +33,7 @@ import { WalletQuickStats } from './_components/WalletQuickStats';
 import { WalletFilters } from './_components/WalletFilters';
 import { WalletDetailsSheet } from './_components/WalletDetailsSheet';
 import { formatDateTime } from '@/lib/formatters';
-import { exportToCSV, formatDateTimeForExport } from '@/lib/utils/export-utils';
+import { formatDateTimeForExport } from '@/lib/utils/export-utils';
 import { toast } from 'sonner';
 import { 
   MoreHorizontal, Eye, Trash2, CheckCircle, XCircle, 
@@ -390,10 +390,32 @@ export default function UserWalletsPage(): JSX.Element {
       'Updated At': formatDateTimeForExport(wallet.updatedAt)
     }));
 
-    exportToCSV(
-      csvData,
-      `wallets-export-${new Date().toISOString().split('T')[0]}.csv`
-    );
+    // Simple CSV export without exportToCSV util
+    const headers = Object.keys(csvData[0] || {});
+    const csvContent = [
+      headers.map(h => `"${h}"`).join(','),
+      ...csvData.map(row => 
+        headers.map(h => {
+          const value = (row as any)[h];
+          const stringValue = String(value ?? '');
+          return stringValue.includes(',') || stringValue.includes('"') 
+            ? `"${stringValue.replace(/"/g, '""')}"` 
+            : stringValue;
+        }).join(',')
+      )
+    ].join('\n');
+
+    // Download
+    const bom = '\uFEFF';
+    const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `wallets-export-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
 
     toast.success(`Exported ${csvData.length} wallet(s)`);
   };
