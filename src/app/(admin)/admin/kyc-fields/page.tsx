@@ -31,6 +31,7 @@ import * as Icons from 'lucide-react';
 import { BrandLoaderInline } from '@/components/ui/brand-loader';
 import { ConditionalLogicSection } from '@/components/admin/kyc/ConditionalLogicSection';
 import { UXEnhancementsSection } from '@/components/admin/kyc/UXEnhancementsSection';
+import { ValidationRulesSection } from '@/components/admin/kyc/ValidationRulesSection';
 
 interface KycField {
   id: string;
@@ -423,10 +424,11 @@ export default function KycFormFieldsPage() {
           </DialogHeader>
 
           <Tabs value={editDialogTab} onValueChange={setEditDialogTab} className="py-4">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="basic">Basic Settings</TabsTrigger>
-              <TabsTrigger value="conditional">Conditional Logic</TabsTrigger>
-              <TabsTrigger value="ux">UX Enhancements</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="basic">Basic</TabsTrigger>
+              <TabsTrigger value="validation">Validation</TabsTrigger>
+              <TabsTrigger value="conditional">Conditional</TabsTrigger>
+              <TabsTrigger value="ux">UX</TabsTrigger>
             </TabsList>
 
             {/* Basic Settings Tab */}
@@ -474,21 +476,6 @@ export default function KycFormFieldsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="validation">Validation Rules (JSON)</Label>
-                <Textarea
-                  id="validation"
-                  value={editForm.validation}
-                  onChange={(e) => setEditForm({ ...editForm, validation: e.target.value })}
-                  rows={4}
-                  placeholder='{"min": 3, "max": 100}'
-                  className="font-mono text-sm"
-                />
-                <p className="text-xs text-muted-foreground">
-                  JSON format: {`{"min": 2, "max": 50, "pattern": "^[A-Z]+$"}`}
-                </p>
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="options">Options (JSON array for select fields)</Label>
                 <Textarea
                   id="options"
@@ -502,6 +489,20 @@ export default function KycFormFieldsPage() {
                   For select/radio/checkbox fields only
                 </p>
               </div>
+            </TabsContent>
+
+            {/* Validation Tab */}
+            <TabsContent value="validation" className="mt-4">
+              <ValidationRulesSection
+                fieldType={selectedField?.fieldType || 'text'}
+                validation={editForm.validation ? (typeof editForm.validation === 'string' ? JSON.parse(editForm.validation || '{}') : editForm.validation) : null}
+                onChange={(validationObj) => {
+                  setEditForm({ 
+                    ...editForm, 
+                    validation: validationObj ? JSON.stringify(validationObj, null, 2) : ''
+                  });
+                }}
+              />
             </TabsContent>
 
             {/* Conditional Logic Tab */}
