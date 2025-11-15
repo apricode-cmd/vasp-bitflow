@@ -168,7 +168,23 @@ export function OrderTransitionDialog({
   // Filter PayIn methods by direction AND currency
   const filteredPayInMethods = paymentMethods.filter(m => {
     const hasCorrectDirection = m.direction === 'IN' || m.direction === 'BOTH';
-    const hasCorrectCurrency = m.fiatCurrencyCode === order.fiatCurrencyCode;
+    // Check both m.currency and m.fiatCurrencyCode for compatibility
+    const methodCurrency = m.fiatCurrencyCode || m.currency;
+    const hasCorrectCurrency = methodCurrency === order.fiatCurrencyCode;
+    
+    // Debug logging
+    console.log('PayIn Method Filter:', {
+      method: m.name,
+      code: m.code,
+      direction: m.direction,
+      hasCorrectDirection,
+      methodCurrency,
+      orderCurrency: order.fiatCurrencyCode,
+      hasCorrectCurrency,
+      isActive: m.isActive,
+      willShow: hasCorrectDirection && hasCorrectCurrency && m.isActive
+    });
+    
     return hasCorrectDirection && hasCorrectCurrency && m.isActive;
   });
 
