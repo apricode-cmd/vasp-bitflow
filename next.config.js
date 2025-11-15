@@ -30,8 +30,14 @@ const securityHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   
+  // Docker standalone build (reduces image size from ~1GB to ~200MB)
+  output: process.env.DOCKER_BUILD === 'true' ? 'standalone' : undefined,
+  
   // Production optimizations
   swcMinify: true, // Use SWC for minification (faster than Terser)
+  
+  // Disable source maps in production for smaller bundle
+  productionBrowserSourceMaps: false,
   
   // Remove console.log in production (keep errors/warnings)
   compiler: {

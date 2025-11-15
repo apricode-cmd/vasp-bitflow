@@ -1,0 +1,202 @@
+# Apricode Exchange - Multi-Tenant Configuration
+# Deploy multiple client instances on single server
+
+version: '3.9'
+
+services:
+  # ====================
+  # Client 1 Instance
+  # ====================
+  client1-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: apricode-client1
+    ports:
+      - "3001:3000"
+    environment:
+      DATABASE_URL: postgresql://postgres:password@client1-db:5432/client1
+      DIRECT_URL: postgresql://postgres:password@client1-db:5432/client1
+      AUTH_SECRET: ${CLIENT1_AUTH_SECRET}
+      NEXTAUTH_URL: https://client1.apricode.io
+      REDIS_URL: redis://redis:6379/1
+      
+      # Branding
+      NEXT_PUBLIC_APP_NAME: "Client 1 Exchange"
+      NEXT_PUBLIC_LOGO_URL: "https://client1.com/logo.svg"
+      NEXT_PUBLIC_PRIMARY_COLOR: "#3b82f6"
+      NEXT_PUBLIC_APP_URL: https://client1.apricode.io
+      
+      # Tenant
+      TENANT_ID: client1
+      
+      # KYC & Services (can be shared or separate)
+      KYCAID_API_KEY: ${CLIENT1_KYCAID_API_KEY}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      EMAIL_FROM: noreply@client1.apricode.io
+      
+    depends_on:
+      - client1-db
+      - redis
+    networks:
+      - apricode-network
+    restart: unless-stopped
+
+  client1-db:
+    image: postgres:15-alpine
+    container_name: apricode-client1-db
+    environment:
+      POSTGRES_DB: client1
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - client1_data:/var/lib/postgresql/data
+    networks:
+      - apricode-network
+    restart: unless-stopped
+
+  # ====================
+  # Client 2 Instance
+  # ====================
+  client2-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: apricode-client2
+    ports:
+      - "3002:3000"
+    environment:
+      DATABASE_URL: postgresql://postgres:password@client2-db:5432/client2
+      DIRECT_URL: postgresql://postgres:password@client2-db:5432/client2
+      AUTH_SECRET: ${CLIENT2_AUTH_SECRET}
+      NEXTAUTH_URL: https://client2.apricode.io
+      REDIS_URL: redis://redis:6379/2
+      
+      # Branding
+      NEXT_PUBLIC_APP_NAME: "Client 2 Crypto"
+      NEXT_PUBLIC_LOGO_URL: "https://client2.com/logo.svg"
+      NEXT_PUBLIC_PRIMARY_COLOR: "#8b5cf6"
+      NEXT_PUBLIC_APP_URL: https://client2.apricode.io
+      
+      # Tenant
+      TENANT_ID: client2
+      
+      KYCAID_API_KEY: ${CLIENT2_KYCAID_API_KEY}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      EMAIL_FROM: noreply@client2.apricode.io
+      
+    depends_on:
+      - client2-db
+      - redis
+    networks:
+      - apricode-network
+    restart: unless-stopped
+
+  client2-db:
+    image: postgres:15-alpine
+    container_name: apricode-client2-db
+    environment:
+      POSTGRES_DB: client2
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - client2_data:/var/lib/postgresql/data
+    networks:
+      - apricode-network
+    restart: unless-stopped
+
+  # ====================
+  # Client 3 Instance
+  # ====================
+  client3-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: apricode-client3
+    ports:
+      - "3003:3000"
+    environment:
+      DATABASE_URL: postgresql://postgres:password@client3-db:5432/client3
+      DIRECT_URL: postgresql://postgres:password@client3-db:5432/client3
+      AUTH_SECRET: ${CLIENT3_AUTH_SECRET}
+      NEXTAUTH_URL: https://client3.apricode.io
+      REDIS_URL: redis://redis:6379/3
+      
+      # Branding
+      NEXT_PUBLIC_APP_NAME: "Client 3 Platform"
+      NEXT_PUBLIC_LOGO_URL: "https://client3.com/logo.svg"
+      NEXT_PUBLIC_PRIMARY_COLOR: "#10b981"
+      NEXT_PUBLIC_APP_URL: https://client3.apricode.io
+      
+      # Tenant
+      TENANT_ID: client3
+      
+      KYCAID_API_KEY: ${CLIENT3_KYCAID_API_KEY}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      EMAIL_FROM: noreply@client3.apricode.io
+      
+    depends_on:
+      - client3-db
+      - redis
+    networks:
+      - apricode-network
+    restart: unless-stopped
+
+  client3-db:
+    image: postgres:15-alpine
+    container_name: apricode-client3-db
+    environment:
+      POSTGRES_DB: client3
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - client3_data:/var/lib/postgresql/data
+    networks:
+      - apricode-network
+    restart: unless-stopped
+
+  # ====================
+  # Shared Redis
+  # ====================
+  redis:
+    image: redis:7-alpine
+    container_name: apricode-redis-shared
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_shared:/data
+    networks:
+      - apricode-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+
+  # ====================
+  # Nginx Reverse Proxy
+  # ====================
+  nginx:
+    image: nginx:alpine
+    container_name: apricode-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx-multi-tenant.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - client1-app
+      - client2-app
+      - client3-app
+    networks:
+      - apricode-network
+    restart: unless-stopped
+
+volumes:
+  client1_data:
+  client2_data:
+  client3_data:
+  redis_shared:
+
+networks:
+  apricode-network:
+    driver: bridge
+
