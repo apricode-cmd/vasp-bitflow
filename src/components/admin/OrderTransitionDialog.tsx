@@ -100,7 +100,7 @@ export function OrderTransitionDialog({
         ...prev,
         payInAmount: order.totalFiat,
         payInFiatCurrency: order.fiatCurrencyCode,
-        payInPaymentMethod: order.paymentMethodCode || '', // Auto-select payment method from order
+        payInPaymentMethod: '', // Will be set by next useEffect
         payInReference: order.paymentReference, // Set default reference
         payOutAmount: order.cryptoAmount,
         payOutCryptoCurrency: order.currencyCode,
@@ -110,6 +110,24 @@ export function OrderTransitionDialog({
       setShowCustomReference(false); // Reset on dialog open
     }
   }, [order, open]);
+
+  // Auto-select payment method (prefer order's method, fallback to first available)
+  useEffect(() => {
+    if (requiresPayIn && filteredPayInMethods.length > 0 && !formData.payInPaymentMethod) {
+      // Check if order's payment method is in filtered list
+      const orderMethodAvailable = order?.paymentMethodCode && 
+        filteredPayInMethods.some(m => m.code === order.paymentMethodCode);
+      
+      const selectedMethod = orderMethodAvailable 
+        ? order.paymentMethodCode 
+        : filteredPayInMethods[0].code;
+
+      setFormData(prev => ({
+        ...prev,
+        payInPaymentMethod: selectedMethod
+      }));
+    }
+  }, [requiresPayIn, filteredPayInMethods, formData.payInPaymentMethod, order?.paymentMethodCode]);
 
   const handleSubmit = async () => {
     if (!order) return;
@@ -171,20 +189,6 @@ export function OrderTransitionDialog({
     // Check both m.currency and m.fiatCurrencyCode for compatibility
     const methodCurrency = m.fiatCurrencyCode || m.currency;
     const hasCorrectCurrency = methodCurrency === order.fiatCurrencyCode;
-    
-    // Debug logging
-    console.log('PayIn Method Filter:', {
-      method: m.name,
-      code: m.code,
-      direction: m.direction,
-      hasCorrectDirection,
-      methodCurrency,
-      orderCurrency: order.fiatCurrencyCode,
-      hasCorrectCurrency,
-      isActive: m.isActive,
-      willShow: hasCorrectDirection && hasCorrectCurrency && m.isActive
-    });
-    
     return hasCorrectDirection && hasCorrectCurrency && m.isActive;
   });
 
