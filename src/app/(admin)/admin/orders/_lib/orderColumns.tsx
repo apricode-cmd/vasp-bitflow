@@ -144,27 +144,12 @@ export function useOrderColumns({ onStatusChange }: UseOrderColumnsProps = {}): 
                 <OrderStatusBadge status={order.status} />
               </SelectTrigger>
               <SelectContent>
-                {/* Current status (for display only) */}
-                <SelectItem value={order.status} disabled>
-                  <div className="flex items-center gap-2">
-                    <OrderStatusBadge status={order.status} />
-                    <span className="text-xs text-muted-foreground">(current)</span>
-                  </div>
-                </SelectItem>
-                
-                {/* Allowed transitions */}
-                {allowedStatuses.length > 0 && (
-                  <>
-                    <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground border-t">
-                      Available transitions:
-                    </div>
-                    {allowedStatuses.map((status) => (
-                      <SelectItem key={status} value={status}>
-                        <OrderStatusBadge status={status} />
-                      </SelectItem>
-                    ))}
-                  </>
-                )}
+                {/* Allowed transitions (only show different statuses) */}
+                {allowedStatuses.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    <OrderStatusBadge status={status} />
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
