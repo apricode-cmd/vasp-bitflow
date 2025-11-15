@@ -3,6 +3,9 @@
  * 
  * Generates comprehensive order reports for compliance and audit purposes
  * Based on user-report-pdf.service.ts pattern
+ * 
+ * ⚠️ IMPORTANT: Based on actual Prisma schema structure
+ * See PRISMA_ORDER_STRUCTURE.md for complete field reference
  */
 
 import React from 'react';
@@ -20,7 +23,7 @@ import { OrderReportDocument, OrderReportData } from '@/components/reports/Order
 export async function generateOrderReportPDF(orderId: string): Promise<Buffer> {
   console.log(`[ORDER_REPORT] Generating PDF for order: ${orderId}`);
 
-  // 1. Fetch order with all related data
+  // 1. Fetch order with all related data (based on ACTUAL Prisma schema)
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: {
@@ -32,9 +35,10 @@ export async function generateOrderReportPDF(orderId: string): Promise<Buffer> {
       },
       currency: true,
       fiatCurrency: true,
+      blockchain: true,
       paymentMethod: {
         include: {
-          paymentAccount: true,
+          paymentAccount: true, // Through paymentMethod!
         },
       },
       userWallet: {
@@ -45,6 +49,8 @@ export async function generateOrderReportPDF(orderId: string): Promise<Buffer> {
       },
       payIn: {
         include: {
+          cryptocurrency: true,
+          fiatCurrency: true,
           paymentMethod: {
             include: {
               paymentAccount: true,
@@ -54,19 +60,16 @@ export async function generateOrderReportPDF(orderId: string): Promise<Buffer> {
       },
       payOut: {
         include: {
+          cryptocurrency: true,
+          fiatCurrency: true,
           network: true,
+          paymentMethod: true,
+          userWallet: true,
         },
       },
       statusHistory: {
         orderBy: {
-          createdAt: 'asc',
-        },
-        include: {
-          changedByAdmin: {
-            select: {
-              email: true,
-            },
-          },
+          createdAt: 'asc', // NOT changedAt!
         },
       },
     },
@@ -112,11 +115,12 @@ export async function generateOrderReportPDF(orderId: string): Promise<Buffer> {
   console.log(`[ORDER_REPORT] Company info: ${legalData.companyLegalName}, Logo: ${logoUrl ? 'Yes' : 'No'}`);
 
   // 4. Build timeline from status history
+  // NOTE: statusHistory has NO relation to Admin, just changedBy (String ID)
   const timeline = order.statusHistory.map(history => ({
-    date: history.createdAt.toISOString(),
+    date: history.createdAt.toISOString(), // Use createdAt, not changedAt!
     status: history.newStatus,
-    description: history.notes || `Order status changed from ${history.oldStatus} to ${history.newStatus}`,
-    actor: history.changedByAdmin?.email || 'System',
+    description: history.note || `Order status changed from ${history.oldStatus} to ${history.newStatus}`, // Use note, not notes!
+    actor: history.changedBy || 'System', // Just admin ID string, no email
   }));
 
   // Add initial creation event if not in history
@@ -129,7 +133,12 @@ export async function generateOrderReportPDF(orderId: string): Promise<Buffer> {
     });
   }
 
-  // 5. Build report data
+  // 5. Calculate completedAt from processedAt and status
+  const completedAt = (order.status === 'COMPLETED' && order.processedAt) 
+    ? order.processedAt.toISOString() 
+    : null;
+
+  // 6. Build report data
   const reportData: OrderReportData = {
     // Report metadata
     reportDate: new Date().toISOString(),
@@ -156,7 +165,7 @@ export async function generateOrderReportPDF(orderId: string): Promise<Buffer> {
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
     expiresAt: order.expiresAt?.toISOString() || null,
-    completedAt: order.completedAt?.toISOString() || null,
+    completedAt, // Calculated from processedAt
 
     // Customer information
     customerId: order.user.id,
@@ -173,8 +182,8 @@ export async function generateOrderReportPDF(orderId: string): Promise<Buffer> {
     cryptoAmount: order.cryptoAmount.toString(),
     fiatCurrency: order.fiatCurrencyCode,
     fiatAmount: order.fiatAmount.toString(),
-    exchangeRate: order.exchangeRate.toString(),
-    platformFee: order.platformFee.toString(),
+    exchangeRate: order.rate.toString(),
+    platformFee: order.feeAmount.toString(),
     totalFiat: order.totalFiat.toString(),
 
     // Payment details
@@ -185,33 +194,33 @@ export async function generateOrderReportPDF(orderId: string): Promise<Buffer> {
       : null,
     
     // Wallet details
-    walletAddress: order.userWallet?.address || null,
+    walletAddress: order.userWallet?.address || order.walletAddress || null,
     walletLabel: order.userWallet?.label || null,
-    blockchain: order.userWallet?.blockchain?.name || null,
+    blockchain: order.userWallet?.blockchain?.name || order.blockchain?.name || null,
 
     // PayIn details
     payInStatus: order.payIn?.status || null,
     payInAmount: order.payIn?.amount?.toString() || null,
-    payInCurrency: order.payIn?.currency || null,
+    payInCurrency: order.payIn?.fiatCurrencyCode || order.payIn?.cryptocurrencyCode || null,
     payInReference: order.payIn?.reference || null,
-    payInReceivedAt: order.payIn?.receivedAt?.toISOString() || null,
+    payInReceivedAt: order.payIn?.receivedDate?.toISOString() || null, // NOTE: receivedDate, not receivedAt!
 
     // PayOut details
     payOutStatus: order.payOut?.status || null,
     payOutAmount: order.payOut?.amount?.toString() || null,
-    payOutCurrency: order.payOut?.currency || null,
-    payOutTxHash: order.payOut?.txHash || null,
+    payOutCurrency: order.payOut?.cryptocurrencyCode || order.payOut?.fiatCurrencyCode || null,
+    payOutTxHash: order.payOut?.transactionHash || null,
     payOutSentAt: order.payOut?.sentAt?.toISOString() || null,
 
     // Timeline
     timeline,
 
-    // Notes
-    adminNotes: order.internalNote || null,
-    customerNotes: order.notes || null,
+    // Notes - Order only has adminNotes field
+    adminNotes: order.adminNotes || null,
+    customerNotes: null, // Order doesn't have customer notes field
   };
 
-  // 6. Generate PDF
+  // 7. Generate PDF
   console.log(`[ORDER_REPORT] Generating PDF document...`);
   
   try {
@@ -239,4 +248,3 @@ export function generateOrderReportFilename(orderId: string, paymentReference: s
   const refPart = paymentReference.replace(/[^a-zA-Z0-9]/g, '-');
   return `order-report-${refPart}-${date}.pdf`;
 }
-

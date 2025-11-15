@@ -309,9 +309,7 @@ export default function OrderDetailsPage(): JSX.Element {
   };
 
   const exportOrder = async (): Promise<void> => {
-    try {
-      toast.loading('Generating order report...');
-      
+    const downloadPromise = async () => {
       // Call API to generate PDF
       const response = await fetch(`/api/admin/orders/${orderId}/report`);
       
@@ -335,11 +333,14 @@ export default function OrderDetailsPage(): JSX.Element {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       
-      toast.success('Order report downloaded successfully');
-    } catch (error) {
-      console.error('Export error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to export order');
-    }
+      return 'Order report downloaded successfully';
+    };
+
+    toast.promise(downloadPromise(), {
+      loading: 'Generating order report...',
+      success: (message) => message,
+      error: (err) => err.message || 'Failed to export order',
+    });
   };
 
   const handleTransitionConfirm = async (data: any): Promise<void> => {
