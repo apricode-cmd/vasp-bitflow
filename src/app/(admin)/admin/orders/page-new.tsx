@@ -69,36 +69,13 @@ export default function OrdersPage(): JSX.Element {
         {/* Left: Filters & Stats */}
         <div className="lg:col-span-1 space-y-4">
           <OrderFilters
-            filters={{
-              search: filters.search,
-              status: filters.status,
-              currencyCode: filters.currencyCode || '',
-              fiatCurrencyCode: filters.fiatCurrencyCode || '',
-              hasPayIn: filters.hasPayIn !== undefined ? filters.hasPayIn.toString() : '',
-              hasPayOut: filters.hasPayOut !== undefined ? filters.hasPayOut.toString() : '',
-              dateFrom: filters.dateRange?.from?.toISOString() || '',
-              dateTo: filters.dateRange?.to?.toISOString() || '',
-            }}
-            onFilterChange={(key, value) => {
-              if (key === 'search' || key === 'status') {
-                setFilter(key, value);
-              } else if (key === 'currencyCode' || key === 'fiatCurrencyCode') {
-                setFilter(key, value === '' ? undefined : value);
-              }
-            }}
-            onReset={() => {
-              // Reset filters to default
-              setFilter('status', 'all');
-              setFilter('search', '');
-              setFilter('currencyCode', undefined);
-              setFilter('fiatCurrencyCode', undefined);
-              setFilter('hasPayIn', undefined);
-              setFilter('hasPayOut', undefined);
-              setFilter('dateRange', undefined);
-            }}
+            selectedStatus={filters.status}
+            onStatusChange={(status) => setFilter('status', status)}
+            dateRange={filters.dateRange}
+            onDateRangeChange={(range) => setFilter('dateRange', range)}
           />
           
-          <OrderQuickStats stats={null} isLoading={loading} />
+          <OrderQuickStats />
         </div>
 
         {/* Right: Main Content */}
