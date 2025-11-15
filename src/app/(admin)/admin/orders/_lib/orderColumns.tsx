@@ -26,8 +26,8 @@ import type { OrderStatus } from '@prisma/client';
 
 // Status transition rules
 const STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  PENDING: ['PAYMENT_PENDING', 'PROCESSING', 'CANCELLED'],
-  PAYMENT_PENDING: ['PROCESSING', 'CANCELLED'],
+  PENDING: ['PAYMENT_PENDING', 'PAYMENT_RECEIVED', 'PROCESSING', 'CANCELLED'],
+  PAYMENT_PENDING: ['PAYMENT_RECEIVED', 'PROCESSING', 'CANCELLED'],
   PAYMENT_RECEIVED: ['PROCESSING', 'CANCELLED'],
   PROCESSING: ['COMPLETED', 'CANCELLED'],
   COMPLETED: [],
@@ -112,7 +112,10 @@ export function useOrderColumns({ onStatusChange }: UseOrderColumnsProps = {}): 
       header: 'Status',
       cell: ({ row, table }) => {
         const order = row.original;
-        const allowedStatuses = STATUS_TRANSITIONS[order.status as OrderStatus] || [];
+        const currentStatus = order.status as OrderStatus;
+        // Filter out current status from allowed transitions
+        const allowedStatuses = (STATUS_TRANSITIONS[currentStatus] || [])
+          .filter(status => status !== currentStatus);
         
         // If no transitions allowed, show static badge
         if (allowedStatuses.length === 0) {
@@ -121,8 +124,8 @@ export function useOrderColumns({ onStatusChange }: UseOrderColumnsProps = {}): 
 
         const handleValueChange = (newValue: string) => {
           const newStatus = newValue as OrderStatus;
-          if (newStatus !== order.status) {
-            onStatusChange?.(order.id, order.status, newStatus);
+          if (newStatus !== currentStatus) {
+            onStatusChange?.(order.id, currentStatus, newStatus);
           }
         };
 

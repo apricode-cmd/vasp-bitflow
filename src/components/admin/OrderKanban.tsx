@@ -105,13 +105,15 @@ interface OrderKanbanProps {
 
 // Status transition rules (what statuses can be changed to from current status)
 const STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  PENDING: ['PAYMENT_PENDING', 'PROCESSING', 'CANCELLED'],
-  PAYMENT_PENDING: ['PROCESSING', 'CANCELLED'],
+  PENDING: ['PAYMENT_PENDING', 'PAYMENT_RECEIVED', 'PROCESSING', 'CANCELLED'],
+  PAYMENT_PENDING: ['PAYMENT_RECEIVED', 'PROCESSING', 'CANCELLED'],
+  PAYMENT_RECEIVED: ['PROCESSING', 'CANCELLED'],
   PROCESSING: ['COMPLETED', 'CANCELLED'],
   COMPLETED: [], // Terminal status
   CANCELLED: [], // Terminal status
   REFUNDED: [], // Terminal status
   EXPIRED: ['PENDING'], // Can be reactivated
+  FAILED: ['PENDING', 'CANCELLED'],
 };
 
 // Enhanced status definitions with better UX
@@ -128,7 +130,7 @@ const KANBAN_COLUMNS = [
     allowedTransitions: STATUS_TRANSITIONS.PENDING
   },
   { 
-    id: 'PAYMENT_PENDING' as OrderStatus, 
+    id: 'PAYMENT_RECEIVED' as OrderStatus, 
     label: 'Payment Received', 
     description: 'Proof uploaded, needs verification',
     helpText: 'Customer uploaded payment proof, verify and process',
@@ -136,7 +138,7 @@ const KANBAN_COLUMNS = [
     bgColor: 'bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-950/20 dark:to-orange-900/10',
     icon: DollarSign,
     iconColor: 'text-orange-600',
-    allowedTransitions: STATUS_TRANSITIONS.PAYMENT_PENDING
+    allowedTransitions: STATUS_TRANSITIONS.PAYMENT_RECEIVED
   },
   { 
     id: 'PROCESSING' as OrderStatus, 
