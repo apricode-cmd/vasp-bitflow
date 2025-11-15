@@ -771,20 +771,27 @@ model OrderStatusHistory {
 }
 
 model KycFormField {
-  id         String   @id @default(cuid())
-  fieldName  String   @unique
-  label      String
-  fieldType  String
-  isRequired Boolean  @default(true)
-  isEnabled  Boolean  @default(true)
-  category   String
-  validation Json?
-  options    Json?
-  priority   Int      @default(0)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  dependsOn  String?
-  showWhen   Json?
+  id          String   @id @default(cuid())
+  fieldName   String   @unique
+  label       String
+  fieldType   String
+  isRequired  Boolean  @default(true)
+  isEnabled   Boolean  @default(true)
+  category    String
+  validation  Json?
+  options     Json?
+  priority    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Conditional Logic
+  dependsOn   String?
+  showWhen    Json?
+  
+  // UX Enhancements
+  helpText    String?
+  placeholder String?
+  customClass String?
 
   @@index([category])
   @@index([isEnabled])
