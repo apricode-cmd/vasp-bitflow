@@ -64,104 +64,94 @@ export default function OrdersPage(): JSX.Element {
         </div>
       </div>
 
-      {/* Filters & Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Left: Filters & Stats */}
-        <div className="lg:col-span-1 space-y-4">
-          <OrderFilters
-            filters={{
-              search: filters.search,
-              status: filters.status,
-              currencyCode: filters.currencyCode || '',
-              fiatCurrencyCode: filters.fiatCurrencyCode || '',
-              hasPayIn: filters.hasPayIn !== undefined ? filters.hasPayIn.toString() : '',
-              hasPayOut: filters.hasPayOut !== undefined ? filters.hasPayOut.toString() : '',
-              dateFrom: filters.dateRange?.from?.toISOString() || '',
-              dateTo: filters.dateRange?.to?.toISOString() || '',
-            }}
-            onFilterChange={(key, value) => {
-              if (key === 'search' || key === 'status') {
-                setFilter(key, value);
-              } else if (key === 'currencyCode' || key === 'fiatCurrencyCode') {
-                setFilter(key, value === '' ? undefined : value);
-              }
-            }}
-            onReset={() => {
-              // Reset filters to default
-              setFilter('status', 'all');
-              setFilter('search', '');
-              setFilter('currencyCode', undefined);
-              setFilter('fiatCurrencyCode', undefined);
-              setFilter('hasPayIn', undefined);
-              setFilter('hasPayOut', undefined);
-              setFilter('dateRange', undefined);
-            }}
-          />
-          
-          <OrderQuickStats stats={null} isLoading={loading} />
-        </div>
+      {/* Filters */}
+      <Card className="p-4">
+        <OrderFilters
+          filters={{
+            search: filters.search,
+            status: filters.status,
+            currencyCode: filters.currencyCode || '',
+            fiatCurrencyCode: filters.fiatCurrencyCode || '',
+            hasPayIn: filters.hasPayIn !== undefined ? filters.hasPayIn.toString() : '',
+            hasPayOut: filters.hasPayOut !== undefined ? filters.hasPayOut.toString() : '',
+            dateFrom: filters.dateRange?.from?.toISOString() || '',
+            dateTo: filters.dateRange?.to?.toISOString() || '',
+          }}
+          onFilterChange={(key, value) => {
+            if (key === 'search' || key === 'status') {
+              setFilter(key, value);
+            } else if (key === 'currencyCode' || key === 'fiatCurrencyCode') {
+              setFilter(key, value === '' ? undefined : value);
+            }
+          }}
+          onReset={() => {
+            // Reset filters to default
+            setFilter('status', 'all');
+            setFilter('search', '');
+            setFilter('currencyCode', undefined);
+            setFilter('fiatCurrencyCode', undefined);
+            setFilter('hasPayIn', undefined);
+            setFilter('hasPayOut', undefined);
+            setFilter('dateRange', undefined);
+          }}
+        />
+      </Card>
 
-        {/* Right: Main Content */}
-        <div className="lg:col-span-3 space-y-4">
-          {/* View Toggle */}
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
-                <TabsList>
-                  <TabsTrigger value="table">
-                    <List className="h-4 w-4 mr-2" />
-                    Table
-                  </TabsTrigger>
-                  <TabsTrigger value="kanban">
-                    <LayoutGrid className="h-4 w-4 mr-2" />
-                    Kanban
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
+      {/* View Toggle & Stats */}
+      <div className="flex items-center justify-between">
+        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+          <TabsList>
+            <TabsTrigger value="table">
+              <List className="h-4 w-4 mr-2" />
+              Table
+            </TabsTrigger>
+            <TabsTrigger value="kanban">
+              <LayoutGrid className="h-4 w-4 mr-2" />
+              Kanban
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-              <p className="text-sm text-muted-foreground">
-                {orders.length} orders
-              </p>
-            </div>
-          </Card>
-
-          {/* View Content */}
-          {viewMode === 'table' ? (
-            <OrdersTableView
-              orders={orders}
-              loading={loading}
-              onRefresh={refetch}
-            />
-          ) : (
-            <OrderKanban
-              orders={orders.map(o => ({
-                ...o,
-                createdAt: new Date(o.createdAt)
-              }))}
-              onStatusChange={async (orderId, newStatus) => {
-                // Handle status change via drag & drop
-                try {
-                  await fetch(`/api/admin/orders/${orderId}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: newStatus })
-                  });
-                  refetch();
-                } catch (error) {
-                  console.error('Status update failed:', error);
-                }
-              }}
-              onOrderClick={(order) => {
-                window.location.href = `/admin/orders/${order.id}`;
-              }}
-              paymentMethods={[]}
-              fiatCurrencies={[]}
-              cryptocurrencies={[]}
-              networks={[]}
-            />
-          )}
-        </div>
+        <p className="text-sm text-muted-foreground">
+          {orders.length} orders
+        </p>
       </div>
+
+      {/* View Content */}
+      {viewMode === 'table' ? (
+        <OrdersTableView
+          orders={orders}
+          loading={loading}
+          onRefresh={refetch}
+        />
+      ) : (
+        <OrderKanban
+          orders={orders.map(o => ({
+            ...o,
+            createdAt: new Date(o.createdAt)
+          }))}
+          onStatusChange={async (orderId, newStatus) => {
+            // Handle status change via drag & drop
+            try {
+              await fetch(`/api/admin/orders/${orderId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+              });
+              refetch();
+            } catch (error) {
+              console.error('Status update failed:', error);
+            }
+          }}
+          onOrderClick={(order) => {
+            window.location.href = `/admin/orders/${order.id}`;
+          }}
+          paymentMethods={[]}
+          fiatCurrencies={[]}
+          cryptocurrencies={[]}
+          networks={[]}
+        />
+      )}
 
       {/* Create Order Dialog */}
       <CreateOrderDialog
