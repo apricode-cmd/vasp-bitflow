@@ -197,7 +197,7 @@ export function OrderPayInTab({ order, onCreatePayIn }: OrderPayInTabProps): JSX
             <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
               <span className="text-sm text-muted-foreground">Received Amount</span>
               <span className="font-semibold">
-                {formatCurrency(order.payIn.amount, order.payIn.currencyCode)}
+                {formatCurrency(order.payIn.amount, order.payIn.currencyType === 'FIAT' ? order.payIn.fiatCurrencyCode : order.payIn.cryptocurrencyCode)}
               </span>
             </div>
 

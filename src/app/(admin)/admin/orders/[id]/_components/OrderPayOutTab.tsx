@@ -208,7 +208,7 @@ export function OrderPayOutTab({ order, onCreatePayOut }: OrderPayOutTabProps): 
             <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
               <span className="text-sm text-muted-foreground">PayOut Amount</span>
               <span className="font-semibold">
-                {formatCryptoAmount(order.payOut.amount)} {order.payOut.currencyCode}
+                {formatCryptoAmount(order.payOut.amount)} {order.payOut.currencyType === 'FIAT' ? order.payOut.fiatCurrencyCode : order.payOut.cryptocurrencyCode}
               </span>
             </div>
 

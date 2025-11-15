@@ -206,7 +206,7 @@ export function OrderOverviewTab({ order }: OrderOverviewTabProps): JSX.Element 
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Amount</span>
-                  <span>{order.payIn.amount} {order.payIn.currencyCode}</span>
+                  <span>{order.payIn.amount} {order.payIn.currencyType === 'FIAT' ? order.payIn.fiatCurrencyCode : order.payIn.cryptocurrencyCode}</span>
                 </div>
                 <Button variant="outline" size="sm" className="w-full" asChild>
                   <a href={`/admin/pay-in/${order.payIn.id}`}>View PayIn Details</a>
@@ -222,7 +222,7 @@ export function OrderOverviewTab({ order }: OrderOverviewTabProps): JSX.Element 
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Amount</span>
-                  <span>{order.payOut.amount} {order.payOut.currencyCode}</span>
+                  <span>{order.payOut.amount} {order.payOut.currencyType === 'FIAT' ? order.payOut.fiatCurrencyCode : order.payOut.cryptocurrencyCode}</span>
                 </div>
                 <Button variant="outline" size="sm" className="w-full" asChild>
                   <a href={`/admin/pay-out/${order.payOut.id}`}>View PayOut Details</a>
