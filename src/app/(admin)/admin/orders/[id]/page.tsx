@@ -13,6 +13,9 @@ import { toast } from 'sonner';
 import { OrderHeader } from './_components/OrderHeader';
 import { OrderQuickStats } from './_components/OrderQuickStats';
 import { OrderOverviewTab } from './_components/OrderOverviewTab';
+import { OrderPayInTab } from './_components/OrderPayInTab';
+import { OrderPayOutTab } from './_components/OrderPayOutTab';
+import { OrderTimelineTab } from './_components/OrderTimelineTab';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   LayoutGrid, 
@@ -85,6 +88,14 @@ interface OrderData {
     amount: number;
     currencyCode: string;
   } | null;
+  statusHistory?: Array<{
+    id: string;
+    oldStatus: string;
+    newStatus: string;
+    changedBy: string;
+    note?: string | null;
+    createdAt: string;
+  }>;
 }
 
 export default function OrderDetailsPage(): JSX.Element {
@@ -276,27 +287,21 @@ export default function OrderDetailsPage(): JSX.Element {
             </TabsContent>
 
             <TabsContent value="payin" className="space-y-4">
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <p className="text-muted-foreground">PayIn tab - Coming soon</p>
-                </CardContent>
-              </Card>
+              <OrderPayInTab 
+                order={order} 
+                onCreatePayIn={() => router.push(`/admin/pay-in?orderId=${order.id}`)}
+              />
             </TabsContent>
 
             <TabsContent value="payout" className="space-y-4">
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <p className="text-muted-foreground">PayOut tab - Coming soon</p>
-                </CardContent>
-              </Card>
+              <OrderPayOutTab 
+                order={order}
+                onCreatePayOut={() => router.push(`/admin/pay-out?orderId=${order.id}`)}
+              />
             </TabsContent>
 
             <TabsContent value="timeline" className="space-y-4">
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <p className="text-muted-foreground">Timeline tab - Coming soon</p>
-                </CardContent>
-              </Card>
+              <OrderTimelineTab order={order} />
             </TabsContent>
 
             <TabsContent value="documents" className="space-y-4">
