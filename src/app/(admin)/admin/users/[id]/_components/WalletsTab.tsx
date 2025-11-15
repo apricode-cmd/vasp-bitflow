@@ -6,6 +6,8 @@
  * - Currency and blockchain info
  * - Default wallet indicator
  * - Verification status
+ * - Orders count
+ * - Quick actions
  */
 
 'use client';
@@ -13,17 +15,31 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Wallet, Copy, CheckCircle, Star } from 'lucide-react';
+import { Wallet, Copy, CheckCircle, Star, ShoppingCart, ExternalLink, XCircle, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { formatDateTime } from '@/lib/formatters';
 
 interface WalletData {
   id: string;
   address: string;
   label: string | null;
   isDefault: boolean;
-  currency: { code: string };
-  blockchain: { name: string };
+  isVerified: boolean;
+  createdAt: string;
+  currency: { 
+    code: string;
+    symbol: string;
+    name: string;
+  };
+  blockchain: { 
+    name: string;
+    code: string;
+    explorerUrl: string;
+  };
+  _count?: {
+    orders: number;
+  };
 }
 
 interface WalletsTabProps {
@@ -35,6 +51,17 @@ export function WalletsTab({ wallets }: WalletsTabProps): JSX.Element {
     navigator.clipboard.writeText(address);
     toast.success('Address copied to clipboard');
   };
+
+  const handleViewInExplorer = (explorerUrl: string, address: string): void => {
+    if (explorerUrl) {
+      window.open(`${explorerUrl}/address/${address}`, '_blank');
+    }
+  };
+
+  // Calculate stats
+  const verifiedCount = wallets.filter(w => w.isVerified).length;
+  const defaultCount = wallets.filter(w => w.isDefault).length;
+  const totalOrders = wallets.reduce((sum, w) => sum + (w._count?.orders || 0), 0);
 
   if (!wallets || wallets.length === 0) {
     return (
@@ -54,25 +81,56 @@ export function WalletsTab({ wallets }: WalletsTabProps): JSX.Element {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Wallet className="h-5 w-5" />
-                Crypto Wallets
-              </CardTitle>
-              <CardDescription>
-                User's verified wallet addresses for receiving crypto
-              </CardDescription>
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Wallets</p>
+                <p className="text-2xl font-bold">{wallets.length}</p>
+              </div>
+              <Wallet className="h-8 w-8 text-blue-500" />
             </div>
-            <Badge variant="secondary" className="text-lg px-3 py-1">
-              {wallets.length}
-            </Badge>
-          </div>
-        </CardHeader>
-      </Card>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Verified</p>
+                <p className="text-2xl font-bold">{verifiedCount}</p>
+              </div>
+              <CheckCircle className="h-8 w-8 text-green-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Default</p>
+                <p className="text-2xl font-bold">{defaultCount}</p>
+              </div>
+              <Star className="h-8 w-8 text-amber-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Orders</p>
+                <p className="text-2xl font-bold">{totalOrders}</p>
+              </div>
+              <ShoppingCart className="h-8 w-8 text-purple-500" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Wallets List */}
       <div className="grid grid-cols-1 gap-4">
@@ -81,27 +139,43 @@ export function WalletsTab({ wallets }: WalletsTabProps): JSX.Element {
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <CardTitle className="text-base">
                       {wallet.label || `Wallet ${index + 1}`}
                     </CardTitle>
                     {wallet.isDefault && (
                       <Badge variant="default" className="flex items-center gap-1">
-                        <Star className="h-3 w-3" />
+                        <Star className="h-3 w-3 fill-current" />
                         Default
+                      </Badge>
+                    )}
+                    {wallet.isVerified ? (
+                      <Badge variant="outline" className="flex items-center gap-1 text-green-600 border-green-600">
+                        <CheckCircle className="h-3 w-3" />
+                        Verified
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="flex items-center gap-1 text-amber-600 border-amber-600">
+                        <AlertCircle className="h-3 w-3" />
+                        Unverified
                       </Badge>
                     )}
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="outline" className="font-mono text-xs">
-                      {wallet.currency.code}
+                      {wallet.currency.symbol} {wallet.currency.code}
                     </Badge>
                     <Badge variant="secondary" className="text-xs">
-                      {wallet.blockchain.name}
+                      {wallet.blockchain.code}
                     </Badge>
+                    {wallet._count && wallet._count.orders > 0 && (
+                      <Badge variant="outline" className="text-xs flex items-center gap-1">
+                        <ShoppingCart className="h-3 w-3" />
+                        {wallet._count.orders} order{wallet._count.orders !== 1 ? 's' : ''}
+                      </Badge>
+                    )}
                   </div>
                 </div>
-                <CheckCircle className="h-5 w-5 text-green-600" />
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -129,19 +203,43 @@ export function WalletsTab({ wallets }: WalletsTabProps): JSX.Element {
               <div className="grid grid-cols-2 gap-4 pt-2">
                 <div>
                   <p className="text-xs text-muted-foreground">Currency</p>
-                  <p className="text-sm font-medium">{wallet.currency.code}</p>
+                  <p className="text-sm font-medium">{wallet.currency.name}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Blockchain</p>
+                  <p className="text-xs text-muted-foreground">Network</p>
                   <p className="text-sm font-medium">{wallet.blockchain.name}</p>
                 </div>
               </div>
 
-              {/* Additional Info */}
-              <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2">
-                <CheckCircle className="h-3 w-3 text-green-600" />
-                <span>Verified wallet address</span>
+              {/* Added Date */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">Added</p>
+                  <p className="text-sm font-medium">{formatDateTime(wallet.createdAt)}</p>
+                </div>
+                {wallet._count && wallet._count.orders > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total Orders</p>
+                    <p className="text-sm font-medium">{wallet._count.orders}</p>
+                  </div>
+                )}
               </div>
+
+              {/* Actions */}
+              {wallet.blockchain.explorerUrl && (
+                <>
+                  <Separator />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewInExplorer(wallet.blockchain.explorerUrl, wallet.address)}
+                    className="w-full"
+                  >
+                    <ExternalLink className="h-3 w-3 mr-2" />
+                    View in Block Explorer
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
         ))}
