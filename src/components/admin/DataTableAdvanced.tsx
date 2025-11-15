@@ -247,105 +247,106 @@ export function DataTableAdvanced<TData, TValue>({
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          {/* Search */}
-          {searchKey && (
-            <div className="flex-1 min-w-[200px] max-w-sm">
-              <Input
-                placeholder={searchPlaceholder}
-                value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ''}
-                onChange={(event) =>
-                  table.getColumn(searchKey)?.setFilterValue(event.target.value)
-                }
-                className="h-9"
-              />
-            </div>
-          )}
-
-          {/* Right Actions */}
-          <div className="flex items-center gap-2">
-            {/* Export */}
-            {enableExport && (
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={onExport || exportToCSV}
-                className="h-9"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
-            )}
-
-            {/* Density */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-9">
-                  <Settings2 className="h-4 w-4 mr-2" />
-                  View
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[200px]">
-                <DropdownMenuLabel>Density</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuCheckboxItem
-                  checked={density === 'compact'}
-                  onCheckedChange={() => setDensity('compact')}
-                >
-                  Compact
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={density === 'standard'}
-                  onCheckedChange={() => setDensity('standard')}
-                >
-                  Standard
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={density === 'comfortable'}
-                  onCheckedChange={() => setDensity('comfortable')}
-                >
-                  Comfortable
-                </DropdownMenuCheckboxItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Column Visibility */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-9">
-                  Columns <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[180px]">
-                <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {table
-                  .getAllColumns()
-                  .filter((column) => column.getCanHide())
-                  .map((column) => {
-                    return (
-                      <DropdownMenuCheckboxItem
-                        key={column.id}
-                        className="capitalize"
-                        checked={column.getIsVisible()}
-                        onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                      >
-                        {column.id}
-                      </DropdownMenuCheckboxItem>
-                    );
-                  })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-
+      <div className="flex items-center gap-2 overflow-x-auto">
         {/* Inline Filters */}
         {filters && (
-          <div className="flex items-center gap-2 flex-wrap">
+          <>
             {filters}
+          </>
+        )}
+
+        {/* Search */}
+        {searchKey && (
+          <div className="w-[200px] flex-shrink-0">
+            <Input
+              placeholder={searchPlaceholder}
+              value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ''}
+              onChange={(event) =>
+                table.getColumn(searchKey)?.setFilterValue(event.target.value)
+              }
+              className="h-9"
+            />
           </div>
         )}
+
+        {/* Spacer */}
+        <div className="flex-1 min-w-[20px]" />
+
+        {/* Right Actions */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Export */}
+          {enableExport && (
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={onExport || exportToCSV}
+              className="h-9"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+          )}
+
+          {/* Density */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9">
+                <Settings2 className="h-4 w-4 mr-2" />
+                View
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[200px]">
+              <DropdownMenuLabel>Density</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuCheckboxItem
+                checked={density === 'compact'}
+                onCheckedChange={() => setDensity('compact')}
+              >
+                Compact
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={density === 'standard'}
+                onCheckedChange={() => setDensity('standard')}
+              >
+                Standard
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={density === 'comfortable'}
+                onCheckedChange={() => setDensity('comfortable')}
+              >
+                Comfortable
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Column Visibility */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9">
+                Columns <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[180px]">
+              <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {table
+                .getAllColumns()
+                .filter((column) => column.getCanHide())
+                .map((column) => {
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={column.id}
+                      className="capitalize"
+                      checked={column.getIsVisible()}
+                      onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                    >
+                      {column.id}
+                    </DropdownMenuCheckboxItem>
+                  );
+                })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* Bulk Actions Bar */}

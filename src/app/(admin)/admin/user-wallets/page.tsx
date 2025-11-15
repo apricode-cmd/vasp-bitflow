@@ -664,21 +664,21 @@ export default function UserWalletsPage(): JSX.Element {
 
       <Separator />
 
-      {/* Filters */}
-      <WalletFilters
-        filters={filters}
-        onFilterChange={handleFilterChange}
-        onReset={handleResetFilters}
-        currencies={currencies}
-        blockchains={blockchains}
-      />
-
       {/* Data Table */}
       <DataTableAdvanced
         columns={columns}
         data={wallets}
         isLoading={loading}
         onRowClick={handleViewDetails}
+        filters={
+          <WalletFilters
+            filters={filters}
+            onFilterChange={handleFilterChange}
+            onReset={handleResetFilters}
+            currencies={currencies}
+            blockchains={blockchains}
+          />
+        }
         bulkActions={[
           {
             label: 'Verify',
