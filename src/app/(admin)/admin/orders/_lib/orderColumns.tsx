@@ -13,6 +13,12 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { OrderStatusBadge } from '@/components/features/OrderStatusBadge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from '@/components/ui/select';
 import { formatDateTime, formatCurrency, formatCryptoAmount } from '@/lib/formatters';
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import type { Order } from './useOrders';
@@ -100,7 +106,7 @@ export function useOrderColumns({ onStatusChange }: UseOrderColumnsProps = {}): 
       ),
     },
 
-    // Status - Editable with transition validation
+    // Status - Editable with transition validation (like PayIn)
     {
       accessorKey: 'status',
       header: 'Status',
@@ -113,47 +119,48 @@ export function useOrderColumns({ onStatusChange }: UseOrderColumnsProps = {}): 
           return <OrderStatusBadge status={order.status} />;
         }
 
+        const handleValueChange = (newValue: string) => {
+          const newStatus = newValue as OrderStatus;
+          if (newStatus !== order.status) {
+            onStatusChange?.(order.id, order.status, newStatus);
+          }
+        };
+
         return (
           <div 
             onClick={(e) => {
               e.stopPropagation(); // Prevent row click
             }}
-            className="relative group"
           >
-            {/* Display badge by default */}
-            <OrderStatusBadge status={order.status} />
-            
-            {/* Hidden select overlay that triggers on click */}
-            <select
-              value={order.status}
-              onChange={(e) => {
-                const newStatus = e.target.value as OrderStatus;
-                if (newStatus !== order.status) {
-                  // Call the status change handler
-                  onStatusChange?.(order.id, order.status, newStatus);
-                }
-              }}
-              onClick={(e) => e.stopPropagation()}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              title="Click to change status"
-            >
-              {/* Current status (always visible) */}
-              <option value={order.status}>
-                {order.status.replace('_', ' ')}
-              </option>
-              
-              {/* Allowed transitions */}
-              {allowedStatuses.map((status) => (
-                <option key={status} value={status}>
-                  → {status.replace('_', ' ')}
-                </option>
-              ))}
-            </select>
-            
-            {/* Hover indicator */}
-            <div className="absolute -right-1 -top-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-              <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-            </div>
+            <Select value={order.status} onValueChange={handleValueChange}>
+              <SelectTrigger
+                className="h-8 w-auto border-0 bg-transparent p-0 focus:ring-0 [&>span]:hidden hover:opacity-80 transition-opacity"
+                aria-label="select-status"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <OrderStatusBadge status={order.status} />
+              </SelectTrigger>
+              <SelectContent>
+                {/* Current status always first */}
+                <SelectItem value={order.status}>
+                  <OrderStatusBadge status={order.status} />
+                </SelectItem>
+                
+                {/* Allowed transitions */}
+                {allowedStatuses.length > 0 && (
+                  <>
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                      Available transitions:
+                    </div>
+                    {allowedStatuses.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        <OrderStatusBadge status={status} />
+                      </SelectItem>
+                    ))}
+                  </>
+                )}
+              </SelectContent>
+            </Select>
           </div>
         );
       },
