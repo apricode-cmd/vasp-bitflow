@@ -160,7 +160,7 @@ export function BrandLoaderPage({ text = 'Loading...' }: { text?: string }): Rea
 
 export function BrandLoaderInline({ text, size = 'sm' }: { text?: string; size?: 'sm' | 'md' }): React.ReactElement {
   return (
-    <div className="flex items-center justify-center py-12">
+    <div className="flex items-center justify-center min-h-[60vh]">
       <BrandLoader size={size} text={text} />
     </div>
   );
