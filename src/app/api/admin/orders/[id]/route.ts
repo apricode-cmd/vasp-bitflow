@@ -223,8 +223,9 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
               transactionHash: validatedData.payOutData.transactionHash,
               paymentMethodCode: validatedData.payOutData.paymentMethodCode,
               status: 'SENT',
-              processedBy: session.user.id,
-              processedAt: new Date()
+              initiatedBy: session.user.id, // Admin ID
+              initiatedAt: new Date(),
+              processingNotes: validatedData.adminNotes
             }
           });
         }
