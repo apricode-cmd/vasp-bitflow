@@ -16,6 +16,9 @@ import { OrderOverviewTab } from './_components/OrderOverviewTab';
 import { OrderPayInTab } from './_components/OrderPayInTab';
 import { OrderPayOutTab } from './_components/OrderPayOutTab';
 import { OrderTimelineTab } from './_components/OrderTimelineTab';
+import { OrderDocumentsTab } from './_components/OrderDocumentsTab';
+import { OrderUserTab } from './_components/OrderUserTab';
+import { OrderNotesTab } from './_components/OrderNotesTab';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   LayoutGrid, 
@@ -94,6 +97,12 @@ interface OrderData {
     newStatus: string;
     changedBy: string;
     note?: string | null;
+    createdAt: string;
+  }>;
+  paymentProofs?: Array<{
+    id: string;
+    proofUrl: string;
+    status: string;
     createdAt: string;
   }>;
 }
@@ -305,27 +314,25 @@ export default function OrderDetailsPage(): JSX.Element {
             </TabsContent>
 
             <TabsContent value="documents" className="space-y-4">
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <p className="text-muted-foreground">Documents tab - Coming soon</p>
-                </CardContent>
-              </Card>
+              <OrderDocumentsTab order={order} />
             </TabsContent>
 
             <TabsContent value="user" className="space-y-4">
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <p className="text-muted-foreground">User tab - Coming soon</p>
-                </CardContent>
-              </Card>
+              <OrderUserTab order={order} />
             </TabsContent>
 
             <TabsContent value="notes" className="space-y-4">
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <p className="text-muted-foreground">Notes tab - Coming soon</p>
-                </CardContent>
-              </Card>
+              <OrderNotesTab 
+                order={order} 
+                onSaveNotes={async (notes) => {
+                  await fetch(`/api/admin/orders/${orderId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminNotes: notes })
+                  });
+                  await fetchOrderDetails();
+                }}
+              />
             </TabsContent>
           </Tabs>
         </div>
