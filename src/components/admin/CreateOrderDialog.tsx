@@ -71,13 +71,14 @@ interface BlockchainNetwork {
 }
 
 interface CreateOrderDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
 }
 
 type OrderType = 'BUY' | 'SELL';
 
-export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.Element {
-  const [open, setOpen] = useState(false);
+export function CreateOrderDialog({ open, onOpenChange, onSuccess }: CreateOrderDialogProps): JSX.Element {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderType, setOrderType] = useState<OrderType>('BUY');
   const [rates, setRates] = useState<ExchangeRates | null>(null);
@@ -320,13 +321,7 @@ export function CreateOrderDialog({ onSuccess }: CreateOrderDialogProps): JSX.El
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="default" className="font-semibold">
-          <Plus className="h-4 w-4 mr-2" />
-          Create Order
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
