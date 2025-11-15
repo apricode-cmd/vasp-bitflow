@@ -32,6 +32,7 @@ import {
 import Color from 'color';
 import { SecuritySettingsTab } from '@/components/admin/SecuritySettingsTab';
 import { useAdminSession } from '@/hooks/useAdminSession';
+import { BrandLoaderInline } from '@/components/ui/brand-loader';
 
 interface SystemSettings {
   // Brand
@@ -253,11 +254,7 @@ export default function SettingsPage(): JSX.Element {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <BrandLoaderInline size="md" text="Loading settings..." />;
   }
 
   return (

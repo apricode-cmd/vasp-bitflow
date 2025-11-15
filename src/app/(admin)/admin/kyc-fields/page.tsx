@@ -28,6 +28,7 @@ import { Edit, Loader2, Check, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { KYC_STEPS, KYC_CATEGORIES, getCategoryIcon } from '@/lib/kyc/config';
 import * as Icons from 'lucide-react';
+import { BrandLoaderInline } from '@/components/ui/brand-loader';
 
 interface KycField {
   id: string;
@@ -170,11 +171,7 @@ export default function KycFormFieldsPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <BrandLoaderInline size="md" text="Loading KYC fields..." />;
   }
 
   // Group fields by step

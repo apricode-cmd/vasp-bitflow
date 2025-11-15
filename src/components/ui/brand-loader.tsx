@@ -66,64 +66,71 @@ export function BrandLoader({
       const response = await fetch('/api/settings/public');
       const data = await response.json();
       
+      console.log('🎨 [BrandLoader] Settings response:', data);
+      console.log('🎨 [BrandLoader] Theme:', resolvedTheme);
+      
       if (data.success && data.settings) {
         // Use dark logo for dark theme, light logo otherwise
         const isDark = resolvedTheme === 'dark';
         const logo = isDark ? data.settings.brandLogoDark : data.settings.brandLogo;
+        
+        console.log('🎨 [BrandLoader] Selected logo:', logo);
         
         if (logo) {
           setLogoUrl(logo);
         }
       }
     } catch (error) {
-      console.error('Failed to fetch logo:', error);
+      console.error('❌ [BrandLoader] Failed to fetch logo:', error);
     }
   };
 
   const content = (
-    <div className={cn('flex flex-col items-center justify-center gap-4', className)}>
+    <div className={cn('flex flex-col items-center justify-center gap-6', className)}>
       <div className="relative flex items-center justify-center">
         {/* Animated rings */}
-        <div className={cn('absolute', ringClasses[size])}>
+        <div className={cn('absolute inset-0 flex items-center justify-center', ringClasses[size])}>
           {/* Outer ring - slower */}
-          <div className="absolute inset-0 rounded-full border-4 border-primary/20 animate-[spin_3s_linear_infinite]" 
+          <div className="absolute inset-0 rounded-full border-4 border-transparent animate-[spin_3s_linear_infinite]" 
                style={{
                  borderTopColor: 'hsl(var(--primary))',
-                 borderRightColor: 'transparent'
+                 borderRightColor: 'hsl(var(--primary) / 0.3)'
                }}
           />
           
           {/* Middle ring - medium speed */}
-          <div className="absolute inset-2 rounded-full border-4 border-primary/30 animate-[spin_2s_linear_infinite_reverse]"
+          <div className="absolute inset-3 rounded-full border-4 border-transparent animate-[spin_2s_linear_infinite_reverse]"
                style={{
-                 borderTopColor: 'hsl(var(--primary))',
-                 borderLeftColor: 'transparent'
+                 borderTopColor: 'hsl(var(--primary) / 0.8)',
+                 borderLeftColor: 'hsl(var(--primary) / 0.2)'
                }}
           />
           
           {/* Inner ring - faster */}
-          <div className="absolute inset-4 rounded-full border-2 border-primary/40 animate-[spin_1.5s_linear_infinite]"
+          <div className="absolute inset-6 rounded-full border-3 border-transparent animate-[spin_1.5s_linear_infinite]"
                style={{
                  borderTopColor: 'hsl(var(--primary))',
-                 borderRightColor: 'transparent',
-                 borderBottomColor: 'transparent'
+                 borderBottomColor: 'hsl(var(--primary) / 0.1)'
                }}
           />
         </div>
 
-        {/* Logo */}
+        {/* Logo container - properly centered */}
         <div className={cn(
-          'relative z-10 flex items-center justify-center rounded-full bg-background p-2',
+          'relative z-10 flex items-center justify-center rounded-full bg-background shadow-lg border-2 border-primary/10',
           sizeClasses[size]
         )}>
           {logoUrl ? (
-            <Image
-              src={logoUrl}
-              alt="Brand Logo"
-              fill
-              className="object-contain p-2 animate-[pulse_2s_ease-in-out_infinite]"
-              priority
-            />
+            <div className="relative w-full h-full p-3">
+              <Image
+                src={logoUrl}
+                alt="Brand Logo"
+                fill
+                className="object-contain animate-[pulse_2s_ease-in-out_infinite] p-2"
+                priority
+                unoptimized
+              />
+            </div>
           ) : (
             // Fallback animated gradient
             <div className="w-full h-full rounded-full bg-gradient-to-br from-primary via-primary/80 to-primary/60 animate-[pulse_2s_ease-in-out_infinite]" />
