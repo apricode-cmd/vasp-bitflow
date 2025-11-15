@@ -7,6 +7,8 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
 import { formatCurrency, formatCryptoAmount } from '@/lib/formatters';
 import { 
   Coins, 
@@ -16,13 +18,18 @@ import {
   CreditCard,
   AlertCircle,
   CheckCircle,
-  Clock
+  Clock,
+  TrendingDown,
+  Send,
+  XCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import type { OrderStatus } from '@prisma/client';
 
 interface OrderQuickStatsProps {
   order: {
+    status: OrderStatus;
     cryptoAmount: number;
     currencyCode: string;
     fiatAmount: number;
@@ -49,11 +56,54 @@ interface OrderQuickStatsProps {
     fiatCurrency: {
       symbol: string;
     };
+    payIn?: {
+      status: string;
+    } | null;
+    payOut?: {
+      status: string;
+    } | null;
   };
 }
 
 export function OrderQuickStats({ order }: OrderQuickStatsProps): JSX.Element {
   const isExpired = new Date(order.expiresAt) < new Date();
+
+  // Calculate order flow progress
+  const getOrderProgress = (): { progress: number; currentStep: number; steps: Array<{ label: string; icon: any; completed: boolean; active: boolean }> } => {
+    const orderFlowSteps = [
+      { label: 'Order Created', icon: CheckCircle, key: 'PENDING' },
+      { label: 'Payment Received', icon: TrendingDown, key: 'PAYMENT_RECEIVED' },
+      { label: 'Processing', icon: Clock, key: 'PROCESSING' },
+      { label: 'Crypto Sent', icon: Send, key: 'COMPLETED' },
+    ];
+
+    const statusFlow = ['PENDING', 'PAYMENT_PENDING', 'PAYMENT_RECEIVED', 'PROCESSING', 'COMPLETED'];
+    const currentIndex = statusFlow.indexOf(order.status);
+    
+    // Handle terminal statuses
+    if (order.status === 'CANCELLED' || order.status === 'FAILED' || order.status === 'EXPIRED') {
+      return {
+        progress: 0,
+        currentStep: 0,
+        steps: orderFlowSteps.map(step => ({ ...step, completed: false, active: false }))
+      };
+    }
+
+    const progress = currentIndex >= 0 ? ((currentIndex + 1) / statusFlow.length) * 100 : 0;
+
+    const steps = orderFlowSteps.map((step, index) => {
+      const stepIndex = statusFlow.indexOf(step.key);
+      return {
+        ...step,
+        completed: currentIndex > stepIndex,
+        active: currentIndex === stepIndex
+      };
+    });
+
+    return { progress, currentStep: currentIndex, steps };
+  };
+
+  const { progress, steps } = getOrderProgress();
 
   const stats = [
     {
@@ -91,6 +141,86 @@ export function OrderQuickStats({ order }: OrderQuickStatsProps): JSX.Element {
 
   return (
     <div className="space-y-4">
+      {/* Order Flow Progress */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Order Progress</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Progress Bar */}
+          <div className="space-y-2">
+            <Progress value={progress} className="h-2" />
+            <p className="text-xs text-muted-foreground text-center">
+              {Math.round(progress)}% Complete
+            </p>
+          </div>
+
+          <Separator />
+
+          {/* Progress Steps */}
+          <div className="space-y-3">
+            {steps.map((step, index) => (
+              <div 
+                key={index}
+                className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${
+                  step.active ? 'bg-primary/10' : step.completed ? 'bg-muted/50' : 'opacity-50'
+                }`}
+              >
+                <div className={`rounded-full p-2 ${
+                  step.active 
+                    ? 'bg-primary text-primary-foreground' 
+                    : step.completed 
+                    ? 'bg-green-500 text-white' 
+                    : 'bg-muted'
+                }`}>
+                  {step.completed ? (
+                    <CheckCircle className="h-4 w-4" />
+                  ) : (
+                    <step.icon className="h-4 w-4" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className={`text-sm font-medium ${step.active ? 'text-primary' : ''}`}>
+                    {step.label}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* PayIn/PayOut Status Indicators */}
+          {(order.payIn || order.payOut) && (
+            <>
+              <Separator />
+              <div className="space-y-2">
+                {order.payIn && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-2">
+                      <TrendingDown className="h-3.5 w-3.5" />
+                      PayIn
+                    </span>
+                    <Badge variant="outline" className="text-xs">
+                      {order.payIn.status}
+                    </Badge>
+                  </div>
+                )}
+                {order.payOut && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-2">
+                      <TrendingUp className="h-3.5 w-3.5" />
+                      PayOut
+                    </span>
+                    <Badge variant="outline" className="text-xs">
+                      {order.payOut.status}
+                    </Badge>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Quick Stats Cards */}
       <Card>
         <CardHeader>
