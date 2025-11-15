@@ -59,7 +59,7 @@ export default function OrdersPage(): JSX.Element {
           networksRes.json()
         ]);
 
-        setPaymentMethods(pmData.success ? pmData.data : []);
+        setPaymentMethods(pmData.success ? (pmData.data || pmData.methods) : []);
         setFiatCurrencies(fiatData.success ? fiatData.data : []);
         setCryptocurrencies(cryptoData.success ? cryptoData.data : []);
         setNetworks(networksData.success ? networksData.data : []);
