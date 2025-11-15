@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
-import { redis } from '@/lib/services/cache.service';
+import { CacheService } from '@/lib/services/cache.service';
 import { z } from 'zod';
 import { syncOrderOnPayOutUpdate, type PayOutStatus } from '@/lib/services/order-status-sync.service';
 
@@ -259,17 +259,9 @@ export async function PATCH(
     }
 
     // Invalidate cache
-    try {
-      await redis.del(`pay-out:${id}`);
-      await redis.del('payout-stats');
-      // Invalidate list caches (all variants)
-      const keys = await redis.keys('pay-out-list:*');
-      if (keys.length > 0) {
-        await redis.del(...keys);
-      }
-    } catch (cacheError) {
-      console.error('Redis invalidation error:', cacheError);
-    }
+    await CacheService.clearAdminStats();
+    await CacheService.deletePattern('admin:pay-out:*');
+    await CacheService.deletePattern('admin:orders:*'); // Orders depend on PayOut
 
     // Create audit log
     await prisma.auditLog.create({

@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
-import { redis } from '@/lib/services/cache.service';
+import { CacheService, redis } from '@/lib/services/cache.service';
 import { z } from 'zod';
 import { syncOrderOnPayOutCreate, type PayOutStatus } from '@/lib/services/order-status-sync.service';
 
@@ -370,21 +370,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // Continue even if sync fails
     }
 
-    // Invalidate cache after creating PayOut
-    try {
-      const keys = await redis.keys('pay-out-list:*');
-      if (keys.length > 0) {
-        await redis.del(...keys);
-        console.log(`🗑️ [Redis] Invalidated ${keys.length} pay-out cache keys`);
-      }
-      
-      // Also invalidate stats cache
-      await redis.del('payout-stats');
-      console.log('🗑️ [Redis] Invalidated payout-stats cache');
-    } catch (cacheError) {
-      console.error('Redis cache invalidation error:', cacheError);
-      // Continue without cache invalidation
-    }
+    // Invalidate cache
+    await CacheService.clearAdminStats();
+    await CacheService.deletePattern('admin:pay-out:*');
+    await CacheService.deletePattern('admin:orders:*'); // Orders depend on PayOut
 
     return NextResponse.json({
       success: true,
