@@ -293,79 +293,113 @@ export default function UserWalletsPage(): JSX.Element {
     }
   };
 
-  const handleBulkVerify = async (ids: string[]) => {
-    try {
-      const response = await fetch(`/api/admin/user-wallets/bulk`, {
+  const handleBulkVerify = async (selectedWallets: UserWallet[]): Promise<void> => {
+    const ids = selectedWallets.map(w => w.id);
+    
+    toast.promise(
+      fetch(`/api/admin/user-wallets/bulk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           walletIds: ids,
           action: 'verify'
         })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        toast.success(data.message);
-        await handleRefresh();
-      } else {
-        toast.error(data.error || 'Bulk verify failed');
+      }).then(res => res.json()).then(data => {
+        if (!data.success) throw new Error(data.error);
+        return data;
+      }),
+      {
+        loading: 'Verifying wallets...',
+        success: () => {
+          handleRefresh();
+          return `Verified ${ids.length} wallet(s)`;
+        },
+        error: 'Failed to verify wallets'
       }
-    } catch (error) {
-      console.error('Bulk verify error:', error);
-      toast.error('Bulk verify failed');
-    }
+    );
   };
 
-  const handleBulkUnverify = async (ids: string[]) => {
-    try {
-      const response = await fetch(`/api/admin/user-wallets/bulk`, {
+  const handleBulkUnverify = async (selectedWallets: UserWallet[]): Promise<void> => {
+    const ids = selectedWallets.map(w => w.id);
+    
+    toast.promise(
+      fetch(`/api/admin/user-wallets/bulk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           walletIds: ids,
           action: 'unverify'
         })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        toast.success(data.message);
-        await handleRefresh();
-      } else {
-        toast.error(data.error || 'Bulk unverify failed');
+      }).then(res => res.json()).then(data => {
+        if (!data.success) throw new Error(data.error);
+        return data;
+      }),
+      {
+        loading: 'Unmarking wallets...',
+        success: () => {
+          handleRefresh();
+          return `Unmarked ${ids.length} wallet(s)`;
+        },
+        error: 'Failed to unverify wallets'
       }
-    } catch (error) {
-      console.error('Bulk unverify error:', error);
-      toast.error('Bulk unverify failed');
-    }
+    );
   };
 
-  const handleBulkDelete = async (ids: string[]) => {
-    try {
-      const response = await fetch(`/api/admin/user-wallets/bulk`, {
+  const handleBulkSetDefault = async (selectedWallets: UserWallet[]): Promise<void> => {
+    const ids = selectedWallets.map(w => w.id);
+    
+    toast.promise(
+      fetch(`/api/admin/user-wallets/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletIds: ids,
+          action: 'setDefault'
+        })
+      }).then(res => res.json()).then(data => {
+        if (!data.success) throw new Error(data.error);
+        return data;
+      }),
+      {
+        loading: 'Setting defaults...',
+        success: () => {
+          handleRefresh();
+          return `Set ${ids.length} as default`;
+        },
+        error: 'Failed to set default'
+      }
+    );
+  };
+
+  const handleBulkDelete = async (selectedWallets: UserWallet[]): Promise<void> => {
+    const ids = selectedWallets.map(w => w.id);
+    
+    toast.promise(
+      fetch(`/api/admin/user-wallets/bulk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           walletIds: ids,
           action: 'delete'
         })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        toast.success(data.message);
-        await handleRefresh();
-      } else {
-        toast.error(data.error || 'Bulk delete failed');
+      }).then(res => res.json()).then(data => {
+        if (!data.success) throw new Error(data.error);
+        return data;
+      }),
+      {
+        loading: 'Deleting wallets...',
+        success: () => {
+          handleRefresh();
+          return `Deleted ${ids.length} wallet(s)`;
+        },
+        error: 'Failed to delete wallets'
       }
-    } catch (error) {
-      console.error('Bulk delete error:', error);
-      toast.error('Bulk delete failed');
-    }
+    );
+  };
+
+  const handleExportSelected = (selectedWallets: UserWallet[]): void => {
+    const ids = selectedWallets.map(w => w.id);
+    handleExport(ids);
   };
 
   const handleExport = (selectedIds?: string[]) => {
@@ -703,19 +737,33 @@ export default function UserWalletsPage(): JSX.Element {
         }
         bulkActions={[
           {
+            label: 'Export Selected',
+            icon: <Download className="h-4 w-4 mr-2" />,
+            onClick: handleExportSelected,
+            variant: 'outline',
+          },
+          {
             label: 'Verify',
+            icon: <ShieldCheck className="h-4 w-4 mr-2" />,
             onClick: handleBulkVerify,
-            icon: <ShieldCheck className="h-4 w-4" />,
+            variant: 'default',
           },
           {
             label: 'Unverify',
+            icon: <XCircle className="h-4 w-4 mr-2" />,
             onClick: handleBulkUnverify,
-            icon: <XCircle className="h-4 w-4" />,
+            variant: 'outline',
+          },
+          {
+            label: 'Set Default',
+            icon: <Star className="h-4 w-4 mr-2" />,
+            onClick: handleBulkSetDefault,
+            variant: 'outline',
           },
           {
             label: 'Delete',
+            icon: <Trash2 className="h-4 w-4 mr-2" />,
             onClick: handleBulkDelete,
-            icon: <Trash2 className="h-4 w-4" />,
             variant: 'destructive',
           },
         ]}
