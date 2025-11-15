@@ -59,7 +59,7 @@ export async function generateOrderReportPDF(orderId: string): Promise<Buffer> {
       },
       statusHistory: {
         orderBy: {
-          changedAt: 'asc',
+          createdAt: 'asc',
         },
         include: {
           changedByAdmin: {
@@ -113,7 +113,7 @@ export async function generateOrderReportPDF(orderId: string): Promise<Buffer> {
 
   // 4. Build timeline from status history
   const timeline = order.statusHistory.map(history => ({
-    date: history.changedAt.toISOString(),
+    date: history.createdAt.toISOString(),
     status: history.newStatus,
     description: history.notes || `Order status changed from ${history.oldStatus} to ${history.newStatus}`,
     actor: history.changedByAdmin?.email || 'System',

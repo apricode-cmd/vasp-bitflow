@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { generateOrderReportPDF, generateOrderReportFilename } from '@/lib/services/order-report-pdf.service';
-import { getAdminSession } from '@/auth-admin';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 
 // Force dynamic rendering
@@ -18,12 +18,9 @@ export async function GET(
 ): Promise<NextResponse> {
   try {
     // 1. Check admin authentication
-    const session = await getAdminSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const authResult = await requireAdminRole('ADMIN');
+    if (authResult instanceof NextResponse) {
+      return authResult;
     }
 
     const { id: orderId } = params;
