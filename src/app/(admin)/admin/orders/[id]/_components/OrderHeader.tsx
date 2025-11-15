@@ -257,7 +257,6 @@ export function OrderHeader({ order, onAction, loading = false }: OrderHeaderPro
         <div className="flex items-center gap-2">
           <Button 
             variant="outline"
-            size="sm"
             onClick={() => onAction('view-user')}
           >
             <ExternalLink className="h-4 w-4 mr-2" />
