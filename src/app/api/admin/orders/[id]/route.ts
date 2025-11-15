@@ -47,13 +47,19 @@ export async function GET(request: NextRequest, { params }: RouteContext): Promi
                 phoneNumber: true,
                 country: true
               }
+            },
+            kycSession: {
+              select: {
+                status: true
+              }
             }
           }
         },
         currency: {
           select: {
             code: true,
-            name: true
+            name: true,
+            symbol: true
           }
         },
         fiatCurrency: {
@@ -66,7 +72,8 @@ export async function GET(request: NextRequest, { params }: RouteContext): Promi
         blockchain: {
           select: {
             code: true,
-            name: true
+            name: true,
+            explorerUrl: true
           }
         },
         paymentMethod: {
@@ -75,9 +82,59 @@ export async function GET(request: NextRequest, { params }: RouteContext): Promi
             name: true
           }
         },
-        payIn: true,
-        payOut: true,
-        paymentProofs: true
+        userWallet: {
+          select: {
+            id: true,
+            address: true,
+            label: true,
+            isVerified: true
+          }
+        },
+        payIn: {
+          select: {
+            id: true,
+            status: true,
+            amount: true,
+            currencyCode: true,
+            senderName: true,
+            paymentMethodCode: true,
+            createdAt: true,
+            updatedAt: true
+          }
+        },
+        payOut: {
+          select: {
+            id: true,
+            status: true,
+            amount: true,
+            currencyCode: true,
+            transactionHash: true,
+            createdAt: true,
+            updatedAt: true
+          }
+        },
+        paymentProofs: {
+          select: {
+            id: true,
+            proofUrl: true,
+            status: true,
+            createdAt: true
+          }
+        },
+        statusHistory: {
+          select: {
+            id: true,
+            oldStatus: true,
+            newStatus: true,
+            changedBy: true,
+            note: true,
+            createdAt: true
+          },
+          orderBy: {
+            createdAt: 'desc'
+          },
+          take: 50
+        }
       }
     });
 
