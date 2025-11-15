@@ -102,8 +102,8 @@ export function CreatePayInSheet({ onSuccess }: CreatePayInSheetProps): JSX.Elem
       const response = await fetch('/api/admin/orders?withoutPayIn=true&limit=100');
       const data = await response.json();
       
-      if (data.success && data.data) {
-        setAvailableOrders(data.data);
+      if (data.orders && Array.isArray(data.orders)) {
+        setAvailableOrders(data.orders);
       } else {
         toast.error('Failed to load orders');
       }

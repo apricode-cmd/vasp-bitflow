@@ -7,7 +7,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
+import { redis } from '@/lib/services/cache.service';
 import { z } from 'zod';
+import { syncOrderOnPayOutCreate, type PayOutStatus } from '@/lib/services/order-status-sync.service';
 
 const payOutFiltersSchema = z.object({
   status: z.string().optional(),
@@ -23,16 +25,31 @@ const payOutFiltersSchema = z.object({
 
 const createPayOutSchema = z.object({
   orderId: z.string(),
-  userId: z.string(),
   amount: z.number().positive(),
-  currency: z.string(),
-  currencyType: z.enum(['FIAT', 'CRYPTO']),
-  networkCode: z.string().optional(),
-  destinationAddress: z.string().optional(),
-  paymentMethodCode: z.string().optional(),
-  recipientAccount: z.string().optional(),
-  recipientName: z.string().optional()
+  destinationAddress: z.string().min(1),
+  networkFee: z.number().optional(),
+  notes: z.string().optional(),
+  status: z.enum(['PENDING', 'QUEUED', 'PROCESSING']).optional().default('PENDING'),
+  destinationTag: z.string().optional(),
+  explorerUrl: z.string().optional(),
+  transactionHash: z.string().optional(),
+  paymentMethodCode: z.string().optional()
 });
+
+// Generate cache key for pay-out list
+function generateCacheKey(filters: any): string {
+  const parts = ['pay-out-list'];
+  if (filters.status) parts.push(`status:${filters.status}`);
+  if (filters.orderId) parts.push(`order:${filters.orderId}`);
+  if (filters.userId) parts.push(`user:${filters.userId}`);
+  if (filters.currency) parts.push(`currency:${filters.currency}`);
+  if (filters.networkCode) parts.push(`network:${filters.networkCode}`);
+  if (filters.fromDate) parts.push(`from:${filters.fromDate}`);
+  if (filters.toDate) parts.push(`to:${filters.toDate}`);
+  parts.push(`page:${filters.page}`);
+  parts.push(`limit:${filters.limit}`);
+  return parts.join(':');
+}
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
@@ -57,6 +74,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     };
 
     const validated = payOutFiltersSchema.parse(params);
+
+    // Try to get from cache
+    const cacheKey = generateCacheKey(validated);
+    
+    try {
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        console.log(`📦 [Redis] Cache HIT: ${cacheKey}`);
+        return NextResponse.json(JSON.parse(cached));
+      }
+    } catch (cacheError) {
+      console.error('Redis get error:', cacheError);
+      // Continue without cache
+    }
+
+    console.log(`📦 [Redis] Cache MISS: ${cacheKey}`);
 
     // Build where clause
     const where: any = {};
@@ -158,7 +191,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       })
     ]);
 
-    return NextResponse.json({
+    const result = {
       success: true,
       data: payOuts,
       pagination: {
@@ -167,7 +200,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         limit: validated.limit,
         pages: Math.ceil(total / validated.limit)
       }
-    });
+    };
+
+    // Cache for 5 minutes
+    try {
+      await redis.set(cacheKey, JSON.stringify(result), 'EX', 300);
+    } catch (cacheError) {
+      console.error('Redis set error:', cacheError);
+      // Continue without caching
+    }
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Get PayOut error:', error);
 
@@ -203,66 +246,145 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const body = await request.json();
     const validated = createPayOutSchema.parse(body);
 
-    // Prepare data based on currency type
-    const payOutData: any = {
-      order: { connect: { id: validated.orderId } },
-      user: { connect: { id: validated.userId } },
-      amount: validated.amount,
-      currencyType: validated.currencyType,
-      status: 'PENDING',
-      retryCount: 0,
-      confirmations: 0
-    };
-
-    // Connect currency relations explicitly based on type
-    if (validated.currencyType === 'FIAT') {
-      payOutData.fiatCurrency = { connect: { code: validated.currency } };
-      if (validated.paymentMethodCode) {
-        // Check if payment method exists
-        const paymentMethodExists = await prisma.paymentMethod.findUnique({
-          where: { code: validated.paymentMethodCode },
-          select: { code: true }
-        });
-        if (paymentMethodExists) {
-          payOutData.paymentMethod = { connect: { code: validated.paymentMethodCode } };
-        }
-      }
-      if (validated.recipientAccount) {
-        payOutData.recipientAccount = validated.recipientAccount;
-      }
-      if (validated.recipientName) {
-        payOutData.recipientName = validated.recipientName;
-      }
-    } else {
-      payOutData.cryptocurrency = { connect: { code: validated.currency } };
-      if (validated.networkCode) {
-        // Check if network exists
-        const networkExists = await prisma.blockchainNetwork.findUnique({
-          where: { code: validated.networkCode },
-          select: { code: true }
-        });
-        if (networkExists) {
-          payOutData.network = { connect: { code: validated.networkCode } };
-        }
-      }
-      if (validated.destinationAddress) {
-        payOutData.destinationAddress = validated.destinationAddress;
-      }
-    }
-
-    // Create PayOut
-    const payOut = await prisma.payOut.create({
-      data: payOutData,
+    // Get order details
+    const order = await prisma.order.findUnique({
+      where: { id: validated.orderId },
       include: {
-        order: true,
-        user: {
-          select: {
-            id: true,
-            email: true
-          }
-        }
+        user: true,
+        currency: true,
+        blockchain: true
       }
     });
+
+    if (!order) {
+      return NextResponse.json(
+        { success: false, error: 'Order not found' },
+        { status: 404 }
+      );
+    }
+
+    // Check if PayOut already exists for this order
+    const existingPayOut = await prisma.payOut.findUnique({
+      where: { orderId: validated.orderId }
+    });
+
+    if (existingPayOut) {
+      return NextResponse.json(
+        { success: false, error: 'PayOut already exists for this order' },
+        { status: 400 }
+      );
+    }
+
+    // Get current admin session for tracking
+    const session = sessionOrError as any;
+    const adminId = session?.user?.id;
+
+    // Prepare PayOut data (for BUY orders - sending crypto to customer)
+    const payOutData: any = {
+      order: { connect: { id: validated.orderId } },
+      user: { connect: { id: order.userId } },
+      amount: validated.amount,
+      currencyType: 'CRYPTO', // Currently only crypto payouts
+      cryptocurrency: { connect: { code: order.currencyCode } },
+      network: order.blockchainCode ? { connect: { code: order.blockchainCode } } : undefined,
+      destinationAddress: validated.destinationAddress,
+      destinationTag: validated.destinationTag || undefined,
+      transactionHash: validated.transactionHash || undefined,
+      networkFee: validated.networkFee || 0,
+      explorerUrl: validated.explorerUrl || undefined,
+      processingNotes: validated.notes, // Correct field name from schema
+      paymentMethod: validated.paymentMethodCode ? { connect: { code: validated.paymentMethodCode } } : undefined,
+      status: validated.status || 'PENDING',
+      retryCount: 0,
+      confirmations: 0,
+      initiatedAt: new Date(),
+      initiatedBy: adminId || undefined,
+      approvalRequired: true, // Manual approval required
+      requiresStepUpMfa: false
+    };
+
+    // Remove undefined fields
+    Object.keys(payOutData).forEach(key => {
+      if (payOutData[key] === undefined) {
+        delete payOutData[key];
+      }
+    });
+
+    // Create PayOut and update Order status in a transaction
+    const payOut = await prisma.$transaction(async (tx) => {
+      // Create PayOut
+      const newPayOut = await tx.payOut.create({
+        data: payOutData,
+        include: {
+          order: {
+            select: {
+              id: true,
+              paymentReference: true,
+              cryptoAmount: true,
+              currencyCode: true
+            }
+          },
+          user: {
+            select: {
+              id: true,
+              email: true
+            }
+          },
+          cryptocurrency: true,
+          network: true
+        }
+      });
+
+      // Order status will be synced outside the transaction
+
+      // Create audit log if admin ID is available
+      if (adminId) {
+        await tx.auditLog.create({
+          data: {
+            adminId,
+            action: 'PAYOUT_CREATED',
+            entity: 'PAYOUT',
+            entityId: newPayOut.id,
+            changes: {
+              orderId: validated.orderId,
+              amount: validated.amount,
+              destinationAddress: validated.destinationAddress,
+              status: validated.status || 'PENDING'
+            },
+            metadata: {
+              orderReference: order.paymentReference,
+              userEmail: order.user.email
+            }
+          }
+        });
+      }
+
+      return newPayOut;
+    });
+
+    // Sync Order status based on PayOut status
+    try {
+      await syncOrderOnPayOutCreate(validated.orderId, (validated.status || 'PENDING') as PayOutStatus);
+    } catch (syncError) {
+      console.error('Order status sync error:', syncError);
+      // Continue even if sync fails
+    }
+
+    // Invalidate cache after creating PayOut
+    try {
+      const keys = await redis.keys('pay-out-list:*');
+      if (keys.length > 0) {
+        await redis.del(...keys);
+        console.log(`🗑️ [Redis] Invalidated ${keys.length} pay-out cache keys`);
+      }
+      
+      // Also invalidate stats cache
+      await redis.del('payout-stats');
+      console.log('🗑️ [Redis] Invalidated payout-stats cache');
+    } catch (cacheError) {
+      console.error('Redis cache invalidation error:', cacheError);
+      // Continue without cache invalidation
+    }
 
     return NextResponse.json({
       success: true,

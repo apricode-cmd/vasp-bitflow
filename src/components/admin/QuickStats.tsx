@@ -14,12 +14,13 @@ import { cn } from '@/lib/utils';
 export interface QuickStat {
   label: string;
   value: string | number;
+  description?: string;
   icon?: React.ReactNode;
   trend?: {
     value: number;
     label: string;
   };
-  color?: 'default' | 'success' | 'warning' | 'danger' | 'info';
+  color?: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'amber' | 'blue' | 'green' | 'red' | 'gray';
 }
 
 interface QuickStatsProps {
@@ -33,6 +34,11 @@ const COLOR_CLASSES = {
   warning: 'text-yellow-600 dark:text-yellow-400',
   danger: 'text-red-600 dark:text-red-400',
   info: 'text-blue-600 dark:text-blue-400',
+  amber: 'text-amber-600 dark:text-amber-400',
+  blue: 'text-blue-600 dark:text-blue-400',
+  green: 'text-green-600 dark:text-green-400',
+  red: 'text-red-600 dark:text-red-400',
+  gray: 'text-gray-600 dark:text-gray-400',
 };
 
 export function QuickStats({ stats, isLoading = false }: QuickStatsProps): JSX.Element {
@@ -73,6 +79,11 @@ export function QuickStats({ stats, isLoading = false }: QuickStatsProps): JSX.E
                 <p className={cn('text-2xl font-bold', colorClass)}>
                   {stat.value}
                 </p>
+                {stat.description && (
+                  <p className="text-xs text-muted-foreground">
+                    {stat.description}
+                  </p>
+                )}
                 {stat.trend && (
                   <div className="flex items-center gap-1 text-xs">
                     {stat.trend.value > 0 ? (

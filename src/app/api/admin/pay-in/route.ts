@@ -3,6 +3,7 @@ import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { redis } from '@/lib/services/cache.service';
 import { z } from 'zod';
+import { syncOrderOnPayInCreate, type PayInStatus } from '@/lib/services/order-status-sync.service';
 
 const payInFiltersSchema = z.object({
   status: z.string().optional(),
@@ -368,6 +369,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         paymentMethod: true
       }
     });
+
+    // Sync Order status based on PayIn status
+    try {
+      await syncOrderOnPayInCreate(validated.orderId, validated.status as PayInStatus);
+    } catch (syncError) {
+      console.error('Order status sync error:', syncError);
+      // Continue even if sync fails
+    }
 
     // Invalidate cache for pay-in list
     try {

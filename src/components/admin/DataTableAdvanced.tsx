@@ -20,6 +20,7 @@ import {
   ColumnFiltersState,
   SortingState,
   VisibilityState,
+  RowData,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
@@ -27,6 +28,14 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table';
+
+// Extend TanStack Table's meta interface for editable cells
+declare module '@tanstack/react-table' {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface TableMeta<TData extends RowData> {
+    updateData?: (rowIndex: number, columnId: string, value: string | number) => void;
+  }
+}
 import {
   Table,
   TableBody,
@@ -97,6 +106,9 @@ export interface DataTableAdvancedProps<TData, TValue> {
   
   // Density
   defaultDensity?: 'compact' | 'standard' | 'comfortable';
+  
+  // Inline editing
+  onDataUpdate?: (rowIndex: number, columnId: string, value: string | number) => void;
 }
 
 type DensityMode = 'compact' | 'standard' | 'comfortable';
@@ -122,6 +134,7 @@ export function DataTableAdvanced<TData, TValue>({
   onExport,
   filters,
   defaultDensity = 'standard',
+  onDataUpdate,
 }: DataTableAdvancedProps<TData, TValue>): React.ReactElement {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -140,6 +153,9 @@ export function DataTableAdvanced<TData, TValue>({
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
+    meta: {
+      updateData: onDataUpdate,
+    },
     state: {
       sorting,
       columnFilters,

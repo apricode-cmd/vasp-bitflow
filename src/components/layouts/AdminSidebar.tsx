@@ -134,8 +134,8 @@ const navigation = [
         description: 'Manage trading pairs'
       },
       { 
-        name: 'Payment Methods', 
-        href: '/admin/payment-methods', 
+        name: 'Payment Accounts', 
+        href: '/admin/payments', 
         icon: CreditCard,
         description: 'Banks, PSP, Wallets',
         requiredPermission: 'finance:read'

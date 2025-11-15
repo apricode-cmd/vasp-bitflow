@@ -27,9 +27,16 @@ import {
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { format } from 'date-fns';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from '@/components/ui/select';
 import { DataTableAdvanced } from '@/components/admin/DataTableAdvanced';
 import { QuickStats } from '@/components/admin/QuickStats';
 import { CreatePayInSheet } from './_components/CreatePayInSheet';
+import { EditableTextCell, createEditableSelectCell } from '@/components/admin/EditableCells';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -241,6 +248,66 @@ export default function PayInPage(): JSX.Element {
     }
   };
 
+  // Create editable status cell with colored badges
+  const EditableStatusCell = ({ getValue, row, column: { id }, table }: any) => {
+    const initialValue = getValue() as string;
+    const payIn = row.original;
+    const config = statusConfig[initialValue] || statusConfig.PENDING;
+
+    const handleValueChange = (newValue: string) => {
+      table.options.meta?.updateData?.(row.index, id, newValue);
+    };
+
+    return (
+      <div className="flex items-center gap-2">
+        <Select value={initialValue} onValueChange={handleValueChange}>
+          <SelectTrigger
+            className="h-8 w-auto border-0 bg-transparent p-0 focus:ring-0 [&>span]:hidden"
+            aria-label="select-status"
+          >
+            <Badge variant={config.variant} className="cursor-pointer">
+              {config.label}
+            </Badge>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="PENDING">
+              <Badge variant={statusConfig.PENDING.variant}>Pending</Badge>
+            </SelectItem>
+            <SelectItem value="RECEIVED">
+              <Badge variant={statusConfig.RECEIVED.variant}>Received</Badge>
+            </SelectItem>
+            <SelectItem value="VERIFIED">
+              <Badge variant={statusConfig.VERIFIED.variant}>Verified</Badge>
+            </SelectItem>
+            <SelectItem value="PARTIAL">
+              <Badge variant={statusConfig.PARTIAL.variant}>Partial</Badge>
+            </SelectItem>
+            <SelectItem value="MISMATCH">
+              <Badge variant={statusConfig.MISMATCH.variant}>Mismatch</Badge>
+            </SelectItem>
+            <SelectItem value="RECONCILED">
+              <Badge variant={statusConfig.RECONCILED.variant}>Reconciled</Badge>
+            </SelectItem>
+            <SelectItem value="FAILED">
+              <Badge variant={statusConfig.FAILED.variant}>Failed</Badge>
+            </SelectItem>
+            <SelectItem value="REFUNDED">
+              <Badge variant={statusConfig.REFUNDED.variant}>Refunded</Badge>
+            </SelectItem>
+            <SelectItem value="EXPIRED">
+              <Badge variant={statusConfig.EXPIRED.variant}>Expired</Badge>
+            </SelectItem>
+          </SelectContent>
+        </Select>
+        {payIn.amountMismatch && (
+          <Badge variant="destructive" className="text-xs">
+            Mismatch
+          </Badge>
+        )}
+      </div>
+    );
+  };
+
   // Define table columns
   const columns: ColumnDef<PayIn>[] = [
     // Row selection checkbox
@@ -329,22 +396,7 @@ export default function PayInPage(): JSX.Element {
     {
       accessorKey: 'status',
       header: 'Status',
-      cell: ({ row }) => {
-        const payIn = row.original;
-        const config = statusConfig[payIn.status] || statusConfig.PENDING;
-        return (
-          <div className="flex items-center gap-2">
-            <Badge variant={config.variant}>
-              {config.label}
-            </Badge>
-            {payIn.amountMismatch && (
-              <Badge variant="destructive" className="text-xs">
-                Mismatch
-              </Badge>
-            )}
-          </div>
-        );
-      },
+      cell: EditableStatusCell, // Now editable!
     },
     {
       id: 'date',
@@ -497,6 +549,36 @@ export default function PayInPage(): JSX.Element {
         exportFilename="pay-in-transactions"
         enableExport={true}
         enableRowSelection={true}
+        onDataUpdate={async (rowIndex, columnId, value) => {
+          const payIn = payIns[rowIndex];
+          if (!payIn) return;
+
+          try {
+            const response = await fetch(`/api/admin/pay-in/${payIn.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ [columnId]: value }),
+            });
+
+            if (!response.ok) {
+              toast.error(`Failed to update ${columnId}`);
+              return;
+            }
+
+            // Update local state optimistically
+            setPayIns(prev => prev.map((item, idx) => 
+              idx === rowIndex ? { ...item, [columnId]: value } : item
+            ));
+
+            toast.success('Updated successfully');
+            await fetchStats();
+          } catch (error) {
+            console.error('Update failed:', error);
+            toast.error('Failed to save changes');
+            // Refresh to revert changes
+            await fetchPayIns();
+          }
+        }}
                 bulkActions={[
                   {
                     label: 'Mark as Verified',

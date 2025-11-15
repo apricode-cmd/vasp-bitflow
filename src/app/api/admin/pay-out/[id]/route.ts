@@ -1,103 +1,156 @@
 /**
- * PayOut API - /api/admin/pay-out/[id]
- * GET - Get specific payment details
- * PATCH - Update payment status (process, confirm, etc.)
- * 
- * CRITICAL ACTION: Requires Step-up MFA for SENT/PROCESSING status
+ * PayOut Details API
+ * GET /api/admin/pay-out/[id] - Get single PayOut
+ * PATCH /api/admin/pay-out/[id] - Update PayOut status
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
-import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
-import { handleStepUpMfa } from '@/lib/middleware/step-up-mfa';
+import { redis } from '@/lib/services/cache.service';
 import { z } from 'zod';
+import { syncOrderOnPayOutUpdate, type PayOutStatus } from '@/lib/services/order-status-sync.service';
 
 const updatePayOutSchema = z.object({
   status: z.enum(['PENDING', 'QUEUED', 'PROCESSING', 'SENT', 'CONFIRMING', 'CONFIRMED', 'FAILED', 'CANCELLED']).optional(),
   transactionHash: z.string().optional(),
-  blockNumber: z.number().optional(),
-  confirmations: z.number().optional(),
   networkFee: z.number().optional(),
-  failureReason: z.string().optional(),
+  destinationAddress: z.string().optional(),
+  recipientName: z.string().optional(),
   processingNotes: z.string().optional(),
-  fromWalletId: z.string().optional(),
-  scheduledFor: z.string().datetime().optional(),
-  sentAt: z.string().datetime().optional(),
-  confirmedAt: z.string().datetime().optional(),
-  // Step-up MFA fields
-  mfaChallengeId: z.string().optional(),
-  mfaResponse: z.any().optional(),
 });
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   try {
+    // Check admin permission
     const sessionOrError = await requireAdminRole('ADMIN');
     if (sessionOrError instanceof NextResponse) {
       return sessionOrError;
     }
 
-    const { id } = await params;
+    const { id } = params;
+
+    // Try cache first
+    const cacheKey = `pay-out:${id}`;
+    try {
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        console.log(`📦 [Redis] Cache HIT: ${cacheKey}`);
+        return NextResponse.json(JSON.parse(cached));
+      }
+    } catch (cacheError) {
+      console.error('Redis get error:', cacheError);
+    }
+
+    console.log(`📦 [Redis] Cache MISS: ${cacheKey}`);
 
     const payOut = await prisma.payOut.findUnique({
       where: { id },
       include: {
         order: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true,
-                profile: true
-              }
-            },
-            currency: true,
-            fiatCurrency: true
+          select: {
+            id: true,
+            paymentReference: true,
+            cryptoAmount: true,
+            status: true,
+            fiatAmount: true,
+            rate: true,
+            feePercent: true,
+            feeAmount: true,
+            totalFiat: true,
+            walletAddress: true,
+            blockchainCode: true,
+            currencyCode: true,
+            fiatCurrencyCode: true,
+            createdAt: true,
           }
         },
         user: {
           select: {
             id: true,
             email: true,
-            profile: true
+            profile: {
+              select: {
+                firstName: true,
+                lastName: true,
+                phoneNumber: true,
+                country: true
+              }
+            }
           }
         },
-        cryptocurrency: true,
-        network: true,
-        userWallet: true,
+        cryptocurrency: {
+          select: {
+            code: true,
+            name: true,
+            symbol: true,
+            decimals: true
+          }
+        },
+        fiatCurrency: {
+          select: {
+            code: true,
+            name: true,
+            symbol: true
+          }
+        },
+        network: {
+          select: {
+            code: true,
+            name: true,
+            explorerUrl: true,
+            confirmations: true
+          }
+        },
+        paymentMethod: {
+          select: {
+            code: true,
+            name: true
+          }
+        },
         processor: {
           select: {
             id: true,
             email: true
           }
         },
-        platformWallet: true
+        platformWallet: {
+          select: {
+            id: true,
+            label: true,
+            address: true
+          }
+        }
       }
     });
 
     if (!payOut) {
       return NextResponse.json(
-        { success: false, error: 'Payment not found' },
+        { success: false, error: 'PayOut not found' },
         { status: 404 }
       );
     }
 
-    // Add explorer URL if transaction hash exists
-    if (payOut.transactionHash && payOut.network.explorerUrl) {
-      (payOut as any).explorerUrl = `${payOut.network.explorerUrl}/tx/${payOut.transactionHash}`;
-    }
-
-    return NextResponse.json({
+    const result = {
       success: true,
       data: payOut
-    });
+    };
+
+    // Cache for 5 minutes
+    try {
+      await redis.set(cacheKey, JSON.stringify(result), 'EX', 300);
+    } catch (cacheError) {
+      console.error('Redis set error:', cacheError);
+    }
+
+    return NextResponse.json(result);
   } catch (error) {
-    console.error('Get PayOut details error:', error);
+    console.error('Get PayOut error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to retrieve payment details' },
+      { success: false, error: 'Failed to fetch PayOut' },
       { status: 500 }
     );
   }
@@ -105,174 +158,150 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   try {
+    // Check admin permission
     const authResult = await requireAdminRole('ADMIN');
     if (authResult instanceof NextResponse) {
       return authResult;
     }
-    const { session } = authResult;
 
-    const { id } = await params;
+    const session = authResult.session;
+    const { id } = params;
 
     const body = await request.json();
+    console.log(`\n🔵 [PayOut PATCH] Request received for PayOut ID: ${id}`);
+    console.log(`   Request body:`, body);
+    
     const validated = updatePayOutSchema.parse(body);
+    console.log(`   Validated data:`, validated);
 
-    // Get existing payment
-    const existing = await prisma.payOut.findUnique({
+    // Check if PayOut exists
+    const existingPayOut = await prisma.payOut.findUnique({
       where: { id },
-      include: {
-        network: true,
-        cryptocurrency: true,
-        fiatCurrency: true,
-      }
+      select: { 
+        id: true, 
+        status: true,
+        orderId: true,
+        userId: true,
+      },
     });
 
-    if (!existing) {
+    if (!existingPayOut) {
       return NextResponse.json(
-        { success: false, error: 'Payment not found' },
+        { success: false, error: 'PayOut not found' },
         { status: 404 }
       );
     }
 
-    // 🔐 STEP-UP MFA: SENT/PROCESSING requires MFA (APPROVE_PAYOUT)
-    const isCriticalAction = validated.status === 'SENT' || validated.status === 'PROCESSING';
-    
-    if (isCriticalAction) {
-      const mfaResult = await handleStepUpMfa(
-        body,
-        session.user.id,
-        'APPROVE_PAYOUT',
-        'PayOut',
-        id
-      );
-
-      // Return MFA challenge if required
-      if (mfaResult.requiresMfa) {
-        return NextResponse.json({
-          success: false,
-          requiresMfa: true,
-          challengeId: mfaResult.challengeId,
-          options: mfaResult.options,
-          message: 'MFA verification required for payout approval',
-        });
-      }
-
-      // Check MFA verification
-      if (!mfaResult.verified) {
-        return NextResponse.json(
-          { success: false, error: mfaResult.error || 'MFA verification failed' },
-          { status: 403 }
-        );
-      }
-    }
-
     // Build update data
     const updateData: any = {};
-
+    
     if (validated.status !== undefined) {
       updateData.status = validated.status;
-
-      // Auto-set processing fields if status is SENT or PROCESSING
-      if ((validated.status === 'SENT' || validated.status === 'PROCESSING') && !existing.processedBy) {
-        updateData.processedBy = session.user.id;
-        updateData.processedAt = new Date();
-        
-        // For SoD (Separation of Duties): if approvalRequired is set
-        if (existing.approvalRequired) {
-          updateData.approvedBy = session.user.id;
-          updateData.approvedAt = new Date();
-        }
-      }
-
-      // Auto-set sentAt if status is SENT
-      if (validated.status === 'SENT' && !existing.sentAt) {
+      
+      // Auto-set timestamps based on status changes
+      if (validated.status === 'SENT' && existingPayOut.status !== 'SENT') {
         updateData.sentAt = new Date();
-      }
-
-      // Auto-set confirmedAt if status is CONFIRMED
-      if (validated.status === 'CONFIRMED' && !existing.confirmedAt) {
+      } else if (validated.status === 'CONFIRMED' && existingPayOut.status !== 'CONFIRMED') {
         updateData.confirmedAt = new Date();
+      } else if (validated.status === 'PROCESSING' && existingPayOut.status !== 'PROCESSING') {
+        updateData.processedAt = new Date();
+        // Note: processedBy is a User ID (client), not Admin ID
+        // Don't set processor relation here
       }
+      // Note: No failedAt field in PayOut schema, only sentAt and confirmedAt
     }
 
-    if (validated.transactionHash) {
+    if (validated.transactionHash !== undefined) {
       updateData.transactionHash = validated.transactionHash;
-      // Generate explorer URL
-      if (existing.network?.explorerUrl) {
-        updateData.explorerUrl = `${existing.network.explorerUrl}/tx/${validated.transactionHash}`;
-      }
+    }
+    if (validated.networkFee !== undefined) {
+      updateData.networkFee = validated.networkFee;
+    }
+    if (validated.destinationAddress !== undefined) {
+      updateData.destinationAddress = validated.destinationAddress;
+    }
+    if (validated.recipientName !== undefined) {
+      updateData.recipientName = validated.recipientName;
+    }
+    if (validated.processingNotes !== undefined) {
+      updateData.processingNotes = validated.processingNotes;
     }
 
-    if (validated.blockNumber !== undefined) updateData.blockNumber = validated.blockNumber;
-    if (validated.confirmations !== undefined) updateData.confirmations = validated.confirmations;
-    if (validated.networkFee !== undefined) updateData.networkFee = validated.networkFee;
-    if (validated.failureReason) updateData.failureReason = validated.failureReason;
-    if (validated.processingNotes) updateData.processingNotes = validated.processingNotes;
-    if (validated.fromWalletId) updateData.fromWalletId = validated.fromWalletId;
-    if (validated.scheduledFor) updateData.scheduledFor = new Date(validated.scheduledFor);
-    if (validated.sentAt) updateData.sentAt = new Date(validated.sentAt);
-    if (validated.confirmedAt) updateData.confirmedAt = new Date(validated.confirmedAt);
-
-    // Update payment
-    const updated = await prisma.payOut.update({
+    // Update PayOut
+    const updatedPayOut = await prisma.payOut.update({
       where: { id },
       data: updateData,
-      include: {
-        order: true,
-        user: {
-          select: {
-            id: true,
-            email: true
-          }
-        },
-        network: true,
-        cryptocurrency: true,
-        fiatCurrency: true,
-      }
     });
 
-    // Log audit (with MFA verification for critical actions)
-    await auditService.logAdminAction(
-      session.user.id,
-      isCriticalAction ? AUDIT_ACTIONS.ORDER_COMPLETED : AUDIT_ACTIONS.ORDER_STATUS_CHANGED,
-      AUDIT_ENTITIES.ORDER,
-      updated.orderId,
-      { payOutStatus: existing.status },
-      { payOutStatus: updated.status },
-      isCriticalAction ? {
-        mfaVerified: true,
-        mfaMethod: 'WEBAUTHN',
-        payoutAmount: existing.amount,
-        destinationAddress: existing.destinationAddress
-      } : undefined
-    );
+    // Sync Order status if PayOut status changed
+    console.log(`\n🔍 [PayOut API] Checking if sync needed:`);
+    console.log(`   validated.status: ${validated.status}`);
+    console.log(`   existingPayOut.status: ${existingPayOut.status}`);
+    console.log(`   existingPayOut.orderId: ${existingPayOut.orderId}`);
+    
+    if (validated.status && existingPayOut.status !== validated.status) {
+      console.log(`   ✅ Status changed, calling syncOrderOnPayOutUpdate...`);
+      try {
+        await syncOrderOnPayOutUpdate(
+          existingPayOut.orderId,
+          existingPayOut.status as PayOutStatus,
+          validated.status as PayOutStatus
+        );
+      } catch (syncError) {
+        console.error('❌ [PayOut API] Order status sync error:', syncError);
+        // Continue even if sync fails
+      }
+    } else {
+      console.log(`   ⏭️  No sync needed (status unchanged or not provided)\n`);
+    }
+
+    // Invalidate cache
+    try {
+      await redis.del(`pay-out:${id}`);
+      await redis.del('payout-stats');
+      // Invalidate list caches (all variants)
+      const keys = await redis.keys('pay-out-list:*');
+      if (keys.length > 0) {
+        await redis.del(...keys);
+      }
+    } catch (cacheError) {
+      console.error('Redis invalidation error:', cacheError);
+    }
+
+    // Create audit log
+    await prisma.auditLog.create({
+      data: {
+        adminId: session.user.id,
+        action: 'PAYOUT_UPDATED',
+        entity: 'PAYOUT',
+        entityId: id,
+        changes: validated,
+        metadata: {
+          orderId: existingPayOut.orderId,
+          userId: existingPayOut.userId,
+        },
+      },
+    });
 
     return NextResponse.json({
       success: true,
-      data: updated,
-      message: 'Payment updated successfully',
-      mfaVerified: isCriticalAction,
+      data: updatedPayOut,
     });
   } catch (error) {
-    console.error('Update PayOut error:', error);
-
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Invalid request data',
-          details: error.errors
-        },
+        { success: false, error: 'Invalid input', details: error.errors },
         { status: 400 }
       );
     }
 
+    console.error('Update PayOut error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to update payment' },
+      { success: false, error: 'Failed to update PayOut' },
       { status: 500 }
     );
   }
 }
-

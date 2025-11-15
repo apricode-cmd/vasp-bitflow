@@ -28,6 +28,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const status = searchParams.get('status');
     const currencyCode = searchParams.get('currency');
     const withoutPayIn = searchParams.get('withoutPayIn') === 'true';
+    const withoutPayOut = searchParams.get('withoutPayOut') === 'true';
 
     // Build where clause
     const where: Record<string, unknown> = {};
@@ -44,6 +45,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       // Only show orders that are waiting for payment or have payment received
       where.status = {
         in: ['PENDING', 'PAYMENT_PENDING', 'PAYMENT_RECEIVED']
+      };
+    }
+    
+    // Filter orders without PayOut (for manual PayOut creation)
+    if (withoutPayOut) {
+      where.payOut = null;
+      // Only show orders that have payment received or are processing
+      where.status = {
+        in: ['PAYMENT_RECEIVED', 'PROCESSING']
       };
     }
 
@@ -84,14 +94,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     ]);
 
     return NextResponse.json({
-      success: true,
-      data: orders,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit)
-      }
+      orders,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
     });
   } catch (error) {
     console.error('Admin get orders error:', error);

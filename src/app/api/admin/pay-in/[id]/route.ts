@@ -9,6 +9,7 @@ import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { redis } from '@/lib/services/cache.service';
 import { z } from 'zod';
+import { syncOrderOnPayInUpdate, type PayInStatus } from '@/lib/services/order-status-sync.service';
 
 const updatePayInSchema = z.object({
   status: z.enum(['PENDING', 'RECEIVED', 'VERIFIED', 'PARTIAL', 'MISMATCH', 'RECONCILED', 'FAILED', 'REFUNDED', 'EXPIRED']),
@@ -152,6 +153,19 @@ export async function PATCH(
     const session = sessionOrError;
     const userId = session.user?.id;
 
+    // Get current PayIn to track status change
+    const currentPayIn = await prisma.payIn.findUnique({
+      where: { id },
+      select: { status: true, orderId: true }
+    });
+
+    if (!currentPayIn) {
+      return NextResponse.json(
+        { success: false, error: 'PayIn not found' },
+        { status: 404 }
+      );
+    }
+
     // Build update data
     const updateData: any = {
       status: validated.status,
@@ -221,6 +235,20 @@ export async function PATCH(
         paymentMethod: true,
       }
     });
+
+    // Sync Order status if PayIn status changed
+    if (currentPayIn.status !== validated.status) {
+      try {
+        await syncOrderOnPayInUpdate(
+          currentPayIn.orderId,
+          currentPayIn.status as PayInStatus,
+          validated.status as PayInStatus
+        );
+      } catch (syncError) {
+        console.error('Order status sync error:', syncError);
+        // Continue even if sync fails
+      }
+    }
 
     // Invalidate cache
     try {
