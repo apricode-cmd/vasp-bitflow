@@ -731,6 +731,8 @@ export default function UserWalletsPage(): JSX.Element {
         data={wallets}
         isLoading={loading}
         onRowClick={handleViewDetails}
+        enableRowSelection={true}
+        enableExport={true}
         filters={
           <WalletFilters
             filters={filters}
