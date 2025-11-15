@@ -47,7 +47,9 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/_next') ||
     path.startsWith('/api/settings/public') ||
     path.startsWith('/api/auth') ||  // Client auth (NextAuth endpoints)
-    path.startsWith('/api/admin/')  // Admin API (auth checked in each route)
+    path.startsWith('/api/admin/') ||  // Admin API (auth checked in each route)
+    path.startsWith('/api/setup/') ||  // Setup API (public for initial setup)
+    path.startsWith('/api/health')  // Health check endpoint (public)
   ) {
     // Log NextAuth requests
     if (path.startsWith('/api/auth')) {
@@ -130,6 +132,7 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/login') ||
     path.startsWith('/register') ||
     path.startsWith('/2fa-verify') ||
+    path.startsWith('/setup') ||  // System setup wizard
     path.startsWith('/api-docs') ||  // Public API documentation
     path.startsWith('/api/docs/') ||  // OpenAPI spec endpoint
     path.startsWith('/api/rates') ||
