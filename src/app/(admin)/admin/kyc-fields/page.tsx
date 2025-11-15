@@ -32,6 +32,7 @@ import { BrandLoaderInline } from '@/components/ui/brand-loader';
 import { ConditionalLogicSection } from '@/components/admin/kyc/ConditionalLogicSection';
 import { UXEnhancementsSection } from '@/components/admin/kyc/UXEnhancementsSection';
 import { ValidationRulesSection } from '@/components/admin/kyc/ValidationRulesSection';
+import { CategoryGroupSection } from '@/components/admin/kyc/CategoryGroupSection';
 
 interface KycField {
   id: string;
@@ -78,6 +79,9 @@ export default function KycFormFieldsPage() {
   
   // Tab state for edit dialog
   const [editDialogTab, setEditDialogTab] = useState('basic');
+  
+  // View mode: 'steps' or 'groups'
+  const [viewMode, setViewMode] = useState<'steps' | 'groups'>('steps');
 
   useEffect(() => {
     fetchFields();
@@ -217,11 +221,21 @@ export default function KycFormFieldsPage() {
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">KYC Form Configuration</h1>
-        <p className="text-muted-foreground mt-2">
-          Configure KYC form fields organized by steps. Total: {fields.length} fields
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">KYC Form Configuration</h1>
+          <p className="text-muted-foreground mt-2">
+            Configure KYC form fields. Total: {fields.length} fields
+          </p>
+        </div>
+        
+        {/* View Mode Toggle */}
+        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'steps' | 'groups')}>
+          <TabsList>
+            <TabsTrigger value="steps">Steps View</TabsTrigger>
+            <TabsTrigger value="groups">Groups View</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       {/* Summary Cards */}
@@ -267,8 +281,30 @@ export default function KycFormFieldsPage() {
         })}
       </div>
 
-      {/* Tabs by Step */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      {/* Groups View */}
+      {viewMode === 'groups' && (
+        <div className="space-y-4">
+          {Object.keys(KYC_CATEGORIES).map((categoryCode) => {
+            const categoryFields = fields.filter(f => f.category === categoryCode);
+            if (categoryFields.length === 0) return null;
+            
+            return (
+              <CategoryGroupSection
+                key={categoryCode}
+                categoryCode={categoryCode}
+                fields={categoryFields}
+                isCollapsible={true}
+                defaultCollapsed={false}
+                onFieldClick={handleEdit}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {/* Steps View (Tabs by Step) */}
+      {viewMode === 'steps' && (
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <ScrollArea className="w-full whitespace-nowrap">
           <TabsList className="inline-flex w-auto">
             {KYC_STEPS.map((step) => (
@@ -411,7 +447,8 @@ export default function KycFormFieldsPage() {
             )}
           </TabsContent>
         ))}
-      </Tabs>
+        </Tabs>
+      )}
 
       {/* Edit Dialog */}
       <Dialog open={editDialog} onOpenChange={setEditDialog}>
