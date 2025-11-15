@@ -268,8 +268,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
       return updated;
     });
 
-    // Clear admin stats cache (order status changed)
+    // Clear caches (order status changed)
     await CacheService.clearAdminStats();
+    await CacheService.deletePattern('admin:orders:*'); // Clear orders list cache
+    await CacheService.deletePattern(`admin:order:${params.id}:*`); // Clear specific order cache
     
     // Log admin action
     await auditService.logAdminAction(
