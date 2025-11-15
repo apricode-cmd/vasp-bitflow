@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRole, getCurrentUserId } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
+import { redis } from '@/lib/services/cache.service';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 import { z } from 'zod';
 
@@ -185,6 +186,17 @@ export async function PATCH(
       { entity: 'UserWallet', action: 'updated' }
     );
 
+    // Invalidate cache
+    try {
+      const keys = await redis.keys('user-wallets-*');
+      if (keys.length > 0) {
+        await redis.del(...keys);
+        console.log(`🗑️ [Redis] Invalidated ${keys.length} wallet cache keys`);
+      }
+    } catch (cacheError) {
+      console.error('Redis cache invalidation error:', cacheError);
+    }
+
     return NextResponse.json({
       success: true,
       data: updatedWallet
@@ -294,6 +306,17 @@ export async function DELETE(
         action: 'deleted'
       }
     );
+
+    // Invalidate cache
+    try {
+      const keys = await redis.keys('user-wallets-*');
+      if (keys.length > 0) {
+        await redis.del(...keys);
+        console.log(`🗑️ [Redis] Invalidated ${keys.length} wallet cache keys`);
+      }
+    } catch (cacheError) {
+      console.error('Redis cache invalidation error:', cacheError);
+    }
 
     return NextResponse.json({
       success: true,

@@ -1,20 +1,46 @@
 /**
- * User Wallets Management Page
- * Manage user cryptocurrency wallets
+ * User Wallets Management Page - REDESIGNED
+ * 
+ * Enhanced wallet management with:
+ * - Advanced data table with sorting & filtering
+ * - Quick stats dashboard
+ * - Bulk actions
+ * - Export functionality
+ * - Quick view details
  */
 
 'use client';
 
-import * as React from 'react';
+import { useState, useEffect } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
-import { DataTable } from '@/components/admin/DataTable';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Plus, MoreHorizontal, ArrowUpDown, Wallet, ExternalLink, CheckCircle, XCircle } from 'lucide-react';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Separator } from '@/components/ui/separator';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DataTableAdvanced } from '@/components/admin/DataTableAdvanced';
+import { WalletQuickStats } from './_components/WalletQuickStats';
+import { WalletFilters } from './_components/WalletFilters';
+import { WalletDetailsSheet } from './_components/WalletDetailsSheet';
+import { formatDateTime } from '@/lib/formatters';
+import { exportToCSV, formatDateTimeForExport } from '@/lib/utils/export-utils';
+import { toast } from 'sonner';
+import { 
+  MoreHorizontal, Eye, Trash2, CheckCircle, XCircle, 
+  Star, ExternalLink, RefreshCw, Wallet, Download,
+  ShieldCheck, Copy, User
+} from 'lucide-react';
+import Link from 'next/link';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,9 +49,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { toast } from 'sonner';
-import { Combobox, ComboboxOption } from '@/components/shared/Combobox';
-import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
 
 interface UserWallet {
   id: string;
@@ -37,6 +60,7 @@ interface UserWallet {
   isVerified: boolean;
   isDefault: boolean;
   createdAt: string;
+  updatedAt: string;
   user: {
     id: string;
     email: string;
@@ -60,15 +84,6 @@ interface UserWallet {
   };
 }
 
-interface User {
-  id: string;
-  email: string;
-  profile?: {
-    firstName: string;
-    lastName: string;
-  } | null;
-}
-
 interface Currency {
   code: string;
   name: string;
@@ -81,195 +96,356 @@ interface BlockchainNetwork {
 }
 
 export default function UserWalletsPage(): JSX.Element {
-  const [wallets, setWallets] = React.useState<UserWallet[]>([]);
-  const [users, setUsers] = React.useState<User[]>([]);
-  const [currencies, setCurrencies] = React.useState<Currency[]>([]);
-  const [blockchains, setBlockchains] = React.useState<BlockchainNetwork[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [isSheetOpen, setIsSheetOpen] = React.useState(false);
-  const [editingWallet, setEditingWallet] = React.useState<UserWallet | null>(null);
-  const [isSaving, setIsSaving] = React.useState(false);
-
-  // Delete confirmation dialog
-  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
-  const [walletToDelete, setWalletToDelete] = React.useState<string | null>(null);
-
-  // Form state
-  const [formData, setFormData] = React.useState({
-    userId: '',
-    blockchainCode: '',
+  const [wallets, setWallets] = useState<UserWallet[]>([]);
+  const [stats, setStats] = useState<any>(null);
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [blockchains, setBlockchains] = useState<BlockchainNetwork[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [walletToDelete, setWalletToDelete] = useState<string | null>(null);
+  const [selectedWallet, setSelectedWallet] = useState<UserWallet | null>(null);
+  const [detailsSheetOpen, setDetailsSheetOpen] = useState(false);
+  
+  // Filters
+  const [filters, setFilters] = useState({
+    search: '',
     currencyCode: '',
-    address: '',
-    label: '',
-    isVerified: false,
-    isDefault: false
+    blockchainCode: '',
+    isVerified: '',
+    isDefault: ''
   });
 
-  React.useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => {
+    fetchWallets();
+    fetchStats();
+    fetchResources();
+  }, [filters]);
 
-  const fetchData = async () => {
-    setIsLoading(true);
+  const fetchWallets = async (): Promise<void> => {
+    setRefreshing(true);
     try {
-      const [walletsRes, usersRes, currenciesRes, blockchainsRes] = await Promise.all([
-        fetch('/api/admin/user-wallets'),
-        fetch('/api/admin/users'),
-        fetch('/api/admin/resources/currencies?active=true'), // Only active
-        fetch('/api/admin/blockchains?active=true') // Only active
+      const params = new URLSearchParams();
+      
+      if (filters.search) params.append('search', filters.search);
+      if (filters.currencyCode) params.append('currencyCode', filters.currencyCode);
+      if (filters.blockchainCode) params.append('blockchainCode', filters.blockchainCode);
+      if (filters.isVerified) params.append('isVerified', filters.isVerified);
+      if (filters.isDefault) params.append('isDefault', filters.isDefault);
+
+      const response = await fetch(`/api/admin/user-wallets?${params}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setWallets(data.data || []);
+      } else {
+        toast.error('Failed to fetch wallets');
+      }
+    } catch (error) {
+      console.error('Fetch wallets error:', error);
+      toast.error('Failed to fetch wallets');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const fetchStats = async (): Promise<void> => {
+    try {
+      const response = await fetch('/api/admin/user-wallets/stats');
+      const data = await response.json();
+      if (data.success) {
+        setStats(data.data);
+      }
+    } catch (error) {
+      console.error('Fetch stats error:', error);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  const fetchResources = async (): Promise<void> => {
+    try {
+      const [currenciesRes, blockchainsRes] = await Promise.all([
+        fetch('/api/admin/resources/currencies?active=true'),
+        fetch('/api/admin/blockchains?active=true')
       ]);
 
-      const [walletsData, usersData, currenciesData, blockchainsData] = await Promise.all([
-        walletsRes.json(),
-        usersRes.json(),
+      const [currenciesData, blockchainsData] = await Promise.all([
         currenciesRes.json(),
         blockchainsRes.json()
       ]);
 
-      if (walletsData.success) setWallets(walletsData.data);
-      if (usersData.success) setUsers(usersData.data);
       if (currenciesData.success) setCurrencies(currenciesData.data);
       if (blockchainsData.success) setBlockchains(blockchainsData.data);
     } catch (error) {
-      console.error('Failed to fetch data:', error);
-      toast.error('Failed to load data');
-    } finally {
-      setIsLoading(false);
+      console.error('Fetch resources error:', error);
     }
   };
 
-  // Combobox options
-  const userOptions: ComboboxOption[] = React.useMemo(() => 
-    users.map(u => ({
-      value: u.id,
-      label: `${u.email} ${u.profile?.firstName ? `(${u.profile.firstName} ${u.profile.lastName})` : ''}`
-    })),
-    [users]
-  );
+  const handleFilterChange = (key: string, value: string) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
 
-  const currencyOptions: ComboboxOption[] = React.useMemo(() =>
-    currencies.map(c => ({
-      value: c.code,
-      label: `${c.symbol} ${c.code} - ${c.name}`
-    })),
-    [currencies]
-  );
-
-  const blockchainOptions: ComboboxOption[] = React.useMemo(() =>
-    blockchains.map(b => ({
-      value: b.code,
-      label: `${b.code} - ${b.name}`
-    })),
-    [blockchains]
-  );
-
-  const handleAdd = () => {
-    setEditingWallet(null);
-    setFormData({
-      userId: '',
-      blockchainCode: '',
+  const handleResetFilters = () => {
+    setFilters({
+      search: '',
       currencyCode: '',
-      address: '',
-      label: '',
-      isVerified: false,
-      isDefault: false
+      blockchainCode: '',
+      isVerified: '',
+      isDefault: ''
     });
-    setIsSheetOpen(true);
   };
 
-  const handleEdit = (wallet: UserWallet) => {
-    setEditingWallet(wallet);
-    setFormData({
-      userId: wallet.userId,
-      blockchainCode: wallet.blockchainCode,
-      currencyCode: wallet.currencyCode,
-      address: wallet.address,
-      label: wallet.label || '',
-      isVerified: wallet.isVerified,
-      isDefault: wallet.isDefault
-    });
-    setIsSheetOpen(true);
+  const handleRefresh = async () => {
+    await Promise.all([fetchWallets(), fetchStats()]);
+    toast.success('Data refreshed');
   };
 
-  const handleSave = async () => {
-    setIsSaving(true);
+  const handleViewDetails = (wallet: UserWallet) => {
+    setSelectedWallet(wallet);
+    setDetailsSheetOpen(true);
+  };
+
+  const handleVerify = async (walletId: string) => {
     try {
-      const payload = {
-        ...formData,
-        label: formData.label || undefined
-      };
-
-      const url = editingWallet 
-        ? `/api/admin/user-wallets/${editingWallet.id}`
-        : '/api/admin/user-wallets';
-      
-      const res = await fetch(url, {
-        method: editingWallet ? 'PATCH' : 'POST',
+      const response = await fetch(`/api/admin/user-wallets/bulk`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          walletIds: [walletId],
+          action: 'verify'
+        })
       });
 
-      const data = await res.json();
+      const data = await response.json();
 
       if (data.success) {
-        toast.success(editingWallet ? 'Wallet updated' : 'Wallet created');
-        setIsSheetOpen(false);
-        fetchData();
+        toast.success('Wallet verified');
+        await handleRefresh();
+        if (selectedWallet?.id === walletId) {
+          setDetailsSheetOpen(false);
+        }
       } else {
-        toast.error(data.error || 'Failed to save wallet');
+        toast.error(data.error || 'Failed to verify wallet');
       }
     } catch (error) {
-      console.error('Save error:', error);
-      toast.error('Failed to save wallet');
-    } finally {
-      setIsSaving(false);
+      console.error('Verify wallet error:', error);
+      toast.error('Failed to verify wallet');
     }
   };
 
-  const handleDelete = (id: string) => {
-    setWalletToDelete(id);
-    setDeleteDialogOpen(true);
+  const handleSetDefault = async (walletId: string) => {
+    try {
+      const response = await fetch(`/api/admin/user-wallets/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletIds: [walletId],
+          action: 'setDefault'
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Wallet set as default');
+        await handleRefresh();
+        if (selectedWallet?.id === walletId) {
+          setDetailsSheetOpen(false);
+        }
+      } else {
+        toast.error(data.error || 'Failed to set default');
+      }
+    } catch (error) {
+      console.error('Set default error:', error);
+      toast.error('Failed to set default');
+    }
   };
 
-  const confirmDelete = async () => {
+  const handleDelete = async () => {
     if (!walletToDelete) return;
 
     try {
-      const res = await fetch(`/api/admin/user-wallets/${walletToDelete}`, {
-        method: 'DELETE'
+      const response = await fetch(`/api/admin/user-wallets/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletIds: [walletToDelete],
+          action: 'delete'
+        })
       });
 
-      const data = await res.json();
+      const data = await response.json();
 
       if (data.success) {
-        toast.success('Wallet deleted successfully');
-        fetchData();
+        toast.success('Wallet deleted');
+        setDeleteDialogOpen(false);
+        setWalletToDelete(null);
+        await handleRefresh();
       } else {
         toast.error(data.error || 'Failed to delete wallet');
       }
     } catch (error) {
-      console.error('Delete error:', error);
+      console.error('Delete wallet error:', error);
       toast.error('Failed to delete wallet');
-    } finally {
-      setWalletToDelete(null);
-      setDeleteDialogOpen(false);
     }
   };
 
+  const handleBulkVerify = async (ids: string[]) => {
+    try {
+      const response = await fetch(`/api/admin/user-wallets/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletIds: ids,
+          action: 'verify'
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(data.message);
+        await handleRefresh();
+      } else {
+        toast.error(data.error || 'Bulk verify failed');
+      }
+    } catch (error) {
+      console.error('Bulk verify error:', error);
+      toast.error('Bulk verify failed');
+    }
+  };
+
+  const handleBulkUnverify = async (ids: string[]) => {
+    try {
+      const response = await fetch(`/api/admin/user-wallets/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletIds: ids,
+          action: 'unverify'
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(data.message);
+        await handleRefresh();
+      } else {
+        toast.error(data.error || 'Bulk unverify failed');
+      }
+    } catch (error) {
+      console.error('Bulk unverify error:', error);
+      toast.error('Bulk unverify failed');
+    }
+  };
+
+  const handleBulkDelete = async (ids: string[]) => {
+    try {
+      const response = await fetch(`/api/admin/user-wallets/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletIds: ids,
+          action: 'delete'
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(data.message);
+        await handleRefresh();
+      } else {
+        toast.error(data.error || 'Bulk delete failed');
+      }
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      toast.error('Bulk delete failed');
+    }
+  };
+
+  const handleExport = (selectedIds?: string[]) => {
+    const walletsToExport = selectedIds 
+      ? wallets.filter(w => selectedIds.includes(w.id))
+      : wallets;
+
+    const csvData = walletsToExport.map(wallet => ({
+      'Wallet ID': wallet.id,
+      'User Email': wallet.user.email,
+      'User Name': wallet.user.profile 
+        ? `${wallet.user.profile.firstName} ${wallet.user.profile.lastName}`
+        : 'N/A',
+      'Currency': `${wallet.currency.symbol} ${wallet.currency.code}`,
+      'Blockchain': `${wallet.blockchain.code} - ${wallet.blockchain.name}`,
+      'Address': wallet.address,
+      'Label': wallet.label || 'N/A',
+      'Verified': wallet.isVerified ? 'Yes' : 'No',
+      'Default': wallet.isDefault ? 'Yes' : 'No',
+      'Orders Count': wallet._count?.orders || 0,
+      'Created At': formatDateTimeForExport(wallet.createdAt),
+      'Updated At': formatDateTimeForExport(wallet.updatedAt)
+    }));
+
+    exportToCSV(
+      csvData,
+      `wallets-export-${new Date().toISOString().split('T')[0]}.csv`
+    );
+
+    toast.success(`Exported ${csvData.length} wallet(s)`);
+  };
+
+  const handleCopy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied to clipboard`);
+  };
+
+  // Define columns
   const columns: ColumnDef<UserWallet>[] = [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected()}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
     {
       accessorKey: 'user',
       header: 'User',
       cell: ({ row }) => {
         const user = row.original.user;
+        const fullName = user.profile 
+          ? `${user.profile.firstName} ${user.profile.lastName}`
+          : '';
+        
         return (
-          <div className="space-y-1">
-            <div className="font-medium">{user.email}</div>
-            {user.profile && (
-              <div className="text-sm text-muted-foreground">
-                {user.profile.firstName} {user.profile.lastName}
-              </div>
-            )}
+          <div className="flex items-center gap-3">
+            <Avatar className="h-8 w-8">
+              <AvatarFallback>
+                {user.profile?.firstName?.[0] || user.email[0].toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium">{user.email}</span>
+              {fullName && (
+                <span className="text-xs text-muted-foreground">{fullName}</span>
+              )}
+            </div>
           </div>
         );
       },
@@ -280,63 +456,119 @@ export default function UserWalletsPage(): JSX.Element {
       cell: ({ row }) => {
         const currency = row.original.currency;
         return (
-          <div className="flex items-center gap-2">
-            <span className="text-lg">{currency.symbol}</span>
-            <span className="font-medium">{currency.code}</span>
-          </div>
+          <Badge variant="outline">
+            {currency.symbol} {currency.code}
+          </Badge>
         );
       },
     },
     {
       accessorKey: 'blockchain',
       header: 'Network',
-      cell: ({ row }) => (
-        <Badge variant="outline">{row.original.blockchain.code}</Badge>
-      ),
+      cell: ({ row }) => {
+        const blockchain = row.original.blockchain;
+        return (
+          <span className="text-sm">
+            {blockchain.code}
+          </span>
+        );
+      },
     },
     {
       accessorKey: 'address',
-      header: 'Wallet Address',
-      cell: ({ row }) => (
-        <div className="max-w-[300px]">
-          <code className="text-xs bg-muted px-2 py-1 rounded">
-            {row.original.address}
-          </code>
-          {row.original.label && (
-            <div className="text-sm text-muted-foreground mt-1">
-              {row.original.label}
-            </div>
-          )}
-        </div>
-      ),
+      header: 'Address',
+      cell: ({ row }) => {
+        const address = row.original.address;
+        const short = `${address.slice(0, 8)}...${address.slice(-6)}`;
+        return (
+          <div className="flex items-center gap-2">
+            <code className="text-xs font-mono">{short}</code>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCopy(address, 'Address');
+              }}
+            >
+              <Copy className="h-3 w-3" />
+            </Button>
+          </div>
+        );
+      },
     },
     {
-      accessorKey: 'status',
-      header: 'Status',
-      cell: ({ row }) => (
-        <div className="space-y-1">
-          {row.original.isVerified && (
-            <Badge variant="default" className="flex items-center gap-1 w-fit">
-              <CheckCircle className="h-3 w-3" />
-              Verified
-            </Badge>
-          )}
-          {row.original.isDefault && (
-            <Badge variant="secondary">Default</Badge>
-          )}
-          {row.original._count && row.original._count.orders > 0 && (
-            <div className="text-xs text-muted-foreground">
-              {row.original._count.orders} orders
-            </div>
-          )}
-        </div>
-      ),
+      accessorKey: 'label',
+      header: 'Label',
+      cell: ({ row }) => {
+        const label = row.original.label;
+        return label ? (
+          <span className="text-sm">{label}</span>
+        ) : (
+          <span className="text-sm text-muted-foreground">-</span>
+        );
+      },
+    },
+    {
+      accessorKey: 'isVerified',
+      header: 'Verified',
+      cell: ({ row }) => {
+        const isVerified = row.original.isVerified;
+        return isVerified ? (
+          <Badge variant="default" className="gap-1">
+            <CheckCircle className="h-3 w-3" />
+            Verified
+          </Badge>
+        ) : (
+          <Badge variant="secondary" className="gap-1">
+            <XCircle className="h-3 w-3" />
+            Unverified
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: 'isDefault',
+      header: 'Default',
+      cell: ({ row }) => {
+        const isDefault = row.original.isDefault;
+        return isDefault ? (
+          <Star className="h-4 w-4 fill-current text-amber-500" />
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        );
+      },
+    },
+    {
+      accessorKey: '_count.orders',
+      header: 'Orders',
+      cell: ({ row }) => {
+        const count = row.original._count?.orders || 0;
+        return (
+          <Badge variant="outline">
+            {count}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: 'createdAt',
+      header: 'Created',
+      cell: ({ row }) => {
+        return (
+          <span className="text-sm text-muted-foreground">
+            {formatDateTime(row.original.createdAt)}
+          </span>
+        );
+      },
     },
     {
       id: 'actions',
+      header: 'Actions',
       cell: ({ row }) => {
         const wallet = row.original;
-
+        
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -346,24 +578,51 @@ export default function UserWalletsPage(): JSX.Element {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => handleEdit(wallet)}>
-                Edit
+              <DropdownMenuItem onClick={() => handleViewDetails(wallet)}>
+                <Eye className="mr-2 h-4 w-4" />
+                View Details
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  const explorerUrl = `${wallet.blockchain.explorerUrl}/address/${wallet.address}`;
-                  window.open(explorerUrl, '_blank');
-                }}
-              >
-                <ExternalLink className="mr-2 h-4 w-4" />
-                View on Explorer
+              <DropdownMenuItem asChild>
+                <Link href={`/admin/users/${wallet.userId}`}>
+                  <User className="mr-2 h-4 w-4" />
+                  View User
+                </Link>
               </DropdownMenuItem>
+              {wallet.blockchain.explorerUrl && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    window.open(
+                      `${wallet.blockchain.explorerUrl}/address/${wallet.address}`,
+                      '_blank'
+                    );
+                  }}
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  View in Explorer
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              {!wallet.isVerified && (
+                <DropdownMenuItem onClick={() => handleVerify(wallet.id)}>
+                  <ShieldCheck className="mr-2 h-4 w-4" />
+                  Verify
+                </DropdownMenuItem>
+              )}
+              {!wallet.isDefault && (
+                <DropdownMenuItem onClick={() => handleSetDefault(wallet.id)}>
+                  <Star className="mr-2 h-4 w-4" />
+                  Set as Default
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => handleDelete(wallet.id)}
                 className="text-destructive"
-                disabled={(wallet._count?.orders || 0) > 0}
+                onClick={() => {
+                  setWalletToDelete(wallet.id);
+                  setDeleteDialogOpen(true);
+                }}
               >
+                <Trash2 className="mr-2 h-4 w-4" />
                 Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -374,145 +633,99 @@ export default function UserWalletsPage(): JSX.Element {
   ];
 
   return (
-    <div className="space-y-6 animate-in">
+    <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">User Wallets</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage user cryptocurrency wallets and addresses
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Wallet className="h-8 w-8" />
+            User Wallets
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            Manage cryptocurrency wallet addresses
           </p>
         </div>
-        <Button onClick={handleAdd} className="gradient-primary">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Wallet
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => handleExport()}>
+            <Download className="h-4 w-4 mr-2" />
+            Export All
+          </Button>
+        </div>
       </div>
 
+      {/* Quick Stats */}
+      {stats && (
+        <WalletQuickStats stats={stats.stats} isLoading={statsLoading} />
+      )}
+
+      <Separator />
+
+      {/* Filters */}
+      <WalletFilters
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        onReset={handleResetFilters}
+        currencies={currencies}
+        blockchains={blockchains}
+      />
+
       {/* Data Table */}
-      <DataTable
+      <DataTableAdvanced
         columns={columns}
         data={wallets}
-        isLoading={isLoading}
-        searchKey="address"
-        searchPlaceholder="Search by address..."
+        isLoading={loading}
+        onRowClick={handleViewDetails}
+        bulkActions={[
+          {
+            label: 'Verify',
+            onClick: handleBulkVerify,
+            icon: <ShieldCheck className="h-4 w-4" />,
+          },
+          {
+            label: 'Unverify',
+            onClick: handleBulkUnverify,
+            icon: <XCircle className="h-4 w-4" />,
+          },
+          {
+            label: 'Delete',
+            onClick: handleBulkDelete,
+            icon: <Trash2 className="h-4 w-4" />,
+            variant: 'destructive',
+          },
+        ]}
+        onExport={handleExport}
       />
 
-      {/* Add/Edit Sheet */}
-      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent className="sm:max-w-[600px] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>
-              {editingWallet ? 'Edit User Wallet' : 'Add User Wallet'}
-            </SheetTitle>
-            <SheetDescription>
-              Configure user wallet details
-            </SheetDescription>
-          </SheetHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>User *</Label>
-              <Combobox
-                options={userOptions}
-                value={formData.userId}
-                onValueChange={(value) => setFormData({ ...formData, userId: value })}
-                placeholder="Select user..."
-                searchPlaceholder="Search users..."
-                disabled={!!editingWallet}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Currency *</Label>
-                <Combobox
-                  options={currencyOptions}
-                  value={formData.currencyCode}
-                  onValueChange={(value) => setFormData({ ...formData, currencyCode: value })}
-                  placeholder="Select currency..."
-                  searchPlaceholder="Search..."
-                  disabled={!!editingWallet}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Blockchain *</Label>
-                <Combobox
-                  options={blockchainOptions}
-                  value={formData.blockchainCode}
-                  onValueChange={(value) => setFormData({ ...formData, blockchainCode: value })}
-                  placeholder="Select network..."
-                  searchPlaceholder="Search..."
-                  disabled={!!editingWallet}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Wallet Address *</Label>
-              <Input
-                value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="0x..."
-                disabled={!!editingWallet}
-                className="font-mono text-sm"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Label (Optional)</Label>
-              <Input
-                value={formData.label}
-                onChange={(e) => setFormData({ ...formData, label: e.target.value })}
-                placeholder="My Main Wallet"
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <Label>Verified</Label>
-              <Switch
-                checked={formData.isVerified}
-                onCheckedChange={(checked) => setFormData({ ...formData, isVerified: checked })}
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <Label>Set as Default</Label>
-              <Switch
-                checked={formData.isDefault}
-                onCheckedChange={(checked) => setFormData({ ...formData, isDefault: checked })}
-              />
-            </div>
-
-            <div className="flex gap-2 pt-4">
-              <Button onClick={handleSave} disabled={isSaving} className="flex-1">
-                {isSaving ? 'Saving...' : 'Save'}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setIsSheetOpen(false)}
-                disabled={isSaving}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
+      {/* Wallet Details Sheet */}
+      <WalletDetailsSheet
+        wallet={selectedWallet}
+        open={detailsSheetOpen}
+        onOpenChange={setDetailsSheetOpen}
+        onVerify={handleVerify}
+        onSetDefault={handleSetDefault}
+      />
 
       {/* Delete Confirmation Dialog */}
-      <ConfirmDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        onConfirm={confirmDelete}
-        title="Are you sure you want to delete this wallet?"
-        description="This action cannot be undone. This will permanently delete the user's wallet address."
-        confirmText="Delete"
-        cancelText="Cancel"
-        variant="destructive"
-      />
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Wallet</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this wallet? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
-

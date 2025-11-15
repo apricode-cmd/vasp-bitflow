@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRole, getCurrentUserId } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
+import { redis } from '@/lib/services/cache.service';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 import { z } from 'zod';
 
@@ -21,6 +22,20 @@ const createUserWalletSchema = z.object({
   isDefault: z.boolean().default(false)
 });
 
+// Generate cache key for wallets list
+function generateCacheKey(filters: any): string {
+  const parts = ['user-wallets-list'];
+  if (filters.userId) parts.push(`user:${filters.userId}`);
+  if (filters.blockchainCode) parts.push(`blockchain:${filters.blockchainCode}`);
+  if (filters.currencyCode) parts.push(`currency:${filters.currencyCode}`);
+  if (filters.isVerified !== undefined) parts.push(`verified:${filters.isVerified}`);
+  if (filters.isDefault !== undefined) parts.push(`default:${filters.isDefault}`);
+  if (filters.search) parts.push(`search:${filters.search}`);
+  parts.push(`page:${filters.page || 1}`);
+  parts.push(`limit:${filters.limit || 50}`);
+  return parts.join(':');
+}
+
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     // Check admin permission
@@ -31,61 +46,113 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
-    const userId = searchParams.get('userId');
-    const blockchainCode = searchParams.get('blockchainCode');
-    const currencyCode = searchParams.get('currencyCode');
+    const filters = {
+      userId: searchParams.get('userId') || undefined,
+      blockchainCode: searchParams.get('blockchainCode') || undefined,
+      currencyCode: searchParams.get('currencyCode') || undefined,
+      isVerified: searchParams.get('isVerified') === 'true' ? true : searchParams.get('isVerified') === 'false' ? false : undefined,
+      isDefault: searchParams.get('isDefault') === 'true' ? true : searchParams.get('isDefault') === 'false' ? false : undefined,
+      search: searchParams.get('search') || undefined,
+      page: parseInt(searchParams.get('page') || '1'),
+      limit: parseInt(searchParams.get('limit') || '50')
+    };
+
+    // Try cache first
+    const cacheKey = generateCacheKey(filters);
+    try {
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        console.log(`📦 [Redis] Cache HIT: ${cacheKey}`);
+        return NextResponse.json(JSON.parse(cached));
+      }
+    } catch (cacheError) {
+      console.error('Redis get error:', cacheError);
+    }
+
+    console.log(`📦 [Redis] Cache MISS: ${cacheKey}`);
 
     // Build where clause
     const where: any = {};
-    if (userId) where.userId = userId;
-    if (blockchainCode) where.blockchainCode = blockchainCode;
-    if (currencyCode) where.currencyCode = currencyCode;
+    if (filters.userId) where.userId = filters.userId;
+    if (filters.blockchainCode) where.blockchainCode = filters.blockchainCode;
+    if (filters.currencyCode) where.currencyCode = filters.currencyCode;
+    if (filters.isVerified !== undefined) where.isVerified = filters.isVerified;
+    if (filters.isDefault !== undefined) where.isDefault = filters.isDefault;
+    
+    // Search by address or user email
+    if (filters.search) {
+      where.OR = [
+        { address: { contains: filters.search, mode: 'insensitive' } },
+        { user: { email: { contains: filters.search, mode: 'insensitive' } } },
+        { label: { contains: filters.search, mode: 'insensitive' } }
+      ];
+    }
 
-    // Get all user wallets
-    const wallets = await prisma.userWallet.findMany({
-      where,
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            profile: {
-              select: {
-                firstName: true,
-                lastName: true
+    // Get total count and wallets in parallel
+    const [total, wallets] = await Promise.all([
+      prisma.userWallet.count({ where }),
+      prisma.userWallet.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              profile: {
+                select: {
+                  firstName: true,
+                  lastName: true
+                }
               }
+            }
+          },
+          blockchain: {
+            select: {
+              code: true,
+              name: true,
+              explorerUrl: true
+            }
+          },
+          currency: {
+            select: {
+              code: true,
+              name: true,
+              symbol: true
+            }
+          },
+          _count: {
+            select: {
+              orders: true
             }
           }
         },
-        blockchain: {
-          select: {
-            code: true,
-            name: true,
-            explorerUrl: true
-          }
-        },
-        currency: {
-          select: {
-            code: true,
-            name: true,
-            symbol: true
-          }
-        },
-        _count: {
-          select: {
-            orders: true
-          }
-        }
-      },
-      orderBy: [
-        { createdAt: 'desc' }
-      ]
-    });
+        orderBy: [
+          { createdAt: 'desc' }
+        ],
+        skip: (filters.page - 1) * filters.limit,
+        take: filters.limit
+      })
+    ]);
 
-    return NextResponse.json({
+    const result = {
       success: true,
-      data: wallets
-    });
+      data: wallets,
+      pagination: {
+        total,
+        page: filters.page,
+        limit: filters.limit,
+        pages: Math.ceil(total / filters.limit)
+      }
+    };
+
+    // Cache for 5 minutes
+    try {
+      await redis.set(cacheKey, JSON.stringify(result), 'EX', 300);
+    } catch (cacheError) {
+      console.error('Redis set error:', cacheError);
+    }
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Get user wallets error:', error);
 
@@ -232,6 +299,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
       { entity: 'UserWallet', action: 'created' }
     );
+
+    // Invalidate cache
+    try {
+      const keys = await redis.keys('user-wallets-*');
+      if (keys.length > 0) {
+        await redis.del(...keys);
+        console.log(`🗑️ [Redis] Invalidated ${keys.length} wallet cache keys`);
+      }
+    } catch (cacheError) {
+      console.error('Redis cache invalidation error:', cacheError);
+    }
 
     return NextResponse.json({
       success: true,
