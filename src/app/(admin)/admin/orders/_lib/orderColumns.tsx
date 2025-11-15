@@ -26,8 +26,8 @@ import type { OrderStatus } from '@prisma/client';
 
 // Status transition rules
 const STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  PENDING: ['PAYMENT_PENDING', 'PAYMENT_RECEIVED', 'PROCESSING', 'CANCELLED'],
-  PAYMENT_PENDING: ['PAYMENT_RECEIVED', 'PROCESSING', 'CANCELLED'],
+  PENDING: ['PAYMENT_RECEIVED', 'PROCESSING', 'CANCELLED'],
+  PAYMENT_PENDING: ['PAYMENT_RECEIVED', 'PROCESSING', 'CANCELLED'], // Legacy support, will be removed
   PAYMENT_RECEIVED: ['PROCESSING', 'CANCELLED'],
   PROCESSING: ['COMPLETED', 'CANCELLED'],
   COMPLETED: [],
