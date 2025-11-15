@@ -247,8 +247,8 @@ export default function AdminOrdersPage(): JSX.Element {
   };
 
   const viewOrderDetails = (order: Order) => {
-    setSelectedOrder(order);
-    setSheetOpen(true);
+    // Navigate to dedicated order details page instead of opening sheet
+    window.location.href = `/admin/orders/${order.id}`;
   };
 
   // Filter orders for table view
@@ -346,9 +346,11 @@ export default function AdminOrdersPage(): JSX.Element {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => viewOrderDetails(order)}>
-                  <Eye className="h-4 w-4 mr-2" />
-                  View Details
+                <DropdownMenuItem asChild>
+                  <Link href={`/admin/orders/${order.id}`}>
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Details
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href={`/admin/users/${order.user.id}`}>
