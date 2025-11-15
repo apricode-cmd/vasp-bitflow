@@ -683,7 +683,7 @@ export const OrderReportDocument: React.FC<OrderReportDocumentProps> = ({ data }
         {/* Footer */}
         <View style={styles.footer} fixed>
           <Text style={styles.footerText}>
-            {data.brandName} • {data.companyWebsite || data.companyEmail}
+            {data.brandName}
           </Text>
           <Text style={styles.pageNumber} render={({ pageNumber, totalPages }) => (
             `Page ${pageNumber} of ${totalPages}`
