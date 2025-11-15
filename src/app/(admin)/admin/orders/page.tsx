@@ -18,17 +18,16 @@ import { OrderFilters } from './_components/OrderFilters';
 import { OrderQuickStats } from './_components/OrderQuickStats';
 import { OrdersTableView } from './_components/OrdersTableView';
 import { OrderKanban } from '@/components/admin/OrderKanban';
-import { CreateOrderDialog } from '@/components/admin/CreateOrderDialog';
 import { useOrders } from './_lib/useOrders';
 import { useOrderFilters } from './_lib/useOrderFilters';
 import { LayoutGrid, List, Plus, RefreshCw } from 'lucide-react';
+import Link from 'next/link';
 
 type ViewMode = 'kanban' | 'table';
 
 export default function OrdersPage(): JSX.Element {
   // View mode
   const [viewMode, setViewMode] = useState<ViewMode>('table');
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   // Custom hooks
   const { filters, setFilter } = useOrderFilters();
@@ -57,10 +56,12 @@ export default function OrdersPage(): JSX.Element {
           </Button>
 
           {/* Create Order */}
-          <Button onClick={() => setCreateDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Order
-          </Button>
+          <Link href="/admin/orders/create">
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Order
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -152,13 +153,6 @@ export default function OrdersPage(): JSX.Element {
           networks={[]}
         />
       )}
-
-      {/* Create Order Dialog */}
-      <CreateOrderDialog
-        open={createDialogOpen}
-        onOpenChange={setCreateDialogOpen}
-        onSuccess={refetch}
-      />
     </div>
   );
 }
