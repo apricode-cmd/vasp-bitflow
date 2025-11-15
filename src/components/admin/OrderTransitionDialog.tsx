@@ -61,8 +61,8 @@ export function OrderTransitionDialog({
   cryptocurrencies = [],
   networks = []
 }: OrderTransitionDialogProps) {
-  const requiresPayIn = fromStatus === 'PENDING' && toStatus === 'PAYMENT_PENDING';
-  const requiresPayOut = fromStatus === 'PROCESSING' && toStatus === 'COMPLETED';
+  const requiresPayIn = toStatus === 'PAYMENT_RECEIVED';
+  const requiresPayOut = toStatus === 'COMPLETED';
   
   const [submitting, setSubmitting] = useState(false);
   const [showCustomReference, setShowCustomReference] = useState(false);
