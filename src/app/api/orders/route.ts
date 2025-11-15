@@ -151,8 +151,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     });
 
-    // Clear admin stats cache (new order created)
+    // Clear caches (new order created)
     await CacheService.clearAdminStats();
+    await CacheService.deletePattern('admin:orders:*'); // Clear orders list cache
     
     // Log order creation with FULL details
     await userActivityService.logOrderCreated(
