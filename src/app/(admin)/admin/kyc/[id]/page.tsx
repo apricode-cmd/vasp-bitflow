@@ -9,8 +9,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { BrandLoaderPage } from '@/components/ui/brand-loader';
 import type { KycSessionDetail } from './_components/types';
 import { KycHeader } from './_components/KycHeader';
 import { KycDetailsTabs } from './_components/KycDetailsTabs';
@@ -59,11 +59,7 @@ export default function KycDetailsPage({ params }: PageProps): JSX.Element {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <BrandLoaderPage text="Loading KYC details..." />;
   }
 
   if (!session) {

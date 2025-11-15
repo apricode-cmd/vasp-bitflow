@@ -14,6 +14,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { registerSchema, type RegisterInput } from '@/lib/validations/auth';
 import { toast } from 'sonner';
+import { BrandLoaderInline } from '@/components/ui/brand-loader';
 import { Loader2, CheckCircle2, Info, UserPlus, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -150,9 +151,8 @@ export default function RegisterPage(): React.ReactElement {
         {/* Check if registration is disabled */}
         {checkingSettings ? (
           <Card className="shadow-2xl border-primary/10 bg-card/95 backdrop-blur-sm">
-            <CardContent className="p-12 text-center">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-4" />
-              <p className="text-muted-foreground">Loading...</p>
+            <CardContent className="p-8">
+              <BrandLoaderInline text="Loading..." size="sm" />
             </CardContent>
           </Card>
         ) : registrationDisabled ? (

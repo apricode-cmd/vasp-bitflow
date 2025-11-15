@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { BrandLoaderInline } from '@/components/ui/brand-loader'
 import { toast } from 'sonner'
 import { 
   FileText, Globe, Shield, Edit, Trash2, Plus,
@@ -237,11 +238,7 @@ export default function DocumentsPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
+    return <BrandLoaderInline text="Loading documents..." size="md" />
   }
 
   const publicDocs = filterDocuments(documents, 'public')

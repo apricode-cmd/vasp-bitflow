@@ -38,6 +38,7 @@ import {
   Loader2,
   Palette
 } from 'lucide-react';
+import { BrandLoaderPage } from '@/components/ui/brand-loader';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getBaseEmailLayout } from '@/lib/email-templates/base-layout';
@@ -280,11 +281,7 @@ export default function EmailTemplateEditorPage({ params }: { params: { id: stri
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <BrandLoaderPage text="Loading template..." />;
   }
 
   if (!template) {

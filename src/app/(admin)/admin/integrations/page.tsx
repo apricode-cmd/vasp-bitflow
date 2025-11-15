@@ -15,6 +15,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { BrandLoaderInline } from '@/components/ui/brand-loader';
 import { toast } from 'sonner';
 import { 
   Shield, Mail, TrendingUp, CreditCard, Loader2, 
@@ -282,11 +283,7 @@ export default function IntegrationsPage(): JSX.Element {
   }, [integrations, searchQuery, categoryFilter, statusFilter]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <BrandLoaderInline text="Loading integrations..." size="md" />;
   }
 
   const renderIntegrationCard = (integration: Integration) => {

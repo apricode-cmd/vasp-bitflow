@@ -37,6 +37,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { formatDate } from '@/lib/formatters';
 import { toast } from 'sonner';
+import { BrandLoaderInline } from '@/components/ui/brand-loader';
 import { 
   User, Mail, Phone, MapPin, Calendar, Shield, Lock, 
   Save, Loader2, AlertCircle, Smartphone, Key, QrCode, Copy, RefreshCw, Eye, EyeOff
@@ -172,11 +173,7 @@ export default function ProfilePage(): React.ReactElement {
   };
 
   if (loading || !user) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <BrandLoaderInline text="Loading profile..." size="md" />;
   }
 
   const userInitials = `${user.profile?.firstName?.charAt(0) || ''}${user.profile?.lastName?.charAt(0) || ''}`.toUpperCase();

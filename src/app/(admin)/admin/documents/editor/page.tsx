@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { BrandLoaderInline } from '@/components/ui/brand-loader'
 import { LegalDocumentEditor } from '@/components/admin/LegalDocumentEditor'
 import {
   Save, Eye, Globe, ArrowLeft, Loader2, FileText,
@@ -216,11 +217,7 @@ export default function DocumentEditorPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
+    return <BrandLoaderInline text="Loading document editor..." size="md" />
   }
 
   return (

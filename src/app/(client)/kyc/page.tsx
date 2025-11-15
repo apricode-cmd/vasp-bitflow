@@ -15,7 +15,8 @@ import { KycConsentScreen } from '@/components/kyc/KycConsentScreen';
 import { useKycFields } from '@/components/kyc/hooks/useKycFields';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { BrandLoaderInline } from '@/components/ui/brand-loader';
+import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { KycStatus } from '@prisma/client';
 
@@ -102,14 +103,7 @@ export default function KycPage(): React.ReactElement {
 
   // Loading state
   if (loading || statusLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto" />
-          <p className="text-muted-foreground">Loading KYC verification...</p>
-      </div>
-          </div>
-        );
+    return <BrandLoaderInline text="Loading KYC verification..." size="md" />;
   }
 
   // Error state

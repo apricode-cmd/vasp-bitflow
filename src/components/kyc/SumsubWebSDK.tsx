@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { BrandLoaderInline } from '@/components/ui/brand-loader';
 import { Loader2, RefreshCw } from 'lucide-react';
 
 interface SumsubWebSDKProps {
@@ -179,12 +180,7 @@ export function SumsubWebSDK({ userId, onComplete, onError }: SumsubWebSDKProps)
       </CardHeader>
       <CardContent>
         {loading && !error && (
-          <div className="flex flex-col items-center justify-center py-12 space-y-4">
-            <Loader2 className="w-12 h-12 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">
-              Loading verification interface...
-            </p>
-          </div>
+          <BrandLoaderInline text="Loading verification interface..." size="md" />
         )}
 
         {error && (
