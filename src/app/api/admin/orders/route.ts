@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
+import { CacheService } from '@/lib/services/cache.service';
 
 // Force dynamic rendering (uses request.url and cookies)
 export const dynamic = 'force-dynamic';
@@ -24,25 +25,78 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const limit = parseInt(searchParams.get('limit') || '20');
     const skip = (page - 1) * limit;
 
-    // Filters
+    // Enhanced filters
     const status = searchParams.get('status');
-    const currencyCode = searchParams.get('currency');
+    const currencyCode = searchParams.get('currencyCode');
+    const fiatCurrencyCode = searchParams.get('fiatCurrencyCode');
+    const search = searchParams.get('search');
+    const hasPayIn = searchParams.get('hasPayIn');
+    const hasPayOut = searchParams.get('hasPayOut');
     const withoutPayIn = searchParams.get('withoutPayIn') === 'true';
     const withoutPayOut = searchParams.get('withoutPayOut') === 'true';
 
+    // Build cache key from filters
+    const cacheKey = `admin:orders:list:${status || 'all'}:${currencyCode || 'all'}:${fiatCurrencyCode || 'all'}:${page}:${limit}:${search || ''}`;
+    
+    // Try cache (only if no search)
+    if (!search) {
+      const cached = await CacheService.get(cacheKey);
+      if (cached) {
+        return NextResponse.json(cached);
+      }
+    }
+
     // Build where clause
-    const where: Record<string, unknown> = {};
+    const where: any = {};
+    
     if (status) {
       where.status = status;
     }
+    
     if (currencyCode) {
       where.currencyCode = currencyCode;
     }
     
-    // Filter orders without PayIn (for manual PayIn creation)
+    if (fiatCurrencyCode) {
+      where.fiatCurrencyCode = fiatCurrencyCode;
+    }
+    
+    // Search by payment reference or user email
+    if (search) {
+      where.OR = [
+        {
+          paymentReference: {
+            contains: search,
+            mode: 'insensitive'
+          }
+        },
+        {
+          user: {
+            email: {
+              contains: search,
+              mode: 'insensitive'
+            }
+          }
+        }
+      ];
+    }
+    
+    // Filter by PayIn/PayOut existence
+    if (hasPayIn === 'true') {
+      where.payIn = { isNot: null };
+    } else if (hasPayIn === 'false') {
+      where.payIn = null;
+    }
+    
+    if (hasPayOut === 'true') {
+      where.payOut = { isNot: null };
+    } else if (hasPayOut === 'false') {
+      where.payOut = null;
+    }
+    
+    // Legacy filters for backward compatibility
     if (withoutPayIn) {
       where.payIn = null;
-      // Only show orders that are waiting for payment or have payment received
       where.status = {
         in: ['PENDING', 'PAYMENT_PENDING', 'PAYMENT_RECEIVED']
       };
@@ -93,12 +147,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       prisma.order.count({ where })
     ]);
 
-    return NextResponse.json({
+    const result = {
       orders,
       total,
       page,
       totalPages: Math.ceil(total / limit)
-    });
+    };
+
+    // Cache result (5 minutes) if no search
+    if (!search) {
+      await CacheService.set(cacheKey, result, 300);
+    }
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Admin get orders error:', error);
     return NextResponse.json(
