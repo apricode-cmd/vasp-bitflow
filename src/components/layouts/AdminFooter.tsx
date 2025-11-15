@@ -4,12 +4,32 @@
  * Compact footer for admin panel with developer credits and system version
  */
 
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ApricodeLogo } from '@/components/icons/ApricodeLogo';
 
 export function AdminFooter(): React.ReactElement {
   const currentYear = new Date().getFullYear();
-  const version = process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0';
+  const [version, setVersion] = useState<string>('1.0.0');
+
+  useEffect(() => {
+    // Fetch version from API
+    fetch('/api/version')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data?.version) {
+          setVersion(data.data.version);
+        }
+      })
+      .catch(() => {
+        // Fallback to importing version.json directly
+        import('@/../version.json').then(versionData => {
+          setVersion(versionData.version || '1.0.0');
+        });
+      });
+  }, []);
 
   return (
     <footer className="bg-muted/30 border-t py-4 mt-auto">

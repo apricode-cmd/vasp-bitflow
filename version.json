@@ -1,8 +1,42 @@
 {
-  "version": "1.0.0",
-  "buildNumber": 1,
-  "buildDate": "2025-11-15T00:00:00.000Z",
+  "version": "1.1.0",
+  "buildNumber": 2,
+  "buildDate": "2025-11-15T14:56:20.328Z",
   "releaseNotes": {
+    "1.1.0": {
+      "date": "2025-11-15",
+      "type": "minor",
+      "features": [
+        "Branded loading system with animated company logo (BrandLoader)",
+        "Automated version management system with Git integration",
+        "Bidirectional Order ↔ PayIn ↔ PayOut status synchronization",
+        "Order transition dialogs with auto-filled payment data",
+        "Enhanced cache invalidation for admin operations",
+        "Professional branded UI across all loading states"
+      ],
+      "improvements": [
+        "Improved order management workflow with status transitions",
+        "Auto-selection of payment methods in PayIn/PayOut dialogs",
+        "Optimized database queries with Redis caching",
+        "Better UX for order status changes in table and Kanban",
+        "Unified loading experience throughout the application",
+        "Enhanced admin dashboard performance"
+      ],
+      "fixes": [
+        "Fixed PayOut foreign key constraint (processedBy → initiatedBy)",
+        "Fixed PayIn creation when order transitions to PAYMENT_RECEIVED",
+        "Fixed duplicate statuses in order status dropdown",
+        "Removed legacy PAYMENT_PENDING status",
+        "Fixed payment method filtering by currency in dialogs"
+      ],
+      "technical": [
+        "Integrated Upstash Redis for distributed caching",
+        "Added database indexes for production optimization",
+        "Implemented CacheService.deletePattern for targeted invalidation",
+        "Created modular BrandLoader components (Page, Inline, Overlay)",
+        "Enhanced API response parsing for payment methods"
+      ]
+    },
     "1.0.0": {
       "date": "2025-11-15",
       "type": "major",
@@ -22,4 +56,3 @@
     }
   }
 }
-
