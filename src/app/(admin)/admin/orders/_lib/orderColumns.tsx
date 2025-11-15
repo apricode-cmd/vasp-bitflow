@@ -113,9 +113,7 @@ export function useOrderColumns({ onStatusChange }: UseOrderColumnsProps = {}): 
       cell: ({ row, table }) => {
         const order = row.original;
         const currentStatus = order.status as OrderStatus;
-        // Filter out current status from allowed transitions
-        const allowedStatuses = (STATUS_TRANSITIONS[currentStatus] || [])
-          .filter(status => status !== currentStatus);
+        const allowedStatuses = STATUS_TRANSITIONS[currentStatus] || [];
         
         // If no transitions allowed, show static badge
         if (allowedStatuses.length === 0) {
@@ -144,7 +142,7 @@ export function useOrderColumns({ onStatusChange }: UseOrderColumnsProps = {}): 
                 <OrderStatusBadge status={order.status} />
               </SelectTrigger>
               <SelectContent>
-                {/* Allowed transitions (only show different statuses) */}
+                {/* Show all allowed transitions */}
                 {allowedStatuses.map((status) => (
                   <SelectItem key={status} value={status}>
                     <OrderStatusBadge status={status} />
