@@ -95,7 +95,7 @@ export function WalletFilters({
         value={filters.isVerified || 'all'}
         onValueChange={(value) => onFilterChange('isVerified', value === 'all' ? '' : value)}
       >
-        <SelectTrigger className="w-[100px] h-9 flex-shrink-0">
+        <SelectTrigger className="w-[130px] h-9 flex-shrink-0">
           <SelectValue placeholder="All Status" />
         </SelectTrigger>
         <SelectContent>
@@ -110,8 +110,8 @@ export function WalletFilters({
         value={filters.isDefault || 'all'}
         onValueChange={(value) => onFilterChange('isDefault', value === 'all' ? '' : value)}
       >
-        <SelectTrigger className="w-[100px] h-9 flex-shrink-0">
-          <SelectValue placeholder="All..." />
+        <SelectTrigger className="w-[130px] h-9 flex-shrink-0">
+          <SelectValue placeholder="All Wallets" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Wallets</SelectItem>
