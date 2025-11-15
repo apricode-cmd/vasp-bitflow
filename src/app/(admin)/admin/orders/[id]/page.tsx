@@ -138,6 +138,12 @@ export default function OrderDetailsPage(): JSX.Element {
   const [actionLoading, setActionLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   
+  // Reference data for OrderTransitionDialog
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [fiatCurrencies, setFiatCurrencies] = useState<any[]>([]);
+  const [cryptocurrencies, setCryptocurrencies] = useState<any[]>([]);
+  const [networks, setNetworks] = useState<any[]>([]);
+  
   // Transition dialog state
   const [transitionDialog, setTransitionDialog] = useState<{
     open: boolean;
@@ -154,6 +160,7 @@ export default function OrderDetailsPage(): JSX.Element {
   useEffect(() => {
     if (orderId) {
       fetchOrderDetails();
+      fetchReferenceData();
     }
   }, [orderId]);
 
@@ -268,6 +275,37 @@ export default function OrderDetailsPage(): JSX.Element {
 
     toast.success('Order status updated');
     await fetchOrderDetails();
+  };
+
+  const fetchReferenceData = async (): Promise<void> => {
+    try {
+      const [methodsRes, fiatRes, cryptoRes, networksRes] = await Promise.all([
+        fetch('/api/admin/payment-methods'),
+        fetch('/api/admin/resources/fiat-currencies'),
+        fetch('/api/admin/resources/currencies?active=true'),
+        fetch('/api/admin/blockchains')
+      ]);
+
+      if (methodsRes.ok) {
+        const data = await methodsRes.json();
+        setPaymentMethods(data.methods || data.data || []);
+      }
+      if (fiatRes.ok) {
+        const data = await fiatRes.json();
+        setFiatCurrencies(data.data || []);
+      }
+      if (cryptoRes.ok) {
+        const data = await cryptoRes.json();
+        setCryptocurrencies(data.data || []);
+      }
+      if (networksRes.ok) {
+        const data = await networksRes.json();
+        setNetworks(data.networks || data.data || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch reference data:', error);
+      // Don't show error to user, reference data is not critical
+    }
   };
 
   const exportOrder = async (): Promise<void> => {
@@ -432,10 +470,10 @@ export default function OrderDetailsPage(): JSX.Element {
           fromStatus={transitionDialog.fromStatus}
           toStatus={transitionDialog.toStatus}
           onConfirm={handleTransitionConfirm}
-          paymentMethods={[]}
-          fiatCurrencies={[]}
-          cryptocurrencies={[]}
-          networks={[]}
+          paymentMethods={paymentMethods}
+          fiatCurrencies={fiatCurrencies}
+          cryptocurrencies={cryptocurrencies}
+          networks={networks}
         />
       )}
     </div>
