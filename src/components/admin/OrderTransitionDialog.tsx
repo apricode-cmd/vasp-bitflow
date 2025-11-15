@@ -34,6 +34,7 @@ interface Order {
   currencyCode: string;
   walletAddress: string;
   blockchainCode?: string;
+  paymentMethodCode?: string;
 }
 
 interface OrderTransitionDialogProps {
@@ -99,6 +100,7 @@ export function OrderTransitionDialog({
         ...prev,
         payInAmount: order.totalFiat,
         payInFiatCurrency: order.fiatCurrencyCode,
+        payInPaymentMethod: order.paymentMethodCode || '', // Auto-select payment method from order
         payInReference: order.paymentReference, // Set default reference
         payOutAmount: order.cryptoAmount,
         payOutCryptoCurrency: order.currencyCode,
