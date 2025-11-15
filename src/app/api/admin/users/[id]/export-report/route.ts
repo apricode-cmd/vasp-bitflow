@@ -7,7 +7,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminAuth } from '@/lib/middleware/admin-auth';
-import { generateUserReportPDF, generateReportFilename } from '@/lib/services/user-report-pdf.service';
 import { prisma } from '@/lib/prisma';
 
 interface RouteContext {
@@ -43,6 +42,9 @@ export async function GET(
       );
     }
 
+    // Dynamic import для PDF генерации (избегаем медленной компиляции)
+    const { generateUserReportPDF, generateReportFilename } = await import('@/lib/services/user-report-pdf.service');
+    
     // Generate PDF
     const pdfBuffer = await generateUserReportPDF(userId);
 
