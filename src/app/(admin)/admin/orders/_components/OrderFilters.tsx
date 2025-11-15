@@ -61,13 +61,10 @@ export function OrderFilters({ filters, onFilterChange, onReset }: OrderFiltersP
         <SelectContent>
           <SelectItem value="all">All Status</SelectItem>
           <SelectItem value="PENDING">Pending</SelectItem>
-          <SelectItem value="PAYMENT_PENDING">Payment Pending</SelectItem>
           <SelectItem value="PAYMENT_RECEIVED">Payment Received</SelectItem>
           <SelectItem value="PROCESSING">Processing</SelectItem>
           <SelectItem value="COMPLETED">Completed</SelectItem>
           <SelectItem value="CANCELLED">Cancelled</SelectItem>
-          <SelectItem value="FAILED">Failed</SelectItem>
-          <SelectItem value="EXPIRED">Expired</SelectItem>
         </SelectContent>
       </Select>
 
