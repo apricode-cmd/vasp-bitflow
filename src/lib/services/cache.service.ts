@@ -245,6 +245,29 @@ export class CacheService {
   }
 
   /**
+   * Delete all keys matching a pattern
+   * @param pattern Redis key pattern (e.g., 'admin:orders:*')
+   * @returns Number of keys deleted
+   */
+  static async deletePattern(pattern: string): Promise<number> {
+    try {
+      const keys = await redis.keys(pattern);
+      
+      if (keys.length === 0) {
+        console.log(`ℹ️  [Redis] No keys to clear for pattern: ${pattern}`);
+        return 0;
+      }
+      
+      await redis.del(...keys);
+      console.log(`🗑️  [Redis] Cleared ${keys.length} keys matching: ${pattern}`);
+      return keys.length;
+    } catch (error) {
+      console.error(`❌ [Redis] Delete pattern ${pattern} error:`, error);
+      return 0;
+    }
+  }
+
+  /**
    * Get cache statistics
    */
   static async getStats(): Promise<{

@@ -405,8 +405,8 @@ export function OrderKanban({
     }
 
     // Check if this transition requires additional data
-    // PayIn required when moving to PROCESSING (payment proof)
-    const requiresPayIn = newStatus === 'PROCESSING';
+    // PayIn required when moving to PAYMENT_PENDING (payment proof received)
+    const requiresPayIn = newStatus === 'PAYMENT_PENDING' || newStatus === 'PAYMENT_RECEIVED' || newStatus === 'PROCESSING';
     // PayOut required when moving to COMPLETED (crypto transaction)
     const requiresPayOut = newStatus === 'COMPLETED';
 
