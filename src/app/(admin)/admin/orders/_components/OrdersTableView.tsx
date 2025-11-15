@@ -62,7 +62,9 @@ export function OrdersTableView({
     if (!order) return;
 
     // Check if this transition requires additional data (PayIn/PayOut)
-    const requiresPayIn = newStatus === 'PAYMENT_PENDING' || newStatus === 'PAYMENT_RECEIVED' || newStatus === 'PROCESSING';
+    // PayIn required when payment is received (PAYMENT_RECEIVED)
+    const requiresPayIn = newStatus === 'PAYMENT_RECEIVED';
+    // PayOut required when sending crypto (COMPLETED)
     const requiresPayOut = newStatus === 'COMPLETED';
 
     if (requiresPayIn || requiresPayOut) {
