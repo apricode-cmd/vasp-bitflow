@@ -20,7 +20,6 @@ import { OrderDocumentsTab } from './_components/OrderDocumentsTab';
 import { OrderUserTab } from './_components/OrderUserTab';
 import { OrderNotesTab } from './_components/OrderNotesTab';
 import { OrderTransitionDialog } from '@/components/admin/OrderTransitionDialog';
-import { Skeleton } from '@/components/ui/skeleton';
 import { 
   LayoutGrid, 
   TrendingDown, 
@@ -31,6 +30,7 @@ import {
   MessageSquare
 } from 'lucide-react';
 import type { OrderStatus } from '@prisma/client';
+import OrderDetailsSkeleton from './loading';
 
 interface OrderData {
   id: string;
@@ -367,19 +367,7 @@ export default function OrderDetailsPage(): JSX.Element {
   };
 
   if (loading) {
-    return (
-      <div className="container mx-auto p-6 space-y-6">
-        <Skeleton className="h-12 w-full" />
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-1 space-y-4">
-            <Skeleton className="h-[400px] w-full" />
-          </div>
-          <div className="lg:col-span-3">
-            <Skeleton className="h-[600px] w-full" />
-          </div>
-        </div>
-      </div>
-    );
+    return <OrderDetailsSkeleton />;
   }
 
   if (!order) {
