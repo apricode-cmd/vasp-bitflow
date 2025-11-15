@@ -106,8 +106,10 @@ export const updateOrderStatusSchema = z.object({
     'REFUNDED',
     'FAILED',
     'EXPIRED'
-  ]),
+  ]).optional(), // Made optional to allow updating only notes
   adminNotes: z.string().max(500).optional(),
+  internalNote: z.string().max(1000).optional(), // Allow updating internal notes
+  notes: z.string().max(1000).optional(), // Allow updating customer notes
   transactionHash: z
     .string()
     .regex(/^(0x)?[a-fA-F0-9]{64}$/, 'Invalid transaction hash')
@@ -115,6 +117,11 @@ export const updateOrderStatusSchema = z.object({
     .nullable(), // Allow null for non-crypto orders
   payInData: payInDataSchema.optional(), // For PENDING → PAYMENT_PENDING or PAYMENT_RECEIVED
   payOutData: payOutDataSchema.optional() // For PROCESSING → COMPLETED
+}).refine((data) => {
+  // At least one field must be provided
+  return data.status || data.adminNotes || data.internalNote || data.notes || data.transactionHash || data.payInData || data.payOutData;
+}, {
+  message: 'At least one field must be provided to update',
 });
 
 export type UpdateOrderStatusInput = z.infer<typeof updateOrderStatusSchema>;

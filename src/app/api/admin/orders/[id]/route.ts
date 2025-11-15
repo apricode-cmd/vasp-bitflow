@@ -137,11 +137,14 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
     const oldStatus = order.status;
     const newStatus = validatedData.status;
 
-    // Smart status transition logic
+    // Check if this is a status change or just notes/data update
+    const isStatusChange = newStatus && newStatus !== oldStatus;
+
+    // Smart status transition logic (only if status is changing)
     // PayIn required when moving to PAYMENT_RECEIVED (payment received from customer)
-    const requiresPayIn = newStatus === 'PAYMENT_RECEIVED' && !order.payIn;
+    const requiresPayIn = isStatusChange && newStatus === 'PAYMENT_RECEIVED' && !order.payIn;
     // PayOut required when moving to COMPLETED (crypto sent)
-    const requiresPayOut = newStatus === 'COMPLETED' && !order.payOut;
+    const requiresPayOut = isStatusChange && newStatus === 'COMPLETED' && !order.payOut;
 
     // Validate required data for transitions
     if (requiresPayIn && !validatedData.payInData) {
@@ -234,16 +237,37 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
         }
       }
 
+      // Prepare update data - only include fields that are provided
+      const updateData: any = {
+        processedBy: session.user.id,
+      };
+
+      // Update status only if provided
+      if (newStatus) {
+        updateData.status = newStatus;
+        updateData.processedAt = newStatus === 'COMPLETED' ? new Date() : order.processedAt;
+      }
+
+      // Update notes fields
+      if (validatedData.adminNotes !== undefined) {
+        updateData.adminNotes = validatedData.adminNotes;
+      }
+      if (validatedData.internalNote !== undefined) {
+        updateData.internalNote = validatedData.internalNote;
+      }
+      if (validatedData.notes !== undefined) {
+        updateData.notes = validatedData.notes;
+      }
+
+      // Update transaction hash
+      if (validatedData.transactionHash !== undefined || validatedData.payOutData?.transactionHash) {
+        updateData.transactionHash = validatedData.transactionHash || validatedData.payOutData?.transactionHash;
+      }
+
       // Update order
       const updated = await tx.order.update({
         where: { id: params.id },
-        data: {
-          status: newStatus,
-          adminNotes: validatedData.adminNotes,
-          transactionHash: validatedData.transactionHash || validatedData.payOutData?.transactionHash,
-          processedBy: session.user.id,
-          processedAt: newStatus === 'COMPLETED' ? new Date() : order.processedAt
-        },
+        data: updateData,
         include: {
           user: {
             include: { profile: true }
@@ -268,15 +292,15 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
         }
       });
 
-      // Create status history entry
-      if (oldStatus !== newStatus) {
+      // Create status history entry (only if status actually changed)
+      if (isStatusChange && newStatus) {
         await tx.orderStatusHistory.create({
           data: {
             orderId: params.id,
             oldStatus,
             newStatus,
             changedBy: session.user.id,
-            note: validatedData.adminNotes
+            notes: validatedData.adminNotes || validatedData.internalNote || null
           }
         });
       }
@@ -284,26 +308,34 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
       return updated;
     });
 
-    // Clear caches (order status changed)
+    // Clear caches (order updated)
     await CacheService.clearAdminStats();
     await CacheService.deletePattern('admin:orders:*'); // Clear orders list cache
     await CacheService.deletePattern(`admin:order:${params.id}:*`); // Clear specific order cache
     
     // Log admin action
+    const auditAction = isStatusChange 
+      ? AUDIT_ACTIONS.ORDER_STATUS_CHANGED 
+      : AUDIT_ACTIONS.ORDER_UPDATED;
+    
     await auditService.logAdminAction(
       session.user.id,
-      AUDIT_ACTIONS.ORDER_STATUS_CHANGED,
+      auditAction,
       AUDIT_ENTITIES.ORDER,
       params.id,
       {
         status: oldStatus,
         adminNotes: order.adminNotes,
+        internalNote: order.internalNote,
+        notes: order.notes,
         transactionHash: order.transactionHash
       },
       {
-        status: newStatus,
-        adminNotes: validatedData.adminNotes,
-        transactionHash: validatedData.transactionHash
+        status: newStatus || oldStatus, // Keep old status if not changing
+        adminNotes: validatedData.adminNotes !== undefined ? validatedData.adminNotes : order.adminNotes,
+        internalNote: validatedData.internalNote !== undefined ? validatedData.internalNote : order.internalNote,
+        notes: validatedData.notes !== undefined ? validatedData.notes : order.notes,
+        transactionHash: validatedData.transactionHash !== undefined ? validatedData.transactionHash : order.transactionHash
       },
       {
         paymentReference: order.paymentReference,
@@ -311,8 +343,9 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
       }
     );
 
-    // Send notification to user about status change
-    try {
+    // Send notification to user about status change (only if status changed)
+    if (isStatusChange) {
+      try {
       const eventKeyMap: Record<string, string> = {
         'PAYMENT_PENDING': 'ORDER_PAYMENT_RECEIVED',
         'PAYMENT_RECEIVED': 'ORDER_PAYMENT_RECEIVED',
@@ -321,7 +354,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
         'REFUNDED': 'ORDER_REFUNDED'
       };
 
-      const eventKey = eventKeyMap[newStatus];
+      const eventKey = newStatus ? eventKeyMap[newStatus] : undefined;
       
       if (eventKey) {
         await eventEmitter.emit(eventKey, {
@@ -340,10 +373,11 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
         });
         console.log(`✅ [NOTIFICATION] Sent ${eventKey} for order ${updatedOrder.id}`);
       }
-    } catch (notifError) {
-      // Don't fail the request if notification fails
-      console.error('❌ [NOTIFICATION] Failed to send:', notifError);
-    }
+      } catch (notifError) {
+        // Don't fail the request if notification fails
+        console.error('❌ [NOTIFICATION] Failed to send:', notifError);
+      }
+    } // Close if (isStatusChange)
 
     return NextResponse.json(updatedOrder);
   } catch (error) {
