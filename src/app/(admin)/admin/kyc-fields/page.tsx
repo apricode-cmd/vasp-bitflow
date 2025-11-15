@@ -29,6 +29,8 @@ import { toast } from 'sonner';
 import { KYC_STEPS, KYC_CATEGORIES, getCategoryIcon } from '@/lib/kyc/config';
 import * as Icons from 'lucide-react';
 import { BrandLoaderInline } from '@/components/ui/brand-loader';
+import { ConditionalLogicSection } from '@/components/admin/kyc/ConditionalLogicSection';
+import { UXEnhancementsSection } from '@/components/admin/kyc/UXEnhancementsSection';
 
 interface KycField {
   id: string;
@@ -41,6 +43,11 @@ interface KycField {
   priority: number;
   validation: any;
   options: any;
+  dependsOn: string | null;
+  showWhen: any;
+  helpText: string | null;
+  placeholder: string | null;
+  customClass: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -60,8 +67,16 @@ export default function KycFormFieldsPage() {
     isEnabled: true,
     priority: 0,
     validation: '',
-    options: ''
+    options: '',
+    dependsOn: null as string | null,
+    showWhen: null as any,
+    helpText: '',
+    placeholder: '',
+    customClass: ''
   });
+  
+  // Tab state for edit dialog
+  const [editDialogTab, setEditDialogTab] = useState('basic');
 
   useEffect(() => {
     fetchFields();
@@ -90,8 +105,14 @@ export default function KycFormFieldsPage() {
       isEnabled: field.isEnabled,
       priority: field.priority,
       validation: field.validation ? JSON.stringify(field.validation, null, 2) : '',
-      options: field.options ? JSON.stringify(field.options, null, 2) : ''
+      options: field.options ? JSON.stringify(field.options, null, 2) : '',
+      dependsOn: field.dependsOn || null,
+      showWhen: field.showWhen || null,
+      helpText: field.helpText || '',
+      placeholder: field.placeholder || '',
+      customClass: field.customClass || ''
     });
+    setEditDialogTab('basic');
     setEditDialog(true);
   };
 
@@ -133,7 +154,12 @@ export default function KycFormFieldsPage() {
           isEnabled: editForm.isEnabled,
           priority: parseInt(editForm.priority.toString()),
           validation,
-          options
+          options,
+          dependsOn: editForm.dependsOn || null,
+          showWhen: editForm.showWhen || null,
+          helpText: editForm.helpText || null,
+          placeholder: editForm.placeholder || null,
+          customClass: editForm.customClass || null
         })
       });
 
@@ -388,7 +414,7 @@ export default function KycFormFieldsPage() {
 
       {/* Edit Dialog */}
       <Dialog open={editDialog} onOpenChange={setEditDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Field: {selectedField?.fieldName}</DialogTitle>
             <DialogDescription>
@@ -396,70 +422,122 @@ export default function KycFormFieldsPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="label">Label</Label>
-              <Input
-                id="label"
-                value={editForm.label}
-                onChange={(e) => setEditForm({ ...editForm, label: e.target.value })}
-              />
-            </div>
+          <Tabs value={editDialogTab} onValueChange={setEditDialogTab} className="py-4">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="basic">Basic Settings</TabsTrigger>
+              <TabsTrigger value="conditional">Conditional Logic</TabsTrigger>
+              <TabsTrigger value="ux">UX Enhancements</TabsTrigger>
+            </TabsList>
 
-            <div className="space-y-2">
-              <Label htmlFor="priority">Priority (order)</Label>
-              <Input
-                id="priority"
-                type="number"
-                value={editForm.priority}
-                onChange={(e) => setEditForm({ ...editForm, priority: parseInt(e.target.value) || 0 })}
-              />
-            </div>
-
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="isRequired"
-                  checked={editForm.isRequired}
-                  onCheckedChange={(checked) => setEditForm({ ...editForm, isRequired: checked })}
+            {/* Basic Settings Tab */}
+            <TabsContent value="basic" className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label htmlFor="label">Label</Label>
+                <Input
+                  id="label"
+                  value={editForm.label}
+                  onChange={(e) => setEditForm({ ...editForm, label: e.target.value })}
                 />
-                <Label htmlFor="isRequired">Required</Label>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="isEnabled"
-                  checked={editForm.isEnabled}
-                  onCheckedChange={(checked) => setEditForm({ ...editForm, isEnabled: checked })}
+              <div className="space-y-2">
+                <Label htmlFor="priority">Priority (order)</Label>
+                <Input
+                  id="priority"
+                  type="number"
+                  value={editForm.priority}
+                  onChange={(e) => setEditForm({ ...editForm, priority: parseInt(e.target.value) || 0 })}
                 />
-                <Label htmlFor="isEnabled">Enabled</Label>
+                <p className="text-xs text-muted-foreground">
+                  Lower numbers appear first
+                </p>
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="validation">Validation Rules (JSON)</Label>
-              <Textarea
-                id="validation"
-                value={editForm.validation}
-                onChange={(e) => setEditForm({ ...editForm, validation: e.target.value })}
-                rows={4}
-                placeholder='{"min": 3, "max": 100}'
-                className="font-mono text-sm"
-              />
-            </div>
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="isRequired"
+                    checked={editForm.isRequired}
+                    onCheckedChange={(checked) => setEditForm({ ...editForm, isRequired: checked })}
+                  />
+                  <Label htmlFor="isRequired">Required</Label>
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="options">Options (JSON array for select fields)</Label>
-              <Textarea
-                id="options"
-                value={editForm.options}
-                onChange={(e) => setEditForm({ ...editForm, options: e.target.value })}
-                rows={4}
-                placeholder='["Option 1", "Option 2", "Option 3"]'
-                className="font-mono text-sm"
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="isEnabled"
+                    checked={editForm.isEnabled}
+                    onCheckedChange={(checked) => setEditForm({ ...editForm, isEnabled: checked })}
+                  />
+                  <Label htmlFor="isEnabled">Enabled</Label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="validation">Validation Rules (JSON)</Label>
+                <Textarea
+                  id="validation"
+                  value={editForm.validation}
+                  onChange={(e) => setEditForm({ ...editForm, validation: e.target.value })}
+                  rows={4}
+                  placeholder='{"min": 3, "max": 100}'
+                  className="font-mono text-sm"
+                />
+                <p className="text-xs text-muted-foreground">
+                  JSON format: {`{"min": 2, "max": 50, "pattern": "^[A-Z]+$"}`}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="options">Options (JSON array for select fields)</Label>
+                <Textarea
+                  id="options"
+                  value={editForm.options}
+                  onChange={(e) => setEditForm({ ...editForm, options: e.target.value })}
+                  rows={4}
+                  placeholder='["Option 1", "Option 2", "Option 3"]'
+                  className="font-mono text-sm"
+                />
+                <p className="text-xs text-muted-foreground">
+                  For select/radio/checkbox fields only
+                </p>
+              </div>
+            </TabsContent>
+
+            {/* Conditional Logic Tab */}
+            <TabsContent value="conditional" className="mt-4">
+              <ConditionalLogicSection
+                value={{
+                  dependsOn: editForm.dependsOn,
+                  showWhen: editForm.showWhen
+                }}
+                onChange={(config) => setEditForm({ 
+                  ...editForm, 
+                  dependsOn: config.dependsOn,
+                  showWhen: config.showWhen
+                })}
+                availableFields={fields.map(f => ({
+                  fieldName: f.fieldName,
+                  label: f.label,
+                  fieldType: f.fieldType
+                }))}
+                currentFieldName={selectedField?.fieldName || ''}
               />
-            </div>
-          </div>
+            </TabsContent>
+
+            {/* UX Enhancements Tab */}
+            <TabsContent value="ux" className="mt-4">
+              <UXEnhancementsSection
+                helpText={editForm.helpText}
+                placeholder={editForm.placeholder}
+                customClass={editForm.customClass}
+                onHelpTextChange={(value) => setEditForm({ ...editForm, helpText: value })}
+                onPlaceholderChange={(value) => setEditForm({ ...editForm, placeholder: value })}
+                onCustomClassChange={(value) => setEditForm({ ...editForm, customClass: value })}
+                fieldType={selectedField?.fieldType || 'text'}
+              />
+            </TabsContent>
+          </Tabs>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditDialog(false)}>

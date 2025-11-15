@@ -13,7 +13,14 @@ const updateFieldSchema = z.object({
   isEnabled: z.boolean().optional(),
   priority: z.number().int().optional(),
   validation: z.any().optional(), // JSON
-  options: z.any().optional() // JSON
+  options: z.any().optional(), // JSON
+  // Conditional Logic
+  dependsOn: z.string().nullable().optional(),
+  showWhen: z.any().nullable().optional(), // JSON: { operator, value }
+  // UX Enhancements
+  helpText: z.string().nullable().optional(),
+  placeholder: z.string().nullable().optional(),
+  customClass: z.string().nullable().optional()
 });
 
 /**
