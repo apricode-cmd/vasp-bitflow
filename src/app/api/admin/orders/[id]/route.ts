@@ -135,8 +135,8 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
     const newStatus = validatedData.status;
 
     // Smart status transition logic
-    // PayIn required when moving to PROCESSING (payment proof uploaded)
-    const requiresPayIn = newStatus === 'PROCESSING' && !order.payIn;
+    // PayIn required when moving to PAYMENT_RECEIVED (payment received from customer)
+    const requiresPayIn = newStatus === 'PAYMENT_RECEIVED' && !order.payIn;
     // PayOut required when moving to COMPLETED (crypto sent)
     const requiresPayOut = newStatus === 'COMPLETED' && !order.payOut;
 
@@ -146,7 +146,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
         { 
           error: 'PayIn data required',
           requiresPayIn: true,
-          message: 'Please provide payment proof information to move order to Processing. Customer must upload payment confirmation first.'
+          message: 'Please provide payment information to register that customer has sent payment.'
         },
         { status: 400 }
       );
@@ -165,7 +165,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
 
     // Update order with transaction
     const updatedOrder = await prisma.$transaction(async (tx) => {
-      // Create PayIn if transitioning to PROCESSING (payment proof uploaded)
+      // Create PayIn if transitioning to PAYMENT_RECEIVED (payment received from customer)
       if (requiresPayIn && validatedData.payInData) {
         const payInExists = await tx.payIn.findUnique({
           where: { orderId: params.id }
