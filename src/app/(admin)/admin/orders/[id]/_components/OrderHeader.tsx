@@ -288,19 +288,6 @@ export function OrderHeader({ order, onAction, loading = false }: OrderHeaderPro
         </div>
       </div>
 
-      {/* Warning Alert for Expiring Soon */}
-      {isExpiringSoon && order.status === 'PENDING' && (
-        <div className="flex items-start gap-3 p-4 border border-orange-200 rounded-lg bg-orange-50">
-          <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="font-medium text-orange-900">Order Expiring Soon</p>
-            <p className="text-sm text-orange-700 mt-1">
-              This order will expire in {timeLeft}. Please ensure payment is received before expiration.
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* User Info Card */}
       <div className="flex items-center gap-3 p-4 border rounded-lg bg-card hover:bg-accent/50 transition-colors">
         <Avatar className="h-10 w-10">
