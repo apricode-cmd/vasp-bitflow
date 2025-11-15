@@ -19,6 +19,7 @@ import { OrderTimelineTab } from './_components/OrderTimelineTab';
 import { OrderDocumentsTab } from './_components/OrderDocumentsTab';
 import { OrderUserTab } from './_components/OrderUserTab';
 import { OrderNotesTab } from './_components/OrderNotesTab';
+import { OrderTransitionDialog } from '@/components/admin/OrderTransitionDialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   LayoutGrid, 
@@ -29,6 +30,7 @@ import {
   User,
   MessageSquare
 } from 'lucide-react';
+import type { OrderStatus } from '@prisma/client';
 
 interface OrderData {
   id: string;
@@ -135,6 +137,19 @@ export default function OrderDetailsPage(): JSX.Element {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  
+  // Transition dialog state
+  const [transitionDialog, setTransitionDialog] = useState<{
+    open: boolean;
+    order: OrderData | null;
+    fromStatus: OrderStatus | null;
+    toStatus: OrderStatus | null;
+  }>({
+    open: false,
+    order: null,
+    fromStatus: null,
+    toStatus: null
+  });
 
   useEffect(() => {
     if (orderId) {
@@ -175,26 +190,49 @@ export default function OrderDetailsPage(): JSX.Element {
 
       switch (action) {
         case 'payment-pending':
-          await updateOrderStatus('PAYMENT_PENDING');
+          // Open dialog for PayIn creation
+          setTransitionDialog({
+            open: true,
+            order,
+            fromStatus: order.status as OrderStatus,
+            toStatus: 'PAYMENT_PENDING'
+          });
           break;
         
         case 'payment-received':
-          await updateOrderStatus('PAYMENT_RECEIVED');
+          // Open dialog for PayIn update to RECEIVED
+          setTransitionDialog({
+            open: true,
+            order,
+            fromStatus: order.status as OrderStatus,
+            toStatus: 'PAYMENT_RECEIVED'
+          });
           break;
         
         case 'verify':
-          await updateOrderStatus('PROCESSING');
+          // Open dialog for PayIn verification
+          setTransitionDialog({
+            open: true,
+            order,
+            fromStatus: order.status as OrderStatus,
+            toStatus: 'PROCESSING'
+          });
+          break;
+        
+        case 'send-crypto':
+          // Open dialog for PayOut creation
+          setTransitionDialog({
+            open: true,
+            order,
+            fromStatus: order.status as OrderStatus,
+            toStatus: 'COMPLETED'
+          });
           break;
         
         case 'cancel':
           if (confirm('Are you sure you want to cancel this order?')) {
             await updateOrderStatus('CANCELLED');
           }
-          break;
-        
-        case 'send-crypto':
-          // Navigate to create PayOut
-          router.push(`/admin/pay-out?orderId=${order.id}`);
           break;
         
         case 'export':
@@ -235,6 +273,29 @@ export default function OrderDetailsPage(): JSX.Element {
   const exportOrder = async (): Promise<void> => {
     // TODO: Implement order export (PDF/CSV)
     toast.info('Export functionality coming soon');
+  };
+
+  const handleTransitionConfirm = async (data: any): Promise<void> => {
+    try {
+      const response = await fetch(`/api/admin/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update order');
+      }
+
+      toast.success('Order updated successfully');
+      setTransitionDialog({ open: false, order: null, fromStatus: null, toStatus: null });
+      await fetchOrderDetails();
+    } catch (error) {
+      console.error('Transition error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update order');
+      throw error;
+    }
   };
 
   if (loading) {
@@ -361,6 +422,22 @@ export default function OrderDetailsPage(): JSX.Element {
           </Tabs>
         </div>
       </div>
+
+      {/* Order Transition Dialog */}
+      {transitionDialog.order && transitionDialog.fromStatus && transitionDialog.toStatus && (
+        <OrderTransitionDialog
+          open={transitionDialog.open}
+          onOpenChange={(open) => setTransitionDialog({ ...transitionDialog, open })}
+          order={transitionDialog.order}
+          fromStatus={transitionDialog.fromStatus}
+          toStatus={transitionDialog.toStatus}
+          onConfirm={handleTransitionConfirm}
+          paymentMethods={[]}
+          fiatCurrencies={[]}
+          cryptocurrencies={[]}
+          networks={[]}
+        />
+      )}
     </div>
   );
 }
