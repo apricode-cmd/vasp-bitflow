@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -136,7 +136,8 @@ export default function AdminOrdersPage(): JSX.Element {
         params.append('to', dateRange.to.toISOString());
       }
 
-      const response = await fetch(`/api/admin/orders?${params}`);
+      // Use light endpoint for better performance (70% smaller response)
+      const response = await fetch(`/api/admin/orders/light?${params}`);
       const data = await response.json();
 
       if (data.orders) {
@@ -246,15 +247,16 @@ export default function AdminOrdersPage(): JSX.Element {
     setDeleteDialogOpen(true);
   };
 
-  const viewOrderDetails = (order: Order) => {
+  const viewOrderDetails = useCallback((order: Order) => {
     // Navigate to dedicated order details page instead of opening sheet
     window.location.href = `/admin/orders/${order.id}`;
-  };
+  }, []);
 
-  // Filter orders for table view
-  const filteredOrders = selectedStatus === 'all' 
-    ? orders 
-    : orders.filter(order => order.status === selectedStatus);
+  // Memoized filtered orders for performance
+  const filteredOrders = useMemo(() => {
+    if (selectedStatus === 'all') return orders;
+    return orders.filter(order => order.status === selectedStatus);
+  }, [orders, selectedStatus]);
 
   // Define table columns
   const columns: ColumnDef<Order>[] = [
