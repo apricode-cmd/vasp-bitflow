@@ -191,6 +191,18 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
         }
       }
 
+      // Update PayIn status if transitioning to PROCESSING (payment verified)
+      if (newStatus === 'PROCESSING' && order.payIn && order.payIn.status === 'RECEIVED') {
+        await tx.payIn.update({
+          where: { orderId: params.id },
+          data: { 
+            status: 'VERIFIED',
+            updatedAt: new Date()
+          }
+        });
+        console.log(`✅ [Order Update] PayIn status updated: RECEIVED → VERIFIED (Order → PROCESSING)`);
+      }
+
       // Create PayOut if transitioning to COMPLETED (crypto sent)
       if (requiresPayOut && validatedData.payOutData) {
         const payOutExists = await tx.payOut.findUnique({
