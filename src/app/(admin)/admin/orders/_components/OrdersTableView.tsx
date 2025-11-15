@@ -7,26 +7,135 @@
  * - Export functionality
  * - Sorting & filtering
  * - Click to navigate to detail page
+ * - Inline status editing with OrderTransitionDialog
  * - Consistent with other admin pages (Users, KYC, PayIn, PayOut)
  */
 
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DataTableAdvanced } from '@/components/admin/DataTableAdvanced';
 import { useOrderColumns } from '../_lib/orderColumns';
+import { OrderTransitionDialog } from '@/components/admin/OrderTransitionDialog';
 import { toast } from 'sonner';
 import type { Order } from '../_lib/useOrders';
+import type { OrderStatus } from '@prisma/client';
 
 interface OrdersTableViewProps {
   orders: Order[];
   loading: boolean;
   onRefresh: () => void;
+  paymentMethods?: any[];
+  fiatCurrencies?: any[];
+  cryptocurrencies?: any[];
+  networks?: any[];
 }
 
-export function OrdersTableView({ orders, loading, onRefresh }: OrdersTableViewProps): JSX.Element {
+export function OrdersTableView({ 
+  orders, 
+  loading, 
+  onRefresh,
+  paymentMethods = [],
+  fiatCurrencies = [],
+  cryptocurrencies = [],
+  networks = []
+}: OrdersTableViewProps): JSX.Element {
   const router = useRouter();
-  const columns = useOrderColumns();
+  
+  // Transition dialog state
+  const [transitionDialog, setTransitionDialog] = useState<{
+    open: boolean;
+    order: Order | null;
+    fromStatus: OrderStatus | null;
+    toStatus: OrderStatus | null;
+  }>({
+    open: false,
+    order: null,
+    fromStatus: null,
+    toStatus: null
+  });
+
+  // Handle status change from inline edit
+  const handleStatusChange = (orderId: string, oldStatus: OrderStatus, newStatus: OrderStatus) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    // Check if this transition requires additional data (PayIn/PayOut)
+    const requiresPayIn = newStatus === 'PAYMENT_PENDING' || newStatus === 'PAYMENT_RECEIVED' || newStatus === 'PROCESSING';
+    const requiresPayOut = newStatus === 'COMPLETED';
+
+    if (requiresPayIn || requiresPayOut) {
+      // Show dialog to collect data
+      setTransitionDialog({
+        open: true,
+        order,
+        fromStatus: oldStatus,
+        toStatus: newStatus
+      });
+    } else {
+      // Simple status change (no additional data needed)
+      updateOrderStatus(orderId, newStatus);
+    }
+  };
+
+  // Handle transition dialog confirmation
+  const handleTransitionConfirm = async (data: any): Promise<void> => {
+    if (!transitionDialog.order) return;
+    
+    try {
+      const response = await fetch(`/api/admin/orders/${transitionDialog.order.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update order');
+      }
+
+      toast.success('Order status updated successfully');
+      
+      // Close dialog
+      setTransitionDialog({
+        open: false,
+        order: null,
+        fromStatus: null,
+        toStatus: null
+      });
+      
+      // Refresh data
+      onRefresh();
+    } catch (error) {
+      console.error('Transition error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update order');
+    }
+  };
+
+  // Simple status update (no PayIn/PayOut needed)
+  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+    try {
+      const response = await fetch(`/api/admin/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update order');
+      }
+
+      toast.success('Order status updated successfully');
+      onRefresh();
+    } catch (error) {
+      console.error('Status update error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update order');
+    }
+  };
+
+  const columns = useOrderColumns({ onStatusChange: handleStatusChange });
 
   // Bulk cancel action
   const handleBulkCancel = async (selectedOrders: Order[]) => {
@@ -92,31 +201,49 @@ export function OrdersTableView({ orders, loading, onRefresh }: OrdersTableViewP
   };
 
   return (
-    <DataTableAdvanced
-      columns={columns}
-      data={orders}
-      isLoading={loading}
-      searchKey="paymentReference"
-      searchPlaceholder="Search by reference or email..."
-      enableRowSelection
-      enableExport
-      bulkActions={[
-        {
-          label: 'Cancel Selected',
-          onClick: handleBulkCancel,
-          variant: 'destructive'
-        },
-        {
-          label: 'Export Selected',
-          onClick: (selected) => handleExport(selected.map((o: Order) => o.id))
-        }
-      ]}
-      onExport={handleExport}
-      exportFileName={`orders-${new Date().toISOString().split('T')[0]}`}
-      onRowClick={handleRowClick}
-      pageSize={20}
-      defaultDensity="standard"
-    />
+    <>
+      <DataTableAdvanced
+        columns={columns}
+        data={orders}
+        isLoading={loading}
+        searchKey="paymentReference"
+        searchPlaceholder="Search by reference or email..."
+        enableRowSelection
+        enableExport
+        bulkActions={[
+          {
+            label: 'Cancel Selected',
+            onClick: handleBulkCancel,
+            variant: 'destructive'
+          },
+          {
+            label: 'Export Selected',
+            onClick: (selected) => handleExport(selected.map((o: Order) => o.id))
+          }
+        ]}
+        onExport={handleExport}
+        exportFileName={`orders-${new Date().toISOString().split('T')[0]}`}
+        onRowClick={handleRowClick}
+        pageSize={20}
+        defaultDensity="standard"
+      />
+
+      {/* Order Transition Dialog */}
+      {transitionDialog.order && transitionDialog.fromStatus && transitionDialog.toStatus && (
+        <OrderTransitionDialog
+          open={transitionDialog.open}
+          onOpenChange={(open) => setTransitionDialog({ ...transitionDialog, open })}
+          order={transitionDialog.order}
+          fromStatus={transitionDialog.fromStatus}
+          toStatus={transitionDialog.toStatus}
+          onConfirm={handleTransitionConfirm}
+          paymentMethods={paymentMethods}
+          fiatCurrencies={fiatCurrencies}
+          cryptocurrencies={cryptocurrencies}
+          networks={networks}
+        />
+      )}
+    </>
   );
 }
 

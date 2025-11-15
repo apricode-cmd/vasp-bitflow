@@ -6,11 +6,12 @@
  * - Modular components (TableView, KanbanView)
  * - Clean, minimal code (~120 lines)
  * - Uses light API endpoint (70% less data)
+ * - Inline status editing with OrderTransitionDialog
  */
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -33,6 +34,42 @@ export default function OrdersPage(): JSX.Element {
   // Custom hooks
   const { filters, setFilter } = useOrderFilters();
   const { orders, loading, refetch } = useOrders(filters);
+
+  // Reference data for OrderTransitionDialog
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [fiatCurrencies, setFiatCurrencies] = useState<any[]>([]);
+  const [cryptocurrencies, setCryptocurrencies] = useState<any[]>([]);
+  const [networks, setNetworks] = useState<any[]>([]);
+
+  // Fetch reference data on mount
+  useEffect(() => {
+    const fetchReferenceData = async () => {
+      try {
+        const [pmRes, fiatRes, cryptoRes, networksRes] = await Promise.all([
+          fetch('/api/admin/payment-methods'),
+          fetch('/api/admin/resources/fiat-currencies'),
+          fetch('/api/admin/resources/currencies?active=true'),
+          fetch('/api/admin/blockchains')
+        ]);
+
+        const [pmData, fiatData, cryptoData, networksData] = await Promise.all([
+          pmRes.json(),
+          fiatRes.json(),
+          cryptoRes.json(),
+          networksRes.json()
+        ]);
+
+        setPaymentMethods(pmData.success ? pmData.data : []);
+        setFiatCurrencies(fiatData.success ? fiatData.data : []);
+        setCryptocurrencies(cryptoData.success ? cryptoData.data : []);
+        setNetworks(networksData.success ? networksData.data : []);
+      } catch (error) {
+        console.error('Failed to fetch reference data:', error);
+      }
+    };
+
+    fetchReferenceData();
+  }, []);
 
   return (
     <div className="space-y-6 p-6">
@@ -123,6 +160,10 @@ export default function OrdersPage(): JSX.Element {
           orders={orders}
           loading={loading}
           onRefresh={refetch}
+          paymentMethods={paymentMethods}
+          fiatCurrencies={fiatCurrencies}
+          cryptocurrencies={cryptocurrencies}
+          networks={networks}
         />
       ) : (
         <OrderKanban
@@ -130,13 +171,13 @@ export default function OrdersPage(): JSX.Element {
             ...o,
             createdAt: new Date(o.createdAt)
           }))}
-          onStatusChange={async (orderId, newStatus) => {
+          onStatusChange={async (orderId, newStatus, transitionData) => {
             // Handle status change via drag & drop
             try {
               await fetch(`/api/admin/orders/${orderId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: newStatus })
+                body: JSON.stringify(transitionData || { status: newStatus })
               });
               refetch();
             } catch (error) {
@@ -146,10 +187,10 @@ export default function OrdersPage(): JSX.Element {
           onOrderClick={(order) => {
             window.location.href = `/admin/orders/${order.id}`;
           }}
-          paymentMethods={[]}
-          fiatCurrencies={[]}
-          cryptocurrencies={[]}
-          networks={[]}
+          paymentMethods={paymentMethods}
+          fiatCurrencies={fiatCurrencies}
+          cryptocurrencies={cryptocurrencies}
+          networks={networks}
         />
       )}
 

@@ -16,8 +16,26 @@ import { OrderStatusBadge } from '@/components/features/OrderStatusBadge';
 import { formatDateTime, formatCurrency, formatCryptoAmount } from '@/lib/formatters';
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import type { Order } from './useOrders';
+import type { OrderStatus } from '@prisma/client';
 
-export function useOrderColumns(): ColumnDef<Order>[] {
+// Status transition rules
+const STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  PENDING: ['PAYMENT_PENDING', 'PROCESSING', 'CANCELLED'],
+  PAYMENT_PENDING: ['PROCESSING', 'CANCELLED'],
+  PAYMENT_RECEIVED: ['PROCESSING', 'CANCELLED'],
+  PROCESSING: ['COMPLETED', 'CANCELLED'],
+  COMPLETED: [],
+  CANCELLED: [],
+  REFUNDED: [],
+  EXPIRED: ['PENDING'],
+  FAILED: ['PENDING', 'CANCELLED'],
+};
+
+interface UseOrderColumnsProps {
+  onStatusChange?: (orderId: string, oldStatus: OrderStatus, newStatus: OrderStatus) => void;
+}
+
+export function useOrderColumns({ onStatusChange }: UseOrderColumnsProps = {}): ColumnDef<Order>[] {
   return useMemo<ColumnDef<Order>[]>(() => [
     // Selection column
     {
@@ -82,11 +100,63 @@ export function useOrderColumns(): ColumnDef<Order>[] {
       ),
     },
 
-    // Status
+    // Status - Editable with transition validation
     {
       accessorKey: 'status',
       header: 'Status',
-      cell: ({ row }) => <OrderStatusBadge status={row.original.status} />,
+      cell: ({ row, table }) => {
+        const order = row.original;
+        const allowedStatuses = STATUS_TRANSITIONS[order.status as OrderStatus] || [];
+        
+        // If no transitions allowed, show static badge
+        if (allowedStatuses.length === 0) {
+          return <OrderStatusBadge status={order.status} />;
+        }
+
+        return (
+          <div 
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent row click
+            }}
+            className="relative group"
+          >
+            {/* Display badge by default */}
+            <OrderStatusBadge status={order.status} />
+            
+            {/* Hidden select overlay that triggers on click */}
+            <select
+              value={order.status}
+              onChange={(e) => {
+                const newStatus = e.target.value as OrderStatus;
+                if (newStatus !== order.status) {
+                  // Call the status change handler
+                  onStatusChange?.(order.id, order.status, newStatus);
+                }
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              title="Click to change status"
+            >
+              {/* Current status (always visible) */}
+              <option value={order.status}>
+                {order.status.replace('_', ' ')}
+              </option>
+              
+              {/* Allowed transitions */}
+              {allowedStatuses.map((status) => (
+                <option key={status} value={status}>
+                  → {status.replace('_', ' ')}
+                </option>
+              ))}
+            </select>
+            
+            {/* Hover indicator */}
+            <div className="absolute -right-1 -top-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+              <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+            </div>
+          </div>
+        );
+      },
     },
 
     // Crypto Amount
@@ -161,6 +231,6 @@ export function useOrderColumns(): ColumnDef<Order>[] {
       ),
     },
 
-  ], []);
+  ], [onStatusChange]);
 }
 
