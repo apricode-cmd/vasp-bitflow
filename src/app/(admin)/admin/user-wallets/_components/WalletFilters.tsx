@@ -58,14 +58,14 @@ export function WalletFilters({
       <div className="flex flex-wrap items-center gap-3">
         {/* Currency Filter */}
         <Select
-          value={filters.currencyCode}
-          onValueChange={(value) => onFilterChange('currencyCode', value)}
+          value={filters.currencyCode || 'all'}
+          onValueChange={(value) => onFilterChange('currencyCode', value === 'all' ? '' : value)}
         >
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="All Currencies" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Currencies</SelectItem>
+            <SelectItem value="all">All Currencies</SelectItem>
             {currencies.map((currency) => (
               <SelectItem key={currency.code} value={currency.code}>
                 {currency.symbol} {currency.code}
@@ -76,14 +76,14 @@ export function WalletFilters({
 
         {/* Blockchain Filter */}
         <Select
-          value={filters.blockchainCode}
-          onValueChange={(value) => onFilterChange('blockchainCode', value)}
+          value={filters.blockchainCode || 'all'}
+          onValueChange={(value) => onFilterChange('blockchainCode', value === 'all' ? '' : value)}
         >
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="All Networks" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Networks</SelectItem>
+            <SelectItem value="all">All Networks</SelectItem>
             {blockchains.map((blockchain) => (
               <SelectItem key={blockchain.code} value={blockchain.code}>
                 {blockchain.code} - {blockchain.name}
@@ -94,14 +94,14 @@ export function WalletFilters({
 
         {/* Verified Filter */}
         <Select
-          value={filters.isVerified}
-          onValueChange={(value) => onFilterChange('isVerified', value)}
+          value={filters.isVerified || 'all'}
+          onValueChange={(value) => onFilterChange('isVerified', value === 'all' ? '' : value)}
         >
           <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="Verification" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Status</SelectItem>
+            <SelectItem value="all">All Status</SelectItem>
             <SelectItem value="true">Verified</SelectItem>
             <SelectItem value="false">Unverified</SelectItem>
           </SelectContent>
@@ -109,14 +109,14 @@ export function WalletFilters({
 
         {/* Default Filter */}
         <Select
-          value={filters.isDefault}
-          onValueChange={(value) => onFilterChange('isDefault', value)}
+          value={filters.isDefault || 'all'}
+          onValueChange={(value) => onFilterChange('isDefault', value === 'all' ? '' : value)}
         >
           <SelectTrigger className="w-[140px]">
             <SelectValue placeholder="Default" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Wallets</SelectItem>
+            <SelectItem value="all">All Wallets</SelectItem>
             <SelectItem value="true">Default Only</SelectItem>
             <SelectItem value="false">Non-Default</SelectItem>
           </SelectContent>
