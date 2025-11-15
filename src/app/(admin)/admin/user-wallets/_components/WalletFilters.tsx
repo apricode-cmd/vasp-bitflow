@@ -42,104 +42,100 @@ export function WalletFilters({
   const activeFilterCount = Object.values(filters).filter(v => v !== '').length;
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-wrap items-center gap-2">
       {/* Search */}
-      <div className="relative">
+      <div className="relative flex-1 min-w-[240px]">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search by address, email, or label..."
           value={filters.search}
           onChange={(e) => onFilterChange('search', e.target.value)}
-          className="pl-10"
+          className="pl-10 h-9"
         />
       </div>
 
-      {/* Filters Row */}
-      <div className="flex flex-wrap items-center gap-3">
-        {/* Currency Filter */}
-        <Select
-          value={filters.currencyCode || 'all'}
-          onValueChange={(value) => onFilterChange('currencyCode', value === 'all' ? '' : value)}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Currencies" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Currencies</SelectItem>
-            {currencies.map((currency) => (
-              <SelectItem key={currency.code} value={currency.code}>
-                {currency.symbol} {currency.code}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Currency Filter */}
+      <Select
+        value={filters.currencyCode || 'all'}
+        onValueChange={(value) => onFilterChange('currencyCode', value === 'all' ? '' : value)}
+      >
+        <SelectTrigger className="w-[140px] h-9">
+          <SelectValue placeholder="All Currencies" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Currencies</SelectItem>
+          {currencies.map((currency) => (
+            <SelectItem key={currency.code} value={currency.code}>
+              {currency.symbol} {currency.code}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
-        {/* Blockchain Filter */}
-        <Select
-          value={filters.blockchainCode || 'all'}
-          onValueChange={(value) => onFilterChange('blockchainCode', value === 'all' ? '' : value)}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Networks" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Networks</SelectItem>
-            {blockchains.map((blockchain) => (
-              <SelectItem key={blockchain.code} value={blockchain.code}>
-                {blockchain.code} - {blockchain.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Blockchain Filter */}
+      <Select
+        value={filters.blockchainCode || 'all'}
+        onValueChange={(value) => onFilterChange('blockchainCode', value === 'all' ? '' : value)}
+      >
+        <SelectTrigger className="w-[140px] h-9">
+          <SelectValue placeholder="All Networks" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Networks</SelectItem>
+          {blockchains.map((blockchain) => (
+            <SelectItem key={blockchain.code} value={blockchain.code}>
+              {blockchain.code} - {blockchain.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
-        {/* Verified Filter */}
-        <Select
-          value={filters.isVerified || 'all'}
-          onValueChange={(value) => onFilterChange('isVerified', value === 'all' ? '' : value)}
-        >
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Verification" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="true">Verified</SelectItem>
-            <SelectItem value="false">Unverified</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Verified Filter */}
+      <Select
+        value={filters.isVerified || 'all'}
+        onValueChange={(value) => onFilterChange('isVerified', value === 'all' ? '' : value)}
+      >
+        <SelectTrigger className="w-[120px] h-9">
+          <SelectValue placeholder="All Status" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Status</SelectItem>
+          <SelectItem value="true">Verified</SelectItem>
+          <SelectItem value="false">Unverified</SelectItem>
+        </SelectContent>
+      </Select>
 
-        {/* Default Filter */}
-        <Select
-          value={filters.isDefault || 'all'}
-          onValueChange={(value) => onFilterChange('isDefault', value === 'all' ? '' : value)}
-        >
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Default" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Wallets</SelectItem>
-            <SelectItem value="true">Default Only</SelectItem>
-            <SelectItem value="false">Non-Default</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Default Filter */}
+      <Select
+        value={filters.isDefault || 'all'}
+        onValueChange={(value) => onFilterChange('isDefault', value === 'all' ? '' : value)}
+      >
+        <SelectTrigger className="w-[120px] h-9">
+          <SelectValue placeholder="All Wallets" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Wallets</SelectItem>
+          <SelectItem value="true">Default Only</SelectItem>
+          <SelectItem value="false">Non-Default</SelectItem>
+        </SelectContent>
+      </Select>
 
-        {/* Active Filters Badge & Reset */}
-        {activeFilterCount > 0 && (
-          <>
-            <Badge variant="secondary">
-              {activeFilterCount} filter{activeFilterCount !== 1 ? 's' : ''} active
-            </Badge>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onReset}
-              className="h-8"
-            >
-              <X className="h-4 w-4 mr-1" />
-              Clear All
-            </Button>
-          </>
-        )}
-      </div>
+      {/* Active Filters Badge & Reset */}
+      {activeFilterCount > 0 && (
+        <>
+          <Badge variant="secondary" className="h-9 px-3">
+            {activeFilterCount}
+          </Badge>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onReset}
+            className="h-9 px-3"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </>
+      )}
     </div>
   );
 }
