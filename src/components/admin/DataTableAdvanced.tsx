@@ -99,7 +99,7 @@ export interface DataTableAdvancedProps<TData, TValue> {
   // Export
   enableExport?: boolean;
   exportFileName?: string;
-  onExport?: () => void; // Custom export handler
+  onExport?: (selectedIds?: string[]) => void; // Custom export handler
   
   // Filters
   filters?: React.ReactNode;
@@ -274,18 +274,27 @@ export function DataTableAdvanced<TData, TValue>({
 
         {/* Right Actions */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Export */}
-          {enableExport && (
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={onExport || exportToCSV}
-              className="h-9"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-          )}
+            {/* Export */}
+            {enableExport && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  if (onExport) {
+                    const selectedIds = hasSelection 
+                      ? selectedRows.map((row: any) => row.id)
+                      : undefined;
+                    onExport(selectedIds);
+                  } else {
+                    exportToCSV();
+                  }
+                }}
+                className="h-9"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+            )}
 
           {/* Density */}
           <DropdownMenu>
