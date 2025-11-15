@@ -113,21 +113,31 @@ export function OrderTransitionDialog({
 
   // Auto-select payment method (prefer order's method, fallback to first available)
   useEffect(() => {
-    if (requiresPayIn && filteredPayInMethods.length > 0 && !formData.payInPaymentMethod) {
+    if (!requiresPayIn || !order || !open || formData.payInPaymentMethod) return;
+
+    // Filter PayIn methods by direction AND currency
+    const availableMethods = paymentMethods.filter(m => {
+      const hasCorrectDirection = m.direction === 'IN' || m.direction === 'BOTH';
+      const methodCurrency = m.fiatCurrencyCode || m.currency;
+      const hasCorrectCurrency = methodCurrency === order.fiatCurrencyCode;
+      return hasCorrectDirection && hasCorrectCurrency && m.isActive;
+    });
+
+    if (availableMethods.length > 0) {
       // Check if order's payment method is in filtered list
-      const orderMethodAvailable = order?.paymentMethodCode && 
-        filteredPayInMethods.some(m => m.code === order.paymentMethodCode);
+      const orderMethodAvailable = order.paymentMethodCode && 
+        availableMethods.some(m => m.code === order.paymentMethodCode);
       
       const selectedMethod = orderMethodAvailable 
         ? order.paymentMethodCode 
-        : filteredPayInMethods[0].code;
+        : availableMethods[0].code;
 
       setFormData(prev => ({
         ...prev,
         payInPaymentMethod: selectedMethod
       }));
     }
-  }, [requiresPayIn, filteredPayInMethods, formData.payInPaymentMethod, order?.paymentMethodCode]);
+  }, [requiresPayIn, order, open, formData.payInPaymentMethod, paymentMethods]);
 
   const handleSubmit = async () => {
     if (!order) return;
