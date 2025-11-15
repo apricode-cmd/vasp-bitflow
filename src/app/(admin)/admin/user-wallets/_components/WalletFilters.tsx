@@ -44,10 +44,10 @@ export function WalletFilters({
   return (
     <div className="flex items-center gap-2 overflow-x-auto">
       {/* Search */}
-      <div className="relative w-[280px] flex-shrink-0">
+      <div className="relative w-[200px] flex-shrink-0">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by address, email, or label..."
+          placeholder="Search by address, email..."
           value={filters.search}
           onChange={(e) => onFilterChange('search', e.target.value)}
           className="pl-10 h-9"
@@ -59,8 +59,8 @@ export function WalletFilters({
         value={filters.currencyCode || 'all'}
         onValueChange={(value) => onFilterChange('currencyCode', value === 'all' ? '' : value)}
       >
-        <SelectTrigger className="w-[140px] h-9 flex-shrink-0">
-          <SelectValue placeholder="All Currencies" />
+        <SelectTrigger className="w-[120px] h-9 flex-shrink-0">
+          <SelectValue placeholder="All..." />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Currencies</SelectItem>
@@ -77,7 +77,7 @@ export function WalletFilters({
         value={filters.blockchainCode || 'all'}
         onValueChange={(value) => onFilterChange('blockchainCode', value === 'all' ? '' : value)}
       >
-        <SelectTrigger className="w-[140px] h-9 flex-shrink-0">
+        <SelectTrigger className="w-[120px] h-9 flex-shrink-0">
           <SelectValue placeholder="All Networks" />
         </SelectTrigger>
         <SelectContent>
@@ -95,7 +95,7 @@ export function WalletFilters({
         value={filters.isVerified || 'all'}
         onValueChange={(value) => onFilterChange('isVerified', value === 'all' ? '' : value)}
       >
-        <SelectTrigger className="w-[120px] h-9 flex-shrink-0">
+        <SelectTrigger className="w-[100px] h-9 flex-shrink-0">
           <SelectValue placeholder="All Status" />
         </SelectTrigger>
         <SelectContent>
@@ -110,8 +110,8 @@ export function WalletFilters({
         value={filters.isDefault || 'all'}
         onValueChange={(value) => onFilterChange('isDefault', value === 'all' ? '' : value)}
       >
-        <SelectTrigger className="w-[120px] h-9 flex-shrink-0">
-          <SelectValue placeholder="All Wallets" />
+        <SelectTrigger className="w-[100px] h-9 flex-shrink-0">
+          <SelectValue placeholder="All..." />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Wallets</SelectItem>
