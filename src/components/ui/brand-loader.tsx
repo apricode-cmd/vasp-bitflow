@@ -115,25 +115,25 @@ export function BrandLoader({
           />
         </div>
 
-        {/* Logo container - properly centered */}
+        {/* Logo container - transparent background, only logo */}
         <div className={cn(
-          'relative z-10 flex items-center justify-center rounded-full bg-background shadow-lg border-2 border-primary/10',
+          'relative z-10 flex items-center justify-center',
           sizeClasses[size]
         )}>
           {logoUrl ? (
-            <div className="relative w-full h-full p-3">
+            <div className="relative w-full h-full">
               <Image
                 src={logoUrl}
                 alt="Brand Logo"
                 fill
-                className="object-contain animate-[pulse_2s_ease-in-out_infinite] p-2"
+                className="object-contain drop-shadow-lg"
                 priority
                 unoptimized
               />
             </div>
           ) : (
-            // Fallback animated gradient
-            <div className="w-full h-full rounded-full bg-gradient-to-br from-primary via-primary/80 to-primary/60 animate-[pulse_2s_ease-in-out_infinite]" />
+            // Fallback animated gradient circle
+            <div className="w-3/4 h-3/4 rounded-full bg-gradient-to-br from-primary via-primary/80 to-primary/60 animate-[pulse_2s_ease-in-out_infinite]" />
           )}
         </div>
       </div>
