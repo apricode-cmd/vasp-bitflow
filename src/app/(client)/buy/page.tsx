@@ -42,19 +42,30 @@ export default function BuyPage(): React.ReactElement {
 
   const fetchKycStatus = async () => {
     try {
-      const [kycRes, settingsRes] = await Promise.all([
+      const [kycRes, settingsRes, configRes] = await Promise.all([
         fetch('/api/kyc/status'),
-        fetch('/api/settings/public')
+        fetch('/api/settings/public'),
+        fetch('/api/buy/config')
       ]);
       
       const kycData = await kycRes.json();
       const settingsData = await settingsRes.json();
+      const configData = await configRes.json();
       
       setKycStatus({
         status: kycData.status || 'NOT_STARTED',
         isApproved: kycData.status === 'APPROVED',
         kycRequired: settingsData.settings?.kycRequired !== false // Default true if not set
       });
+      
+      // Load available currencies with icons
+      if (configData.currencies && Array.isArray(configData.currencies)) {
+        setCurrencies(configData.currencies.map((c: Currency) => ({
+          code: c.code,
+          name: c.name,
+          iconUrl: c.iconUrl
+        })));
+      }
     } catch (error) {
       console.error('Failed to fetch KYC status:', error);
     } finally {
