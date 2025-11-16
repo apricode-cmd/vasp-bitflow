@@ -153,8 +153,25 @@ class NotificationService {
       // 5. Create queue entries for each channel
       const queueIds: string[] = [];
       
-      // Get templateKey from event (use eventKey as fallback)
-      const templateKey = event.templateKey || eventKey;
+      // Get templateKey from event's linked EmailTemplate (if exists)
+      let templateKey: string | undefined = event.templateKey || undefined; // Deprecated field
+      
+      if (!templateKey && event.templateId) {
+        // Fetch EmailTemplate to get its key
+        const emailTemplate = await prisma.emailTemplate.findUnique({
+          where: { id: event.templateId },
+          select: { key: true }
+        });
+        
+        if (emailTemplate) {
+          templateKey = emailTemplate.key;
+        }
+      }
+      
+      // Fallback to eventKey if no template
+      if (!templateKey) {
+        templateKey = eventKey;
+      }
       
       for (const ch of channelsToUse) {
         const queueEntry = await prisma.notificationQueue.create({
