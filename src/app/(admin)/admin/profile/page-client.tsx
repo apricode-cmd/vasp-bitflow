@@ -130,6 +130,7 @@ interface AdminSession {
   lastActivity: string;
   createdAt: string;
   expiresAt: string;
+  isCurrent?: boolean; // Flag from backend
 }
 
 export function AdminProfileClient({ 
@@ -975,9 +976,9 @@ export function AdminProfileClient({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sessions.map((session, index) => {
-                      // First session is likely current (most recent activity)
-                      const isCurrent = index === 0;
+                    {sessions.map((session) => {
+                      // Backend marks current session
+                      const isCurrent = session.isCurrent === true;
                       
                       return (
                         <TableRow key={session.id} className={isCurrent ? 'bg-primary/5' : ''}>

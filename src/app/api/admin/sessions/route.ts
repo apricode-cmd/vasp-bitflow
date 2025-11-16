@@ -27,12 +27,30 @@ export async function GET(request: NextRequest) {
     // Try Custom JWT (Passkey) first
     let adminId: string | null = null;
     let adminRole: string | null = null;
+    let currentSessionId: string | null = null; // Changed from sessionKey
 
     const customSession = await getAdminSessionData();
     
     if (customSession) {
       adminId = customSession.adminId;
       adminRole = customSession.role;
+      // For custom JWT, we need to find session by JWT token
+      // The JWT token itself is stored as sessionKey
+      const cookieStore = request.cookies;
+      const jwtToken = cookieStore.get('admin-session')?.value;
+      
+      if (jwtToken) {
+        // Find session by sessionKey (JWT token)
+        const currentSession = await prisma.adminSession.findFirst({
+          where: {
+            sessionKey: jwtToken,
+            isActive: true,
+            adminId: customSession.adminId,
+          },
+          select: { sessionId: true },
+        });
+        currentSessionId = currentSession?.sessionId || null;
+      }
     } else {
       // Try NextAuth (Password+TOTP)
       const nextAuthSession = await getAdminSession();
@@ -40,6 +58,8 @@ export async function GET(request: NextRequest) {
       if (nextAuthSession?.user?.id) {
         adminId = nextAuthSession.user.id;
         adminRole = nextAuthSession.user.role as string;
+        // For NextAuth, get sessionId from JWT payload
+        currentSessionId = (nextAuthSession.user as any).sessionId || null;
       }
     }
 
@@ -52,12 +72,26 @@ export async function GET(request: NextRequest) {
 
     if (isSuperAdmin) {
       const allSessions = await getAllActiveSessions();
-      return NextResponse.json({ sessions: allSessions });
+      
+      // Mark current session by sessionId
+      const sessionsWithCurrent = allSessions.map(s => ({
+        ...s,
+        isCurrent: s.sessionId === currentSessionId
+      }));
+      
+      return NextResponse.json({ sessions: sessionsWithCurrent });
     }
 
     // Regular admins see only their own sessions
     const sessions = await getAdminActiveSessions(adminId);
-    return NextResponse.json({ sessions });
+    
+    // Mark current session by sessionId
+    const sessionsWithCurrent = sessions.map(s => ({
+      ...s,
+      isCurrent: s.sessionId === currentSessionId
+    }));
+    
+    return NextResponse.json({ sessions: sessionsWithCurrent });
   } catch (error) {
     console.error('❌ [SessionsAPI] GET error:', error);
     return NextResponse.json(
