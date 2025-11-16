@@ -55,8 +55,9 @@ export function BrandLoader({
         const isDark = resolvedTheme === 'dark';
         const logo = isDark ? data.settings.brandLogoDark : data.settings.brandLogo;
         
-        if (logo) {
-          setImageLoaded(false); // Reset image loaded state when logo changes
+        if (logo && logo !== logoUrl) {
+          // Only reset if logo actually changed
+          setImageLoaded(false);
           setLogoUrl(logo);
         }
       }
@@ -129,6 +130,7 @@ export function BrandLoader({
           {/* Logo image - fades in when loaded */}
           {logoUrl && (
             <Image
+              key={logoUrl}
               src={logoUrl}
               alt="Loading"
               fill
