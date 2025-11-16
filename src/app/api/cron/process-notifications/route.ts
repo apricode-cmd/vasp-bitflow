@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
  * {
  *   "crons": [{
  *     "path": "/api/cron/process-notifications",
- *     "schedule": "*/5 * * * *"
+ *     "schedule": "every 5 minutes"
  *   }]
  * }
  * 
