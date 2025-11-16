@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
@@ -78,6 +79,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           },
         });
 
+        // Revalidate cache after bulk approval
+        revalidatePath('/admin/kyc');
+        revalidatePath('/admin/users');
+        revalidateTag('kyc-sessions');
+        console.log(`✅ Cache invalidated after bulk KYC approval (${affected} sessions)`);
+
         break;
       }
 
@@ -112,10 +119,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           },
         });
 
+        // Revalidate cache after bulk rejection
+        revalidatePath('/admin/kyc');
+        revalidatePath('/admin/users');
+        revalidateTag('kyc-sessions');
+        console.log(`✅ Cache invalidated after bulk KYC rejection (${affected} sessions)`);
+
         break;
       }
 
       case 'delete': {
+        // Get user IDs before deleting for cache invalidation
+        const sessions = await prisma.kycSession.findMany({
+          where: { id: { in: sessionIds } },
+          select: { userId: true }
+        });
+        const userIds = [...new Set(sessions.map(s => s.userId))];
+
         // Delete sessions (be careful!)
         const result = await prisma.kycSession.deleteMany({
           where: {
@@ -134,9 +154,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             details: {
               affected,
               sessionIds,
+              userIds,
             },
           },
         });
+
+        // Revalidate cache after bulk deletion
+        revalidatePath('/admin/kyc');
+        revalidatePath('/admin/users');
+        revalidateTag('kyc-sessions');
+        
+        // Invalidate user-specific caches
+        userIds.forEach(userId => {
+          revalidatePath(`/admin/users/${userId}`);
+          revalidateTag(`kyc-${userId}`);
+        });
+        
+        console.log(`✅ Cache invalidated after bulk KYC deletion (${affected} sessions, ${userIds.length} users)`);
 
         break;
       }
