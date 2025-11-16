@@ -775,8 +775,35 @@ export async function processKycWebhook(
 
     console.log(`✅ KYC session updated via webhook: ${updatedSession.status}`);
 
-    // TODO: Send email notification to user
-    // TODO: Trigger any post-approval actions
+    // Send email notification to user
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: updatedSession.userId },
+        select: { email: true }
+      });
+
+      if (user?.email) {
+        const { eventEmitter } = await import('./event-emitter.service');
+        
+        if (updatedSession.status === 'APPROVED') {
+          await eventEmitter.emit('KYC_APPROVED', {
+            userId: updatedSession.userId,
+            recipientEmail: user.email,
+          });
+          console.log(`✅ [NOTIFICATION] Sent KYC_APPROVED via webhook for user ${updatedSession.userId}`);
+        } else if (updatedSession.status === 'REJECTED') {
+          await eventEmitter.emit('KYC_REJECTED', {
+            userId: updatedSession.userId,
+            recipientEmail: user.email,
+            reason: updatedSession.rejectionReason || 'No reason provided',
+          });
+          console.log(`✅ [NOTIFICATION] Sent KYC_REJECTED via webhook for user ${updatedSession.userId}`);
+        }
+      }
+    } catch (notifError) {
+      // Don't fail the webhook if notification fails
+      console.error('❌ [NOTIFICATION] Failed to send KYC webhook notification:', notifError);
+    }
 
     return {
       success: true,

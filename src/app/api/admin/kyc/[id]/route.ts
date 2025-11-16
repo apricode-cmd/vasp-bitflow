@@ -148,7 +148,28 @@ export async function PUT(
     revalidateTag('kyc-sessions');
     revalidateTag(`kyc-${kycSession.userId}`);
 
-    // TODO: Send email notification to user
+    // Send email notification to user
+    try {
+      const { eventEmitter } = await import('@/lib/services/event-emitter.service');
+      
+      if (status === 'APPROVED') {
+        await eventEmitter.emit('KYC_APPROVED', {
+          userId: kycSession.userId,
+          recipientEmail: kycSession.user.email,
+        });
+        console.log(`✅ [NOTIFICATION] Sent KYC_APPROVED for user ${kycSession.userId}`);
+      } else if (status === 'REJECTED') {
+        await eventEmitter.emit('KYC_REJECTED', {
+          userId: kycSession.userId,
+          recipientEmail: kycSession.user.email,
+          reason: rejectionReason,
+        });
+        console.log(`✅ [NOTIFICATION] Sent KYC_REJECTED for user ${kycSession.userId}`);
+      }
+    } catch (notifError) {
+      // Don't fail the request if notification fails
+      console.error('❌ [NOTIFICATION] Failed to send KYC notification:', notifError);
+    }
 
     return NextResponse.json({
       success: true,

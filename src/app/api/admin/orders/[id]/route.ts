@@ -349,9 +349,12 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
       const eventKeyMap: Record<string, string> = {
         'PAYMENT_PENDING': 'ORDER_PAYMENT_RECEIVED',
         'PAYMENT_RECEIVED': 'ORDER_PAYMENT_RECEIVED',
+        'PROCESSING': 'ORDER_PROCESSING',
         'COMPLETED': 'ORDER_COMPLETED',
         'CANCELLED': 'ORDER_CANCELLED',
-        'REFUNDED': 'ORDER_REFUNDED'
+        'EXPIRED': 'ORDER_EXPIRED',
+        'REFUNDED': 'ORDER_REFUNDED',
+        'FAILED': 'ORDER_FAILED'
       };
 
       const eventKey = newStatus ? eventKeyMap[newStatus] : undefined;
