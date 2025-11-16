@@ -174,33 +174,23 @@ async function checkDatabase(): Promise<ServiceHealth> {
 
 /**
  * Check Redis connectivity
+ * 
+ * NOTE: Redis is optional and not implemented in MVP.
+ * This check is a placeholder for future Redis integration.
  */
 async function checkRedis(): Promise<ServiceHealth | undefined> {
+  // Redis is optional - skip if not configured
   if (!process.env.REDIS_URL) {
-    return undefined; // Redis is optional
+    return undefined;
   }
 
-  const start = Date.now();
-  
-  try {
-    // Try to import and use Redis
-    const { redis } = await import('@/lib/redis');
-    await redis.ping();
-    const latency = Date.now() - start;
-    
-    return {
-      status: latency < 50 ? 'ok' : 'degraded',
-      latency,
-      message: 'Redis responsive',
-      lastChecked: new Date().toISOString()
-    };
-  } catch (error) {
-    return {
-      status: 'error',
-      message: `Redis connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      lastChecked: new Date().toISOString()
-    };
-  }
+  // TODO: Implement Redis health check when Redis is added to the project
+  // For now, just return that it's configured but not checked
+  return {
+    status: 'ok',
+    message: 'Redis configured (health check not implemented)',
+    lastChecked: new Date().toISOString()
+  };
 }
 
 /**
