@@ -113,35 +113,34 @@ export function BrandLoader({
 
         {/* Logo */}
         <div 
-          className="relative z-10"
+          className="relative z-10 flex items-center justify-center"
           style={{ width: config.logo, height: config.logo }}
         >
-          {logoUrl ? (
-            <>
-              <Image
-                src={logoUrl}
-                alt="Loading"
-                fill
-                className={cn(
-                  "object-contain transition-opacity duration-300",
-                  imageLoaded ? "opacity-100" : "opacity-0"
-                )}
-                priority
-                unoptimized
-                onLoad={() => setImageLoaded(true)}
-                onError={() => setImageLoaded(false)}
-              />
-              {/* Fallback while image is loading */}
-              {!imageLoaded && (
-                <div className="absolute inset-0 w-full h-full flex items-center justify-center">
-                  <div className="w-4 h-4 rounded-full bg-primary animate-pulse" />
-                </div>
+          {/* Fallback dot - always visible when image not loaded */}
+          <div 
+            className={cn(
+              "absolute inset-0 flex items-center justify-center transition-opacity duration-300",
+              imageLoaded ? "opacity-0 pointer-events-none" : "opacity-100"
+            )}
+          >
+            <div className="w-4 h-4 rounded-full bg-primary animate-pulse" />
+          </div>
+
+          {/* Logo image - fades in when loaded */}
+          {logoUrl && (
+            <Image
+              src={logoUrl}
+              alt="Loading"
+              fill
+              className={cn(
+                "object-contain transition-opacity duration-300",
+                imageLoaded ? "opacity-100" : "opacity-0"
               )}
-            </>
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <div className="w-4 h-4 rounded-full bg-primary animate-pulse" />
-            </div>
+              priority
+              unoptimized
+              onLoad={() => setImageLoaded(true)}
+              onError={() => setImageLoaded(false)}
+            />
           )}
         </div>
       </div>
