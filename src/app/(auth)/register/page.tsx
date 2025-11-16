@@ -332,12 +332,12 @@ export default function RegisterPage(): React.ReactElement {
                             </FormControl>
                             {hasPhone && validStatus === 'warning' && (
                               <p className="text-sm text-yellow-600 dark:text-yellow-500">
-                                Номер выглядит неполным
+                                Phone number looks incomplete
                               </p>
                             )}
                             {hasPhone && validStatus === 'valid' && (
                               <p className="text-sm text-green-600 dark:text-green-500">
-                                ✓ Номер валиден
+                                ✓ Valid phone number
                               </p>
                             )}
                             <FormMessage />

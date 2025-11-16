@@ -24,13 +24,13 @@ export interface PhoneValidationResult {
  * Phone validation error messages
  */
 export const PHONE_ERRORS = {
-  REQUIRED: 'Номер телефона обязателен',
-  INVALID_FORMAT: 'Неверный формат номера телефона',
-  TOO_SHORT: 'Номер телефона слишком короткий',
-  TOO_LONG: 'Номер телефона слишком длинный',
-  INVALID_COUNTRY: 'Неверный код страны',
-  NOT_POSSIBLE: 'Этот номер телефона выглядит недействительным',
-  INVALID_PATTERN: 'Номер содержит недопустимые символы'
+  REQUIRED: 'Phone number is required',
+  INVALID_FORMAT: 'Invalid phone number format',
+  TOO_SHORT: 'Phone number is too short',
+  TOO_LONG: 'Phone number is too long',
+  INVALID_COUNTRY: 'Invalid country code',
+  NOT_POSSIBLE: 'This phone number appears to be invalid',
+  INVALID_PATTERN: 'Phone number contains invalid characters'
 } as const;
 
 /**

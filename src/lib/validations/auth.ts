@@ -63,14 +63,15 @@ export const registerSchema = z
       .toUpperCase(),
     phoneNumber: z
       .string()
-      .min(1, 'Номер телефона обязателен')
+      .min(1, 'Phone number is required')
       .refine(
         (val) => {
           if (!val || val.trim() === '') return false;
+          // isValidPhoneNumber automatically checks correct length for each country
           return isValidPhoneNumber(val);
         },
         {
-          message: 'Неверный формат номера телефона. Пример: +48 123 456 789'
+          message: 'Invalid phone number format for selected country'
         }
       )
   })
