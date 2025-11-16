@@ -22,6 +22,12 @@ import {
   Bell,
   Activity,
   AlertCircle,
+  Laptop,
+  Monitor,
+  Smartphone,
+  Tablet,
+  MapPin,
+  Loader2,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -59,6 +65,15 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { PasskeyManagement } from '@/components/admin/PasskeyManagement';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { formatDistanceToNow } from 'date-fns';
 
 // Profile update schema
 const profileSchema = z.object({
@@ -103,6 +118,20 @@ interface Activity {
   createdAt: string;
 }
 
+interface AdminSession {
+  id: string;
+  sessionId: string;
+  deviceType: string | null;
+  browser: string | null;
+  os: string | null;
+  ipAddress: string;
+  country: string | null;
+  city: string | null;
+  lastActivity: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
 export function AdminProfileClient({ 
   adminId, 
   adminEmail, 
@@ -113,6 +142,9 @@ export function AdminProfileClient({
   const [activities, setActivities] = useState<Activity[]>([]);
   const [activityStats, setActivityStats] = useState<any>(null);
   const [loadingActivities, setLoadingActivities] = useState(false);
+  const [sessions, setSessions] = useState<AdminSession[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [terminating, setTerminating] = useState<string | null>(null);
 
   // Profile form
   const profileForm = useForm<ProfileFormData>({
@@ -201,6 +233,62 @@ export function AdminProfileClient({
       setLoadingActivities(false);
       }
     };
+
+  // Load sessions
+  const loadSessions = async () => {
+    setLoadingSessions(true);
+    try {
+      const response = await fetch('/api/admin/sessions');
+      if (!response.ok) throw new Error('Failed to fetch sessions');
+      const data = await response.json();
+      setSessions(data.sessions || []);
+    } catch (error) {
+      console.error('Failed to load sessions:', error);
+      toast.error('Failed to load sessions');
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
+
+  // Terminate session
+  const handleTerminateSession = async (sessionId: string) => {
+    setTerminating(sessionId);
+    try {
+      const response = await fetch(`/api/admin/sessions/${sessionId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) throw new Error('Failed to terminate session');
+
+      toast.success('Session terminated successfully');
+      loadSessions();
+    } catch (error) {
+      console.error('Failed to terminate session:', error);
+      toast.error('Failed to terminate session');
+    } finally {
+      setTerminating(null);
+    }
+  };
+
+  // Terminate all sessions
+  const handleTerminateAllSessions = async () => {
+    try {
+      const response = await fetch('/api/admin/sessions', {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) throw new Error('Failed to terminate all sessions');
+
+      const data = await response.json();
+      toast.success(data.message || 'All sessions terminated');
+      
+      // Redirect to login
+      window.location.href = '/admin/auth/login';
+    } catch (error) {
+      console.error('Failed to terminate all sessions:', error);
+      toast.error('Failed to terminate all sessions');
+    }
+  };
 
   // Update profile
   const onProfileSubmit = async (data: ProfileFormData) => {
@@ -314,6 +402,20 @@ export function AdminProfileClient({
     }
   };
 
+  // Device icon helper
+  const DeviceIcon = ({ type }: { type: string | null }) => {
+    switch (type?.toLowerCase()) {
+      case 'mobile':
+        return <Smartphone className="h-4 w-4" />;
+      case 'tablet':
+        return <Tablet className="h-4 w-4" />;
+      case 'desktop':
+        return <Monitor className="h-4 w-4" />;
+      default:
+        return <Laptop className="h-4 w-4" />;
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -368,7 +470,7 @@ export function AdminProfileClient({
 
       {/* Tabs */}
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
           <TabsTrigger value="profile" className="gap-2">
             <User className="w-4 h-4" />
             Profile
@@ -376,6 +478,10 @@ export function AdminProfileClient({
           <TabsTrigger value="security" className="gap-2">
             <Shield className="w-4 h-4" />
             Security
+          </TabsTrigger>
+          <TabsTrigger value="sessions" className="gap-2">
+            <Monitor className="w-4 h-4" />
+            Sessions
           </TabsTrigger>
           <TabsTrigger value="activity" className="gap-2">
             <Activity className="w-4 h-4" />
@@ -783,6 +889,172 @@ export function AdminProfileClient({
                   </p>
                           </div>
                   </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Sessions Tab */}
+        <TabsContent value="sessions" className="space-y-6" onFocus={loadSessions}>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold">Active Sessions</h3>
+              <p className="text-sm text-muted-foreground">
+                Manage your active login sessions across devices
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadSessions}
+                disabled={loadingSessions}
+              >
+                {loadingSessions ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Refresh'}
+              </Button>
+              {sessions.length > 1 && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Logout All
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Logout from all devices?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will terminate all active sessions including this one. You will be redirected to the login page.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleTerminateAllSessions}>
+                        Logout All
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Active Devices ({sessions.length})</CardTitle>
+              <CardDescription>
+                Sessions expire after 8 hours or 15 minutes of inactivity
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingSessions ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Loader2 className="w-12 h-12 mx-auto mb-4 animate-spin" />
+                  <p>Loading sessions...</p>
+                </div>
+              ) : sessions.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Monitor className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No active sessions found</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Device</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Last Activity</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sessions.map((session) => (
+                      <TableRow key={session.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <DeviceIcon type={session.deviceType} />
+                            <div className="flex flex-col">
+                              <span className="font-medium">
+                                {session.browser || 'Unknown'} on {session.os || 'Unknown'}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {session.deviceType || 'desktop'}
+                              </span>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-sm">
+                              {session.city && session.country
+                                ? `${session.city}, ${session.country}`
+                                : session.country || session.ipAddress}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">
+                            {formatDistanceToNow(new Date(session.lastActivity), { addSuffix: true })}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={terminating === session.id}
+                              >
+                                {terminating === session.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <LogOut className="mr-2 h-3 w-3" />
+                                    Logout
+                                  </>
+                                )}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Terminate this session?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will logout this device. If this is your current session, you will be redirected to the login page.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleTerminateSession(session.id)}>
+                                  Terminate
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Security Info */}
+          <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
+                <div className="space-y-2 text-sm">
+                  <p className="text-blue-900 dark:text-blue-100">
+                    <strong>Security Tips:</strong>
+                  </p>
+                  <ul className="space-y-1 text-blue-800 dark:text-blue-200">
+                    <li>• Sessions are automatically terminated after 8 hours or 15 minutes of inactivity</li>
+                    <li>• Review your active sessions regularly and terminate unknown devices</li>
+                    <li>• Configure session timeouts in the Security tab</li>
+                  </ul>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

@@ -1,156 +1,81 @@
-// Force dynamic rendering for API route
-export const dynamic = 'force-dynamic';
-
 /**
- * Sessions API
+ * Admin Sessions Management API
  * 
- * GET: Get all active sessions for current admin
+ * GET - List active sessions (own or all if SUPER_ADMIN)
+ * DELETE - Terminate all sessions for current admin
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { requireAdminRole } from '@/lib/middleware/admin-auth';
+import { getAdminSession } from '@/auth-admin';
+import {
+  getAdminActiveSessions,
+  getAllActiveSessions,
+  terminateAllAdminSessions,
+} from '@/lib/services/admin-session-tracker.service';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
+/**
+ * GET /api/admin/sessions
+ * List active sessions
+ */
 export async function GET(request: NextRequest) {
   try {
-    const authResult = await requireAdminRole('ADMIN');
-    if (authResult instanceof NextResponse) {
-      return authResult;
-    }
-    const { session } = authResult;
+    const session = await getAdminSession();
 
-    const userId = session.user.id;
-
-    // Get current request info to identify the current session
-    const currentIp = request.headers.get('x-forwarded-for') || 
-                      request.headers.get('x-real-ip') || 
-                      'unknown';
-    const currentUserAgent = request.headers.get('user-agent') || 'unknown';
-    
-    // Parse current user agent to get device/browser info
-    const getCurrentBrowser = (ua: string) => {
-      if (ua.includes('Chrome') && !ua.includes('Edg')) return 'Chrome';
-      if (ua.includes('Firefox')) return 'Firefox';
-      if (ua.includes('Safari') && !ua.includes('Chrome')) return 'Safari';
-      if (ua.includes('Edg')) return 'Edge';
-      return 'Unknown';
-    };
-    
-    const getCurrentDevice = (ua: string) => {
-      if (ua.includes('Mobile') || ua.includes('Android') || ua.includes('iPhone')) return 'mobile';
-      if (ua.includes('Tablet') || ua.includes('iPad')) return 'tablet';
-      return 'desktop';
-    };
-    
-    const currentBrowser = getCurrentBrowser(currentUserAgent);
-    const currentDevice = getCurrentDevice(currentUserAgent);
-    const currentSessionKey = `${currentIp}-${currentDevice}-${currentBrowser}`;
-
-    // Get recent system logs for this user (login and API activities)
-    // Consider a session active if there was activity in the last 24 hours
-    const recentActivity = await prisma.systemLog.findMany({
-      where: {
-        userId,
-        createdAt: {
-          // Activity in the last 24 hours
-          gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    // Group by unique device/IP combinations to identify unique sessions
-    const sessionMap = new Map<string, any>();
-
-    for (const log of recentActivity) {
-      const sessionKey = `${log.ipAddress}-${log.deviceType}-${log.browser}`;
-      
-      if (!sessionMap.has(sessionKey)) {
-        sessionMap.set(sessionKey, {
-          id: log.id,
-          userId: log.userId,
-          device: log.deviceType || 'Unknown Device',
-          browser: log.browser || 'Unknown Browser',
-          os: log.os || 'Unknown OS',
-          ipAddress: log.ipAddress,
-          lastActive: log.createdAt,
-          firstSeen: log.createdAt,
-          activityCount: 1,
-        });
-      } else {
-        const sessionItem = sessionMap.get(sessionKey);
-        sessionItem.activityCount++;
-        // Update first seen if this log is older
-        if (log.createdAt < sessionItem.firstSeen) {
-          sessionItem.firstSeen = log.createdAt;
-        }
-      }
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Convert map to array and sort by last active
-    const sessions = Array.from(sessionMap.values())
-      .sort((a, b) => b.lastActive.getTime() - a.lastActive.getTime())
-      .map((sess) => {
-        // Determine if this is the current session by comparing sessionKey
-        const sessKey = `${sess.ipAddress}-${sess.device}-${sess.browser}`;
-        return {
-          ...sess,
-          isCurrent: sessKey === currentSessionKey,
-        };
-      });
+    // SUPER_ADMIN can see all sessions
+    const isSuperAdmin = session.user.role === 'SUPER_ADMIN';
 
-    // If no sessions found, create one for current session
-    if (sessions.length === 0) {
-      // Verify user exists before creating log
-      const userExists = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true }
-      });
-
-      if (userExists) {
-        // Log current session
-        const currentLog = await prisma.systemLog.create({
-          data: {
-            userId,
-            action: 'SESSION_VIEW',
-            path: '/api/admin/sessions',
-            ipAddress: currentIp,
-            userAgent: currentUserAgent,
-            deviceType: currentDevice,
-            browser: currentBrowser,
-            os: currentUserAgent.includes('Windows') ? 'Windows' :
-                currentUserAgent.includes('Mac') ? 'macOS' :
-                currentUserAgent.includes('Linux') ? 'Linux' : 'Unknown',
-            metadata: { action: 'Viewing sessions page' },
-          },
-        });
-
-        sessions.push({
-          id: currentLog.id,
-          userId,
-          device: currentDevice,
-          browser: currentBrowser,
-          os: currentLog.os,
-          ipAddress: currentIp,
-          lastActive: currentLog.createdAt,
-          firstSeen: currentLog.createdAt,
-          activityCount: 1,
-          isCurrent: true,
-        });
-      }
+    if (isSuperAdmin) {
+      const allSessions = await getAllActiveSessions();
+      return NextResponse.json({ sessions: allSessions });
     }
 
-    return NextResponse.json({
-      success: true,
-      sessions,
-    });
+    // Regular admins see only their own sessions
+    const sessions = await getAdminActiveSessions(session.user.id);
+    return NextResponse.json({ sessions });
   } catch (error) {
-    console.error('Get sessions error:', error);
+    console.error('❌ [SessionsAPI] GET error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch sessions' },
+      { error: 'Failed to fetch sessions' },
       { status: 500 }
     );
   }
 }
 
+/**
+ * DELETE /api/admin/sessions
+ * Terminate all sessions for current admin (force logout all devices)
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getAdminSession();
 
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const count = await terminateAllAdminSessions(
+      session.user.id,
+      'USER_LOGOUT_ALL_DEVICES',
+      session.user.id
+    );
+
+    return NextResponse.json({
+      success: true,
+      terminatedCount: count,
+      message: `Terminated ${count} active session(s)`,
+    });
+  } catch (error) {
+    console.error('❌ [SessionsAPI] DELETE error:', error);
+    return NextResponse.json(
+      { error: 'Failed to terminate sessions' },
+      { status: 500 }
+    );
+  }
+}

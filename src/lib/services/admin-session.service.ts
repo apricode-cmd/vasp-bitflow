@@ -14,7 +14,7 @@ const JWT_SECRET = new TextEncoder().encode(
 );
 
 const SESSION_COOKIE_NAME = 'admin-session';
-const SESSION_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
+const SESSION_MAX_AGE = 8 * 60 * 60; // 8 hours (TEMPORARY FIX until full session tracking implemented)
 
 export interface AdminSessionData {
   adminId: string;

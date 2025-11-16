@@ -19,6 +19,7 @@ import { isPasswordAuthEnabledForRole } from '@/lib/features/admin-auth-features
 import { verifyPassword } from '@/lib/auth-utils';
 import { verifyTotpCode } from '@/lib/services/totp.service';
 import { decrypt } from '@/lib/services/encryption.service';
+import { validateAndUpdateSession } from '@/lib/services/admin-session-tracker.service';
 
 export const { 
   handlers: adminHandlers, 
@@ -273,23 +274,38 @@ export const {
       return true;
     },
 
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account, trigger }) {
       if (user) {
         token.id = user.id;
         token.role = user.role;
         token.authMethod = user.authMethod || account?.provider || 'PASSWORD';
+        // Generate unique session ID for tracking
+        token.sessionId = token.sessionId || crypto.randomUUID();
       }
       return token;
     },
 
     async session({ session, token }) {
-      if (session.user) {
+      if (session.user && token.sessionId) {
         session.user.id = token.id as string;
         session.user.role = token.role;
         session.user.authMethod = token.authMethod as string;
+        session.user.sessionId = token.sessionId as string;
 
-        // TODO: Check session validity (idle + max duration)
-        // await checkAdminSessionValidity(token.sessionToken);
+        // ✅ Check session validity (idle + max duration)
+        try {
+          const validation = await validateAndUpdateSession(token.sessionId as string);
+          
+          if (!validation.valid) {
+            console.warn(`❌ [Auth] Invalid session for ${session.user.email}: ${validation.reason}`);
+            // Return null to force logout
+            return null as any;
+          }
+        } catch (error) {
+          // If validation fails (e.g., DB error), allow session but log error
+          console.error('❌ [Auth] Session validation error:', error);
+          // Don't block user if DB is temporarily down
+        }
       }
       return session;
     }
@@ -302,8 +318,8 @@ export const {
 
   session: {
     strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 days for admins (like regular sessions)
-    updateAge: 24 * 60 * 60, // Update once per day
+    maxAge: 8 * 60 * 60, // 8 hours (TEMPORARY FIX until full session tracking implemented)
+    updateAge: 15 * 60, // Update every 15 minutes (check session validity)
   },
 
   cookies: {
