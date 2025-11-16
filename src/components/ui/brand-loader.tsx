@@ -35,6 +35,7 @@ export function BrandLoader({
   const [logoUrl, setLogoUrl] = useState<string>('');
   const [mounted, setMounted] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -56,13 +57,15 @@ export function BrandLoader({
         const logo = isDark ? data.settings.brandLogoDark : data.settings.brandLogo;
         
         if (logo && logo !== logoUrl) {
-          // Only reset if logo actually changed
+          // Reset states when logo changes
           setImageLoaded(false);
+          setImageError(false);
           setLogoUrl(logo);
         }
       }
     } catch (error) {
       console.error('Failed to fetch logo:', error);
+      setImageError(true);
     }
   };
 
@@ -117,31 +120,42 @@ export function BrandLoader({
           className="relative z-10 flex items-center justify-center"
           style={{ width: config.logo, height: config.logo }}
         >
-          {/* Fallback dot - always visible when image not loaded */}
+          {/* Fallback dot - visible when image not loaded or error */}
           <div 
             className={cn(
               "absolute inset-0 flex items-center justify-center transition-opacity duration-300",
-              imageLoaded ? "opacity-0 pointer-events-none" : "opacity-100"
+              (imageLoaded && !imageError) ? "opacity-0 pointer-events-none" : "opacity-100"
             )}
           >
             <div className="w-4 h-4 rounded-full bg-primary animate-pulse" />
           </div>
 
           {/* Logo image - fades in when loaded */}
-          {logoUrl && (
+          {logoUrl && !imageError && (
             <Image
               key={logoUrl}
               src={logoUrl}
               alt="Loading"
               fill
+              sizes={`${config.logo}px`}
               className={cn(
                 "object-contain transition-opacity duration-300",
                 imageLoaded ? "opacity-100" : "opacity-0"
               )}
               priority
-              unoptimized
-              onLoad={() => setImageLoaded(true)}
-              onError={() => setImageLoaded(false)}
+              unoptimized={logoUrl.startsWith('http')}
+              onLoad={(e) => {
+                // Check if image actually loaded
+                if (e.currentTarget.complete && e.currentTarget.naturalWidth > 0) {
+                  setImageLoaded(true);
+                  setImageError(false);
+                }
+              }}
+              onError={() => {
+                console.error('Failed to load logo image:', logoUrl);
+                setImageLoaded(false);
+                setImageError(true);
+              }}
             />
           )}
         </div>
