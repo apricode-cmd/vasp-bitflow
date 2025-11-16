@@ -7,6 +7,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminSession } from '@/auth-admin';
+import { getAdminSessionData } from '@/lib/services/admin-session.service';
+import { prisma } from '@/lib/prisma';
 import {
   getAdminActiveSessions,
   getAllActiveSessions,
@@ -22,14 +24,31 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await getAdminSession();
+    // Try Custom JWT (Passkey) first
+    let adminId: string | null = null;
+    let adminRole: string | null = null;
 
-    if (!session?.user) {
+    const customSession = await getAdminSessionData();
+    
+    if (customSession) {
+      adminId = customSession.adminId;
+      adminRole = customSession.role;
+    } else {
+      // Try NextAuth (Password+TOTP)
+      const nextAuthSession = await getAdminSession();
+      
+      if (nextAuthSession?.user?.id) {
+        adminId = nextAuthSession.user.id;
+        adminRole = nextAuthSession.user.role as string;
+      }
+    }
+
+    if (!adminId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // SUPER_ADMIN can see all sessions
-    const isSuperAdmin = session.user.role === 'SUPER_ADMIN';
+    const isSuperAdmin = adminRole === 'SUPER_ADMIN';
 
     if (isSuperAdmin) {
       const allSessions = await getAllActiveSessions();
@@ -37,7 +56,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Regular admins see only their own sessions
-    const sessions = await getAdminActiveSessions(session.user.id);
+    const sessions = await getAdminActiveSessions(adminId);
     return NextResponse.json({ sessions });
   } catch (error) {
     console.error('❌ [SessionsAPI] GET error:', error);
@@ -54,16 +73,30 @@ export async function GET(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getAdminSession();
+    // Try Custom JWT (Passkey) first
+    let adminId: string | null = null;
 
-    if (!session?.user) {
+    const customSession = await getAdminSessionData();
+    
+    if (customSession) {
+      adminId = customSession.adminId;
+    } else {
+      // Try NextAuth (Password+TOTP)
+      const nextAuthSession = await getAdminSession();
+      
+      if (nextAuthSession?.user?.id) {
+        adminId = nextAuthSession.user.id;
+      }
+    }
+
+    if (!adminId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const count = await terminateAllAdminSessions(
-      session.user.id,
+      adminId,
       'USER_LOGOUT_ALL_DEVICES',
-      session.user.id
+      adminId
     );
 
     return NextResponse.json({

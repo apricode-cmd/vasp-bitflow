@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminSession } from '@/auth-admin';
+import { getAdminSessionData } from '@/lib/services/admin-session.service';
 import { terminateSession } from '@/lib/services/admin-session-tracker.service';
 import { prisma } from '@/lib/prisma';
 
@@ -21,9 +22,26 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getAdminSession();
+    // Try Custom JWT (Passkey) first
+    let adminId: string | null = null;
+    let adminRole: string | null = null;
 
-    if (!session?.user) {
+    const customSession = await getAdminSessionData();
+    
+    if (customSession) {
+      adminId = customSession.adminId;
+      adminRole = customSession.role;
+    } else {
+      // Try NextAuth (Password+TOTP)
+      const nextAuthSession = await getAdminSession();
+      
+      if (nextAuthSession?.user?.id) {
+        adminId = nextAuthSession.user.id;
+        adminRole = nextAuthSession.user.role as string;
+      }
+    }
+
+    if (!adminId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -41,8 +59,8 @@ export async function DELETE(
     }
 
     // Only allow terminating own sessions (or any if SUPER_ADMIN)
-    const isSuperAdmin = session.user.role === 'SUPER_ADMIN';
-    const isOwnSession = targetSession.adminId === session.user.id;
+    const isSuperAdmin = adminRole === 'SUPER_ADMIN';
+    const isOwnSession = targetSession.adminId === adminId;
 
     if (!isSuperAdmin && !isOwnSession) {
       return NextResponse.json(
@@ -55,7 +73,7 @@ export async function DELETE(
     const success = await terminateSession(
       targetSession.sessionKey,
       'USER_LOGOUT_SINGLE_DEVICE',
-      session.user.id
+      adminId
     );
 
     if (!success) {
