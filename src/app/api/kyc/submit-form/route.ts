@@ -125,6 +125,28 @@ export async function POST(request: NextRequest) {
       console.log(`✅ Linked ${documentsLinked.count} documents to session`);
     }
 
+    // Send KYC_SUBMITTED notification
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { email: true, profile: true }
+      });
+
+      if (user?.email) {
+        const { eventEmitter } = await import('@/lib/services/event-emitter.service');
+        await eventEmitter.emit('KYC_SUBMITTED', {
+          userId: session.user.id,
+          recipientEmail: user.email,
+          userName: user.profile?.firstName || 'User',
+          kycSessionId: kycSession.id,
+        });
+        console.log(`✅ [NOTIFICATION] Sent KYC_SUBMITTED for user ${session.user.id}`);
+      }
+    } catch (notifError) {
+      // Don't fail the request if notification fails
+      console.error('❌ [NOTIFICATION] Failed to send KYC_SUBMITTED:', notifError);
+    }
+
     // UPDATE applicant in Sumsub with latest profile data
     if (kycSession.applicantId && kycSession.kycProviderId) {
       console.log('🔄 Updating applicant in provider with current profile...');

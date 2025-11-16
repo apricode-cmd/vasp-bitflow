@@ -175,10 +175,31 @@ const navigation = [
         requiredPermission: 'settings:read'
       },
       { 
-        name: 'Notifications', 
+        name: 'Notification Events', 
+        href: '/admin/notification-events', 
+        icon: Bell,
+        description: 'Configure events & triggers',
+        requiredPermission: 'settings:read'
+      },
+      { 
+        name: 'Notification Categories', 
+        href: '/admin/notification-categories', 
+        icon: MessageSquare,
+        description: 'Event categories',
+        requiredPermission: 'settings:read'
+      },
+      { 
+        name: 'Notification Queue', 
+        href: '/admin/notification-queue', 
+        icon: Send,
+        description: 'Pending & sent notifications',
+        badge: 'pending'
+      },
+      { 
+        name: 'Admin Alerts', 
         href: '/admin/notifications', 
         icon: Bell,
-        description: 'Admin alerts',
+        description: 'Your admin notifications',
         badge: 'unread'
       },
       { 
