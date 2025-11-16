@@ -93,26 +93,6 @@ export function PasskeyLoginButton({ email, onSuccess, onError }: PasskeyLoginBu
       const sessionData = await sessionRes.json();
       console.log('✅ Session created successfully:', sessionData.admin.email);
 
-      // 5. Create session record in database for tracking
-      try {
-        const trackingRes = await fetch('/api/admin/session/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: crypto.randomUUID(), // Generate unique session ID
-            mfaMethod: 'PASSKEY',
-          }),
-        });
-
-        if (trackingRes.ok) {
-          console.log('✅ Session record created in database');
-        } else {
-          console.warn('⚠️ Failed to create session record (non-critical)');
-        }
-      } catch (error) {
-        console.warn('⚠️ Session tracking error (non-critical):', error);
-      }
-
       toast.success('Passkey authentication successful!');
       
       // Critical: Wait for cookie to be set and propagate (1 second)

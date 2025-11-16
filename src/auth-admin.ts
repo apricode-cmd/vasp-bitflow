@@ -19,7 +19,8 @@ import { isPasswordAuthEnabledForRole } from '@/lib/features/admin-auth-features
 import { verifyPassword } from '@/lib/auth-utils';
 import { verifyTotpCode } from '@/lib/services/totp.service';
 import { decrypt } from '@/lib/services/encryption.service';
-import { validateAndUpdateSession } from '@/lib/services/admin-session-tracker.service';
+import { validateAndUpdateSession, createSessionRecord } from '@/lib/services/admin-session-tracker.service';
+import { headers } from 'next/headers';
 
 export const { 
   handlers: adminHandlers, 
@@ -262,8 +263,30 @@ export const {
             data: { lastLogin: new Date() },
           });
 
-          // TODO: Create AdminSession record
-          // await createAdminSession(user.id, request);
+          // Create AdminSession record in database
+          try {
+            const headersList = await headers();
+            const ipAddress = headersList.get('x-forwarded-for') || 
+                              headersList.get('x-real-ip') || 
+                              'unknown';
+            const userAgent = headersList.get('user-agent') || 'unknown';
+            const country = headersList.get('x-user-country') || null;
+            const city = headersList.get('x-user-city') || null;
+
+            await createSessionRecord({
+              adminId: user.id,
+              sessionId: crypto.randomUUID(),
+              ipAddress,
+              userAgent,
+              country,
+              city,
+              mfaMethod: account.provider === 'password-totp' ? 'TOTP' : null,
+            });
+
+            console.log('✅ Session record created in database (NextAuth)');
+          } catch (error) {
+            console.error('⚠️ Failed to create session record (non-critical):', error);
+          }
 
           return true;
         } catch (error) {

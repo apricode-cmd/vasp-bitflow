@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createAdminSession } from '@/lib/services/admin-session.service';
+import { createSessionRecord } from '@/lib/services/admin-session-tracker.service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Create session
+    // Create session (JWT cookie)
     const result = await createAdminSession(otat.admin.id, 'PASSKEY');
 
     if (!result.success) {
@@ -99,6 +100,29 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('✅ Admin session created for:', otat.admin.email);
+
+    // Create session record in database for tracking
+    try {
+      const ipAddress = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
+      const userAgent = request.headers.get('user-agent') || 'unknown';
+      const country = request.geo?.country || null;
+      const city = request.geo?.city || null;
+
+      await createSessionRecord({
+        adminId: otat.admin.id,
+        sessionId: crypto.randomUUID(),
+        ipAddress,
+        userAgent,
+        country,
+        city,
+        mfaMethod: 'PASSKEY',
+      });
+
+      console.log('✅ Session record created in database');
+    } catch (error) {
+      console.error('⚠️ Failed to create session record (non-critical):', error);
+      // Don't fail the login if session tracking fails
+    }
 
     return NextResponse.json({
       success: true,
