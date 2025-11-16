@@ -140,14 +140,7 @@ export function Combobox({
                     />
                     <div className="flex items-center gap-2 flex-1">
                       {option.icon}
-                      <div className="flex flex-col">
-                        <span>{option.label}</span>
-                        {option.description && (
-                          <span className="text-xs text-muted-foreground">
-                            {option.description}
-                          </span>
-                        )}
-                      </div>
+                      <span>{option.label}</span>
                     </div>
                   </CommandItem>
                 );

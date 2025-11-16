@@ -451,11 +451,18 @@ export function ClientOrderWidget() {
   const selectedFiatData = config?.fiatCurrencies.find(f => f.code === selectedFiat);
   const selectedPaymentData = config?.paymentMethods.find(p => p.code === selectedPaymentMethod);
 
-  // Create options
+  // Create options with icons
   const cryptoOptions = config?.currencies.map(crypto => ({
     value: crypto.code,
     label: `${crypto.name} (${crypto.code})`,
-    description: crypto.symbol
+    icon: (
+      <CurrencyIcon 
+        currencyCode={crypto.code}
+        currencyName={crypto.name}
+        iconUrl={crypto.iconUrl}
+        size={20}
+      />
+    )
   })) || [];
 
   const fiatOptions = config?.fiatCurrencies.map(fiat => ({
@@ -639,9 +646,23 @@ export function ClientOrderWidget() {
   return (
     <Card className="bg-card/50 backdrop-blur-sm border-primary/10">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <ShoppingCart className="h-5 w-5" />
-          Buy Cryptocurrency
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShoppingCart className="h-5 w-5" />
+            Buy Cryptocurrency
+          </div>
+          {selectedCrypto && selectedCryptoData && (
+            <div className="flex items-center gap-2 text-base font-normal">
+              <span className="text-muted-foreground text-sm">Selected:</span>
+              <CurrencyIcon 
+                currencyCode={selectedCrypto}
+                currencyName={selectedCryptoData.name}
+                iconUrl={selectedCryptoData.iconUrl}
+                size={24}
+              />
+              <span className="font-semibold text-primary">{selectedCrypto}</span>
+            </div>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -1024,11 +1045,19 @@ export function ClientOrderWidget() {
                     <span className="font-semibold">Order Summary</span>
                   </div>
                   <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">You will receive:</span>
-                      <span className="font-medium">
-                        {formatCryptoAmount(parseFloat(cryptoAmount), selectedCryptoData?.decimals || 8)} {selectedCrypto}
-                      </span>
+                      <div className="flex items-center gap-2 font-medium">
+                        <CurrencyIcon 
+                          currencyCode={selectedCrypto}
+                          currencyName={selectedCryptoData?.name}
+                          iconUrl={selectedCryptoData?.iconUrl}
+                          size={18}
+                        />
+                        <span>
+                          {formatCryptoAmount(parseFloat(cryptoAmount), selectedCryptoData?.decimals || 8)} {selectedCrypto}
+                        </span>
+                      </div>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Subtotal:</span>

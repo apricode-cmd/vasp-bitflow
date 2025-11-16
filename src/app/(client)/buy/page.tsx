@@ -10,10 +10,12 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { ClientOrderWidget } from '@/components/features/ClientOrderWidget';
 import { KycAlert } from '@/components/features/KycAlert';
+import { CurrencyDisplay } from '@/components/features/CurrencyIcon';
 import { 
-  ShoppingCart, Shield, Lock, Zap, TrendingUp, CheckCircle2
+  ShoppingCart, Shield, Lock, Zap, TrendingUp, CheckCircle2, Coins
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -23,8 +25,15 @@ interface UserKycStatus {
   kycRequired: boolean; // From system settings
 }
 
+interface Currency {
+  code: string;
+  name: string;
+  iconUrl: string | null;
+}
+
 export default function BuyPage(): React.ReactElement {
   const [kycStatus, setKycStatus] = useState<UserKycStatus | null>(null);
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -171,6 +180,37 @@ export default function BuyPage(): React.ReactElement {
               </div>
             </CardContent>
           </Card>
+
+          {/* Supported Cryptocurrencies */}
+          {currencies.length > 0 && (
+            <Card className="bg-card/50 backdrop-blur-sm border-primary/10">
+              <CardContent className="p-5">
+                <h3 className="font-semibold mb-4 flex items-center gap-2">
+                  <Coins className="h-4 w-4 text-primary" />
+                  Supported Cryptocurrencies
+                </h3>
+                <div className="space-y-3">
+                  {currencies.map((currency) => (
+                    <div 
+                      key={currency.code}
+                      className="flex items-center justify-between p-2 rounded-lg hover:bg-accent/50 transition-colors"
+                    >
+                      <CurrencyDisplay
+                        currencyCode={currency.code}
+                        currencyName={currency.name}
+                        iconUrl={currency.iconUrl}
+                        showCode={false}
+                        size="sm"
+                      />
+                      <Badge variant="secondary" className="text-xs">
+                        {currency.code}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* How it Works */}
           <Card className="bg-card/50 backdrop-blur-sm border-primary/10">
