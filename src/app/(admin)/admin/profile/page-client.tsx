@@ -251,7 +251,7 @@ export function AdminProfileClient({
   };
 
   // Terminate session
-  const handleTerminateSession = async (sessionId: string) => {
+  const handleTerminateSession = async (sessionId: string, isCurrent: boolean) => {
     setTerminating(sessionId);
     try {
       const response = await fetch(`/api/admin/sessions/${sessionId}`, {
@@ -261,11 +261,19 @@ export function AdminProfileClient({
       if (!response.ok) throw new Error('Failed to terminate session');
 
       toast.success('Session terminated successfully');
-      loadSessions();
+      
+      // If terminating current session, redirect to login
+      if (isCurrent) {
+        toast.info('Redirecting to login...');
+        setTimeout(() => {
+          window.location.href = '/admin/auth/login';
+        }, 1000);
+      } else {
+        loadSessions();
+      }
     } catch (error) {
       console.error('Failed to terminate session:', error);
       toast.error('Failed to terminate session');
-    } finally {
       setTerminating(null);
     }
   };
@@ -967,72 +975,88 @@ export function AdminProfileClient({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sessions.map((session) => (
-                      <TableRow key={session.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <DeviceIcon type={session.deviceType} />
-                            <div className="flex flex-col">
-                              <span className="font-medium">
-                                {session.browser || 'Unknown'} on {session.os || 'Unknown'}
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                {session.deviceType || 'desktop'}
+                    {sessions.map((session, index) => {
+                      // First session is likely current (most recent activity)
+                      const isCurrent = index === 0;
+                      
+                      return (
+                        <TableRow key={session.id} className={isCurrent ? 'bg-primary/5' : ''}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <DeviceIcon type={session.deviceType} />
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">
+                                    {session.browser || 'Unknown'} on {session.os || 'Unknown'}
+                                  </span>
+                                  {isCurrent && (
+                                    <Badge variant="default" className="text-xs">
+                                      Current
+                                    </Badge>
+                                  )}
+                                </div>
+                                <span className="text-xs text-muted-foreground">
+                                  {session.deviceType || 'desktop'}
+                                </span>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-sm">
+                                {session.city && session.country
+                                  ? `${session.city}, ${session.country}`
+                                  : session.country || session.ipAddress}
                               </span>
                             </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-sm">
-                              {session.city && session.country
-                                ? `${session.city}, ${session.country}`
-                                : session.country || session.ipAddress}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">
-                            {formatDistanceToNow(new Date(session.lastActivity), { addSuffix: true })}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={terminating === session.id}
-                              >
-                                {terminating === session.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <>
-                                    <LogOut className="mr-2 h-3 w-3" />
-                                    Logout
-                                  </>
-                                )}
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Terminate this session?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will logout this device. If this is your current session, you will be redirected to the login page.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleTerminateSession(session.id)}>
-                                  Terminate
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">
+                              {formatDistanceToNow(new Date(session.lastActivity), { addSuffix: true })}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={terminating === session.id}
+                                >
+                                  {terminating === session.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <LogOut className="mr-2 h-3 w-3" />
+                                      Logout
+                                    </>
+                                  )}
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>
+                                    {isCurrent ? 'Logout from current session?' : 'Terminate this session?'}
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    {isCurrent 
+                                      ? 'This is your current session. You will be logged out and redirected to the login page.'
+                                      : 'This will logout this device immediately.'}
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleTerminateSession(session.id, isCurrent)}>
+                                    {isCurrent ? 'Logout' : 'Terminate'}
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}
