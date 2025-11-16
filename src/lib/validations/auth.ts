@@ -5,6 +5,7 @@
  */
 
 import { z } from 'zod';
+import { isValidPhoneNumber } from 'react-phone-number-input';
 
 /**
  * Password validation schema with strict requirements
@@ -62,8 +63,16 @@ export const registerSchema = z
       .toUpperCase(),
     phoneNumber: z
       .string()
-      .regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number format')
-      .optional()
+      .min(1, 'Номер телефона обязателен')
+      .refine(
+        (val) => {
+          if (!val || val.trim() === '') return false;
+          return isValidPhoneNumber(val);
+        },
+        {
+          message: 'Неверный формат номера телефона. Пример: +48 123 456 789'
+        }
+      )
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Passwords do not match',

@@ -15,7 +15,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { registerSchema, type RegisterInput } from '@/lib/validations/auth';
 import { toast } from 'sonner';
 import { BrandLoaderInline } from '@/components/ui/brand-loader';
-import { Loader2, CheckCircle2, Info, UserPlus, AlertCircle } from 'lucide-react';
+import { Loader2, CheckCircle2, Info, UserPlus, AlertCircle, XCircle } from 'lucide-react';
+import { isValidPhoneNumber, isPossiblePhoneNumber } from 'react-phone-number-input';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -281,21 +282,67 @@ export default function RegisterPage(): React.ReactElement {
                     <FormField
                       control={form.control}
                       name="phoneNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Phone Number</FormLabel>
-                          <FormControl>
-                            <PhoneInput
-                              value={field.value as PhoneValue}
-                              onChange={field.onChange}
-                              defaultCountry="PL"
-                              placeholder="Enter phone number"
-                              disabled={isLoading}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      render={({ field }) => {
+                        // Check phone validation status
+                        const phoneValue = field.value;
+                        const hasPhone = phoneValue && phoneValue.trim() !== '';
+                        
+                        let validStatus: 'idle' | 'valid' | 'invalid' | 'warning' = 'idle';
+                        if (hasPhone) {
+                          const isValid = isValidPhoneNumber(phoneValue);
+                          const isPossible = isPossiblePhoneNumber(phoneValue);
+                          
+                          if (isValid) {
+                            validStatus = 'valid';
+                          } else if (isPossible) {
+                            validStatus = 'warning';
+                          } else {
+                            validStatus = 'invalid';
+                          }
+                        }
+
+                        return (
+                          <FormItem>
+                            <FormLabel>Phone Number *</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <PhoneInput
+                                  value={field.value as PhoneValue}
+                                  onChange={field.onChange}
+                                  defaultCountry="PL"
+                                  placeholder="Enter phone number"
+                                  disabled={isLoading}
+                                />
+                                {/* Validation icon */}
+                                {hasPhone && (
+                                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                    {validStatus === 'valid' && (
+                                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                    )}
+                                    {validStatus === 'invalid' && (
+                                      <XCircle className="h-4 w-4 text-destructive" />
+                                    )}
+                                    {validStatus === 'warning' && (
+                                      <AlertCircle className="h-4 w-4 text-yellow-500" />
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </FormControl>
+                            {hasPhone && validStatus === 'warning' && (
+                              <p className="text-sm text-yellow-600 dark:text-yellow-500">
+                                Номер выглядит неполным
+                              </p>
+                            )}
+                            {hasPhone && validStatus === 'valid' && (
+                              <p className="text-sm text-green-600 dark:text-green-500">
+                                ✓ Номер валиден
+                              </p>
+                            )}
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
                     />
 
                     <FormField
