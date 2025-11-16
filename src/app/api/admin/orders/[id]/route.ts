@@ -300,7 +300,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext): Pro
             oldStatus,
             newStatus,
             changedBy: session.user.id,
-            notes: validatedData.adminNotes || validatedData.internalNote || null
+            note: validatedData.adminNotes || validatedData.internalNote || null
           }
         });
       }
