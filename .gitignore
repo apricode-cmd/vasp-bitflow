@@ -100,4 +100,7 @@ backups/
 # Local uploads (development)
 public/uploads/*
 !public/uploads/.gitkeep
+# Exception: Track currency icons (static assets)
+!public/uploads/currencies/
+!public/uploads/currencies/**
 
