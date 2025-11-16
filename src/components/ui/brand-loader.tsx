@@ -182,8 +182,23 @@ export function BrandLoader({
 
 export function BrandLoaderPage({ text = 'Loading...' }: { text?: string }): React.ReactElement {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <BrandLoader size="lg" text={text} />
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+      {/* Animated gradient background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-primary/10" />
+      
+      {/* Subtle pattern overlay */}
+      <div 
+        className="absolute inset-0 opacity-[0.02] dark:opacity-[0.05]"
+        style={{
+          backgroundImage: 'radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)',
+          backgroundSize: '32px 32px'
+        }}
+      />
+      
+      {/* Content */}
+      <div className="relative z-10">
+        <BrandLoader size="lg" text={text} />
+      </div>
     </div>
   );
 }
