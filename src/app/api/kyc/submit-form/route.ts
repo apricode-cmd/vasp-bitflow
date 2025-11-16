@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { getClientSession } from '@/auth-client';
 import { prisma } from '@/lib/prisma';
 import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
@@ -59,6 +60,13 @@ export async function POST(request: NextRequest) {
       });
       
       console.log('✅ Created KYC session:', kycSession.id);
+      
+      // Revalidate cache when creating new session
+      revalidatePath('/admin/kyc');
+      revalidatePath('/admin/users');
+      revalidatePath(`/admin/users/${session.user.id}`);
+      revalidateTag('kyc-sessions');
+      revalidateTag(`kyc-${session.user.id}`);
     }
 
     console.log('📋 Using existing KYC Session ID:', kycSession.id);

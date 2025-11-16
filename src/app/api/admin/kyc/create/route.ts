@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { auditService } from '@/lib/services/audit.service';
@@ -90,6 +91,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
 
     console.log('[CREATE KYC] Session created:', kycSession.id);
+
+    // Revalidate cache
+    revalidatePath('/admin/kyc');
+    revalidatePath('/admin/users');
+    revalidatePath(`/admin/users/${validated.userId}`);
+    revalidateTag('kyc-sessions');
 
     // Audit log
     try {

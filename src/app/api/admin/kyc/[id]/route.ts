@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic';
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { requireAdminAuth } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
@@ -139,6 +140,14 @@ export async function PUT(
       },
     });
 
+    // Revalidate cache after status update
+    revalidatePath('/admin/kyc');
+    revalidatePath('/admin/users');
+    revalidatePath(`/admin/users/${kycSession.userId}`);
+    revalidatePath(`/admin/kyc/${id}`);
+    revalidateTag('kyc-sessions');
+    revalidateTag(`kyc-${kycSession.userId}`);
+
     // TODO: Send email notification to user
 
     return NextResponse.json({
@@ -175,9 +184,25 @@ export async function DELETE(
   try {
     const { id } = params;
 
+    // Get session before deleting to get userId
+    const session = await prisma.kycSession.findUnique({
+      where: { id },
+      select: { userId: true }
+    });
+
     await prisma.kycSession.delete({
       where: { id },
     });
+
+    // Revalidate cache after deletion
+    if (session?.userId) {
+      revalidatePath('/admin/kyc');
+      revalidatePath('/admin/users');
+      revalidatePath(`/admin/users/${session.userId}`);
+      revalidateTag('kyc-sessions');
+      revalidateTag(`kyc-${session.userId}`);
+      console.log('✅ Cache invalidated after KYC deletion for user:', session.userId);
+    }
 
     return NextResponse.json({
       success: true,

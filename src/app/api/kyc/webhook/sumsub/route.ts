@@ -11,6 +11,7 @@ export const dynamic = 'force-dynamic';
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
 import { prisma } from '@/lib/prisma';
 
@@ -162,6 +163,15 @@ export async function POST(request: NextRequest) {
     });
 
     console.log(`✅ Updated KYC session: ${updated.id}`);
+
+    // Revalidate cache after status change
+    revalidatePath('/admin/kyc');
+    revalidatePath('/admin/users');
+    revalidatePath(`/admin/users/${updated.userId}`);
+    revalidatePath(`/admin/kyc/${updated.id}`);
+    revalidateTag('kyc-sessions');
+    revalidateTag(`kyc-${updated.userId}`);
+    console.log('✅ Cache invalidated for user:', updated.userId);
 
     // 8. Log to audit (optional - uncomment if you have audit logging)
     /*

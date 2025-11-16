@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { processKycWebhook } from '@/lib/services/kyc.service';
 import { systemLogService } from '@/lib/services/system-log.service';
 
@@ -81,6 +82,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         status: result.status,
         session: result.session?.id
       });
+      
+      // Revalidate cache after status change
+      if (result.session?.userId) {
+        revalidatePath('/admin/kyc');
+        revalidatePath('/admin/users');
+        revalidatePath(`/admin/users/${result.session.userId}`);
+        revalidatePath(`/admin/kyc/${result.session.id}`);
+        revalidateTag('kyc-sessions');
+        revalidateTag(`kyc-${result.session.userId}`);
+        console.log('✅ Cache invalidated for user:', result.session.userId);
+      }
       
       // Log successful webhook
       await systemLogService.createLog({
