@@ -34,6 +34,7 @@ export function BrandLoader({
   const { resolvedTheme } = useTheme();
   const [logoUrl, setLogoUrl] = useState<string>('');
   const [mounted, setMounted] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -55,6 +56,7 @@ export function BrandLoader({
         const logo = isDark ? data.settings.brandLogoDark : data.settings.brandLogo;
         
         if (logo) {
+          setImageLoaded(false); // Reset image loaded state when logo changes
           setLogoUrl(logo);
         }
       }
@@ -115,14 +117,27 @@ export function BrandLoader({
           style={{ width: config.logo, height: config.logo }}
         >
           {logoUrl ? (
-            <Image
-              src={logoUrl}
-              alt="Loading"
-              fill
-              className="object-contain"
-              priority
-              unoptimized
-            />
+            <>
+              <Image
+                src={logoUrl}
+                alt="Loading"
+                fill
+                className={cn(
+                  "object-contain transition-opacity duration-300",
+                  imageLoaded ? "opacity-100" : "opacity-0"
+                )}
+                priority
+                unoptimized
+                onLoad={() => setImageLoaded(true)}
+                onError={() => setImageLoaded(false)}
+              />
+              {/* Fallback while image is loading */}
+              {!imageLoaded && (
+                <div className="absolute inset-0 w-full h-full flex items-center justify-center">
+                  <div className="w-4 h-4 rounded-full bg-primary animate-pulse" />
+                </div>
+              )}
+            </>
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <div className="w-4 h-4 rounded-full bg-primary animate-pulse" />
