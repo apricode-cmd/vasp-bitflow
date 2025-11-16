@@ -5,7 +5,6 @@
  */
 
 import { z } from 'zod';
-import { isValidPhoneNumber } from 'react-phone-number-input';
 
 /**
  * Password validation schema with strict requirements
@@ -64,16 +63,9 @@ export const registerSchema = z
     phoneNumber: z
       .string()
       .min(1, 'Phone number is required')
-      .refine(
-        (val) => {
-          if (!val || val.trim() === '') return false;
-          // isValidPhoneNumber automatically checks correct length for each country
-          return isValidPhoneNumber(val);
-        },
-        {
-          message: 'Invalid phone number format for selected country'
-        }
-      )
+      // Phone validation done on client-side with react-phone-number-input
+      // Basic regex check for server-side
+      .regex(/^\+[1-9]\d{1,14}$/, 'Invalid phone number format')
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Passwords do not match',

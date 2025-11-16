@@ -40,6 +40,15 @@ export async function middleware(request: NextRequest) {
   // Add pathname to headers for server components
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-pathname', path);
+  
+  // Add Vercel Geo data to headers for server components
+  if (request.geo) {
+    if (request.geo.country) requestHeaders.set('x-user-country', request.geo.country);
+    if (request.geo.city) requestHeaders.set('x-user-city', request.geo.city);
+    if (request.geo.region) requestHeaders.set('x-user-region', request.geo.region);
+    if (request.geo.latitude) requestHeaders.set('x-user-latitude', request.geo.latitude);
+    if (request.geo.longitude) requestHeaders.set('x-user-longitude', request.geo.longitude);
+  }
 
   // Always allow these critical routes (to prevent infinite loops)
   if (
@@ -138,6 +147,7 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/api/rates') ||
     path.startsWith('/api/payment-methods') ||
     path.startsWith('/api/legal-documents/public') ||
+    path.startsWith('/api/geo/detect') ||  // Geo detection (public for registration)
     path.startsWith('/api/v1/') ||  // Public API v1 (uses API keys)
     path.startsWith('/api/kyc/webhook') ||  // Webhook from KYCAID
     path.startsWith('/api/kyc/verify/') ||  // White-label verification links

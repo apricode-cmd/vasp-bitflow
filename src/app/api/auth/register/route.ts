@@ -14,6 +14,7 @@ import { hashPassword } from '@/lib/auth-utils';
 import { registerSchema } from '@/lib/validations/auth';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 import { eventEmitter } from '@/lib/services/event-emitter.service';
+import { getGeoFromRequest, formatGeoForLog } from '@/lib/utils/geo';
 import { z } from 'zod';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -73,7 +74,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     });
 
-    // Log user registration
+    // Get geo location for audit log
+    const geo = getGeoFromRequest(request);
+    
+    // Log user registration with geo data
     await auditService.logUserAction(
       user.id,
       AUDIT_ACTIONS.USER_REGISTERED,
@@ -81,9 +85,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       user.id,
       {
         email: user.email,
-        country: validatedData.country
+        country: validatedData.country,
+        registrationLocation: formatGeoForLog(geo),
+        ip: geo.ip,
+        geoCountry: geo.country,
+        geoCity: geo.city,
+        geoRegion: geo.region
       }
     );
+    
+    console.log('✅ User registered:', {
+      userId: user.id,
+      email: user.email,
+      location: formatGeoForLog(geo)
+    });
 
     // Emit WELCOME_EMAIL event
     await eventEmitter.emit('WELCOME_EMAIL', {

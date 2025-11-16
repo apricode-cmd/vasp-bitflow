@@ -70,11 +70,40 @@ export default function RegisterPage(): React.ReactElement {
       lastName: '',
       email: '',
       phoneNumber: '',
-      country: '',
+      country: '', // Will be auto-filled from geo
       password: '',
       confirmPassword: '',
     },
   });
+
+  // Auto-detect user's country on mount
+  useEffect(() => {
+    const detectCountry = async () => {
+      try {
+        const response = await fetch('/api/geo/detect');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.country && !form.getValues('country')) {
+            form.setValue('country', data.country);
+            if (data.detected) {
+              console.log('✅ Auto-detected country:', data.country, data.city || '');
+            } else {
+              console.log('ℹ️ Using default country:', data.country);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to auto-detect country:', error);
+        // Silently fail - user can select manually
+        // Set default country as fallback
+        if (!form.getValues('country')) {
+          form.setValue('country', 'PL');
+        }
+      }
+    };
+
+    detectCountry();
+  }, [form]);
 
   // Calculate form completion progress
   const watchedFields = form.watch();
