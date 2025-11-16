@@ -16,7 +16,7 @@ import { registerSchema, type RegisterInput } from '@/lib/validations/auth';
 import { toast } from 'sonner';
 import { BrandLoaderInline } from '@/components/ui/brand-loader';
 import { Loader2, CheckCircle2, Info, UserPlus, AlertCircle, XCircle } from 'lucide-react';
-import { isValidPhoneNumber, isPossiblePhoneNumber } from 'react-phone-number-input';
+import { isValidPhoneNumber, isPossiblePhoneNumber, getCountryCallingCode, type CountryCode } from 'react-phone-number-input';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -286,6 +286,7 @@ export default function RegisterPage(): React.ReactElement {
                         // Check phone validation status
                         const phoneValue = field.value;
                         const hasPhone = phoneValue && phoneValue.trim() !== '';
+                        const selectedCountry = form.watch('country');
                         
                         let validStatus: 'idle' | 'valid' | 'invalid' | 'warning' = 'idle';
                         if (hasPhone) {
@@ -309,7 +310,7 @@ export default function RegisterPage(): React.ReactElement {
                                 <PhoneInput
                                   value={field.value as PhoneValue}
                                   onChange={field.onChange}
-                                  defaultCountry="PL"
+                                  country={(selectedCountry as CountryCode) || "PL"}
                                   placeholder="Enter phone number"
                                   disabled={isLoading}
                                 />
@@ -354,7 +355,22 @@ export default function RegisterPage(): React.ReactElement {
                           <FormControl>
                             <CountryDropdown
                               defaultValue={field.value}
-                              onChange={(country) => field.onChange(country.alpha2)}
+                              onChange={(country) => {
+                                field.onChange(country.alpha2);
+                                
+                                // Auto-set phone country code when country changes
+                                const currentPhone = form.getValues('phoneNumber');
+                                // Only auto-fill if phone is empty or just a '+'
+                                if (!currentPhone || currentPhone.trim() === '' || currentPhone === '+') {
+                                  try {
+                                    const callingCode = getCountryCallingCode(country.alpha2 as CountryCode);
+                                    form.setValue('phoneNumber', `+${callingCode}`);
+                                  } catch (error) {
+                                    // Country code not found, ignore
+                                    console.warn('Country code not found for:', country.alpha2);
+                                  }
+                                }
+                              }}
                               placeholder="Select your country"
                               disabled={isLoading}
                             />
