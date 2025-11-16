@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminSession } from '@/auth-admin';
 import { getAdminSessionData } from '@/lib/services/admin-session.service';
-import { terminateSession } from '@/lib/services/admin-session-tracker.service';
+import { terminateSessionById } from '@/lib/services/admin-session-tracker.service';
 import { prisma } from '@/lib/prisma';
 
 // Force dynamic rendering
@@ -51,11 +51,15 @@ export async function DELETE(
     // (or current admin is SUPER_ADMIN)
     const targetSession = await prisma.adminSession.findUnique({
       where: { id: sessionId },
-      select: { adminId: true, sessionKey: true },
+      select: { adminId: true, isActive: true },
     });
 
     if (!targetSession) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    }
+
+    if (!targetSession.isActive) {
+      return NextResponse.json({ error: 'Session already terminated' }, { status: 400 });
     }
 
     // Only allow terminating own sessions (or any if SUPER_ADMIN)
@@ -69,9 +73,9 @@ export async function DELETE(
       );
     }
 
-    // Terminate session
-    const success = await terminateSession(
-      targetSession.sessionKey,
+    // Terminate session by ID
+    const success = await terminateSessionById(
+      sessionId,
       'USER_LOGOUT_SINGLE_DEVICE',
       adminId
     );

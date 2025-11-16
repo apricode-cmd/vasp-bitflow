@@ -201,22 +201,23 @@ export async function validateAndUpdateSession(
 }
 
 /**
- * Terminate session
+ * Terminate session by sessionKey
  */
 export async function terminateSession(
-  sessionId: string,
+  sessionKey: string,
   reason: string = 'USER_LOGOUT',
   terminatedBy?: string
 ): Promise<boolean> {
   try {
     const session = await prisma.adminSession.findFirst({
       where: {
-        sessionKey: sessionId,
+        sessionKey: sessionKey,
         isActive: true,
       },
     });
 
     if (!session) {
+      console.warn(`⚠️ [SessionTracker] Session not found: ${sessionKey.substring(0, 8)}...`);
       return false;
     }
 
@@ -230,7 +231,43 @@ export async function terminateSession(
       },
     });
 
-    console.log(`✅ [SessionTracker] Terminated session ${sessionId.substring(0, 8)}... (${reason})`);
+    console.log(`✅ [SessionTracker] Terminated session ${sessionKey.substring(0, 8)}... (${reason})`);
+    return true;
+  } catch (error) {
+    console.error('❌ [SessionTracker] Termination error:', error);
+    return false;
+  }
+}
+
+/**
+ * Terminate session by database ID
+ */
+export async function terminateSessionById(
+  sessionId: string,
+  reason: string = 'USER_LOGOUT',
+  terminatedBy?: string
+): Promise<boolean> {
+  try {
+    const session = await prisma.adminSession.findUnique({
+      where: { id: sessionId },
+    });
+
+    if (!session || !session.isActive) {
+      console.warn(`⚠️ [SessionTracker] Session not found or inactive: ${sessionId}`);
+      return false;
+    }
+
+    await prisma.adminSession.update({
+      where: { id: sessionId },
+      data: {
+        isActive: false,
+        terminatedAt: new Date(),
+        terminationReason: reason,
+        terminatedBy,
+      },
+    });
+
+    console.log(`✅ [SessionTracker] Terminated session ${sessionId} (${reason})`);
     return true;
   } catch (error) {
     console.error('❌ [SessionTracker] Termination error:', error);
