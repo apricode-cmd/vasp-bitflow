@@ -83,6 +83,26 @@ export function PasswordTotpLogin({ email, onSuccess, onError }: PasswordTotpLog
         console.log('⏳ Waiting for session cookie to be set...');
         await new Promise(resolve => setTimeout(resolve, 1000));
         
+        // Create session record in database for tracking
+        try {
+          const trackingRes = await fetch('/api/admin/session/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId: crypto.randomUUID(), // Generate unique session ID
+              mfaMethod: 'TOTP',
+            }),
+          });
+
+          if (trackingRes.ok) {
+            console.log('✅ Session record created in database');
+          } else {
+            console.warn('⚠️ Failed to create session record (non-critical)');
+          }
+        } catch (error) {
+          console.warn('⚠️ Session tracking error (non-critical):', error);
+        }
+        
         // Hard redirect to force full page reload with new session
         console.log('🔄 Redirecting to /admin...');
         window.location.href = '/admin';
