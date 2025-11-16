@@ -84,7 +84,21 @@ export default function RegisterPage(): React.ReactElement {
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.country && !form.getValues('country')) {
+            // Set country
             form.setValue('country', data.country);
+            
+            // Auto-set phone country code
+            const currentPhone = form.getValues('phoneNumber');
+            if (!currentPhone || currentPhone.trim() === '') {
+              try {
+                const callingCode = getCountryCallingCode(data.country as CountryCode);
+                form.setValue('phoneNumber', `+${callingCode}`);
+                console.log('✅ Auto-filled phone code:', `+${callingCode}`);
+              } catch (error) {
+                console.warn('Could not get calling code for:', data.country);
+              }
+            }
+            
             if (data.detected) {
               console.log('✅ Auto-detected country:', data.country, data.city || '');
             } else {
@@ -98,6 +112,8 @@ export default function RegisterPage(): React.ReactElement {
         // Set default country as fallback
         if (!form.getValues('country')) {
           form.setValue('country', 'PL');
+          // Also set default phone code
+          form.setValue('phoneNumber', '+48');
         }
       }
     };
