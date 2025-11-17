@@ -21,6 +21,7 @@ export interface AdminSessionData {
   email: string;
   role: string;
   authMethod: 'PASSKEY' | 'SSO' | 'EMERGENCY';
+  sessionId?: string; // Unique session identifier for tracking
   iat: number;
   exp: number;
 }
@@ -30,8 +31,9 @@ export interface AdminSessionData {
  */
 export async function createAdminSession(
   adminId: string,
-  authMethod: 'PASSKEY' | 'SSO' | 'EMERGENCY'
-): Promise<{ success: boolean; error?: string }> {
+  authMethod: 'PASSKEY' | 'SSO' | 'EMERGENCY',
+  sessionId: string // ← NEW: Pass sessionId to embed in JWT
+): Promise<{ success: boolean; error?: string; token?: string }> {
   try {
     // Get admin data
     const admin = await prisma.admin.findUnique({
@@ -53,13 +55,14 @@ export async function createAdminSession(
       return { success: false, error: 'Admin account is not active' };
     }
 
-    // Create JWT
+    // Create JWT with sessionId
     const now = Math.floor(Date.now() / 1000);
     const token = await new SignJWT({
       adminId: admin.id,
       email: admin.email,
       role: admin.role,
       authMethod,
+      sessionId, // ← CRITICAL: Embed sessionId in JWT for tracking
     })
       .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
       .setIssuedAt(now)
@@ -82,9 +85,9 @@ export async function createAdminSession(
       data: { lastLogin: new Date() },
     });
 
-    console.log('✅ Admin session created for:', admin.email);
+    console.log('✅ Admin session created for:', admin.email, 'sessionId:', sessionId.substring(0, 8) + '...');
 
-    return { success: true };
+    return { success: true, token }; // Return token for sessionKey storage
   } catch (error) {
     console.error('❌ Failed to create admin session:', error);
     return { success: false, error: 'Failed to create session' };
@@ -111,6 +114,7 @@ export async function getAdminSessionData(): Promise<AdminSessionData | null> {
       email: payload.email as string,
       role: payload.role as string,
       authMethod: payload.authMethod as 'PASSKEY' | 'SSO' | 'EMERGENCY',
+      sessionId: payload.sessionId as string | undefined,
       iat: payload.iat as number,
       exp: payload.exp as number,
     };

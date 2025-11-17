@@ -27,30 +27,16 @@ export async function GET(request: NextRequest) {
     // Try Custom JWT (Passkey) first
     let adminId: string | null = null;
     let adminRole: string | null = null;
-    let currentSessionId: string | null = null; // Changed from sessionKey
+    let currentSessionId: string | null = null;
 
     const customSession = await getAdminSessionData();
     
     if (customSession) {
       adminId = customSession.adminId;
       adminRole = customSession.role;
-      // For custom JWT, we need to find session by JWT token
-      // The JWT token itself is stored as sessionKey
-      const cookieStore = request.cookies;
-      const jwtToken = cookieStore.get('admin-session')?.value;
-      
-      if (jwtToken) {
-        // Find session by sessionKey (JWT token)
-        const currentSession = await prisma.adminSession.findFirst({
-          where: {
-            sessionKey: jwtToken,
-            isActive: true,
-            adminId: customSession.adminId,
-          },
-          select: { sessionId: true },
-        });
-        currentSessionId = currentSession?.sessionId || null;
-      }
+      // For Passkey, sessionId is embedded in JWT payload
+      currentSessionId = customSession.sessionId || null;
+      console.log('🔐 [SessionsAPI] Passkey session - currentSessionId:', currentSessionId?.substring(0, 8) + '...');
     } else {
       // Try NextAuth (Password+TOTP)
       const nextAuthSession = await getAdminSession();
@@ -58,8 +44,9 @@ export async function GET(request: NextRequest) {
       if (nextAuthSession?.user?.id) {
         adminId = nextAuthSession.user.id;
         adminRole = nextAuthSession.user.role as string;
-        // For NextAuth, get sessionId from JWT payload
+        // For NextAuth, sessionId is in JWT payload
         currentSessionId = (nextAuthSession.user as any).sessionId || null;
+        console.log('🔐 [SessionsAPI] NextAuth session - currentSessionId:', currentSessionId?.substring(0, 8) + '...');
       }
     }
 
@@ -79,6 +66,7 @@ export async function GET(request: NextRequest) {
         isCurrent: s.sessionId === currentSessionId
       }));
       
+      console.log('✅ [SessionsAPI] Returning', allSessions.length, 'sessions (SUPER_ADMIN), current:', currentSessionId?.substring(0, 8) + '...');
       return NextResponse.json({ sessions: sessionsWithCurrent });
     }
 
@@ -91,6 +79,7 @@ export async function GET(request: NextRequest) {
       isCurrent: s.sessionId === currentSessionId
     }));
     
+    console.log('✅ [SessionsAPI] Returning', sessions.length, 'sessions, current:', currentSessionId?.substring(0, 8) + '...');
     return NextResponse.json({ sessions: sessionsWithCurrent });
   } catch (error) {
     console.error('❌ [SessionsAPI] GET error:', error);

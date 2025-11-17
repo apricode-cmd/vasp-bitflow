@@ -253,22 +253,54 @@ export function AdminProfileClient({
 
   // Terminate session
   const handleTerminateSession = async (sessionId: string, isCurrent: boolean) => {
+    console.log('🗑️ [UI] handleTerminateSession called:', { sessionId, isCurrent });
+    
     setTerminating(sessionId);
     try {
+      console.log('🌐 [UI] Sending DELETE request to:', `/api/admin/sessions/${sessionId}`);
+      
+      // Terminate session in database
       const response = await fetch(`/api/admin/sessions/${sessionId}`, {
         method: 'DELETE',
       });
 
-      if (!response.ok) throw new Error('Failed to terminate session');
+      console.log('📥 [UI] DELETE response:', { status: response.status, ok: response.ok });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ [UI] DELETE failed:', errorData);
+        throw new Error('Failed to terminate session');
+      }
+
+      const data = await response.json();
+      console.log('✅ [UI] DELETE successful:', data);
 
       toast.success('Session terminated successfully');
       
-      // If terminating current session, redirect to login
+      // If terminating current session, logout and redirect
       if (isCurrent) {
-        toast.info('Redirecting to login...');
+        toast.info('Logging out...');
+        
+        // Logout from appropriate auth system
+        // Try Passkey (Custom JWT) first
+        try {
+          await fetch('/api/admin/auth/logout', { method: 'POST' });
+        } catch (e) {
+          console.log('Not a Passkey session, trying NextAuth...');
+        }
+        
+        // Try NextAuth
+        try {
+          const { signOut } = await import('next-auth/react');
+          await signOut({ redirect: false });
+        } catch (e) {
+          console.log('Not a NextAuth session');
+        }
+        
+        // Force redirect
         setTimeout(() => {
           window.location.href = '/admin/auth/login';
-        }, 1000);
+        }, 500);
       } else {
         loadSessions();
       }

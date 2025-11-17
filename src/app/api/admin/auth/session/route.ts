@@ -88,8 +88,12 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Create session (JWT cookie)
-    const result = await createAdminSession(otat.admin.id, 'PASSKEY');
+    // 1. Generate sessionId ONCE
+    const sessionId = crypto.randomUUID();
+    console.log('🆔 Generated sessionId:', sessionId.substring(0, 8) + '...');
+
+    // 2. Create session (JWT cookie) with sessionId embedded
+    const result = await createAdminSession(otat.admin.id, 'PASSKEY', sessionId);
 
     if (!result.success) {
       console.error('❌ Failed to create session:', result.error);
@@ -99,9 +103,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('✅ Admin session created for:', otat.admin.email);
+    console.log('✅ Admin session JWT created for:', otat.admin.email);
 
-    // Create session record in database for tracking
+    // 3. Create session record in database with SAME sessionId + JWT token
     try {
       const ipAddress = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
       const userAgent = request.headers.get('user-agent') || 'unknown';
@@ -110,15 +114,16 @@ export async function POST(request: NextRequest) {
 
       await createSessionRecord({
         adminId: otat.admin.id,
-        sessionId: crypto.randomUUID(),
+        sessionId, // ← SAME sessionId as in JWT!
         ipAddress,
         userAgent,
         country,
         city,
         mfaMethod: 'PASSKEY',
+        jwtToken: result.token, // ← CRITICAL: Store JWT token in sessionKey!
       });
 
-      console.log('✅ Session record created in database');
+      console.log('✅ Session record created in database with sessionId:', sessionId.substring(0, 8) + '...');
     } catch (error) {
       console.error('⚠️ Failed to create session record (non-critical):', error);
       // Don't fail the login if session tracking fails

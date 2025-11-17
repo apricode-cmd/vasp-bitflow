@@ -23,6 +23,7 @@ interface CreateSessionParams {
   country?: string | null;
   city?: string | null;
   mfaMethod?: string | null;
+  jwtToken?: string | null; // For Passkey: JWT token to store in sessionKey
 }
 
 interface SessionValidationResult {
@@ -94,7 +95,7 @@ function detectOS(userAgent: string | null): string {
 export async function createSessionRecord(
   params: CreateSessionParams
 ): Promise<AdminSession> {
-  const { adminId, sessionId, ipAddress, userAgent, country, city, mfaMethod } = params;
+  const { adminId, sessionId, ipAddress, userAgent, country, city, mfaMethod, jwtToken } = params;
 
   // Get admin settings
   const settings = await getAdminSettings(adminId);
@@ -104,13 +105,17 @@ export async function createSessionRecord(
   const maxDurationMs = settings.maxSessionDuration * 60 * 60 * 1000;
   const expiresAt = new Date(now.getTime() + maxDurationMs);
 
+  // For Passkey: use JWT token as sessionKey
+  // For NextAuth: use sessionId as sessionKey (backwards compat)
+  const sessionKey = jwtToken || sessionId;
+
   // Create session record
   const session = await prisma.adminSession.create({
     data: {
       adminId,
       sessionId,
       sessionToken: sessionId.substring(0, 64), // Store prefix for lookup
-      sessionKey: sessionId,
+      sessionKey, // JWT token for Passkey, sessionId for NextAuth
       ipAddress,
       userAgent,
       deviceType: detectDeviceType(userAgent),
@@ -129,27 +134,30 @@ export async function createSessionRecord(
     },
   });
 
-  console.log(`✅ [SessionTracker] Created session ${sessionId.substring(0, 8)}... for admin ${adminId}`);
+  console.log(`✅ [SessionTracker] Created session ${sessionId.substring(0, 8)}... for admin ${adminId} (sessionKey: ${jwtToken ? 'JWT' : 'UUID'})`);
 
   return session;
 }
 
 /**
  * Validate session and update activity
+ * 
+ * @param sessionId - Unique session identifier (UUID)
  */
 export async function validateAndUpdateSession(
   sessionId: string
 ): Promise<SessionValidationResult> {
   try {
-    // Find active session
+    // Find active session by sessionId (not sessionKey!)
     const session = await prisma.adminSession.findFirst({
       where: {
-        sessionKey: sessionId,
+        sessionId: sessionId, // ← FIXED: Use sessionId, not sessionKey
         isActive: true,
       },
     });
 
     if (!session) {
+      console.warn(`⚠️ [SessionTracker] Session not found: ${sessionId.substring(0, 8)}...`);
       return { valid: false, reason: 'Session not found or inactive' };
     }
 
@@ -193,6 +201,7 @@ export async function validateAndUpdateSession(
       data: { lastActivity: now },
     });
 
+    console.log(`✅ [SessionTracker] Session ${sessionId.substring(0, 8)}... validated and updated`);
     return { valid: true, session };
   } catch (error) {
     console.error('❌ [SessionTracker] Validation error:', error);
@@ -240,25 +249,39 @@ export async function terminateSession(
 }
 
 /**
- * Terminate session by database ID
+ * Terminate session by database ID (record.id, not sessionId!)
  */
 export async function terminateSessionById(
-  sessionId: string,
+  recordId: string, // This is AdminSession.id (cuid), NOT sessionId (UUID)!
   reason: string = 'USER_LOGOUT',
   terminatedBy?: string
 ): Promise<boolean> {
   try {
+    console.log(`🔍 [SessionTracker] Looking for session with id (record ID): ${recordId}`);
+    
     const session = await prisma.adminSession.findUnique({
-      where: { id: sessionId },
+      where: { id: recordId },
     });
 
-    if (!session || !session.isActive) {
-      console.warn(`⚠️ [SessionTracker] Session not found or inactive: ${sessionId}`);
+    if (!session) {
+      console.error(`❌ [SessionTracker] Session record not found with id: ${recordId}`);
+      return false;
+    }
+
+    console.log(`🔍 [SessionTracker] Found session:`, {
+      id: session.id,
+      sessionId: session.sessionId.substring(0, 8) + '...',
+      isActive: session.isActive,
+      adminId: session.adminId
+    });
+
+    if (!session.isActive) {
+      console.warn(`⚠️ [SessionTracker] Session already inactive: ${recordId}`);
       return false;
     }
 
     await prisma.adminSession.update({
-      where: { id: sessionId },
+      where: { id: recordId },
       data: {
         isActive: false,
         terminatedAt: new Date(),
@@ -267,7 +290,7 @@ export async function terminateSessionById(
       },
     });
 
-    console.log(`✅ [SessionTracker] Terminated session ${sessionId} (${reason})`);
+    console.log(`✅ [SessionTracker] Terminated session record ${recordId} (sessionId: ${session.sessionId.substring(0, 8)}..., reason: ${reason})`);
     return true;
   } catch (error) {
     console.error('❌ [SessionTracker] Termination error:', error);

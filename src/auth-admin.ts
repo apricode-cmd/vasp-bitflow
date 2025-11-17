@@ -263,7 +263,14 @@ export const {
             data: { lastLogin: new Date() },
           });
 
-          // Create AdminSession record in database
+          // 1. Generate sessionId ONCE (will be used in jwt callback)
+          const sessionId = crypto.randomUUID();
+          console.log('🆔 [NextAuth] Generated sessionId:', sessionId.substring(0, 8) + '...');
+          
+          // 2. Store sessionId in user object for jwt callback
+          (user as any).sessionId = sessionId;
+
+          // 3. Create AdminSession record in database with SAME sessionId
           try {
             const headersList = await headers();
             const ipAddress = headersList.get('x-forwarded-for') || 
@@ -275,7 +282,7 @@ export const {
 
             await createSessionRecord({
               adminId: user.id,
-              sessionId: crypto.randomUUID(),
+              sessionId, // ← SAME sessionId that will be in JWT!
               ipAddress,
               userAgent,
               country,
@@ -283,9 +290,9 @@ export const {
               mfaMethod: account.provider === 'password-totp' ? 'TOTP' : null,
             });
 
-            console.log('✅ Session record created in database (NextAuth)');
+            console.log('✅ [NextAuth] Session record created in database with sessionId:', sessionId.substring(0, 8) + '...');
           } catch (error) {
-            console.error('⚠️ Failed to create session record (non-critical):', error);
+            console.error('⚠️ [NextAuth] Failed to create session record (non-critical):', error);
           }
 
           return true;
@@ -302,8 +309,10 @@ export const {
         token.id = user.id;
         token.role = user.role;
         token.authMethod = user.authMethod || account?.provider || 'PASSWORD';
-        // Generate unique session ID for tracking
-        token.sessionId = token.sessionId || crypto.randomUUID();
+        // Use sessionId from signIn callback (generated ONCE)
+        token.sessionId = (user as any).sessionId || token.sessionId;
+        
+        console.log('🔐 [NextAuth] JWT callback - sessionId:', (token.sessionId as string)?.substring(0, 8) + '...');
       }
       return token;
     },
