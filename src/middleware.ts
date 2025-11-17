@@ -150,6 +150,7 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/api/geo/detect') ||  // Geo detection (public for registration)
     path.startsWith('/api/v1/') ||  // Public API v1 (uses API keys)
     path.startsWith('/api/kyc/webhook') ||  // Webhook from KYCAID
+    path.startsWith('/sumsub/v1/notification') ||  // Webhook from SumSub (official path)
     path.startsWith('/api/kyc/verify/') ||  // White-label verification links
     path.startsWith('/kyc/verify/') ||  // White-label verification pages
     path.startsWith('/legal/')
