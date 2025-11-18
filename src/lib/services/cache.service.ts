@@ -3,89 +3,39 @@
  * 
  * Provides caching functionality for exchange rates, admin stats, and other data.
  * Supports both local Redis (development) and Upstash Redis (production).
- * 
- * Note: Redis client is lazily initialized to prevent connection attempts during build time.
  */
 
 import Redis from 'ioredis';
 
-// Redis client instance (lazily initialized)
-let redisClient: Redis | null = null;
+// Initialize Redis client
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+  retryStrategy: (times) => {
+    const delay = Math.min(times * 50, 2000);
+    return delay;
+  },
+  reconnectOnError: (err) => {
+    const targetError = 'READONLY';
+    if (err.message.includes(targetError)) {
+      // Reconnect on READONLY errors
+      return true;
+    }
+    return false;
+  },
+  maxRetriesPerRequest: 3,
+});
 
-/**
- * Get or create Redis client instance
- * Lazy initialization prevents connection attempts during Next.js build
- */
-function getRedisClient(): Redis | null {
-  // Skip Redis during build time (static generation)
-  if (process.env.NEXT_PHASE === 'phase-production-build' || 
-      process.env.NEXT_PHASE === 'phase-export') {
-    console.log('⏭️  [Redis] Skipping connection during build time');
-    return null;
-  }
+// Handle connection events
+redis.on('connect', () => {
+  console.log('📦 [Redis] Connected successfully');
+});
 
-  // Return existing client if already initialized
-  if (redisClient) {
-    return redisClient;
-  }
+redis.on('error', (error) => {
+  console.error('❌ [Redis] Connection error:', error.message);
+});
 
-  // Check if Redis URL is configured
-  const redisUrl = process.env.REDIS_URL;
-  if (!redisUrl) {
-    console.warn('⚠️  [Redis] REDIS_URL not configured, caching disabled');
-    return null;
-  }
-
-  try {
-    // Initialize Redis client
-    redisClient = new Redis(redisUrl, {
-      retryStrategy: (times) => {
-        const delay = Math.min(times * 50, 2000);
-        return delay;
-      },
-      reconnectOnError: (err) => {
-        const targetError = 'READONLY';
-        if (err.message.includes(targetError)) {
-          // Reconnect on READONLY errors
-          return true;
-        }
-        return false;
-      },
-      maxRetriesPerRequest: 3,
-      lazyConnect: true, // Don't connect immediately
-    });
-
-    // Handle connection events
-    redisClient.on('connect', () => {
-      console.log('📦 [Redis] Connected successfully');
-    });
-
-    redisClient.on('error', (error) => {
-      console.error('❌ [Redis] Connection error:', error.message);
-    });
-
-    redisClient.on('close', () => {
-      console.log('🔒 [Redis] Connection closed');
-    });
-
-    // Connect asynchronously
-    redisClient.connect().catch((err) => {
-      console.error('❌ [Redis] Failed to connect:', err.message);
-    });
-
-    return redisClient;
-  } catch (error) {
-    console.error('❌ [Redis] Initialization error:', error);
-    return null;
-  }
-}
-
-// Export getter function instead of direct client
-const redis = {
-  get client() {
-    return getRedisClient();
-  }
-};
+redis.on('close', () => {
+  console.log('🔒 [Redis] Connection closed');
+});
 
 /**
  * Cache Service
@@ -109,21 +59,12 @@ export class CacheService {
   };
 
   /**
-   * Check if Redis is available
-   */
-  private static isAvailable(): boolean {
-    return redis.client !== null;
-  }
-
-  /**
    * Get exchange rate from cache
    */
   static async getRate(cryptoCode: string, fiatCode: string): Promise<number | null> {
-    if (!this.isAvailable()) return null;
-    
     try {
       const key = `${this.PREFIX.RATES}${cryptoCode}-${fiatCode}`;
-      const cached = await redis.client!.get(key);
+      const cached = await redis.get(key);
       
       if (cached !== null) {
         const rate = parseFloat(cached);
@@ -149,11 +90,9 @@ export class CacheService {
     rate: number,
     ttl: number = 30
   ): Promise<void> {
-    if (!this.isAvailable()) return;
-    
     try {
       const key = `${this.PREFIX.RATES}${cryptoCode}-${fiatCode}`;
-      await redis.client!.setex(key, ttl, rate.toString());
+      await redis.setex(key, ttl, rate.toString());
       console.log(`✅ [Redis] Cached: ${key} = ${rate} (TTL: ${ttl}s)`);
     } catch (error) {
       console.error('❌ [Redis] Set rate error:', error);
@@ -168,10 +107,8 @@ export class CacheService {
     rates: Record<string, Record<string, number>>,
     ttl: number = 30
   ): Promise<void> {
-    if (!this.isAvailable()) return;
-    
     try {
-      const pipeline = redis.client!.pipeline();
+      const pipeline = redis.pipeline();
       let count = 0;
       
       for (const [crypto, fiatRates] of Object.entries(rates)) {
@@ -193,18 +130,16 @@ export class CacheService {
    * Clear all rate caches (for manual refresh)
    */
   static async clearRatesCache(): Promise<number> {
-    if (!this.isAvailable()) return 0;
-    
     try {
       const pattern = `${this.PREFIX.RATES}*`;
-      const keys = await redis.client!.keys(pattern);
+      const keys = await redis.keys(pattern);
       
       if (keys.length === 0) {
         console.log('ℹ️  [Redis] No rate keys to clear');
         return 0;
       }
       
-      await redis.client!.del(...keys);
+      await redis.del(...keys);
       console.log(`🗑️  [Redis] Cleared ${keys.length} rate keys`);
       return keys.length;
     } catch (error) {
@@ -217,11 +152,9 @@ export class CacheService {
    * Cache admin dashboard stats
    */
   static async getAdminStats(timeRange: string = 'week'): Promise<any | null> {
-    if (!this.isAvailable()) return null;
-    
     try {
       const cacheKey = `${this.PREFIX.STATS}:${timeRange}`;
-      const cached = await redis.client!.get(cacheKey);
+      const cached = await redis.get(cacheKey);
       if (cached) {
         console.log(`📦 [Redis] Cache HIT: admin stats (${timeRange})`);
         return JSON.parse(cached);
@@ -236,11 +169,9 @@ export class CacheService {
   }
 
   static async setAdminStats(timeRange: string, stats: any, ttl: number = 120): Promise<void> {
-    if (!this.isAvailable()) return;
-    
     try {
       const cacheKey = `${this.PREFIX.STATS}:${timeRange}`;
-      await redis.client!.setex(cacheKey, ttl, JSON.stringify(stats));
+      await redis.setex(cacheKey, ttl, JSON.stringify(stats));
       console.log(`✅ [Redis] Cached admin stats (${timeRange}, TTL: ${ttl}s)`);
     } catch (error) {
       console.error('❌ [Redis] Set stats error:', error);
@@ -251,18 +182,16 @@ export class CacheService {
    * Clear admin stats cache
    */
   static async clearAdminStats(): Promise<number> {
-    if (!this.isAvailable()) return 0;
-    
     try {
       const pattern = `${this.PREFIX.STATS}:*`;
-      const keys = await redis.client!.keys(pattern);
+      const keys = await redis.keys(pattern);
       
       if (keys.length === 0) {
         console.log('ℹ️  [Redis] No admin stats keys to clear');
         return 0;
       }
       
-      await redis.client!.del(...keys);
+      await redis.del(...keys);
       console.log(`🗑️  [Redis] Cleared ${keys.length} admin stats keys`);
       return keys.length;
     } catch (error) {
@@ -280,7 +209,7 @@ export class CacheService {
    */
   static async get<T>(key: string): Promise<T | null> {
     try {
-      const cached = await redis.client!.get(key);
+      const cached = await redis.get(key);
       if (cached) {
         return JSON.parse(cached) as T;
       }
@@ -296,7 +225,7 @@ export class CacheService {
    */
   static async set<T>(key: string, value: T, ttl: number = 300): Promise<void> {
     try {
-      await redis.client!.setex(key, ttl, JSON.stringify(value));
+      await redis.setex(key, ttl, JSON.stringify(value));
       console.log(`✅ [Redis] Cached ${key} (TTL: ${ttl}s)`);
     } catch (error) {
       console.error(`❌ [Redis] Set ${key} error:`, error);
@@ -308,7 +237,7 @@ export class CacheService {
    */
   static async delete(key: string): Promise<void> {
     try {
-      await redis.client!.del(key);
+      await redis.del(key);
       console.log(`🗑️  [Redis] Deleted ${key}`);
     } catch (error) {
       console.error(`❌ [Redis] Delete ${key} error:`, error);
@@ -322,14 +251,14 @@ export class CacheService {
    */
   static async deletePattern(pattern: string): Promise<number> {
     try {
-      const keys = await redis.client!.keys(pattern);
+      const keys = await redis.keys(pattern);
       
       if (keys.length === 0) {
         console.log(`ℹ️  [Redis] No keys to clear for pattern: ${pattern}`);
         return 0;
       }
       
-      await redis.client!.del(...keys);
+      await redis.del(...keys);
       console.log(`🗑️  [Redis] Cleared ${keys.length} keys matching: ${pattern}`);
       return keys.length;
     } catch (error) {
@@ -348,9 +277,9 @@ export class CacheService {
     connected: boolean;
   }> {
     try {
-      const allKeys = await redis.client!.keys('*');
-      const rateKeys = await redis.client!.keys(`${this.PREFIX.RATES}*`);
-      const info = await redis.client!.info('memory');
+      const allKeys = await redis.keys('*');
+      const rateKeys = await redis.keys(`${this.PREFIX.RATES}*`);
+      const info = await redis.info('memory');
       
       // Parse memory usage from INFO command
       const memoryMatch = info.match(/used_memory_human:([^\r\n]+)/);
@@ -360,7 +289,7 @@ export class CacheService {
         totalKeys: allKeys.length,
         rateKeys: rateKeys.length,
         memoryUsed,
-        connected: redis.client!.status === 'ready',
+        connected: redis.status === 'ready',
       };
     } catch (error) {
       console.error('❌ [Redis] Get stats error:', error);
@@ -378,7 +307,7 @@ export class CacheService {
    */
   static async ping(): Promise<boolean> {
     try {
-      const pong = await redis.client!.ping();
+      const pong = await redis.ping();
       return pong === 'PONG';
     } catch (error) {
       console.error('❌ [Redis] Ping error:', error);
@@ -394,7 +323,7 @@ export class CacheService {
       throw new Error('flushAll is not allowed in production');
     }
     try {
-      await redis.client!.flushall();
+      await redis.flushall();
       console.log('🗑️  [Redis] All cache cleared');
     } catch (error) {
       console.error('❌ [Redis] Flush all error:', error);
@@ -406,7 +335,7 @@ export class CacheService {
    */
   static async disconnect(): Promise<void> {
     try {
-      await redis.client!.quit();
+      await redis.quit();
       console.log('👋 [Redis] Disconnected');
     } catch (error) {
       console.error('❌ [Redis] Disconnect error:', error);
@@ -423,7 +352,7 @@ export class CacheService {
   static async getSetting(key: string): Promise<string | null> {
     try {
       const cacheKey = `${this.PREFIX.SETTINGS}${key}`;
-      const cached = await redis.client!.get(cacheKey);
+      const cached = await redis.get(cacheKey);
       
       if (cached !== null) {
         console.log(`📦 [Redis] Cache HIT: ${cacheKey}`);
@@ -445,7 +374,7 @@ export class CacheService {
   static async setSetting(key: string, value: string, ttl: number = 300): Promise<void> {
     try {
       const cacheKey = `${this.PREFIX.SETTINGS}${key}`;
-      await redis.client!.setex(cacheKey, ttl, value);
+      await redis.setex(cacheKey, ttl, value);
       console.log(`✅ [Redis] Cached setting: ${cacheKey} (TTL: ${ttl}s)`);
     } catch (error) {
       console.error('❌ [Redis] Set setting error:', error);
@@ -458,7 +387,7 @@ export class CacheService {
   static async clearSetting(key: string): Promise<void> {
     try {
       const cacheKey = `${this.PREFIX.SETTINGS}${key}`;
-      await redis.client!.del(cacheKey);
+      await redis.del(cacheKey);
       console.log(`🗑️  [Redis] Cleared setting: ${cacheKey}`);
     } catch (error) {
       console.error('❌ [Redis] Clear setting error:', error);
@@ -471,14 +400,14 @@ export class CacheService {
   static async clearAllSettings(): Promise<number> {
     try {
       const pattern = `${this.PREFIX.SETTINGS}*`;
-      const keys = await redis.client!.keys(pattern);
+      const keys = await redis.keys(pattern);
       
       if (keys.length === 0) {
         console.log('ℹ️  [Redis] No setting keys to clear');
         return 0;
       }
       
-      await redis.client!.del(...keys);
+      await redis.del(...keys);
       console.log(`🗑️  [Redis] Cleared ${keys.length} setting keys`);
       return keys.length;
     } catch (error) {
@@ -497,7 +426,7 @@ export class CacheService {
   static async getActiveIntegration(category: string): Promise<any | null> {
     try {
       const cacheKey = `${this.PREFIX.INTEGRATION}active:${category}`;
-      const cached = await redis.client!.get(cacheKey);
+      const cached = await redis.get(cacheKey);
       
       if (cached !== null) {
         console.log(`📦 [Redis] Cache HIT: ${cacheKey}`);
@@ -523,7 +452,7 @@ export class CacheService {
   ): Promise<void> {
     try {
       const cacheKey = `${this.PREFIX.INTEGRATION}active:${category}`;
-      await redis.client!.setex(cacheKey, ttl, JSON.stringify(integration));
+      await redis.setex(cacheKey, ttl, JSON.stringify(integration));
       console.log(`✅ [Redis] Cached active integration: ${category} (TTL: ${ttl}s)`);
     } catch (error) {
       console.error('❌ [Redis] Set active integration error:', error);
@@ -536,7 +465,7 @@ export class CacheService {
   static async clearActiveIntegration(category: string): Promise<void> {
     try {
       const cacheKey = `${this.PREFIX.INTEGRATION}active:${category}`;
-      await redis.client!.del(cacheKey);
+      await redis.del(cacheKey);
       console.log(`🗑️  [Redis] Cleared active integration: ${category}`);
     } catch (error) {
       console.error('❌ [Redis] Clear active integration error:', error);
@@ -549,14 +478,14 @@ export class CacheService {
   static async clearAllIntegrations(): Promise<number> {
     try {
       const pattern = `${this.PREFIX.INTEGRATION}*`;
-      const keys = await redis.client!.keys(pattern);
+      const keys = await redis.keys(pattern);
       
       if (keys.length === 0) {
         console.log('ℹ️  [Redis] No integration keys to clear');
         return 0;
       }
       
-      await redis.client!.del(...keys);
+      await redis.del(...keys);
       console.log(`🗑️  [Redis] Cleared ${keys.length} integration keys`);
       return keys.length;
     } catch (error) {
@@ -589,7 +518,7 @@ export class CacheService {
         cacheKey += 'all';
       }
       
-      const cached = await redis.client!.get(cacheKey);
+      const cached = await redis.get(cacheKey);
       
       if (cached !== null) {
         console.log(`📦 [Redis] Cache HIT: ${cacheKey}`);
@@ -629,7 +558,7 @@ export class CacheService {
         cacheKey += 'all';
       }
       
-      await redis.client!.setex(cacheKey, ttl, JSON.stringify(pairs));
+      await redis.setex(cacheKey, ttl, JSON.stringify(pairs));
       console.log(`✅ [Redis] Cached trading pairs: ${cacheKey} (TTL: ${ttl}s)`);
     } catch (error) {
       console.error('❌ [Redis] Set trading pairs error:', error);
@@ -642,14 +571,14 @@ export class CacheService {
   static async clearTradingPairs(): Promise<number> {
     try {
       const pattern = `${this.PREFIX.TRADING_PAIRS}*`;
-      const keys = await redis.client!.keys(pattern);
+      const keys = await redis.keys(pattern);
       
       if (keys.length === 0) {
         console.log('ℹ️  [Redis] No trading pair keys to clear');
         return 0;
       }
       
-      await redis.client!.del(...keys);
+      await redis.del(...keys);
       console.log(`🗑️  [Redis] Cleared ${keys.length} trading pair keys`);
       return keys.length;
     } catch (error) {
@@ -668,7 +597,7 @@ export class CacheService {
   static async getUserKycStatus(userId: string): Promise<string | null> {
     try {
       const cacheKey = `${this.PREFIX.USER}${userId}:kyc-status`;
-      const cached = await redis.client!.get(cacheKey);
+      const cached = await redis.get(cacheKey);
       
       if (cached !== null) {
         console.log(`📦 [Redis] Cache HIT: user KYC status (${userId})`);
@@ -694,7 +623,7 @@ export class CacheService {
   ): Promise<void> {
     try {
       const cacheKey = `${this.PREFIX.USER}${userId}:kyc-status`;
-      await redis.client!.setex(cacheKey, ttl, kycStatus);
+      await redis.setex(cacheKey, ttl, kycStatus);
       console.log(`✅ [Redis] Cached user KYC status: ${userId} (TTL: ${ttl}s)`);
     } catch (error) {
       console.error('❌ [Redis] Set user KYC status error:', error);
@@ -707,7 +636,7 @@ export class CacheService {
   static async clearUserKycStatus(userId: string): Promise<void> {
     try {
       const cacheKey = `${this.PREFIX.USER}${userId}:kyc-status`;
-      await redis.client!.del(cacheKey);
+      await redis.del(cacheKey);
       console.log(`🗑️  [Redis] Cleared user KYC status: ${userId}`);
     } catch (error) {
       console.error('❌ [Redis] Clear user KYC status error:', error);
@@ -720,7 +649,7 @@ export class CacheService {
   static async getUserWallets(userId: string): Promise<any[] | null> {
     try {
       const cacheKey = `${this.PREFIX.USER}${userId}:wallets`;
-      const cached = await redis.client!.get(cacheKey);
+      const cached = await redis.get(cacheKey);
       
       if (cached !== null) {
         console.log(`📦 [Redis] Cache HIT: user wallets (${userId})`);
@@ -746,7 +675,7 @@ export class CacheService {
   ): Promise<void> {
     try {
       const cacheKey = `${this.PREFIX.USER}${userId}:wallets`;
-      await redis.client!.setex(cacheKey, ttl, JSON.stringify(wallets));
+      await redis.setex(cacheKey, ttl, JSON.stringify(wallets));
       console.log(`✅ [Redis] Cached user wallets: ${userId} (TTL: ${ttl}s)`);
     } catch (error) {
       console.error('❌ [Redis] Set user wallets error:', error);
@@ -759,7 +688,7 @@ export class CacheService {
   static async clearUserWallets(userId: string): Promise<void> {
     try {
       const cacheKey = `${this.PREFIX.USER}${userId}:wallets`;
-      await redis.client!.del(cacheKey);
+      await redis.del(cacheKey);
       console.log(`🗑️  [Redis] Cleared user wallets: ${userId}`);
     } catch (error) {
       console.error('❌ [Redis] Clear user wallets error:', error);
@@ -772,14 +701,14 @@ export class CacheService {
   static async clearUserCache(userId: string): Promise<number> {
     try {
       const pattern = `${this.PREFIX.USER}${userId}:*`;
-      const keys = await redis.client!.keys(pattern);
+      const keys = await redis.keys(pattern);
       
       if (keys.length === 0) {
         console.log(`ℹ️  [Redis] No user cache keys to clear for ${userId}`);
         return 0;
       }
       
-      await redis.client!.del(...keys);
+      await redis.del(...keys);
       console.log(`🗑️  [Redis] Cleared ${keys.length} user cache keys for ${userId}`);
       return keys.length;
     } catch (error) {
@@ -798,7 +727,7 @@ export class CacheService {
   static async getCurrencies(): Promise<any[] | null> {
     try {
       const cacheKey = `${this.PREFIX.CURRENCIES}all`;
-      const cached = await redis.client!.get(cacheKey);
+      const cached = await redis.get(cacheKey);
       
       if (cached !== null) {
         console.log(`📦 [Redis] Cache HIT: currencies`);
@@ -820,7 +749,7 @@ export class CacheService {
   static async setCurrencies(currencies: any[], ttl: number = 3600): Promise<void> {
     try {
       const cacheKey = `${this.PREFIX.CURRENCIES}all`;
-      await redis.client!.setex(cacheKey, ttl, JSON.stringify(currencies));
+      await redis.setex(cacheKey, ttl, JSON.stringify(currencies));
       console.log(`✅ [Redis] Cached currencies (TTL: ${ttl}s)`);
     } catch (error) {
       console.error('❌ [Redis] Set currencies error:', error);
@@ -833,7 +762,7 @@ export class CacheService {
   static async getFiatCurrencies(): Promise<any[] | null> {
     try {
       const cacheKey = `${this.PREFIX.CURRENCIES}fiat`;
-      const cached = await redis.client!.get(cacheKey);
+      const cached = await redis.get(cacheKey);
       
       if (cached !== null) {
         console.log(`📦 [Redis] Cache HIT: fiat currencies`);
@@ -855,7 +784,7 @@ export class CacheService {
   static async setFiatCurrencies(fiatCurrencies: any[], ttl: number = 3600): Promise<void> {
     try {
       const cacheKey = `${this.PREFIX.CURRENCIES}fiat`;
-      await redis.client!.setex(cacheKey, ttl, JSON.stringify(fiatCurrencies));
+      await redis.setex(cacheKey, ttl, JSON.stringify(fiatCurrencies));
       console.log(`✅ [Redis] Cached fiat currencies (TTL: ${ttl}s)`);
     } catch (error) {
       console.error('❌ [Redis] Set fiat currencies error:', error);
@@ -868,14 +797,14 @@ export class CacheService {
   static async clearCurrencies(): Promise<number> {
     try {
       const pattern = `${this.PREFIX.CURRENCIES}*`;
-      const keys = await redis.client!.keys(pattern);
+      const keys = await redis.keys(pattern);
       
       if (keys.length === 0) {
         console.log('ℹ️  [Redis] No currency keys to clear');
         return 0;
       }
       
-      await redis.client!.del(...keys);
+      await redis.del(...keys);
       console.log(`🗑️  [Redis] Cleared ${keys.length} currency keys`);
       return keys.length;
     } catch (error) {
