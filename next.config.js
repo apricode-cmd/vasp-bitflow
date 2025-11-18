@@ -114,6 +114,16 @@ const nextConfig = {
     ];
   },
   images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**.public.blob.vercel-storage.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'public.blob.vercel-storage.com',
+      },
+    ],
     domains: ['localhost'],
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 60,
