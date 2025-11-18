@@ -894,13 +894,9 @@ export class SumsubAdapter implements IKycProvider {
         if (reviewAnswer === 'GREEN') {
           status = 'approved';
         } else if (reviewAnswer === 'RED') {
-          // Check if it's final rejection or retry allowed
-          if (reviewRejectType === 'FINAL') {
-            status = 'rejected';
-          } else {
-            // RETRY allowed - treat as pending for resubmission
-            status = 'pending';
-          }
+          // Always rejected for RED (regardless of FINAL/RETRY)
+          // Resubmission eligibility is determined by attempts count in UI/API
+          status = 'rejected';
         } else if (reviewAnswer === 'YELLOW') {
           // Requires attention but not final rejection
           status = 'pending';
