@@ -470,24 +470,187 @@ export function KycStatusCard({ kycSession, onRefresh, userId, onStartResubmissi
 
                 {/* CTA: Resubmit or Contact Support */}
                 {canResubmit ? (
-                  <div className="space-y-3">
-                    <Button 
-                      className="w-full"
-                      size="lg"
-                      onClick={() => {
-                        if (onStartResubmission) {
-                          onStartResubmission();
-                        } else {
-                          toast.info('Resubmission feature not available yet');
-                        }
-                      }}
-                    >
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Fix and Resubmit Documents
-                    </Button>
-                    <p className="text-xs text-center text-muted-foreground">
-                      You can correct the problematic information and resubmit for review ({MAX_ATTEMPTS - currentAttempt} attempts remaining)
-                    </p>
+                  <div className="space-y-4">
+                    {/* Resubmit form button */}
+                    <div>
+                      <Button 
+                        variant="outline"
+                        className="w-full"
+                        size="lg"
+                        onClick={() => {
+                          if (onStartResubmission) {
+                            onStartResubmission();
+                          } else {
+                            toast.info('Resubmission feature not available yet');
+                          }
+                        }}
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Edit Form Data
+                      </Button>
+                      <p className="text-xs text-center text-muted-foreground mt-2">
+                        Update your information if needed ({MAX_ATTEMPTS - currentAttempt} attempts remaining)
+                      </p>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-border"></div>
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background px-2 text-muted-foreground">Or retry verification</span>
+                      </div>
+                    </div>
+
+                    {/* Start verification button (same as PENDING) */}
+                    {kycSession.kycProviderId === 'sumsub' && session?.user?.id ? (
+                      <>
+                        <div className="grid md:grid-cols-[2fr,1fr] gap-8 items-center">
+                          {/* Left: Desktop WebSDK option */}
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                              <ExternalLink className="h-4 w-4" />
+                              Continue on this device
+                            </div>
+                            <Button 
+                              className="w-full"
+                              size="lg"
+                              onClick={async () => {
+                                try {
+                                  toast.info('Loading verification interface...');
+                                  
+                                  const response = await fetch('/api/kyc/sdk-token');
+                                  if (!response.ok) throw new Error('Failed to get SDK token');
+                                  const { token } = await response.json();
+                                  
+                                  const modal = document.createElement('div');
+                                  modal.id = 'sumsub-modal';
+                                  modal.className = 'fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4';
+                                  modal.innerHTML = `
+                                    <div class="bg-white dark:bg-gray-900 rounded-lg w-full max-w-4xl max-h-[90vh] overflow-auto relative">
+                                      <button id="close-modal" class="absolute top-4 right-4 z-10 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                        </svg>
+                                      </button>
+                                      <div id="sumsub-websdk-container" class="p-6 min-h-[600px]"></div>
+                                    </div>
+                                  `;
+                                  document.body.appendChild(modal);
+                                  
+                                  document.getElementById('close-modal')?.addEventListener('click', () => modal.remove());
+                                  
+                                  const loadScript = () => {
+                                    return new Promise((resolve, reject) => {
+                                      if (document.getElementById('sumsub-websdk-script')) { resolve(true); return; }
+                                      const script = document.createElement('script');
+                                      script.id = 'sumsub-websdk-script';
+                                      script.src = 'https://static.sumsub.com/idensic/static/sns-websdk-builder.js';
+                                      script.async = true;
+                                      script.onload = () => resolve(true);
+                                      script.onerror = () => reject(new Error('Failed to load SDK'));
+                                      document.body.appendChild(script);
+                                    });
+                                  };
+                                  
+                                  await loadScript();
+                                  
+                                  const snsWebSdk = (window as any).snsWebSdk;
+                                  if (!snsWebSdk) throw new Error('Sumsub SDK not loaded');
+                                  
+                                  const instance = snsWebSdk
+                                    .init(token, async () => {
+                                      const refreshResponse = await fetch('/api/kyc/sdk-token');
+                                      const refreshData = await refreshResponse.json();
+                                      return refreshData.token;
+                                    })
+                                    .withConf({ lang: 'en', theme: 'light' })
+                                    .on('idCheck.onApplicantSubmitted', () => {
+                                      toast.success('Verification submitted! Please wait for review.');
+                                      modal.remove();
+                                      onRefresh();
+                                    })
+                                    .on('idCheck.onError', (error: any) => {
+                                      toast.error('Verification error: ' + (error.message || 'Unknown error'));
+                                    })
+                                    .build();
+                                  
+                                  instance.launch('#sumsub-websdk-container');
+                                  
+                                } catch (error: any) {
+                                  toast.error('Failed to load verification: ' + error.message);
+                                  console.error('Sumsub modal error:', error);
+                                }
+                              }}
+                            >
+                              <Camera className="h-5 w-5 mr-2" />
+                              Retry Verification
+                            </Button>
+                            <p className="text-xs text-muted-foreground">
+                              Opens verification interface in a modal window
+                            </p>
+                          </div>
+
+                          {/* Right: Mobile QR */}
+                          <div className="flex flex-col items-center justify-center gap-3 md:border-l md:pl-8 py-2">
+                            <div className="text-xs font-medium text-muted-foreground text-center">
+                              Or scan with phone
+                            </div>
+                            {sumsubMobileUrl ? (
+                              <>
+                                <QRCode
+                                  className="size-32 rounded-lg border bg-background p-2.5 shadow-sm hover:shadow-md transition-all"
+                                  data={sumsubMobileUrl}
+                                />
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => copyLink(sumsubMobileUrl)}
+                                  className="w-full max-w-[200px]"
+                                >
+                                  <Copy className="h-3 w-3 mr-2" />
+                                  Copy Link
+                                </Button>
+                              </>
+                            ) : (
+                              <div className="size-32 rounded-lg border bg-muted flex items-center justify-center">
+                                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                              </div>
+                            )}
+                            <p className="text-xs text-muted-foreground text-center">
+                              Complete on mobile
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* What to prepare - compact */}
+                        <div className="rounded-lg border bg-muted/30 p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="rounded-md bg-background p-2 mt-0.5">
+                              <Info className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                            <div className="flex-1 space-y-1.5">
+                              <p className="text-sm font-medium">What you'll need</p>
+                              <ul className="text-sm text-muted-foreground space-y-1">
+                                <li className="flex items-start gap-2">
+                                  <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 mt-1.5 shrink-0" />
+                                  <span>Government-issued ID (passport or ID card)</span>
+                                </li>
+                                <li className="flex items-start gap-2">
+                                  <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 mt-1.5 shrink-0" />
+                                  <span>Good lighting for selfie and document photos</span>
+                                </li>
+                                <li className="flex items-start gap-2">
+                                  <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 mt-1.5 shrink-0" />
+                                  <span>5-7 minutes of your time</span>
+                                </li>
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    ) : null}
                   </div>
                 ) : (
                   <div className="space-y-3">
