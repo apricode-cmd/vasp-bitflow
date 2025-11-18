@@ -69,12 +69,12 @@ model Profile {
 }
 
 model KycSession {
-  id                   String        @id @default(cuid())
-  userId               String        @unique
-  kycaidVerificationId String?       @unique
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  kycaidVerificationId String?   @unique
   kycaidApplicantId    String?
   kycaidFormId         String?
-  status               KycStatus     @default(PENDING)
+  status               KycStatus @default(PENDING)
   submittedAt          DateTime?
   reviewedAt           DateTime?
   reviewedBy           String?
@@ -84,23 +84,35 @@ model KycSession {
   rejectionReason      String?
   webhookData          Json?
   metadata             Json?
-  attempts             Int           @default(0)
+  attempts             Int       @default(0)
   lastAttemptAt        DateTime?
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
   kycProviderId        String?
   applicantId          String?
-  verificationId       String?       @unique
-  documents            KycDocument[]
-  formData             KycFormData[]
-  profile              KycProfile?
-  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verificationId       String?   @unique
+
+  // Resubmission fields (SumSub)
+  reviewRejectType  String? // "RETRY" or "FINAL"
+  moderationComment String? // Moderator's comment explaining rejection
+  clientComment     String? // Client-facing rejection message
+  rejectLabels      String[] // Array of rejection labels (e.g. ["UNSATISFACTORY_PHOTOS"])
+  buttonIds         String[] // UI button IDs from SumSub
+  problematicSteps  Json? // Details of problematic verification steps
+  canResubmit       Boolean  @default(false) // Quick flag for resubmission eligibility
+
+  documents KycDocument[]
+  formData  KycFormData[]
+  profile   KycProfile?
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([kycaidVerificationId])
   @@index([kycProviderId])
   @@index([applicantId])
   @@index([verificationId])
+  @@index([canResubmit])
+  @@index([reviewRejectType])
 }
 
 model Currency {
@@ -771,23 +783,23 @@ model OrderStatusHistory {
 }
 
 model KycFormField {
-  id          String   @id @default(cuid())
-  fieldName   String   @unique
-  label       String
-  fieldType   String
-  isRequired  Boolean  @default(true)
-  isEnabled   Boolean  @default(true)
-  category    String
-  validation  Json?
-  options     Json?
-  priority    Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  id         String   @id @default(cuid())
+  fieldName  String   @unique
+  label      String
+  fieldType  String
+  isRequired Boolean  @default(true)
+  isEnabled  Boolean  @default(true)
+  category   String
+  validation Json?
+  options    Json?
+  priority   Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
   // Conditional Logic
-  dependsOn   String?
-  showWhen    Json?
-  
+  dependsOn String?
+  showWhen  Json?
+
   // UX Enhancements
   helpText    String?
   placeholder String?
@@ -799,23 +811,31 @@ model KycFormField {
 }
 
 model KycDocument {
-  id               String      @id @default(cuid())
+  id               String   @id @default(cuid())
   kycSessionId     String?
   documentType     String
   fileUrl          String
   fileName         String
   fileSize         Int
   mimeType         String
-  verifiedByAI     Boolean     @default(false)
+  verifiedByAI     Boolean  @default(false)
   verificationData Json?
-  uploadedAt       DateTime    @default(now())
+  uploadedAt       DateTime @default(now())
   userId           String
-  kycSession       KycSession? @relation(fields: [kycSessionId], references: [id], onDelete: Cascade)
-  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Resubmission tracking
+  documentStatus String? @default("PENDING") // PENDING, APPROVED, REJECTED
+  reviewComment  String? // Comment about this specific document
+  resubmittedFor String? // ID of document this replaces
+  attempt        Int     @default(1) // Attempt number (1st, 2nd, 3rd try)
+
+  kycSession KycSession? @relation(fields: [kycSessionId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([kycSessionId])
   @@index([documentType])
+  @@index([documentStatus])
 }
 
 model KycFormData {

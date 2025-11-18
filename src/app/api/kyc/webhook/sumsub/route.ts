@@ -164,7 +164,23 @@ export async function POST(request: NextRequest) {
       };
     }
 
-    // Update with metadata preservation
+    // Extract resubmission fields from webhook
+    const reviewResult = event.metadata?.reviewResult || {};
+    const reviewRejectType = reviewResult.reviewRejectType || null; // RETRY or FINAL
+    const moderationComment = reviewResult.moderationComment || null;
+    const clientComment = reviewResult.clientComment || null;
+    const rejectLabels = reviewResult.rejectLabels || [];
+    const buttonIds = reviewResult.buttonIds || [];
+    const canResubmit = (event.status === 'rejected' && reviewRejectType === 'RETRY');
+
+    console.log('📋 [WEBHOOK] Resubmission data:', {
+      reviewRejectType,
+      canResubmit,
+      moderationComment: moderationComment?.substring(0, 50) + '...',
+      rejectLabelsCount: rejectLabels.length
+    });
+
+    // Update with metadata preservation + resubmission fields
     const updated = await prisma.kycSession.update({
       where: { id: session.id },
       data: {
@@ -172,14 +188,52 @@ export async function POST(request: NextRequest) {
         rejectionReason: event.reason || null,
         webhookData: event.metadata as any,
         completedAt: event.status === 'approved' ? new Date() : null,
+        
+        // Resubmission fields (SumSub)
+        reviewRejectType,
+        moderationComment,
+        clientComment,
+        rejectLabels,
+        buttonIds,
+        canResubmit,
+        
         metadata: mergeMetadata(session.metadata, {
           lastWebhook: new Date(),
           webhookStatus: event.status,
-          webhookReason: event.reason
+          webhookReason: event.reason,
+          reviewRejectType,
+          canResubmit
         }),
         updatedAt: new Date()
       }
     });
+
+    // If RETRY rejection, fetch problematic documents details
+    if (canResubmit && event.applicantId) {
+      try {
+        console.log('📥 [WEBHOOK] Fetching problematic documents for resubmission...');
+        
+        const sumsubAdapter = provider as any;
+        if (sumsubAdapter.getProblematicDocuments) {
+          const problematicSteps = await sumsubAdapter.getProblematicDocuments(event.applicantId);
+          
+          // Update session with problematic steps
+          await prisma.kycSession.update({
+            where: { id: session.id },
+            data: {
+              problematicSteps: problematicSteps as any
+            }
+          });
+          
+          console.log('✅ [WEBHOOK] Problematic documents saved for resubmission');
+        } else {
+          console.warn('⚠️ [WEBHOOK] SumsubAdapter does not support getProblematicDocuments yet');
+        }
+      } catch (error) {
+        console.error('❌ [WEBHOOK] Failed to fetch problematic documents:', error);
+        // Don't fail the webhook, just log the error
+      }
+    }
 
     console.log(`✅ Updated KYC session: ${updated.id}`);
 
