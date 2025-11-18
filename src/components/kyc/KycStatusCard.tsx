@@ -19,6 +19,9 @@ import { KycStatus } from '@prisma/client';
 import { toast } from 'sonner';
 import { formatDateTime } from '@/lib/formatters';
 
+// Maximum number of resubmission attempts allowed
+const MAX_ATTEMPTS = 5;
+
 interface KycSession {
   id: string;
   status: KycStatus;
@@ -404,104 +407,109 @@ export function KycStatusCard({ kycSession, onRefresh, userId, onStartResubmissi
           )}
 
           {/* REJECTED */}
-          {kycSession.status === 'REJECTED' && (
-            <div className="space-y-6">
-              {/* Error header */}
-              <div className="flex items-center gap-4 pb-4 border-b">
-                <div className="rounded-lg bg-destructive/10 p-3">
-                  <XCircle className="h-7 w-7 text-destructive" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-lg">
-                    {kycSession.canResubmit 
-                      ? 'Verification Rejected (Resubmission Allowed)'
-                      : 'Verification Not Approved'
-                    }
-                  </h3>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    {kycSession.canResubmit
-                      ? `Attempt ${kycSession.attempts || 1} - Please fix the issues below`
-                      : 'Please contact support for assistance'
-                    }
-                  </p>
-                </div>
-              </div>
-
-              {/* Moderator comment (for resubmission) */}
-              {kycSession.canResubmit && kycSession.moderationComment && (
-                <Alert>
-                  <Info className="h-4 w-4" />
-                  <AlertDescription>
-                    <strong>Moderator:</strong> {kycSession.moderationComment}
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {/* Rejection reason (fallback) */}
-              {kycSession.rejectionReason && !kycSession.moderationComment && (
-                <Alert variant="destructive">
-                  <AlertDescription>
-                    {kycSession.rejectionReason}
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {/* Rejection labels */}
-              {kycSession.rejectLabels && kycSession.rejectLabels.length > 0 && (
-                <div className="rounded-lg border bg-muted/30 p-4">
-                  <p className="text-sm font-medium mb-2">Issues Found:</p>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    {kycSession.rejectLabels.map((label, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-destructive mt-1.5 shrink-0" />
-                        <span>{label.replace(/_/g, ' ').toLowerCase()}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* CTA: Resubmit or Contact Support */}
-              {kycSession.canResubmit ? (
-                <div className="space-y-3">
-                  <Button 
-                    className="w-full"
-                    size="lg"
-                    onClick={() => {
-                      if (onStartResubmission) {
-                        onStartResubmission();
-                      } else {
-                        toast.info('Resubmission feature not available yet');
+          {kycSession.status === 'REJECTED' && (() => {
+            const currentAttempt = kycSession.attempts || 1;
+            const canResubmit = currentAttempt < MAX_ATTEMPTS;
+            
+            return (
+              <div className="space-y-6">
+                {/* Error header */}
+                <div className="flex items-center gap-4 pb-4 border-b">
+                  <div className="rounded-lg bg-destructive/10 p-3">
+                    <XCircle className="h-7 w-7 text-destructive" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-lg">
+                      {canResubmit 
+                        ? 'Verification Rejected'
+                        : 'Maximum Attempts Reached'
                       }
-                    }}
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Fix and Resubmit Documents
-                  </Button>
-                  <p className="text-xs text-center text-muted-foreground">
-                    You will be able to correct the problematic information and resubmit for review
-                  </p>
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {canResubmit
+                        ? `Attempt ${currentAttempt} of ${MAX_ATTEMPTS} - You can fix the issues and resubmit`
+                        : `You've used all ${MAX_ATTEMPTS} attempts - Please contact support`
+                      }
+                    </p>
+                  </div>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <Alert variant="destructive">
+
+                {/* Moderator comment */}
+                {kycSession.moderationComment && (
+                  <Alert>
+                    <Info className="h-4 w-4" />
                     <AlertDescription>
-                      <strong>Final Rejection:</strong> This application cannot be resubmitted. 
-                      Please contact support for further assistance.
+                      <strong>Moderator:</strong> {kycSession.moderationComment}
                     </AlertDescription>
                   </Alert>
-                  <Button 
-                    variant="outline"
-                    className="w-full"
-                    size="lg"
-                    onClick={() => window.location.href = '/profile'}
-                  >
-                    Contact Support
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
+                )}
+
+                {/* Rejection reason (fallback) */}
+                {kycSession.rejectionReason && !kycSession.moderationComment && (
+                  <Alert variant="destructive">
+                    <AlertDescription>
+                      {kycSession.rejectionReason}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Rejection labels */}
+                {kycSession.rejectLabels && kycSession.rejectLabels.length > 0 && (
+                  <div className="rounded-lg border bg-muted/30 p-4">
+                    <p className="text-sm font-medium mb-2">Issues Found:</p>
+                    <ul className="text-sm text-muted-foreground space-y-1">
+                      {kycSession.rejectLabels.map((label, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <div className="h-1.5 w-1.5 rounded-full bg-destructive mt-1.5 shrink-0" />
+                          <span>{label.replace(/_/g, ' ').toLowerCase()}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* CTA: Resubmit or Contact Support */}
+                {canResubmit ? (
+                  <div className="space-y-3">
+                    <Button 
+                      className="w-full"
+                      size="lg"
+                      onClick={() => {
+                        if (onStartResubmission) {
+                          onStartResubmission();
+                        } else {
+                          toast.info('Resubmission feature not available yet');
+                        }
+                      }}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Fix and Resubmit Documents
+                    </Button>
+                    <p className="text-xs text-center text-muted-foreground">
+                      You can correct the problematic information and resubmit for review ({MAX_ATTEMPTS - currentAttempt} attempts remaining)
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <Alert variant="destructive">
+                      <AlertDescription>
+                        <strong>Maximum Attempts Reached:</strong> You've used all {MAX_ATTEMPTS} resubmission attempts. 
+                        Please contact support for further assistance.
+                      </AlertDescription>
+                    </Alert>
+                    <Button 
+                      variant="outline"
+                      className="w-full"
+                      size="lg"
+                      onClick={() => window.location.href = '/profile'}
+                    >
+                      Contact Support
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Refresh Button */}
           <div className="pt-4 border-t">

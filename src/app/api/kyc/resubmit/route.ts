@@ -14,6 +14,9 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
 
+// Maximum number of resubmission attempts allowed
+const MAX_ATTEMPTS = 5;
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -49,30 +52,47 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Validate: can resubmit (REJECTED + RETRY)
-    if (kycSession.status !== 'REJECTED' || !kycSession.canResubmit) {
+    // 2. Validate: can resubmit (REJECTED + under MAX_ATTEMPTS)
+    const currentAttempt = kycSession.attempts || 1;
+    
+    if (kycSession.status !== 'REJECTED') {
       return NextResponse.json(
         { 
           error: 'Resubmission not allowed',
-          reason: kycSession.status !== 'REJECTED' 
-            ? 'Session is not rejected' 
-            : 'Final rejection - cannot resubmit'
+          reason: 'Session is not rejected' 
         },
         { status: 400 }
       );
     }
 
-    console.log('✅ [RESUBMIT] Validation passed, updating session...');
+    if (currentAttempt >= MAX_ATTEMPTS) {
+      return NextResponse.json(
+        { 
+          error: 'Maximum attempts reached',
+          reason: `You have used all ${MAX_ATTEMPTS} resubmission attempts. Please contact support.`,
+          attempts: currentAttempt,
+          maxAttempts: MAX_ATTEMPTS
+        },
+        { status: 400 }
+      );
+    }
+
+    console.log(`✅ [RESUBMIT] Validation passed (attempt ${currentAttempt}/${MAX_ATTEMPTS}), updating session...`);
 
     // 3. Update KYC session
     await prisma.kycSession.update({
       where: { id: sessionId },
       data: {
         status: 'PENDING',
-        canResubmit: false, // Lock during review
         attempts: { increment: 1 },
         lastAttemptAt: new Date(),
         updatedAt: new Date(),
+        // Clear rejection data
+        reviewRejectType: null,
+        moderationComment: null,
+        clientComment: null,
+        rejectLabels: [],
+        canResubmit: false,
         metadata: {
           ...(kycSession.metadata as any),
           lastResubmit: new Date(),
