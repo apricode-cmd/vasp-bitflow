@@ -17,10 +17,13 @@ import type { NextRequest } from 'next/server';
 import { getClientSession } from '@/auth-client';
 import { getAdminSession } from '@/auth-admin';
 
-async function checkMaintenanceMode(): Promise<boolean> {
+async function checkMaintenanceMode(request: NextRequest): Promise<boolean> {
   try {
+    // Get the correct origin from the request
+    const origin = request.nextUrl.origin;
+    
     // Fetch maintenance status from API
-    const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/settings/public`, {
+    const response = await fetch(`${origin}/api/settings/public`, {
       next: { revalidate: 60 } // Cache for 1 minute
     });
     
@@ -114,7 +117,7 @@ export async function middleware(request: NextRequest) {
   // === CLIENT ROUTES ===
 
   // Check maintenance mode FIRST (block ALL non-admin clients)
-  const isMaintenanceMode = await checkMaintenanceMode();
+  const isMaintenanceMode = await checkMaintenanceMode(request);
   
   if (isMaintenanceMode) {
     // During maintenance, admins can still access
