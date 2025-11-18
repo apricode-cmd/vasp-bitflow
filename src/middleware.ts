@@ -58,7 +58,8 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/api/auth') ||  // Client auth (NextAuth endpoints)
     path.startsWith('/api/admin/') ||  // Admin API (auth checked in each route)
     path.startsWith('/api/setup/') ||  // Setup API (public for initial setup)
-    path.startsWith('/api/health')  // Health check endpoint (public)
+    path.startsWith('/api/health') ||  // Health check endpoint (public)
+    path.startsWith('/api/version')  // Version info endpoint (public)
   ) {
     // Log NextAuth requests
     if (path.startsWith('/api/auth')) {
