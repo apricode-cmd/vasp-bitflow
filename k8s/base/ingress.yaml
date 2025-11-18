@@ -1,0 +1,113 @@
+# Install Nginx Ingress Controller first:
+# kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.9.5/deploy/static/provider/cloud/deploy.yaml
+
+# Install cert-manager for SSL:
+# kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.3/cert-manager.yaml
+
+---
+# ClusterIssuer for Let's Encrypt SSL certificates
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@bitflow.biz  # CHANGE THIS to your email
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+---
+# Ingress for main application
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: apricode-ingress
+  namespace: apricode-exchange
+  annotations:
+    # Ingress class
+    kubernetes.io/ingress.class: "nginx"
+    
+    # SSL/TLS
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # Proxy settings
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"  # Max upload size
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    
+    # Rate limiting (DDoS protection)
+    nginx.ingress.kubernetes.io/limit-rps: "10"  # 10 requests per second per IP
+    nginx.ingress.kubernetes.io/limit-connections: "20"  # Max 20 concurrent connections per IP
+    
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: SAMEORIGIN";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+      more_set_headers "Permissions-Policy: geolocation=(), microphone=(), camera=()";
+    
+    # CORS (if needed)
+    # nginx.ingress.kubernetes.io/enable-cors: "true"
+    # nginx.ingress.kubernetes.io/cors-allow-origin: "https://yourdomain.com"
+    
+    # Websocket support (if needed)
+    nginx.ingress.kubernetes.io/websocket-services: "app-service"
+    
+    # Logging
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  
+  tls:
+  - hosts:
+    - app.bitflow.biz  # CHANGE THIS to your domain
+    secretName: apricode-tls  # SSL certificate will be stored here
+  
+  rules:
+  - host: app.bitflow.biz  # CHANGE THIS to your domain
+    http:
+      paths:
+      # Main application
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: app-service
+            port:
+              number: 3000
+---
+# Optional: Redirect www to non-www
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: apricode-ingress-www-redirect
+  namespace: apricode-exchange
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/permanent-redirect: "https://app.bitflow.biz$request_uri"
+spec:
+  tls:
+  - hosts:
+    - www.app.bitflow.biz
+    secretName: apricode-tls-www
+  rules:
+  - host: www.app.bitflow.biz
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: app-service
+            port:
+              number: 3000
+

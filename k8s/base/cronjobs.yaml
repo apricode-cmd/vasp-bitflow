@@ -1,0 +1,221 @@
+# CronJob: Cleanup expired sessions (runs hourly)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cleanup-sessions
+  namespace: apricode-exchange
+  labels:
+    app: cronjob
+    job: cleanup-sessions
+spec:
+  schedule: "0 * * * *"  # Every hour at minute 0
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid  # Don't run if previous job is still running
+  
+  jobTemplate:
+    spec:
+      backoffLimit: 3  # Retry up to 3 times on failure
+      activeDeadlineSeconds: 300  # Timeout after 5 minutes
+      
+      template:
+        metadata:
+          labels:
+            app: cronjob
+            job: cleanup-sessions
+        spec:
+          restartPolicy: OnFailure
+          
+          containers:
+          - name: cleanup
+            image: curlimages/curl:latest
+            command:
+            - sh
+            - -c
+            - |
+              echo "🧹 Starting session cleanup..."
+              response=$(curl -s -o /dev/null -w "%{http_code}" \
+                -X POST \
+                -H "Content-Type: application/json" \
+                http://app-service:3000/api/cron/cleanup-sessions)
+              
+              if [ "$response" -eq 200 ]; then
+                echo "✅ Session cleanup completed successfully"
+                exit 0
+              else
+                echo "❌ Session cleanup failed with status code: $response"
+                exit 1
+              fi
+            
+            resources:
+              requests:
+                cpu: "50m"
+                memory: "64Mi"
+              limits:
+                cpu: "200m"
+                memory: "128Mi"
+---
+# CronJob: Process notification queue (runs every 5 minutes)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: process-notifications
+  namespace: apricode-exchange
+  labels:
+    app: cronjob
+    job: process-notifications
+spec:
+  schedule: "*/5 * * * *"  # Every 5 minutes
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      activeDeadlineSeconds: 300
+      
+      template:
+        metadata:
+          labels:
+            app: cronjob
+            job: process-notifications
+        spec:
+          restartPolicy: OnFailure
+          
+          containers:
+          - name: process
+            image: curlimages/curl:latest
+            command:
+            - sh
+            - -c
+            - |
+              echo "📧 Starting notification processing..."
+              response=$(curl -s -o /dev/null -w "%{http_code}" \
+                -X POST \
+                -H "Content-Type: application/json" \
+                http://app-service:3000/api/cron/process-notifications)
+              
+              if [ "$response" -eq 200 ]; then
+                echo "✅ Notification processing completed successfully"
+                exit 0
+              else
+                echo "❌ Notification processing failed with status code: $response"
+                exit 1
+              fi
+            
+            resources:
+              requests:
+                cpu: "50m"
+                memory: "64Mi"
+              limits:
+                cpu: "200m"
+                memory: "128Mi"
+---
+# CronJob: Database backup (runs daily at 2 AM)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: apricode-exchange
+  labels:
+    app: cronjob
+    job: postgres-backup
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  successfulJobsHistoryLimit: 7  # Keep last 7 days
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800  # 30 minutes timeout
+      
+      template:
+        metadata:
+          labels:
+            app: cronjob
+            job: postgres-backup
+        spec:
+          restartPolicy: OnFailure
+          
+          containers:
+          - name: backup
+            image: postgres:15-alpine
+            command:
+            - sh
+            - -c
+            - |
+              echo "💾 Starting PostgreSQL backup..."
+              TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+              BACKUP_FILE="/backups/backup_${TIMESTAMP}.sql.gz"
+              
+              # Create backup
+              pg_dump -h $POSTGRES_HOST -U postgres -d $POSTGRES_DB | gzip > $BACKUP_FILE
+              
+              if [ $? -eq 0 ]; then
+                echo "✅ Backup created: $BACKUP_FILE"
+                
+                # Optional: Upload to cloud storage (S3/GCS)
+                # aws s3 cp $BACKUP_FILE s3://your-bucket/postgres/
+                # gsutil cp $BACKUP_FILE gs://your-bucket/postgres/
+                
+                # Cleanup old backups (keep last 30 days)
+                find /backups -name "*.sql.gz" -mtime +30 -delete
+                echo "🧹 Old backups cleaned up"
+                
+                exit 0
+              else
+                echo "❌ Backup failed"
+                exit 1
+              fi
+            
+            env:
+            - name: POSTGRES_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: POSTGRES_HOST
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: POSTGRES_DB
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: POSTGRES_PASSWORD
+            
+            resources:
+              requests:
+                cpu: "200m"
+                memory: "256Mi"
+              limits:
+                cpu: "1000m"
+                memory: "1Gi"
+            
+            volumeMounts:
+            - name: backups
+              mountPath: /backups
+          
+          volumes:
+          - name: backups
+            persistentVolumeClaim:
+              claimName: backups-pvc
+---
+# PVC for database backups
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backups-pvc
+  namespace: apricode-exchange
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: "fast-ssd"
+  resources:
+    requests:
+      storage: 100Gi
+
