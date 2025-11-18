@@ -87,10 +87,13 @@ export async function POST(request: NextRequest) {
     // 5. Parse payload
     const payload = JSON.parse(rawBody);
     
-    console.log('📊 Webhook payload:', {
+    console.log('📊 [WEBHOOK] Raw payload:', {
       type: payload.type,
       applicantId: payload.applicantId,
-      reviewStatus: payload.reviewStatus
+      inspectionId: payload.inspectionId,
+      reviewStatus: payload.reviewStatus,
+      reviewAnswer: payload.reviewResult?.reviewAnswer,
+      externalUserId: payload.externalUserId
     });
 
     // 6. Process webhook (normalize data)
@@ -104,30 +107,46 @@ export async function POST(request: NextRequest) {
 
     const event = sumsubAdapter.processWebhook(payload);
 
-    console.log('📊 Processed webhook event:', {
+    console.log('📊 [WEBHOOK] Processed event:', {
+      verificationId: event.verificationId,
       applicantId: event.applicantId,
       status: event.status,
-      reason: event.reason
+      reason: event.reason,
+      metadata: {
+        type: event.metadata?.type,
+        reviewStatus: event.metadata?.reviewStatus,
+        reviewAnswer: event.metadata?.reviewAnswer
+      }
     });
 
     // 7. Update KycSession in database
-    // Find the session first to preserve metadata
+    // Find the session by verificationId (inspectionId) or applicantId
     const session = await prisma.kycSession.findFirst({
       where: {
         kycProviderId: 'sumsub',
         OR: [
-          { verificationId: event.verificationId },
-          { applicantId: event.applicantId }
-        ]
+          { verificationId: event.verificationId }, // inspectionId from SumSub
+          { applicantId: event.applicantId },
+          // Also try to match by externalUserId if stored
+          event.metadata?.externalUserId ? { userId: event.metadata.externalUserId } : {}
+        ].filter(condition => Object.keys(condition).length > 0) // Remove empty conditions
       }
     });
 
     if (!session) {
-      console.warn('⚠️ No KYC session found for webhook event');
+      console.warn('⚠️ [WEBHOOK] No KYC session found for:', {
+        verificationId: event.verificationId,
+        applicantId: event.applicantId,
+        externalUserId: event.metadata?.externalUserId
+      });
+      
+      // Return 200 OK (not 404) to prevent SumSub from retrying
+      // This can happen if webhook arrives before session is created
       return NextResponse.json({
         success: false,
-        error: 'Session not found'
-      }, { status: 404 });
+        error: 'Session not found',
+        note: 'Webhook accepted but session not in database yet'
+      }, { status: 200 });
     }
 
     // Helper: Merge metadata safely

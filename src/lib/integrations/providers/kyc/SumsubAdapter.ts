@@ -825,6 +825,8 @@ export class SumsubAdapter implements IKycProvider {
 
   /**
    * Process webhook payload (normalize data)
+   * Official SumSub webhook documentation:
+   * https://docs.sumsub.com/reference/webhook-structure
    */
   processWebhook(payload: any): {
     verificationId: string;
@@ -834,41 +836,124 @@ export class SumsubAdapter implements IKycProvider {
     metadata?: Record<string, any>;
   } {
     const applicantId = payload.applicantId || payload.applicant?.id;
-    const reviewStatus = payload.reviewStatus || payload.review?.reviewStatus;
-    const reviewAnswer = payload.reviewResult?.reviewAnswer;
+    const inspectionId = payload.inspectionId;
+    const type = payload.type; // Event type (applicantCreated, applicantPending, etc.)
+    const reviewStatus = payload.reviewStatus; // Current review status
+    const reviewAnswer = payload.reviewResult?.reviewAnswer; // GREEN/RED/YELLOW
+    const reviewRejectType = payload.reviewResult?.reviewRejectType; // FINAL/RETRY
 
-    console.log('📥 Processing Sumsub webhook:', {
+    console.log('📥 [SUMSUB WEBHOOK] Processing:', {
+      type,
       applicantId,
+      inspectionId,
       reviewStatus,
-      reviewAnswer
+      reviewAnswer,
+      reviewRejectType
     });
 
-    // Map status
+    // Map SumSub reviewStatus to our KycVerificationStatus
     let status: KycVerificationStatus = 'pending';
     
-    if (reviewStatus === 'completed') {
-      if (reviewAnswer === 'GREEN') {
-        status = 'approved';
-      } else if (reviewAnswer === 'RED') {
-        status = 'rejected';
-      }
+    /**
+     * Status mapping according to SumSub documentation:
+     * 
+     * - init: Applicant created but not submitted yet
+     * - pending: Under review by SumSub
+     * - queued/prechecked: Passed automatic checks, awaiting manual review
+     * - onHold: Review temporarily paused
+     * - awaitingService: Waiting for external service (e.g., AML)
+     * - awaitingUser: Waiting for user action (resubmission)
+     * - completed: Review finished
+     *   - GREEN: Approved
+     *   - RED: Rejected (FINAL or RETRY)
+     *   - YELLOW: Requires attention
+     */
+    
+    switch (reviewStatus) {
+      case 'init':
+        // Applicant created, not submitted yet
+        status = 'pending';
+        break;
+        
+      case 'pending':
+      case 'queued':
+      case 'prechecked':
+        // Under review
+        status = 'pending';
+        break;
+        
+      case 'onHold':
+      case 'awaitingService':
+      case 'awaitingUser':
+        // Temporarily paused, treat as pending
+        status = 'pending';
+        break;
+        
+      case 'completed':
+        // Final decision made
+        if (reviewAnswer === 'GREEN') {
+          status = 'approved';
+        } else if (reviewAnswer === 'RED') {
+          // Check if it's final rejection or retry allowed
+          if (reviewRejectType === 'FINAL') {
+            status = 'rejected';
+          } else {
+            // RETRY allowed - treat as pending for resubmission
+            status = 'pending';
+          }
+        } else if (reviewAnswer === 'YELLOW') {
+          // Requires attention but not final rejection
+          status = 'pending';
+        } else {
+          // Completed but no clear answer - treat as pending
+          status = 'pending';
+        }
+        break;
+        
+      default:
+        // Unknown status - default to pending
+        console.warn('⚠️ [SUMSUB] Unknown reviewStatus:', reviewStatus);
+        status = 'pending';
     }
 
     // Collect rejection reasons
     const rejectLabels = payload.reviewResult?.rejectLabels || [];
-    const rejectionReason = rejectLabels.length > 0 ? rejectLabels.join(', ') : undefined;
-
-    console.log('📊 Webhook mapped status:', status);
-    if (rejectionReason) {
-      console.log('❌ Rejection reason:', rejectionReason);
+    const moderationComment = payload.reviewResult?.moderationComment;
+    const clientComment = payload.reviewResult?.clientComment;
+    
+    let rejectionReason: string | undefined;
+    if (rejectLabels.length > 0) {
+      rejectionReason = rejectLabels.join(', ');
+    } else if (moderationComment) {
+      rejectionReason = moderationComment;
+    } else if (clientComment) {
+      rejectionReason = clientComment;
     }
 
+    console.log('✅ [SUMSUB WEBHOOK] Mapped:', {
+      from: { reviewStatus, reviewAnswer, reviewRejectType },
+      to: status,
+      reason: rejectionReason
+    });
+
     return {
-      verificationId: applicantId, // Use applicantId as verificationId
+      verificationId: inspectionId || applicantId, // Use inspectionId if available
       applicantId,
       status,
       reason: rejectionReason,
-      metadata: payload
+      metadata: {
+        type, // Store original event type
+        reviewStatus,
+        reviewAnswer,
+        reviewRejectType,
+        correlationId: payload.correlationId,
+        levelName: payload.levelName,
+        externalUserId: payload.externalUserId,
+        sandboxMode: payload.sandboxMode,
+        createdAtMs: payload.createdAtMs,
+        clientId: payload.clientId,
+        reviewResult: payload.reviewResult
+      }
     };
   }
 
