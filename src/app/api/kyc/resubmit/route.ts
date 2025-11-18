@@ -122,17 +122,51 @@ export async function POST(request: NextRequest) {
     // 5. Trigger review in SumSub (if using SumSub provider)
     if (kycSession.kycProviderId === 'sumsub' && kycSession.applicantId) {
       try {
+        // Get provider and initialize with config from DB
         const provider = await integrationFactory.getProviderByService('sumsub');
-        const sumsubAdapter = provider as any;
         
-        if (sumsubAdapter.requestReview) {
-          console.log('📤 [RESUBMIT] Requesting SumSub review for applicant:', kycSession.applicantId);
-          
-          const reviewResponse = await sumsubAdapter.requestReview(kycSession.applicantId);
-          
-          console.log('✅ [RESUBMIT] SumSub review requested:', reviewResponse);
+        if (!provider) {
+          console.warn('⚠️ [RESUBMIT] Sumsub provider not found');
         } else {
-          console.warn('⚠️ [RESUBMIT] SumsubAdapter does not support requestReview yet');
+          // Initialize with config from database
+          const integration = await prisma.integration.findUnique({
+            where: { service: 'sumsub' }
+          });
+
+          if (integration) {
+            await provider.initialize({
+              apiKey: integration.apiKey,
+              apiEndpoint: integration.apiEndpoint || undefined,
+              ...(integration.config as Record<string, any> || {})
+            });
+
+            const sumsubAdapter = provider as any;
+            
+            // First, update applicant data with new form data
+            if (sumsubAdapter.updateApplicantData) {
+              try {
+                console.log('📝 [RESUBMIT] Updating applicant data in SumSub...');
+                await sumsubAdapter.updateApplicantData(kycSession.applicantId, formData);
+                console.log('✅ [RESUBMIT] Applicant data updated in SumSub');
+              } catch (updateError) {
+                console.error('❌ [RESUBMIT] Failed to update applicant data:', updateError);
+                // Continue anyway - requestReview might still work
+              }
+            }
+
+            // Then, request a new review
+            if (sumsubAdapter.requestReview) {
+              console.log('📤 [RESUBMIT] Requesting SumSub review for applicant:', kycSession.applicantId);
+              
+              const reviewResponse = await sumsubAdapter.requestReview(kycSession.applicantId);
+              
+              console.log('✅ [RESUBMIT] SumSub review requested:', reviewResponse);
+            } else {
+              console.warn('⚠️ [RESUBMIT] SumsubAdapter does not support requestReview method');
+            }
+          } else {
+            console.warn('⚠️ [RESUBMIT] Sumsub integration config not found in DB');
+          }
         }
       } catch (error) {
         console.error('❌ [RESUBMIT] Failed to request SumSub review:', error);
