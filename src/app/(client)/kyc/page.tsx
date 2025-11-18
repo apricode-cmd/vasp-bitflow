@@ -20,6 +20,9 @@ import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { KycStatus } from '@prisma/client';
 
+// Maximum number of resubmission attempts allowed
+const MAX_ATTEMPTS = 5;
+
 interface KycSession {
   id: string;
   status: KycStatus;
@@ -151,7 +154,17 @@ export default function KycPage(): React.ReactElement {
   }
 
   // Show resubmission form if in resubmission mode
-  if (isResubmitting && kycSession?.canResubmit) {
+  if (isResubmitting && kycSession && kycSession.status === 'REJECTED') {
+    const currentAttempt = kycSession.attempts || 1;
+    const canResubmit = currentAttempt < MAX_ATTEMPTS;
+
+    if (!canResubmit) {
+      // Shouldn't happen (button is hidden), but just in case
+      toast.error(`Maximum attempts (${MAX_ATTEMPTS}) reached. Please contact support.`);
+      setIsResubmitting(false);
+      return null;
+    }
+
     return (
       <KycFormWizard
         fields={fields}
