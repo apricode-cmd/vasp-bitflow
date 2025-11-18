@@ -27,15 +27,23 @@ interface KycSession {
   rejectionReason: string | null;
   formUrl?: string | null;
   kycProviderId?: string | null;
+  // Resubmission fields
+  canResubmit?: boolean;
+  reviewRejectType?: string | null;
+  moderationComment?: string | null;
+  clientComment?: string | null;
+  rejectLabels?: string[];
+  attempts?: number;
 }
 
 interface Props {
   kycSession: KycSession;
   onRefresh: () => Promise<void>;
   userId?: string;
+  onStartResubmission?: () => void; // Callback to show form
 }
 
-export function KycStatusCard({ kycSession, onRefresh, userId }: Props) {
+export function KycStatusCard({ kycSession, onRefresh, userId, onStartResubmission }: Props) {
   const { data: session } = useSession();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [sumsubMobileUrl, setSumsubMobileUrl] = useState<string | null>(null);
@@ -404,15 +412,33 @@ export function KycStatusCard({ kycSession, onRefresh, userId }: Props) {
                   <XCircle className="h-7 w-7 text-destructive" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-semibold text-lg">Verification Not Approved</h3>
+                  <h3 className="font-semibold text-lg">
+                    {kycSession.canResubmit 
+                      ? 'Verification Rejected (Resubmission Allowed)'
+                      : 'Verification Not Approved'
+                    }
+                  </h3>
                   <p className="text-sm text-muted-foreground mt-0.5">
-                    Please review the information below
+                    {kycSession.canResubmit
+                      ? `Attempt ${kycSession.attempts || 1} - Please fix the issues below`
+                      : 'Please contact support for assistance'
+                    }
                   </p>
                 </div>
               </div>
 
-              {/* Reason */}
-              {kycSession.rejectionReason && (
+              {/* Moderator comment (for resubmission) */}
+              {kycSession.canResubmit && kycSession.moderationComment && (
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Moderator:</strong> {kycSession.moderationComment}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Rejection reason (fallback) */}
+              {kycSession.rejectionReason && !kycSession.moderationComment && (
                 <Alert variant="destructive">
                   <AlertDescription>
                     {kycSession.rejectionReason}
@@ -420,41 +446,60 @@ export function KycStatusCard({ kycSession, onRefresh, userId }: Props) {
                 </Alert>
               )}
 
-              {/* Next steps - compact */}
-              <div className="rounded-lg border bg-muted/30 p-4">
-                <div className="flex items-start gap-3">
-                  <div className="rounded-md bg-background p-2 mt-0.5">
-                    <Info className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div className="flex-1 space-y-1.5">
-                    <p className="text-sm font-medium">What to do next</p>
-                    <ul className="text-sm text-muted-foreground space-y-1">
-                      <li className="flex items-start gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 mt-1.5 shrink-0" />
-                        <span>Contact our support team for details</span>
+              {/* Rejection labels */}
+              {kycSession.rejectLabels && kycSession.rejectLabels.length > 0 && (
+                <div className="rounded-lg border bg-muted/30 p-4">
+                  <p className="text-sm font-medium mb-2">Issues Found:</p>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    {kycSession.rejectLabels.map((label, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full bg-destructive mt-1.5 shrink-0" />
+                        <span>{label.replace(/_/g, ' ').toLowerCase()}</span>
                       </li>
-                      <li className="flex items-start gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 mt-1.5 shrink-0" />
-                        <span>Ensure your documents are clear and valid</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 mt-1.5 shrink-0" />
-                        <span>You may reapply after addressing issues</span>
-                      </li>
-                    </ul>
-                  </div>
+                    ))}
+                  </ul>
                 </div>
-              </div>
+              )}
 
-              {/* CTA */}
-              <Button 
-                variant="outline"
-                className="w-full"
-                size="lg"
-                onClick={() => window.location.href = '/profile'}
-              >
-                Contact Support
-              </Button>
+              {/* CTA: Resubmit or Contact Support */}
+              {kycSession.canResubmit ? (
+                <div className="space-y-3">
+                  <Button 
+                    className="w-full"
+                    size="lg"
+                    onClick={() => {
+                      if (onStartResubmission) {
+                        onStartResubmission();
+                      } else {
+                        toast.info('Resubmission feature not available yet');
+                      }
+                    }}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Fix and Resubmit Documents
+                  </Button>
+                  <p className="text-xs text-center text-muted-foreground">
+                    You will be able to correct the problematic information and resubmit for review
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <Alert variant="destructive">
+                    <AlertDescription>
+                      <strong>Final Rejection:</strong> This application cannot be resubmitted. 
+                      Please contact support for further assistance.
+                    </AlertDescription>
+                  </Alert>
+                  <Button 
+                    variant="outline"
+                    className="w-full"
+                    size="lg"
+                    onClick={() => window.location.href = '/profile'}
+                  >
+                    Contact Support
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 

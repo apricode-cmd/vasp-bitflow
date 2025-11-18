@@ -29,6 +29,13 @@ interface KycSession {
   formUrl?: string | null;
   kycProviderId?: string | null;
   formData?: any;
+  // Resubmission fields
+  canResubmit?: boolean;
+  reviewRejectType?: string | null;
+  moderationComment?: string | null;
+  clientComment?: string | null;
+  rejectLabels?: string[];
+  attempts?: number;
 }
 
 export default function KycPage(): React.ReactElement {
@@ -39,6 +46,7 @@ export default function KycPage(): React.ReactElement {
   const [showConsents, setShowConsents] = useState(true);
   const [consentsAccepted, setConsentsAccepted] = useState(false);
   const [statusLoading, setStatusLoading] = useState(true);
+  const [isResubmitting, setIsResubmitting] = useState(false); // New: resubmission mode
 
   // Fetch KYC status on mount
   useEffect(() => {
@@ -79,6 +87,13 @@ export default function KycPage(): React.ReactElement {
             formUrl: data.formUrl || null,
             kycProviderId: data.kycProviderId || null,
             formData: data.formData || null,
+            // Resubmission fields
+            canResubmit: data.canResubmit || false,
+            reviewRejectType: data.reviewRejectType || null,
+            moderationComment: data.moderationComment || null,
+            clientComment: data.clientComment || null,
+            rejectLabels: data.rejectLabels || [],
+            attempts: data.attempts || 0
           });
           
           // If already submitted, skip consents
@@ -99,6 +114,17 @@ export default function KycPage(): React.ReactElement {
   const handleConsentsAccept = () => {
     setConsentsAccepted(true);
     setShowConsents(false);
+  };
+
+  const handleStartResubmission = () => {
+    console.log('🔄 Starting resubmission mode');
+    setIsResubmitting(true);
+  };
+
+  const handleResubmitComplete = async () => {
+    console.log('✅ Resubmission completed, refreshing status');
+    setIsResubmitting(false);
+    await fetchKycStatus();
   };
 
   // Loading state
@@ -124,6 +150,20 @@ export default function KycPage(): React.ReactElement {
     return <KycConsentScreen onAccept={handleConsentsAccept} />;
   }
 
+  // Show resubmission form if in resubmission mode
+  if (isResubmitting && kycSession?.canResubmit) {
+    return (
+      <KycFormWizard
+        fields={fields}
+        kycSession={kycSession}
+        isResubmission={true}
+        moderationComment={kycSession.moderationComment}
+        rejectLabels={kycSession.rejectLabels}
+        onComplete={handleResubmitComplete}
+      />
+    );
+  }
+
   // Show status card if KYC already submitted
   if (kycSession && kycSession.status !== 'NOT_STARTED') {
     return (
@@ -131,6 +171,7 @@ export default function KycPage(): React.ReactElement {
         kycSession={kycSession}
         onRefresh={fetchKycStatus}
         userId={session?.user?.id}
+        onStartResubmission={handleStartResubmission}
       />
     );
   }

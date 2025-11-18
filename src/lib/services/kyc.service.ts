@@ -60,7 +60,14 @@ function formatStatusResponse(session: any, message?: string) {
     rejectionReason: session.rejectionReason || null,
     formUrl: (session.metadata as any)?.formUrl || null,
     kycProviderId: session.kycProviderId || (session.metadata as any)?.provider || 'kycaid',
-    message: message || getStatusMessage(session.status)
+    message: message || getStatusMessage(session.status),
+    // Resubmission fields (for REJECTED status)
+    canResubmit: session.canResubmit || false,
+    reviewRejectType: session.reviewRejectType || null,
+    moderationComment: session.moderationComment || null,
+    clientComment: session.clientComment || null,
+    rejectLabels: session.rejectLabels || [],
+    attempts: session.attempts || 0
   };
 }
 

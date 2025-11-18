@@ -958,6 +958,60 @@ export class SumsubAdapter implements IKycProvider {
   }
 
   /**
+   * Request review for resubmission
+   * POST /resources/applicants/{applicantId}/status/pending
+   * 
+   * According to SumSub docs:
+   * After uploading corrected documents, call this to trigger new review
+   */
+  async requestReview(applicantId: string): Promise<{ ok: number }> {
+    try {
+      if (!this.isConfigured()) {
+        throw new Error('Sumsub provider not configured');
+      }
+
+      const path = `/resources/applicants/${applicantId}/status/pending`;
+      const method = 'POST';
+      const ts = Math.floor(Date.now() / 1000).toString();
+
+      // Calculate signature
+      const signature = crypto
+        .createHmac('sha256', this.config.secretKey!)
+        .update(ts + method.toUpperCase() + path)
+        .digest('hex');
+
+      console.log('📤 [SUMSUB] Requesting review for applicant:', applicantId);
+
+      const response = await fetch(`${this.baseUrl}${path}`, {
+        method,
+        headers: {
+          'X-App-Token': this.config.appToken!,
+          'X-App-Access-Sig': signature,
+          'X-App-Access-Ts': ts,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [SUMSUB] Request review failed:', {
+          status: response.status,
+          error: errorText
+        });
+        throw new Error(`Failed to request review: ${response.status} ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ [SUMSUB] Review requested successfully:', result);
+
+      return result;
+    } catch (error) {
+      console.error('❌ [SUMSUB] Request review error:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Verify document liveness (optional, Sumsub handles internally)
    */
   async verifyDocumentLiveness(documentUrl: string): Promise<KycDocumentVerification> {

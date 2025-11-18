@@ -9,9 +9,10 @@ import { useSession } from 'next-auth/react';
 import { KycFormStep } from './KycFormStep';
 import { KYC_STEPS, getStepsWithFields, getFieldsForStep } from '@/lib/kyc/config';
 import { Card, CardContent } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, ArrowRight, Loader2, Shield, Check, Save } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Shield, Check, Save, AlertCircle, RefreshCw } from 'lucide-react';
 import { useKycForm } from './hooks/useKycForm';
 import { toast } from 'sonner';
 
@@ -19,9 +20,20 @@ interface Props {
   fields: any[];
   kycSession: any;
   onComplete: () => void;
+  // Resubmission props
+  isResubmission?: boolean;
+  moderationComment?: string | null;
+  rejectLabels?: string[];
 }
 
-export function KycFormWizard({ fields, kycSession, onComplete }: Props) {
+export function KycFormWizard({ 
+  fields, 
+  kycSession, 
+  onComplete,
+  isResubmission = false,
+  moderationComment = null,
+  rejectLabels = []
+}: Props) {
   const { data: session } = useSession();
   
   // Filter steps - only show steps with enabled fields
@@ -196,6 +208,37 @@ export function KycFormWizard({ fields, kycSession, onComplete }: Props) {
   const handleSubmit = async () => {
     setIsSaving(true);
     try {
+      // If resubmission, use different flow
+      if (isResubmission && kycSession?.id) {
+        console.log('🔄 Resubmitting KYC form...');
+        
+        const resubmitResponse = await fetch('/api/kyc/resubmit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: kycSession.id,
+            formData
+          })
+        });
+
+        const resubmitData = await resubmitResponse.json();
+        
+        if (!resubmitData.success) {
+          throw new Error(resubmitData.error || 'Failed to resubmit KYC');
+        }
+
+        console.log('✅ KYC resubmitted successfully, attempt:', resubmitData.attempt);
+        
+        // Clear draft and show success
+        clearDraft();
+        toast.success('Your documents have been resubmitted for review!');
+        
+        // Call onComplete callback
+        onComplete();
+        return;
+      }
+
+      // Normal submission flow
       console.log('📝 Submitting KYC form...');
       
       // Step 1: Save profile data (basic fields)
@@ -320,13 +363,38 @@ export function KycFormWizard({ fields, kycSession, onComplete }: Props) {
       {/* Header */}
       <div className="space-y-2">
         <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Shield className="h-8 w-8 text-primary" />
-          KYC Verification
+          {isResubmission ? <RefreshCw className="h-8 w-8 text-primary" /> : <Shield className="h-8 w-8 text-primary" />}
+          {isResubmission ? 'Resubmit KYC Documents' : 'KYC Verification'}
         </h1>
         <p className="text-muted-foreground">
-          Complete your KYC verification to start trading cryptocurrency
+          {isResubmission 
+            ? `Attempt ${kycSession?.attempts || 1} - Please correct the issues and resubmit`
+            : 'Complete your KYC verification to start trading cryptocurrency'
+          }
         </p>
       </div>
+
+      {/* Resubmission Alert */}
+      {isResubmission && moderationComment && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Please fix the following issues</AlertTitle>
+          <AlertDescription>
+            <strong>Moderator feedback:</strong> {moderationComment}
+            
+            {rejectLabels && rejectLabels.length > 0 && (
+              <ul className="mt-2 text-sm space-y-1">
+                {rejectLabels.map((label, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-destructive">•</span>
+                    <span>{label.replace(/_/g, ' ').toLowerCase()}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Progress Card */}
       <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
