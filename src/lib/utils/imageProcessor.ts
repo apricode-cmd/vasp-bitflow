@@ -91,10 +91,15 @@ export async function validateImageQuality(file: File): Promise<ImageQuality> {
     // Get image dimensions
     const dimensions = await getImageDimensions(file);
     
-    // Check minimum resolution (at least 720p)
-    if (dimensions.width < 1280 || dimensions.height < 720) {
-      result.warnings.push('Low resolution. Please use higher quality camera');
-      result.score -= 20;
+    // Check minimum resolution (at least VGA - 640x480)
+    // Lower threshold for mobile compatibility
+    if (dimensions.width < 640 || dimensions.height < 480) {
+      result.warnings.push('Resolution too low. Image may not be readable');
+      result.score -= 30;
+    } else if (dimensions.width < 1280 || dimensions.height < 720) {
+      // Warn for sub-HD but still acceptable
+      console.log('ℹ️ Sub-HD resolution detected, but acceptable for documents:', dimensions);
+      // Don't show warning to user - it's fine for documents
     }
 
     // Check aspect ratio (documents should be roughly rectangular)

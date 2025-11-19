@@ -161,7 +161,7 @@ export function useCamera(options: UseCameraOptions = {}): UseCameraReturn {
 
       if (isMobile) {
         // Mobile: minimal constraints BUT allow deviceId for switching
-        console.log('📱 Mobile detected - using minimal constraints');
+        console.log('📱 Mobile detected - using minimal constraints with quality hints');
         
         if (currentDeviceId) {
           // If specific device selected (switching cameras)
@@ -169,14 +169,20 @@ export function useCamera(options: UseCameraOptions = {}): UseCameraReturn {
           constraints = {
             audio: false,
             video: {
-              deviceId: { exact: currentDeviceId }
+              deviceId: { exact: currentDeviceId },
+              width: { ideal: 1280 },   // Request HD if available
+              height: { ideal: 720 }     // But don't fail if not
             }
           };
         } else {
-          // First time - just request any camera
+          // First time - request decent quality but flexible
           constraints = {
             audio: false,
-            video: true
+            video: {
+              facingMode: options.facingMode || 'environment',
+              width: { ideal: 1280 },   // Try to get HD
+              height: { ideal: 720 }     // But accept lower
+            }
           };
         }
       } else {
