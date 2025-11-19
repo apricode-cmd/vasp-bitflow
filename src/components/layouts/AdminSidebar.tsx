@@ -17,7 +17,7 @@ import {
   Wallet, Globe, Key, User, FileText, Scale,
   ChevronDown, ChevronRight, Search,
   ArrowDownCircle, ArrowUpCircle, BookOpen, Plug,
-  Bell, Mail, MessageSquare, Send
+  Bell, Mail, MessageSquare, Send, Workflow
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -146,6 +146,20 @@ const navigation = [
         icon: Globe,
         description: 'ETH, BSC, Polygon, etc.',
         requiredPermission: 'settings:read'
+      },
+    ],
+    defaultOpen: false,
+    priority: 'medium'
+  },
+  {
+    section: 'Compliance & Automation',
+    items: [
+      { 
+        name: 'Workflows', 
+        href: '/admin/workflows', 
+        icon: Workflow,
+        description: 'No-Code automation rules',
+        requiredPermission: 'settings:system'
       },
     ],
     defaultOpen: false,
