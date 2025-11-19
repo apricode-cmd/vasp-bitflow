@@ -83,50 +83,47 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
     return () => {
       stopCamera();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCameraSupported, open]);
 
   /**
-   * Attach stream to video element - ULTRA SIMPLE NATIVE
+   * Attach stream to video element - MDN RECOMMENDED APPROACH
    */
   useEffect(() => {
     if (!stream || !videoRef.current || capturedImage) return;
 
     const video = videoRef.current;
     
-    console.log('🎬 [Camera] ULTRA SIMPLE attach');
-    
-    // Clear first
-    video.srcObject = null;
-    
-    // Set stream
-    video.srcObject = stream;
-    
-    // Force play immediately (no waiting!)
-    video.play().catch(err => {
-      console.warn('⚠️ First play attempt failed (expected), will retry:', err.message);
+    console.log('🎬 [Camera] Attaching stream to video', {
+      streamId: stream.id,
+      tracks: stream.getTracks().length,
+      videoReady: video.readyState
     });
     
-    // Also try on loadedmetadata
-    video.onloadedmetadata = () => {
-      console.log('📹 Metadata loaded');
-      video.play().then(() => {
-        console.log('✅ Playing!');
-        setStreamError(null);
-      }).catch(err => {
-        console.error('❌ Play error:', err);
-      });
+    // Handle canplay event (MDN recommended)
+    const handleCanPlay = () => {
+      console.log('📹 [Camera] Can play - stream is ready');
+      video.play()
+        .then(() => {
+          console.log('✅ [Camera] Video playing successfully');
+        })
+        .catch(err => {
+          console.error('❌ [Camera] Play failed:', err);
+        });
     };
     
-    // Force load if needed
-    if (video.readyState === 0) {
-      console.log('🔄 Forcing load()');
-      video.load();
-    }
+    // Set stream to video element
+    video.srcObject = stream;
+    
+    // Listen for canplay event
+    video.addEventListener('canplay', handleCanPlay, { once: true });
     
     // Cleanup
     return () => {
-      video.onloadedmetadata = null;
-      video.srcObject = null;
+      video.removeEventListener('canplay', handleCanPlay);
+      if (video.srcObject) {
+        video.srcObject = null;
+      }
     };
   }, [stream, capturedImage]);
 
