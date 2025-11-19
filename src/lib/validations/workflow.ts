@@ -123,11 +123,11 @@ export const JsonLogicSchema = z.record(z.any());
 // Create Workflow
 export const createWorkflowSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
-  description: z.string().max(500, 'Description too long').optional(),
+  description: z.string().max(500, 'Description too long').optional().nullable(),
   trigger: WorkflowTriggerSchema,
   triggerConfig: z.record(z.any()).optional(),
   visualState: VisualStateSchema,
-  logicState: JsonLogicSchema,
+  logicState: JsonLogicSchema.optional(), // Will be auto-compiled from visualState
   priority: z.number().int().min(0).max(100).optional().default(0),
 });
 

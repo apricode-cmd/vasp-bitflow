@@ -18,6 +18,8 @@ import {
   type WorkflowFiltersInput,
 } from '@/lib/validations/workflow';
 import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
+import { compileWorkflow } from '@/lib/workflows/compiler/graphToJsonLogic';
+import { validateWorkflowGraph } from '@/lib/workflows/validation/validateWorkflowGraph';
 
 /**
  * GET /api/admin/workflows
@@ -173,15 +175,64 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     console.log(`📝 [Workflows API] Creating workflow: ${validated.name}`);
 
+    // Validate graph structure (only if nodes exist)
+    const hasNodes = validated.visualState.nodes.length > 0;
+    
+    if (hasNodes) {
+      const graphValidation = validateWorkflowGraph(
+        validated.visualState.nodes,
+        validated.visualState.edges
+      );
+
+      if (!graphValidation.valid) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'Invalid workflow graph', 
+            validationErrors: graphValidation.errors 
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Auto-compile logicState if not provided
+    let logicState = validated.logicState;
+    
+    // Only compile if nodes exist
+    if (hasNodes && (!logicState || Object.keys(logicState).length === 0)) {
+      try {
+        logicState = compileWorkflow(
+          validated.visualState.nodes,
+          validated.visualState.edges
+        );
+        console.log(`✅ [Workflows API] Auto-compiled logicState for: ${validated.name}`);
+      } catch (error) {
+        console.error('❌ [Workflows API] Compilation failed:', error);
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'Failed to compile workflow', 
+            details: error instanceof Error ? error.message : 'Unknown error' 
+          },
+          { status: 400 }
+        );
+      }
+    } else if (!hasNodes) {
+      // Empty workflow (DRAFT state) - set empty logicState
+      logicState = {};
+      console.log(`📝 [Workflows API] Creating empty DRAFT workflow: ${validated.name}`);
+    }
+
     // Create workflow
     const workflow = await prisma.workflow.create({
       data: {
         name: validated.name,
-        description: validated.description,
+        description: validated.description || null,
         trigger: validated.trigger,
         triggerConfig: validated.triggerConfig || null,
         visualState: validated.visualState as any,
-        logicState: validated.logicState as any,
+        logicState: logicState as any,
         priority: validated.priority || 0,
         status: 'DRAFT', // Always start as draft
         isActive: false, // Must be published to activate
