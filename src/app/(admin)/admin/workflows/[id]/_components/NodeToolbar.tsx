@@ -99,7 +99,7 @@ export default function NodeToolbar({ onAddNode }: NodeToolbarProps) {
   };
 
   return (
-    <div className="space-y-4 p-4 bg-background dark:bg-card border rounded-lg shadow-sm">
+    <div className="space-y-4 p-4">
       <div>
         <h3 className="font-semibold text-sm mb-1 text-foreground">Node Library</h3>
         <p className="text-xs text-muted-foreground">Drag and drop to canvas</p>

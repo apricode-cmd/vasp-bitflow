@@ -185,12 +185,13 @@ export default function WorkflowCanvas({
         edgesFocusable={!readOnly}
         elementsSelectable={!readOnly}
       >
-        {/* Background */}
+        {/* Background - Keep dots but subtle */}
         <Background
           variant={BackgroundVariant.Dots}
-          gap={15}
+          gap={20}
           size={1}
-          color={isDarkMode ? '#334155' : '#e2e8f0'}
+          color="hsl(var(--border))"
+          style={{ opacity: 0.4 }}
         />
 
         {/* Controls */}

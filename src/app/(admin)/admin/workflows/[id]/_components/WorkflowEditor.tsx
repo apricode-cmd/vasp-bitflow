@@ -200,7 +200,7 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="border-b bg-background p-4">
+      <div className="border-b p-4">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Button
@@ -329,7 +329,7 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
       {/* Canvas + Toolbar */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar with NodeToolbar */}
-        <div className="w-64 border-r bg-muted/30 overflow-y-auto">
+        <div className="w-64 border-r overflow-y-auto">
           <NodeToolbar />
         </div>
 

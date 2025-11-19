@@ -1,15 +1,19 @@
 /**
- * React Flow Dark Theme Support
+ * React Flow Theme Integration
  * 
- * Custom styles for React Flow to work with shadcn/ui dark mode
+ * Custom styles for React Flow to work with shadcn/ui theme system
  */
 
-/* Dark mode overrides for React Flow */
-.dark .react-flow {
-  background-color: hsl(var(--background));
+/* Make React Flow background transparent - use page background */
+.react-flow {
+  background-color: transparent !important;
 }
 
-.dark .react-flow__node {
+.react-flow__pane {
+  background-color: transparent !important;
+}
+
+.react-flow__node {
   color: hsl(var(--foreground));
 }
 
