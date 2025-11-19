@@ -55,6 +55,16 @@ export function validateGraph(
 }
 
 /**
+ * Main export for backend use (alias of validateGraph)
+ */
+export function validateWorkflowGraph(
+  nodes: Node[],
+  edges: Edge[]
+): ValidationResult {
+  return validateGraph(nodes, edges);
+}
+
+/**
  * Validate before save
  */
 export function validateBeforeSave(

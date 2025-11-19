@@ -101,12 +101,13 @@ export async function POST(
       AUDIT_ACTIONS.WORKFLOW_PUBLISHED,
       AUDIT_ENTITIES.WORKFLOW,
       workflow.id,
-      request,
-      {
+      { status: 'DRAFT', isActive: false }, // oldValue
+      { 
         workflowName: workflow.name,
         trigger: workflow.trigger,
-      },
-      'HIGH' // High severity for publishing workflows
+        status: 'ACTIVE',
+        isActive: true
+      }
     );
 
     console.log(`✅ [Workflow Publish API] Workflow published: ${workflow.id}`);

@@ -192,7 +192,7 @@ export async function PATCH(
       AUDIT_ACTIONS.WORKFLOW_UPDATED,
       AUDIT_ENTITIES.WORKFLOW,
       workflow.id,
-      request,
+      { workflowName: existingWorkflow.name }, // oldValue
       {
         workflowName: workflow.name,
         changes: validated,
@@ -280,10 +280,8 @@ export async function DELETE(
       AUDIT_ACTIONS.WORKFLOW_DELETED,
       AUDIT_ENTITIES.WORKFLOW,
       workflow.id,
-      request,
-      {
-        workflowName: workflow.name,
-      }
+      { workflowName: workflow.name, status: 'ACTIVE' }, // oldValue
+      { workflowName: workflow.name, status: 'ARCHIVED' } // newValue
     );
 
     console.log(`✅ [Workflow API] Workflow archived: ${workflow.id}`);

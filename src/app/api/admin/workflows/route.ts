@@ -256,7 +256,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       AUDIT_ACTIONS.WORKFLOW_CREATED,
       AUDIT_ENTITIES.WORKFLOW,
       workflow.id,
-      request,
+      {}, // oldValue (empty for new workflow)
       {
         workflowName: workflow.name,
         trigger: workflow.trigger,
