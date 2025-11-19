@@ -198,6 +198,26 @@ function HttpRequestNode({ data, selected }: NodeProps<HttpRequestNodeData>) {
                 <span className="font-mono">{data.config.timeout / 1000}s</span>
               </div>
             )}
+
+            {/* Execution Result - HTTP specific */}
+            {data.executionResult && (
+              <>
+                {data.executionResult.status && (
+                  <div className="flex items-center justify-between pt-2 mt-2 border-t border-current/20">
+                    <span className="font-medium opacity-70">Status:</span>
+                    <Badge variant={data.executionResult.success ? 'default' : 'destructive'} className="text-xs">
+                      {data.executionResult.status}
+                    </Badge>
+                  </div>
+                )}
+                {data.executionResult.duration && (
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium opacity-70">Duration:</span>
+                    <span className="font-mono">{data.executionResult.duration}ms</span>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
 

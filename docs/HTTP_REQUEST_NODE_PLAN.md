@@ -68,7 +68,7 @@ Create a professional HTTP Request node matching n8n's functionality and UX.
 
 ## 🏗️ Implementation Phases
 
-### Phase 1: Enhanced Request Configuration ✅ → 🔄
+### Phase 1: Enhanced Request Configuration ✅
 **Files to update:**
 - `src/lib/validations/http-request.ts` - Extended schema
 - `src/app/(admin)/admin/workflows/[id]/_components/PropertiesPanel.tsx` - New form sections
@@ -81,7 +81,7 @@ Create a professional HTTP Request node matching n8n's functionality and UX.
 4. Add Body content editor based on type
 5. Expression support for all fields
 
-### Phase 2: Advanced Authentication 🔄
+### Phase 2: Response Handling & Testing ✅
 **Files to create/update:**
 - `src/lib/services/http-auth.service.ts` - Auth handlers
 - `src/components/workflows/CredentialSelector.tsx` - Credential picker
