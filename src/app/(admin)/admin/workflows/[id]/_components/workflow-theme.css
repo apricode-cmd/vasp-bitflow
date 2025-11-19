@@ -106,24 +106,28 @@
   transition: all 0.2s ease;
 }
 
-/* Custom edge styles */
+/* Custom edge styles - Thicker and clearer */
 .react-flow__edge-path {
-  stroke-width: 2.5;
+  stroke-width: 3.5 !important;
   transition: stroke-width 0.2s ease;
+  opacity: 0.9;
 }
 
 .react-flow__edge:hover .react-flow__edge-path {
-  stroke-width: 3.5;
+  stroke-width: 4.5 !important;
+  opacity: 1;
 }
 
 .react-flow__edge.animated path {
   stroke-dasharray: 8 4;
   animation: dashdraw 1s linear infinite;
+  stroke-width: 3.5 !important;
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
-  stroke-width: 4;
-  filter: drop-shadow(0 0 4px rgba(var(--primary-rgb), 0.5));
+  stroke-width: 5 !important;
+  filter: drop-shadow(0 0 6px rgba(var(--primary-rgb), 0.6));
+  opacity: 1;
 }
 
 .react-flow__edge .react-flow__edge-path {

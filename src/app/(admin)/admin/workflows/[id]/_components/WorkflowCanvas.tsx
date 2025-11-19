@@ -100,22 +100,21 @@ export default function WorkflowCanvas({
     [onEdgesChange, onEdgesChangeProp]
   );
 
-  // Handle node click
+  // Handle node click - DO NOT open properties on single click
   const handleNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
-      if (onNodeClick && !readOnly) {
-        onNodeClick(node);
-      }
+      // Single click just selects the node, doesn't open properties
+      // Properties open only on double-click or via context menu
     },
-    [onNodeClick, readOnly]
+    [readOnly]
   );
 
-  // Handle node double click for quick edit
+  // Handle node double click - open properties
   const handleNodeDoubleClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
       if (onNodeClick && !readOnly) {
         onNodeClick(node);
-        toast.info('Editing node', { duration: 1000 });
+        toast.info('Editing node properties', { duration: 1000 });
       }
     },
     [onNodeClick, readOnly]
@@ -197,20 +196,20 @@ export default function WorkflowCanvas({
       }
       else if (sourceNode?.type === 'action') edgeColor = '#a3a3a3'; // Light gray
 
-      // Add edge with styling
+      // Add edge with styling (thicker and clearer)
       const newEdge = {
         ...connection,
         type: edgeType,
         animated: sourceNode?.type === 'trigger',
         style: { 
-          strokeWidth: 2.5,
+          strokeWidth: 3.5,
           stroke: edgeColor,
         },
         markerEnd: {
           type: 'arrowclosed' as const,
           color: edgeColor,
-          width: 20,
-          height: 20,
+          width: 22,
+          height: 22,
         },
       };
 
@@ -231,15 +230,20 @@ export default function WorkflowCanvas({
       if (!data || !reactFlowBounds || !reactFlowInstance.current) return;
 
       const { nodeType, nodeData } = JSON.parse(data);
+      
+      // Get accurate position in flow coordinates
       const position = reactFlowInstance.current.screenToFlowPosition({
-        x: event.clientX - reactFlowBounds.left,
-        y: event.clientY - reactFlowBounds.top,
+        x: event.clientX,
+        y: event.clientY,
       });
 
       const newNode: Node = {
         id: `${nodeType}-${Date.now()}`,
         type: nodeType,
-        position,
+        position: {
+          x: position.x - 140, // Center node horizontally (280px width / 2)
+          y: position.y - 75,  // Center node vertically (150px height / 2)
+        },
         data: nodeData,
       };
 
@@ -328,11 +332,15 @@ export default function WorkflowCanvas({
   const handleContextMenuAction = useCallback((action: string, data?: any) => {
     switch (action) {
       case 'edit':
-        if (data && onNodeClick) onNodeClick(data);
+        // Open properties panel
+        if (data && onNodeClick && !readOnly) {
+          onNodeClick(data);
+          toast.info('Opening node properties', { duration: 1000 });
+        }
         break;
       
       case 'duplicate':
-        if (data) {
+        if (data && !readOnly) {
           const newNode: Node = {
             ...data,
             id: `${data.type}-${Date.now()}`,
@@ -347,8 +355,58 @@ export default function WorkflowCanvas({
         }
         break;
       
+      case 'copy':
+        // Copy node to clipboard (browser clipboard API)
+        if (data && !readOnly) {
+          try {
+            const nodeCopy = JSON.stringify({
+              type: data.type,
+              data: data.data,
+            });
+            navigator.clipboard.writeText(nodeCopy);
+            toast.success('Node copied to clipboard');
+          } catch (error) {
+            toast.error('Failed to copy node');
+          }
+        }
+        break;
+      
+      case 'paste':
+        // Paste from clipboard
+        if (!readOnly) {
+          try {
+            navigator.clipboard.readText().then((text) => {
+              const { type, data: nodeData } = JSON.parse(text);
+              const newNode: Node = {
+                id: `${type}-${Date.now()}`,
+                type,
+                position: { x: 100, y: 100 }, // Default position
+                data: nodeData,
+              };
+              setNodes((nds) => [...nds, newNode]);
+              toast.success('Node pasted');
+            });
+          } catch (error) {
+            toast.error('Nothing to paste or invalid data');
+          }
+        }
+        break;
+      
+      case 'disable':
+        if (data && !readOnly) {
+          setNodes((nds) =>
+            nds.map((n) =>
+              n.id === data.id
+                ? { ...n, data: { ...n.data, disabled: !n.data?.disabled } }
+                : n
+            )
+          );
+          toast.success(data.data?.disabled ? 'Node enabled' : 'Node disabled');
+        }
+        break;
+      
       case 'delete':
-        if (data) {
+        if (data && !readOnly) {
           setNodes((nds) => nds.filter((n) => n.id !== data.id));
           setEdges((eds) => eds.filter((e) => e.source !== data.id && e.target !== data.id));
           toast.success('Node deleted');
@@ -356,9 +414,16 @@ export default function WorkflowCanvas({
         break;
       
       case 'deleteEdge':
-        if (data) {
+        if (data && !readOnly) {
           setEdges((eds) => eds.filter((e) => e.id !== data.id));
           toast.success('Connection deleted');
+        }
+        break;
+      
+      case 'editEdge':
+        if (data && !readOnly) {
+          // TODO: Implement edge label editing
+          toast.info('Edge editing coming soon');
         }
         break;
       
@@ -366,22 +431,31 @@ export default function WorkflowCanvas({
         handleFitView();
         break;
       
+      case 'autoLayout':
+        // TODO: Implement auto-layout with Dagre
+        toast.info('Auto-layout coming soon');
+        break;
+      
       case 'alignLeft':
       case 'alignCenter':
       case 'alignRight':
-        alignNodesHorizontally(action.replace('align', '').toLowerCase() as 'left' | 'center' | 'right');
+        if (!readOnly) {
+          alignNodesHorizontally(action.replace('align', '').toLowerCase() as 'left' | 'center' | 'right');
+        }
         break;
       
       case 'alignTop':
       case 'alignMiddle':
       case 'alignBottom':
-        alignNodesVertically(action.replace('align', '').toLowerCase() as 'top' | 'middle' | 'bottom');
+        if (!readOnly) {
+          alignNodesVertically(action.replace('align', '').toLowerCase() as 'top' | 'middle' | 'bottom');
+        }
         break;
       
       default:
         console.log('Unknown action:', action);
     }
-  }, [onNodeClick, setNodes, setEdges, handleFitView]);
+  }, [onNodeClick, setNodes, setEdges, handleFitView, alignNodesHorizontally, alignNodesVertically, readOnly]);
 
   // Alignment functions
   const alignNodesHorizontally = useCallback((alignment: 'left' | 'center' | 'right') => {
@@ -521,15 +595,15 @@ export default function WorkflowCanvas({
         defaultEdgeOptions={{
           type: 'smoothstep',
           animated: false,
-          style: { strokeWidth: 2.5 },
+          style: { strokeWidth: 3.5 },
           markerEnd: {
             type: 'arrowclosed',
-            width: 20,
-            height: 20,
+            width: 22,
+            height: 22,
           },
         }}
         connectionLineStyle={{
-          strokeWidth: 2.5,
+          strokeWidth: 3.5,
           stroke: '#94a3b8',
           strokeDasharray: '5 5',
         }}
