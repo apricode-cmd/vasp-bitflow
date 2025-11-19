@@ -3,7 +3,10 @@
  * 
  * Helper functions for country codes and flags
  * Supports ALL ISO 3166-1 alpha-2 country codes
+ * Auto-converts Alpha-3 codes to Alpha-2 for compatibility with multiple KYC providers
  */
+
+import { alpha3ToIso2 } from './country-codes';
 
 // Map country codes to flag emojis (Unicode Regional Indicator Symbols)
 export function getCountryFlag(countryCode: string): string {
@@ -11,11 +14,17 @@ export function getCountryFlag(countryCode: string): string {
     return '🌍'; // Default globe emoji for empty/null
   }
 
-  // Validate ISO 3166-1 alpha-2 format (2 letters)
-  const code = countryCode.toUpperCase().trim();
+  let code = countryCode.toUpperCase().trim();
   
+  // ✅ Auto-detect and convert Alpha-3 (3 letters) to Alpha-2 (2 letters)
+  // This handles both Sumsub (ISO 3166-1 alpha-3) and KYCAID (ISO 3166-1 alpha-2) formats
+  if (code.length === 3) {
+    code = alpha3ToIso2(code);
+  }
+  
+  // Validate ISO 3166-1 alpha-2 format (2 letters)
   if (code.length !== 2 || !/^[A-Z]{2}$/.test(code)) {
-    console.warn(`Invalid country code: "${countryCode}". Expected 2-letter ISO code.`);
+    console.warn(`Invalid country code after conversion: "${countryCode}" → "${code}". Expected 2-letter ISO code.`);
     return '🌍'; // Default globe emoji for invalid codes
   }
 
@@ -32,6 +41,14 @@ export function getCountryFlag(countryCode: string): string {
 // Get country name from code (Complete ISO 3166-1 alpha-2 list)
 export function getCountryName(countryCode: string): string {
   if (!countryCode) return '';
+  
+  let code = countryCode.toUpperCase().trim();
+  
+  // ✅ Auto-detect and convert Alpha-3 (3 letters) to Alpha-2 (2 letters)
+  // This handles both Sumsub (ISO 3166-1 alpha-3) and KYCAID (ISO 3166-1 alpha-2) formats
+  if (code.length === 3) {
+    code = alpha3ToIso2(code);
+  }
   
   const countries: Record<string, string> = {
     // Europe
@@ -101,7 +118,6 @@ export function getCountryName(countryCode: string): string {
     'CK': 'Cook Islands', 'PN': 'Pitcairn Islands',
   };
 
-  const code = countryCode.toUpperCase();
   return countries[code] || code;
 }
 
