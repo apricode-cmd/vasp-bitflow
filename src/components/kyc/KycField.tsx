@@ -4,7 +4,7 @@
  */
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense, lazy } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,9 +14,12 @@ import { CountryDropdown } from '@/components/ui/country-dropdown';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { Button } from '@/components/ui/button';
 import { KycField as KycFieldType } from '@/lib/kyc/config';
-import { Upload, FileText, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Upload, FileText, CheckCircle, XCircle, Loader2, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Value as PhoneValue } from 'react-phone-number-input';
+
+// Lazy load camera component (только когда нужно)
+const CameraCapture = lazy(() => import('./CameraCapture').then(m => ({ default: m.CameraCapture })));
 
 interface Props {
   field: KycFieldType;
@@ -206,6 +209,7 @@ export function KycField({ field, value, onChange, error, formData = {} }: Props
 
 /**
  * FileUploadField - File upload with preview and upload to KYC provider
+ * Enhanced with camera capture support
  */
 function FileUploadField({ field, value, onChange, error, formData = {} }: {
   field: KycFieldType;
@@ -216,6 +220,7 @@ function FileUploadField({ field, value, onChange, error, formData = {} }: {
 }) {
   const [uploading, setUploading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<any>(value);
+  const [showCamera, setShowCamera] = useState(false);
 
   const handleFileSelect = async (file: File) => {
     // Validate file
@@ -323,6 +328,14 @@ function FileUploadField({ field, value, onChange, error, formData = {} }: {
     onChange(null);
   };
 
+  /**
+   * Handle photo captured from camera
+   */
+  const handleCameraCapture = (capturedFile: File) => {
+    setShowCamera(false);
+    handleFileSelect(capturedFile);
+  };
+
   // Already uploaded
   if (uploadedFile && uploadedFile.status === 'success') {
     return (
@@ -357,7 +370,19 @@ function FileUploadField({ field, value, onChange, error, formData = {} }: {
 
   // Upload UI
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
+      {/* Camera Modal (lazy loaded) */}
+      {showCamera && (
+        <Suspense fallback={<div className="text-center py-4">Loading camera...</div>}>
+          <CameraCapture
+            onCapture={handleCameraCapture}
+            onCancel={() => setShowCamera(false)}
+            documentType={field.label}
+          />
+        </Suspense>
+      )}
+
+      {/* Drag & Drop Upload Area */}
       <div className={`group relative flex items-center justify-center border-2 border-dashed rounded-xl p-8 transition-all duration-200 ${
         error 
           ? 'border-destructive bg-destructive/5' 
@@ -406,6 +431,28 @@ function FileUploadField({ field, value, onChange, error, formData = {} }: {
           }}
         />
       </div>
+
+      {/* OR Divider */}
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-border"></div>
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">or</span>
+        </div>
+      </div>
+
+      {/* Take Photo Button */}
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full h-12"
+        onClick={() => setShowCamera(true)}
+        disabled={uploading}
+      >
+        <Camera className="h-4 w-4 mr-2" />
+        Take Photo
+      </Button>
     </div>
   );
 }
