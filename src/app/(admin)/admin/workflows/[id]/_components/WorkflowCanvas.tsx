@@ -322,6 +322,30 @@ export default function WorkflowCanvas({
       }, 100);
     }
   }, [nodes.length]);
+  
+  // Update node className based on execution status
+  useEffect(() => {
+    setNodes((nds) =>
+      nds.map((node) => {
+        const executionStatus = node.data?.executionStatus;
+        let className = '';
+        
+        if (executionStatus === 'running') {
+          className = 'node-executing';
+        } else if (executionStatus === 'success') {
+          className = 'node-success';
+        } else if (executionStatus === 'error') {
+          className = 'node-error';
+        }
+        
+        // Only update if className changed
+        if (node.className !== className) {
+          return { ...node, className };
+        }
+        return node;
+      })
+    );
+  }, [nodes.map(n => n.data?.executionStatus).join(','), setNodes]);
 
   // Handle select all nodes (Ctrl+A / Cmd+A)
   const selectAllPressed = useKeyPress(['Meta+a', 'Control+a']);

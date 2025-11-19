@@ -26,6 +26,7 @@ import {
   ChevronRight,
   ChevronDown,
   AlertCircle,
+  Copy,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -132,6 +133,15 @@ export default function ExecutionPanel({
     if (template) {
       setContextData(JSON.stringify(template, null, 2));
       toast.success('Template loaded');
+    }
+  };
+  
+  const handleCopyJSON = (data: any, label: string) => {
+    try {
+      navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+      toast.success(`${label} copied to clipboard`);
+    } catch (error) {
+      toast.error('Failed to copy');
     }
   };
 
@@ -401,24 +411,37 @@ export default function ExecutionPanel({
             />
           </div>
 
-          <Button
-            onClick={handleExecute}
-            disabled={isExecuting}
-            className="w-full"
-            size="sm"
-          >
-            {isExecuting ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Executing...
-              </>
-            ) : (
-              <>
-                <Play className="h-4 w-4 mr-2" />
-                Execute Workflow
-              </>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleExecute}
+              disabled={isExecuting}
+              className="flex-1"
+              size="sm"
+            >
+              {isExecuting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Executing...
+                </>
+              ) : (
+                <>
+                  <Play className="h-4 w-4 mr-2" />
+                  Execute
+                </>
+              )}
+            </Button>
+            {execution && !isExecuting && (
+              <Button
+                onClick={handleExecute}
+                variant="outline"
+                size="sm"
+                className="px-3"
+                title="Re-run execution"
+              >
+                <RotateCw className="h-4 w-4" />
+              </Button>
             )}
-          </Button>
+          </div>
 
           {/* Execution Summary */}
           {execution && (
@@ -521,7 +544,17 @@ export default function ExecutionPanel({
 
                             {step.input && (
                               <div className="space-y-1">
-                                <Label className="text-[10px]">Input</Label>
+                                <div className="flex items-center justify-between">
+                                  <Label className="text-[10px]">Input</Label>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleCopyJSON(step.input, 'Input')}
+                                    className="h-5 w-5 p-0"
+                                  >
+                                    <Copy className="h-3 w-3" />
+                                  </Button>
+                                </div>
                                 <pre className="text-[10px] font-mono bg-background p-2 rounded overflow-x-auto max-h-32">
                                   {JSON.stringify(step.input, null, 2)}
                                 </pre>
@@ -530,7 +563,17 @@ export default function ExecutionPanel({
 
                             {step.output && (
                               <div className="space-y-1">
-                                <Label className="text-[10px]">Output</Label>
+                                <div className="flex items-center justify-between">
+                                  <Label className="text-[10px]">Output</Label>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleCopyJSON(step.output, 'Output')}
+                                    className="h-5 w-5 p-0"
+                                  >
+                                    <Copy className="h-3 w-3" />
+                                  </Button>
+                                </div>
                                 <pre className="text-[10px] font-mono bg-background p-2 rounded overflow-x-auto max-h-32">
                                   {JSON.stringify(step.output, null, 2)}
                                 </pre>
