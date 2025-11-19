@@ -65,6 +65,7 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [testDialogOpen, setTestDialogOpen] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
 
   const isNewWorkflow = workflowId === 'create';
 
@@ -211,6 +212,32 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
     );
     setSelectedNode(null);
     toast.success('Node updated');
+  }, []);
+
+  // Handle execution status update for visualization
+  const handleExecutionStatusUpdate = useCallback((nodeId: string, executionData: any) => {
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === nodeId
+          ? { ...node, data: { ...node.data, ...executionData } }
+          : node
+      )
+    );
+  }, []);
+
+  // Clear execution status from all nodes
+  const clearExecutionStatus = useCallback(() => {
+    setNodes((nds) =>
+      nds.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          executionStatus: undefined,
+          executionResult: undefined,
+          executionTime: undefined,
+        },
+      }))
+    );
   }, []);
 
   if (loading) {
@@ -413,6 +440,13 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
           onOpenChange={setTestDialogOpen}
           workflowId={workflowId}
           trigger={trigger}
+          nodes={nodes}
+          onExecutionStatusUpdate={handleExecutionStatusUpdate}
+          onExecutionStart={() => {
+            setIsExecuting(true);
+            clearExecutionStatus();
+          }}
+          onExecutionEnd={() => setIsExecuting(false)}
         />
       )}
     </div>

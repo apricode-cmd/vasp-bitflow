@@ -7,6 +7,7 @@
  */
 
 import { useState } from 'react';
+import type { Node } from '@xyflow/react';
 import {
   Dialog,
   DialogContent,
@@ -29,6 +30,10 @@ interface TestWorkflowDialogProps {
   onOpenChange: (open: boolean) => void;
   workflowId: string;
   trigger: string;
+  nodes: Node[];
+  onExecutionStatusUpdate: (nodeId: string, executionData: any) => void;
+  onExecutionStart: () => void;
+  onExecutionEnd: () => void;
 }
 
 // Sample data templates for different triggers
@@ -86,6 +91,10 @@ export default function TestWorkflowDialog({
   onOpenChange,
   workflowId,
   trigger,
+  nodes,
+  onExecutionStatusUpdate,
+  onExecutionStart,
+  onExecutionEnd,
 }: TestWorkflowDialogProps) {
   const [contextData, setContextData] = useState<string>(
     JSON.stringify(SAMPLE_DATA_TEMPLATES[trigger] || {}, null, 2)
@@ -93,13 +102,67 @@ export default function TestWorkflowDialog({
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<any>(null);
 
+  // Simulate node-by-node execution with visual feedback
+  const simulateExecution = async (nodes: Node[]) => {
+    // Find trigger node
+    const triggerNode = nodes.find(n => n.type === 'trigger');
+    if (!triggerNode) return;
+
+    // Step 1: Trigger running
+    onExecutionStatusUpdate(triggerNode.id, { 
+      executionStatus: 'running',
+      executionResult: undefined,
+      executionTime: undefined
+    });
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Step 2: Trigger success
+    onExecutionStatusUpdate(triggerNode.id, { 
+      executionStatus: 'success',
+      executionTime: Math.floor(Math.random() * 50) + 10
+    });
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // Step 3: Process other nodes (simplified simulation)
+    const otherNodes = nodes.filter(n => n.type !== 'trigger');
+    for (const node of otherNodes) {
+      // Running
+      onExecutionStatusUpdate(node.id, { 
+        executionStatus: 'running',
+        executionResult: undefined,
+        executionTime: undefined
+      });
+      await new Promise(resolve => setTimeout(resolve, 400));
+
+      // Success with result
+      if (node.type === 'condition') {
+        const result = Math.random() > 0.5;
+        onExecutionStatusUpdate(node.id, { 
+          executionStatus: 'success',
+          executionResult: result,
+          executionTime: Math.floor(Math.random() * 30) + 5
+        });
+      } else {
+        onExecutionStatusUpdate(node.id, { 
+          executionStatus: 'success',
+          executionTime: Math.floor(Math.random() * 40) + 10
+        });
+      }
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+  };
+
   const handleTest = async () => {
     try {
       setTesting(true);
       setResult(null);
+      onExecutionStart();
 
       // Parse context data
       const parsedData = JSON.parse(contextData);
+
+      // Start visual simulation
+      const simulationPromise = simulateExecution(nodes);
 
       // Call test API
       const response = await fetch(`/api/admin/workflows/${workflowId}/test`, {
@@ -109,6 +172,9 @@ export default function TestWorkflowDialog({
           contextData: parsedData,
         }),
       });
+
+      // Wait for simulation to complete
+      await simulationPromise;
 
       if (!response.ok) {
         const error = await response.json();
@@ -125,8 +191,19 @@ export default function TestWorkflowDialog({
         toast.error(error instanceof Error ? error.message : 'Test failed');
       }
       console.error(error);
+      
+      // Mark all nodes as error
+      nodes.forEach(node => {
+        onExecutionStatusUpdate(node.id, { 
+          executionStatus: 'error',
+          executionTime: 0
+        });
+      });
     } finally {
       setTesting(false);
+      setTimeout(() => {
+        onExecutionEnd();
+      }, 2000); // Keep visualization for 2 seconds
     }
   };
 

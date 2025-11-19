@@ -107,6 +107,17 @@ export default function WorkflowCanvas({
     [onNodeClick, readOnly]
   );
 
+  // Handle node double click for quick edit
+  const handleNodeDoubleClick = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      if (onNodeClick && !readOnly) {
+        onNodeClick(node);
+        toast.info('Editing node', { duration: 1000 });
+      }
+    },
+    [onNodeClick, readOnly]
+  );
+
   // Handle new connections
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -241,6 +252,7 @@ export default function WorkflowCanvas({
         onEdgesChange={handleEdgesChange}
         onConnect={onConnect}
         onNodeClick={handleNodeClick}
+        onNodeDoubleClick={handleNodeDoubleClick}
         onInit={(instance) => {
           reactFlowInstance.current = instance;
           // Set initial zoom to 75% for better overview (like n8n)
