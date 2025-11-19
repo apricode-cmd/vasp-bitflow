@@ -106,191 +106,42 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
   }, [stopCamera]);
 
   /**
-   * Attach stream to video element - ENTERPRISE GRADE
+   * Attach stream to video element - NATIVE & SIMPLE
    */
   useEffect(() => {
     if (!stream || !videoRef.current || capturedImage) return;
 
     const video = videoRef.current;
-    let retryCount = 0;
-    const MAX_RETRIES = 3;
     
-    console.log('🎬 [Camera] Attaching stream to video element...');
-    console.log('📊 [Camera] Stream info:', {
-      id: stream.id,
-      active: stream.active,
-      tracks: stream.getTracks().map(t => ({
-        kind: t.kind,
-        enabled: t.enabled,
-        readyState: t.readyState,
-        muted: t.muted,
-        label: t.label
-      }))
-    });
-
-    // Validate stream
-    const videoTracks = stream.getVideoTracks();
-    if (videoTracks.length === 0) {
-      console.error('❌ [Camera] No video tracks in stream');
-      setStreamError('No video tracks available');
-      return;
-    }
-
-    if (!stream.active) {
-      console.error('❌ [Camera] Stream is not active');
-      setStreamError('Camera stream is not active');
-      return;
-    }
-
-    const attachStream = async (attempt = 1) => {
-      try {
-        console.log(`🔄 [Camera] Attach attempt ${attempt}/${MAX_RETRIES}`);
-        
-        // Check if video element is visible
-        const isVisible = video.offsetParent !== null;
-        console.log('👁️  [Camera] Video element visible:', isVisible);
-        
-        if (!isVisible && attempt === 1) {
-          console.warn('⚠️  [Camera] Video element not visible, waiting...');
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-        
-        // Clear any existing srcObject
-        if (video.srcObject) {
-          video.srcObject = null;
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-        
-        // Set srcObject
-        video.srcObject = stream;
-        console.log('📎 [Camera] srcObject set');
-        
-        // Force attributes for mobile compatibility
-        video.setAttribute('playsinline', 'true');
-        video.setAttribute('autoplay', 'true');
-        video.setAttribute('muted', 'true');
-        video.muted = true;
-        video.playsInline = true;
-        
-        // Wait for metadata
-        await new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error('Metadata load timeout (5s)'));
-          }, 5000);
-
-          video.onloadedmetadata = () => {
-            clearTimeout(timeout);
-            console.log('📹 [Camera] Video metadata loaded');
-            console.log('📐 [Camera] Video dimensions:', {
-              videoWidth: video.videoWidth,
-              videoHeight: video.videoHeight,
-              clientWidth: video.clientWidth,
-              clientHeight: video.clientHeight,
-              offsetWidth: video.offsetWidth,
-              offsetHeight: video.offsetHeight
-            });
-            
-            // Validate dimensions
-            if (video.videoWidth === 0 || video.videoHeight === 0) {
-              reject(new Error('Video dimensions are zero'));
-              return;
-            }
-            
-            resolve();
-          };
-
-          video.onerror = (e) => {
-            clearTimeout(timeout);
-            console.error('❌ [Camera] Video element error:', e);
-            reject(new Error(`Video element error: ${e}`));
-          };
-          
-          // Fallback: if metadata doesn't load, try to play anyway after delay
-          setTimeout(() => {
-            if (video.readyState === 0) {
-              console.warn('⚠️  [Camera] Metadata not loaded after 3s, forcing play...');
-              video.load();
-            }
-          }, 3000);
-        });
-
-        // Try to play
-        console.log('▶️  [Camera] Attempting to play video...');
-        await video.play();
-        
-        console.log('✅ [Camera] Video playing successfully');
-        console.log('📊 [Camera] Final state:', {
-          playing: !video.paused,
-          currentTime: video.currentTime,
-          readyState: video.readyState,
-          networkState: video.networkState
-        });
-        
-        setStreamError(null);
-        
-        // Set diagnostics
-        setDiagnostics({
-          success: true,
-          attempt,
-          videoTrack: videoTracks[0].getSettings(),
-          videoElement: {
-            videoWidth: video.videoWidth,
-            videoHeight: video.videoHeight,
-            readyState: video.readyState,
+    console.log('🎬 [Camera] Simple native attach - stream:', stream.id.slice(0, 8));
+    
+    // NATIVE: Direct assignment
+    video.srcObject = stream;
+    
+    // Simple play on loadedmetadata
+    const handleLoadedMetadata = () => {
+      console.log('📹 [Camera] Metadata loaded, playing...');
+      video.play()
+        .then(() => {
+          console.log('✅ [Camera] Playing!', {
+            dimensions: `${video.videoWidth}x${video.videoHeight}`,
             paused: video.paused,
-            muted: video.muted,
-            currentTime: video.currentTime
-          },
-          userAgent: navigator.userAgent
-        });
-
-      } catch (err: any) {
-        console.error(`❌ [Camera] Attach attempt ${attempt} failed:`, err);
-        console.error('📊 [Camera] Error state:', {
-          videoReadyState: video.readyState,
-          videoPaused: video.paused,
-          srcObject: video.srcObject ? 'set' : 'null',
-          streamActive: stream.active,
-          videoTracksCount: videoTracks.length
-        });
-        
-        if (attempt < MAX_RETRIES) {
-          retryCount = attempt;
-          console.log(`⏳ [Camera] Retrying in 1 second...`);
-          // Retry with delay
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          await attachStream(attempt + 1);
-        } else {
-          console.error('❌ [Camera] All attach attempts failed');
-          setStreamError(`Camera display failed: ${err.message}`);
-          setDiagnostics({
-            success: false,
-            error: err.message,
-            stack: err.stack,
-            attempts: MAX_RETRIES,
-            videoState: {
-              readyState: video.readyState,
-              networkState: video.networkState,
-              paused: video.paused
-            },
-            streamState: {
-              active: stream.active,
-              tracks: stream.getTracks().map(t => ({
-                kind: t.kind,
-                readyState: t.readyState,
-                enabled: t.enabled
-              }))
-            }
+            readyState: video.readyState
           });
-        }
-      }
+          setStreamError(null);
+        })
+        .catch(err => {
+          console.error('❌ [Camera] Play failed:', err);
+          setStreamError(err.message);
+        });
     };
-
-    attachStream();
-
+    
+    video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    
     // Cleanup
     return () => {
-      if (video.srcObject) {
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      if (video.srcObject === stream) {
         video.srcObject = null;
       }
     };
