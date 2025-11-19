@@ -232,18 +232,33 @@ export default function WorkflowCanvas({
       const { nodeType, nodeData } = JSON.parse(data);
       
       // Get accurate position in flow coordinates
-      const position = reactFlowInstance.current.screenToFlowPosition({
+      let position = reactFlowInstance.current.screenToFlowPosition({
         x: event.clientX,
         y: event.clientY,
       });
 
+      // If this is the first node, place it in the center of the viewport
+      if (nodes.length === 0) {
+        const viewport = reactFlowInstance.current.getViewport();
+        const { innerWidth, innerHeight } = window;
+        
+        // Calculate center of visible area
+        const centerX = (innerWidth / 2 - viewport.x) / viewport.zoom;
+        const centerY = (innerHeight / 2 - viewport.y) / viewport.zoom;
+        
+        position = { x: centerX - 140, y: centerY - 75 };
+      } else {
+        // Regular drop - center under cursor
+        position = {
+          x: position.x - 140, // Center node horizontally (280px width / 2)
+          y: position.y - 75,  // Center node vertically (150px height / 2)
+        };
+      }
+
       const newNode: Node = {
         id: `${nodeType}-${Date.now()}`,
         type: nodeType,
-        position: {
-          x: position.x - 140, // Center node horizontally (280px width / 2)
-          y: position.y - 75,  // Center node vertically (150px height / 2)
-        },
+        position,
         data: nodeData,
       };
 
@@ -292,6 +307,21 @@ export default function WorkflowCanvas({
       onTest();
     }
   }, [onTest]);
+
+  // Auto-fit view when nodes are first added to empty canvas
+  useEffect(() => {
+    if (nodes.length === 1 && reactFlowInstance.current) {
+      // First node added - center it
+      setTimeout(() => {
+        reactFlowInstance.current?.fitView({ 
+          padding: 0.3,
+          minZoom: 0.5,
+          maxZoom: 1,
+          duration: 300,
+        });
+      }, 100);
+    }
+  }, [nodes.length]);
 
   // Handle select all nodes (Ctrl+A / Cmd+A)
   const selectAllPressed = useKeyPress(['Meta+a', 'Control+a']);
@@ -583,8 +613,21 @@ export default function WorkflowCanvas({
         onPaneContextMenu={handlePaneContextMenu}
         onInit={(instance) => {
           reactFlowInstance.current = instance;
-          // Set initial zoom to 75% for better overview (like n8n)
-          instance.setViewport({ x: 100, y: 100, zoom: 0.75 });
+          
+          // If there are nodes, fit them to view with padding
+          if (initialNodes.length > 0) {
+            setTimeout(() => {
+              instance.fitView({ 
+                padding: 0.2,
+                minZoom: 0.5,
+                maxZoom: 1,
+                duration: 300,
+              });
+            }, 50);
+          } else {
+            // Set initial zoom to 75% for empty canvas
+            instance.setViewport({ x: 100, y: 100, zoom: 0.75 });
+          }
         }}
         onDrop={onDrop}
         onDragOver={onDragOver}
