@@ -28,8 +28,6 @@ import TriggerConfigDialog from './TriggerConfigDialog';
 import KeyValuePairBuilder, { type KeyValuePair } from '@/components/workflows/KeyValuePairBuilder';
 import { HTTP_REQUEST_TEMPLATES, type HttpRequestTemplate } from '@/lib/validations/http-request';
 import HttpRequestTester from './HttpRequestTester';
-import NodePropertiesModal from './NodePropertiesModal';
-import { useState } from 'react';
 import type { Edge } from '@xyflow/react';
 import type { TriggerConfig } from '@/lib/validations/trigger-config';
 import { useState as useReactState } from 'react';
@@ -145,7 +143,6 @@ export default function PropertiesPanel({
 }: PropertiesPanelProps) {
   const [formData, setFormData] = useState<any>({});
   const [showTriggerConfig, setShowTriggerConfig] = useReactState(false);
-  const [showFullscreen, setShowFullscreen] = useReactState(false);
 
   // Initialize form data when node is selected
   useEffect(() => {
@@ -444,14 +441,14 @@ export default function PropertiesPanel({
     const handleLoadTemplate = (templateKey: string) => {
       const template = HTTP_REQUEST_TEMPLATES[templateKey as HttpRequestTemplate];
       if (template) {
-        const { name, ...templateConfig } = template;
+        const { name, ...templateConfig } = template as any;
         setFormData((prev: any) => ({
           ...prev,
           config: {
             ...prev.config,
             ...templateConfig,
-            queryParams: templateConfig.queryParams || [],
-            headers: templateConfig.headers || [],
+            queryParams: (templateConfig as any).queryParams || [],
+            headers: (templateConfig as any).headers || [],
           },
         }));
       }
@@ -573,8 +570,6 @@ export default function PropertiesPanel({
                           : 'Raw content here'
                       }
                       availableVariables={availableVariables}
-                      rows={8}
-                      isJson={bodyType === 'JSON'}
                     />
                   </div>
                 )}
@@ -635,7 +630,6 @@ export default function PropertiesPanel({
                     onChange={(value) => handleConfigChange('auth', { ...config.auth, type: authType, password: value })}
                     placeholder="Password or {{ $env.API_PASSWORD }}"
                     availableVariables={availableVariables}
-                    type="password"
                   />
                 </div>
               </>
@@ -943,22 +937,7 @@ export default function PropertiesPanel({
   };
 
   return (
-    <>
-      {/* Fullscreen Modal */}
-      <NodePropertiesModal
-        open={showFullscreen}
-        selectedNode={selectedNode}
-        allNodes={allNodes}
-        allEdges={allEdges}
-        onClose={() => setShowFullscreen(false)}
-        onSave={(nodeId, data) => {
-          onUpdate(nodeId, data);
-          setShowFullscreen(false);
-        }}
-      />
-
-      {/* Sidebar Panel */}
-      <div className="w-[520px] border-l bg-background flex flex-col h-full shadow-xl">
+    <div className="w-[700px] border-l bg-background flex flex-col h-full shadow-xl">
         {/* Header */}
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-2">
@@ -973,17 +952,6 @@ export default function PropertiesPanel({
               variant="ghost"
               size="sm"
               className="h-8 w-8 p-0"
-              onClick={() => setShowFullscreen(true)}
-              title="Expand to fullscreen (more space)"
-            >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-              </svg>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0"
               onClick={onClose}
             >
               <X className="h-4 w-4" />
@@ -991,7 +959,7 @@ export default function PropertiesPanel({
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          Tip: Scroll down for all options. Click expand icon for more space.
+          Tip: Scroll down for all options.
         </p>
       </div>
 
@@ -1025,7 +993,6 @@ export default function PropertiesPanel({
         </div>
       </div>
     </div>
-    </>
   );
 }
 
