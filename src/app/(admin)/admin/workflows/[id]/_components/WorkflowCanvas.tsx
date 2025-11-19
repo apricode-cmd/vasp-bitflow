@@ -29,7 +29,7 @@ import './workflow-theme.css';
 
 import { nodeTypes } from './nodes';
 import { Button } from '@/components/ui/button';
-import { Save, Play, Eye, AlertCircle } from 'lucide-react';
+import { Save, Play, Eye, AlertCircle, Maximize2, MousePointer2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { compileWorkflow, validateWorkflowGraph } from '@/lib/workflows/compiler/graphToJsonLogic';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -243,11 +243,13 @@ export default function WorkflowCanvas({
         onNodeClick={handleNodeClick}
         onInit={(instance) => {
           reactFlowInstance.current = instance;
+          // Set initial zoom to 75% for better overview (like n8n)
+          instance.setViewport({ x: 100, y: 100, zoom: 0.75 });
         }}
         onDrop={onDrop}
         onDragOver={onDragOver}
         nodeTypes={nodeTypes}
-        fitView
+        fitView={false} // Disable auto-fit, use custom zoom
         snapToGrid
         snapGrid={[15, 15]}
         defaultEdgeOptions={{
@@ -255,6 +257,7 @@ export default function WorkflowCanvas({
           animated: true,
           style: { strokeWidth: 2 },
         }}
+        defaultViewport={{ x: 100, y: 100, zoom: 0.75 }}
         deleteKeyCode="Delete"
         selectionKeyCode="Shift"
         multiSelectionKeyCode="Shift"
@@ -262,13 +265,14 @@ export default function WorkflowCanvas({
         panOnDrag={[1, 2]} // Left + middle mouse button
         zoomOnScroll
         zoomOnDoubleClick
-        minZoom={0.2}
+        minZoom={0.1}
         maxZoom={2}
         nodesDraggable={!readOnly}
         nodesConnectable={!readOnly}
         nodesFocusable={!readOnly}
         edgesFocusable={!readOnly}
         elementsSelectable={!readOnly}
+        selectNodesOnDrag={false} // Better UX: don't select when dragging
       >
         {/* Background with dots - like n8n */}
         <Background
@@ -310,24 +314,48 @@ export default function WorkflowCanvas({
 
         {/* Top Panel (Toolbar) */}
         {!readOnly && (
-          <Panel position="top-right" className="space-x-2">
-            <Button
-              onClick={handleTest}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-            >
-              <Play className="h-4 w-4" />
-              Test
-            </Button>
-            <Button
-              onClick={handleSave}
-              size="sm"
-              className="gap-2"
-            >
-              <Save className="h-4 w-4" />
-              Save
-            </Button>
+          <Panel position="top-right" className="flex gap-2">
+            <div className="flex gap-2 border-r pr-2">
+              <Button
+                onClick={handleSelectAll}
+                variant="ghost"
+                size="sm"
+                title="Select All (Ctrl+A)"
+                className="gap-2"
+              >
+                <MousePointer2 className="h-4 w-4" />
+                Select All
+              </Button>
+              <Button
+                onClick={handleFitView}
+                variant="ghost"
+                size="sm"
+                title="Fit View"
+                className="gap-2"
+              >
+                <Maximize2 className="h-4 w-4" />
+                Fit View
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleTest}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <Play className="h-4 w-4" />
+                Test
+              </Button>
+              <Button
+                onClick={handleSave}
+                size="sm"
+                className="gap-2"
+              >
+                <Save className="h-4 w-4" />
+                Save
+              </Button>
+            </div>
           </Panel>
         )}
 
