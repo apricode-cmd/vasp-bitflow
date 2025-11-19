@@ -250,119 +250,60 @@
   }
 }
 
-/* Node execution states - Enhanced visual feedback */
+/* Node execution states - Clean indicators only, no movement */
 
-/* Running state - Strong yellow glow + pulse */
+/* Running state - Yellow border only */
 .react-flow__node.node-executing {
-  animation: node-executing-pulse 1.2s ease-in-out infinite;
-  box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.4), 
-              0 0 20px rgba(234, 179, 8, 0.3),
-              0 4px 6px -1px rgb(0 0 0 / 0.2) !important;
+  box-shadow: 0 0 0 2px #eab308 !important;
   position: relative;
   z-index: 100;
 }
 
-/* Success state - Green glow + scale pop */
+/* Success state - Green border */
 .react-flow__node.node-success {
-  animation: node-success-pop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.6),
-              0 0 20px rgba(34, 197, 94, 0.4),
-              0 4px 6px -1px rgb(0 0 0 / 0.2) !important;
+  box-shadow: 0 0 0 2px #22c55e !important;
+  position: relative;
 }
 
-/* Error state - Red glow + intense shake */
+/* Error state - Red border */
 .react-flow__node.node-error {
-  animation: node-error-intense 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97);
-  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.6),
-              0 0 20px rgba(239, 68, 68, 0.4),
-              0 4px 6px -1px rgb(0 0 0 / 0.2) !important;
+  box-shadow: 0 0 0 2px #ef4444 !important;
+  position: relative;
 }
 
-/* Executing animation - pulse + glow */
-@keyframes node-executing-pulse {
-  0%, 100% {
-    transform: scale(1);
-    box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.4), 
-                0 0 20px rgba(234, 179, 8, 0.3),
-                0 4px 6px -1px rgb(0 0 0 / 0.2);
-  }
-  50% {
-    transform: scale(1.05);
-    box-shadow: 0 0 0 6px rgba(234, 179, 8, 0.2), 
-                0 0 30px rgba(234, 179, 8, 0.5),
-                0 8px 12px -2px rgb(0 0 0 / 0.3);
-  }
-}
-
-/* Success animation - pop effect */
-@keyframes node-success-pop {
-  0% {
-    transform: scale(1);
-    box-shadow: 0 0 0 0px rgba(34, 197, 94, 0),
-                0 0 0px rgba(34, 197, 94, 0);
-  }
-  40% {
-    transform: scale(1.15);
-    box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.4),
-                0 0 40px rgba(34, 197, 94, 0.6);
-  }
-  100% {
-    transform: scale(1);
-    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.6),
-                0 0 20px rgba(34, 197, 94, 0.4);
-  }
-}
-
-/* Error animation - shake + red flash */
-@keyframes node-error-intense {
-  0%, 100% {
-    transform: translateX(0) rotate(0deg);
-    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.6),
-                0 0 20px rgba(239, 68, 68, 0.4);
-  }
-  10%, 30%, 50%, 70%, 90% {
-    transform: translateX(-8px) rotate(-1deg);
-    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.8),
-                0 0 30px rgba(239, 68, 68, 0.6);
-  }
-  20%, 40%, 60%, 80% {
-    transform: translateX(8px) rotate(1deg);
-    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.8),
-                0 0 30px rgba(239, 68, 68, 0.6);
-  }
-}
-
-/* Spinning progress indicator overlay */
+/* Spinning progress indicator overlay - Bigger and clearer */
 .react-flow__node.node-executing::before {
   content: '';
   position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 24px;
-  height: 24px;
-  border: 3px solid rgba(234, 179, 8, 0.2);
+  top: -8px;
+  right: -8px;
+  width: 32px;
+  height: 32px;
+  border: 4px solid rgba(234, 179, 8, 0.2);
   border-top-color: #eab308;
+  border-right-color: #eab308;
   border-radius: 50%;
   animation: spinner-rotate 0.8s linear infinite;
   z-index: 10;
   background: white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 .dark .react-flow__node.node-executing::before {
   background: hsl(var(--background));
-  border-color: rgba(234, 179, 8, 0.3);
+  border-color: rgba(234, 179, 8, 0.2);
   border-top-color: #eab308;
+  border-right-color: #eab308;
 }
 
-/* Success checkmark overlay */
+/* Success checkmark overlay - No animation */
 .react-flow__node.node-success::after {
   content: '✓';
   position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 24px;
-  height: 24px;
+  top: -8px;
+  right: -8px;
+  width: 32px;
+  height: 32px;
   background: #22c55e;
   color: white;
   border-radius: 50%;
@@ -370,20 +311,19 @@
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  font-size: 14px;
+  font-size: 18px;
   z-index: 10;
   box-shadow: 0 2px 8px rgba(34, 197, 94, 0.4);
-  animation: checkmark-appear 0.3s ease-out 0.3s backwards;
 }
 
-/* Error X overlay */
+/* Error X overlay - No animation */
 .react-flow__node.node-error::after {
   content: '✕';
   position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 24px;
-  height: 24px;
+  top: -8px;
+  right: -8px;
+  width: 32px;
+  height: 32px;
   background: #ef4444;
   color: white;
   border-radius: 50%;
@@ -391,40 +331,18 @@
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  font-size: 14px;
+  font-size: 18px;
   z-index: 10;
   box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
-  animation: error-appear 0.3s ease-out 0.3s backwards;
 }
 
+/* Spinner rotation - smooth infinite spin */
 @keyframes spinner-rotate {
   from {
     transform: rotate(0deg);
   }
   to {
     transform: rotate(360deg);
-  }
-}
-
-@keyframes checkmark-appear {
-  from {
-    transform: scale(0) rotate(-180deg);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1) rotate(0deg);
-    opacity: 1;
-  }
-}
-
-@keyframes error-appear {
-  from {
-    transform: scale(0);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
   }
 }
 
