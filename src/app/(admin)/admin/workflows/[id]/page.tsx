@@ -18,7 +18,7 @@ export default function WorkflowEditorPage({ params }: PageProps) {
   const workflowId = params.id;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="absolute inset-0 flex flex-col">
       <WorkflowEditor workflowId={workflowId} />
     </div>
   );

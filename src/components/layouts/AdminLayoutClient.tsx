@@ -59,19 +59,16 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps): React.R
           <ResizablePanel defaultSize={DEFAULT_SIDEBAR_SIZE} minSize={15} maxSize={30} className="min-w-[220px]">
             <AdminSidebar />
           </ResizablePanel>
-          <ResizableHandle className="w-px bg-transparent hover:bg-primary/30 transition-all duration-200 group relative">
-            <div className="absolute inset-y-0 -left-px w-[3px] bg-gradient-to-r from-transparent via-border/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          </ResizableHandle>
-          <ResizablePanel defaultSize={82} minSize={50}>
-            <div className="flex flex-col h-full overflow-auto">
-              <main className="flex-1">
-                <div className="container mx-auto p-6 max-w-[1600px]">
-                  {children}
-                </div>
-              </main>
-              <AdminFooter />
-            </div>
-          </ResizablePanel>
+        <ResizableHandle className="w-px bg-transparent hover:bg-primary/30 transition-all duration-200 group relative">
+          <div className="absolute inset-y-0 -left-px w-[3px] bg-gradient-to-r from-transparent via-border/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        </ResizableHandle>
+        <ResizablePanel defaultSize={82} minSize={50}>
+          <div className="flex flex-col h-full relative">
+            <main className="flex-1 relative">
+              {children}
+            </main>
+          </div>
+        </ResizablePanel>
         </ResizablePanelGroup>
       </div>
     );
@@ -106,13 +103,10 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps): React.R
 
         {/* Main Content Panel */}
         <ResizablePanel defaultSize={82} minSize={50}>
-          <div className="flex flex-col h-full overflow-auto">
-            <main className="flex-1">
-              <div className="container mx-auto p-6 max-w-[1600px]">
-                {children}
-              </div>
+          <div className="flex flex-col h-full relative">
+            <main className="flex-1 relative">
+              {children}
             </main>
-            <AdminFooter />
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
