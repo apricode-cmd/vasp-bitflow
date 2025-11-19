@@ -28,6 +28,8 @@ import TriggerConfigDialog from './TriggerConfigDialog';
 import KeyValuePairBuilder, { type KeyValuePair } from '@/components/workflows/KeyValuePairBuilder';
 import { HTTP_REQUEST_TEMPLATES, type HttpRequestTemplate } from '@/lib/validations/http-request';
 import HttpRequestTester from './HttpRequestTester';
+import NodePropertiesModal from './NodePropertiesModal';
+import { useState } from 'react';
 import type { Edge } from '@xyflow/react';
 import type { TriggerConfig } from '@/lib/validations/trigger-config';
 import { useState as useReactState } from 'react';
@@ -143,6 +145,7 @@ export default function PropertiesPanel({
 }: PropertiesPanelProps) {
   const [formData, setFormData] = useState<any>({});
   const [showTriggerConfig, setShowTriggerConfig] = useReactState(false);
+  const [showFullscreen, setShowFullscreen] = useReactState(false);
 
   // Initialize form data when node is selected
   useEffect(() => {
@@ -940,8 +943,23 @@ export default function PropertiesPanel({
   };
 
   return (
-    <div className="w-[520px] border-l bg-background flex flex-col h-full shadow-xl">
-      {/* Header */}
+    <>
+      {/* Fullscreen Modal */}
+      <NodePropertiesModal
+        open={showFullscreen}
+        selectedNode={selectedNode}
+        allNodes={allNodes}
+        allEdges={allEdges}
+        onClose={() => setShowFullscreen(false)}
+        onSave={(nodeId, data) => {
+          onUpdate(nodeId, data);
+          setShowFullscreen(false);
+        }}
+      />
+
+      {/* Sidebar Panel */}
+      <div className="w-[520px] border-l bg-background flex flex-col h-full shadow-xl">
+        {/* Header */}
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-2">
           <div>
@@ -955,11 +973,8 @@ export default function PropertiesPanel({
               variant="ghost"
               size="sm"
               className="h-8 w-8 p-0"
-              onClick={() => {
-                // TODO: Open fullscreen dialog
-                alert('Fullscreen mode coming soon! For now, you can scroll in this panel.');
-              }}
-              title="Expand to fullscreen"
+              onClick={() => setShowFullscreen(true)}
+              title="Expand to fullscreen (more space)"
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
@@ -1010,6 +1025,7 @@ export default function PropertiesPanel({
         </div>
       </div>
     </div>
+    </>
   );
 }
 
