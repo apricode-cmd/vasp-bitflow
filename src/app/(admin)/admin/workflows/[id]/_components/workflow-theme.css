@@ -250,46 +250,181 @@
   }
 }
 
-/* Node execution states */
+/* Node execution states - Enhanced visual feedback */
+
+/* Running state - Strong yellow glow + pulse */
 .react-flow__node.node-executing {
-  animation: node-pulse 1.5s ease-in-out infinite;
+  animation: node-executing-pulse 1.2s ease-in-out infinite;
+  box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.4), 
+              0 0 20px rgba(234, 179, 8, 0.3),
+              0 4px 6px -1px rgb(0 0 0 / 0.2) !important;
+  position: relative;
+  z-index: 100;
 }
 
+/* Success state - Green glow + scale pop */
 .react-flow__node.node-success {
-  animation: node-success-flash 0.5s ease-out;
+  animation: node-success-pop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.6),
+              0 0 20px rgba(34, 197, 94, 0.4),
+              0 4px 6px -1px rgb(0 0 0 / 0.2) !important;
 }
 
+/* Error state - Red glow + intense shake */
 .react-flow__node.node-error {
-  animation: node-error-shake 0.5s ease-out;
+  animation: node-error-intense 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.6),
+              0 0 20px rgba(239, 68, 68, 0.4),
+              0 4px 6px -1px rgb(0 0 0 / 0.2) !important;
 }
 
-@keyframes node-pulse {
+/* Executing animation - pulse + glow */
+@keyframes node-executing-pulse {
   0%, 100% {
     transform: scale(1);
+    box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.4), 
+                0 0 20px rgba(234, 179, 8, 0.3),
+                0 4px 6px -1px rgb(0 0 0 / 0.2);
   }
   50% {
-    transform: scale(1.02);
+    transform: scale(1.05);
+    box-shadow: 0 0 0 6px rgba(234, 179, 8, 0.2), 
+                0 0 30px rgba(234, 179, 8, 0.5),
+                0 8px 12px -2px rgb(0 0 0 / 0.3);
   }
 }
 
-@keyframes node-success-flash {
-  0%, 100% {
-    filter: brightness(1);
+/* Success animation - pop effect */
+@keyframes node-success-pop {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0px rgba(34, 197, 94, 0),
+                0 0 0px rgba(34, 197, 94, 0);
   }
-  50% {
-    filter: brightness(1.2);
+  40% {
+    transform: scale(1.15);
+    box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.4),
+                0 0 40px rgba(34, 197, 94, 0.6);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.6),
+                0 0 20px rgba(34, 197, 94, 0.4);
   }
 }
 
-@keyframes node-error-shake {
+/* Error animation - shake + red flash */
+@keyframes node-error-intense {
   0%, 100% {
-    transform: translateX(0);
+    transform: translateX(0) rotate(0deg);
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.6),
+                0 0 20px rgba(239, 68, 68, 0.4);
   }
-  25% {
-    transform: translateX(-4px);
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-8px) rotate(-1deg);
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.8),
+                0 0 30px rgba(239, 68, 68, 0.6);
   }
-  75% {
-    transform: translateX(4px);
+  20%, 40%, 60%, 80% {
+    transform: translateX(8px) rotate(1deg);
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.8),
+                0 0 30px rgba(239, 68, 68, 0.6);
+  }
+}
+
+/* Spinning progress indicator overlay */
+.react-flow__node.node-executing::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(234, 179, 8, 0.2);
+  border-top-color: #eab308;
+  border-radius: 50%;
+  animation: spinner-rotate 0.8s linear infinite;
+  z-index: 10;
+  background: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.dark .react-flow__node.node-executing::before {
+  background: hsl(var(--background));
+  border-color: rgba(234, 179, 8, 0.3);
+  border-top-color: #eab308;
+}
+
+/* Success checkmark overlay */
+.react-flow__node.node-success::after {
+  content: '✓';
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 24px;
+  height: 24px;
+  background: #22c55e;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.4);
+  animation: checkmark-appear 0.3s ease-out 0.3s backwards;
+}
+
+/* Error X overlay */
+.react-flow__node.node-error::after {
+  content: '✕';
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 24px;
+  height: 24px;
+  background: #ef4444;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+  animation: error-appear 0.3s ease-out 0.3s backwards;
+}
+
+@keyframes spinner-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes checkmark-appear {
+  from {
+    transform: scale(0) rotate(-180deg);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes error-appear {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
   }
 }
 
