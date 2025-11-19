@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminRole } from '@/lib/middleware/admin-auth';
+import { requireAdminAuth } from '@/lib/middleware/admin-auth';
 import { httpExecutor } from '@/lib/services/http-executor.service';
 import { HttpRequestConfig } from '@/lib/validations/http-request';
 import { z } from 'zod';
@@ -23,9 +23,9 @@ const TestRequestSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     // Require admin authentication
-    const adminAuth = await requireAdminRole(request, ['SUPER_ADMIN', 'COMPLIANCE_OFFICER']);
-    if (!adminAuth.authorized) {
-      return NextResponse.json({ error: adminAuth.error }, { status: 401 });
+    const session = await requireAdminAuth();
+    if (session instanceof NextResponse) {
+      return session; // Return 401 error
     }
 
     // Parse request body

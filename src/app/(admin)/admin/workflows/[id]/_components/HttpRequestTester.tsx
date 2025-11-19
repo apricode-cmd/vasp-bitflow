@@ -30,10 +30,11 @@ export default function HttpRequestTester({ config }: HttpRequestTesterProps) {
       const variables = testContext ? JSON.parse(testContext) : {};
       const env = testEnv ? JSON.parse(testEnv) : {};
 
-      // Make request
+      // Make request with credentials
       const res = await fetch('/api/admin/workflows/test-http', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // Include cookies for auth
         body: JSON.stringify({
           config,
           context: { variables, env },
