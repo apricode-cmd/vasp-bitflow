@@ -871,6 +871,11 @@ export default function PropertiesPanel({
   const renderActionForm = () => {
     const actionType = ACTION_TYPES.find(a => a.value === formData.actionType);
 
+    // Special handling for HTTP_REQUEST - use dedicated form
+    if (formData.actionType === 'HTTP_REQUEST') {
+      return renderHttpRequestForm();
+    }
+
     return (
       <div className="space-y-4">
         <div>
@@ -990,7 +995,6 @@ export default function PropertiesPanel({
         {selectedNode.type === 'trigger' && renderTriggerForm()}
         {selectedNode.type === 'condition' && renderConditionForm()}
         {selectedNode.type === 'action' && renderActionForm()}
-        {selectedNode.type === 'httpRequest' && renderHttpRequestForm()}
       </div>
 
       {/* Footer */}

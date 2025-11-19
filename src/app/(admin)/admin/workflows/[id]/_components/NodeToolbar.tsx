@@ -85,30 +85,7 @@ const NODE_LIBRARY: NodeCategory[] = [
       { type: 'action', icon: AlertTriangle, label: 'Flag for Review', actionType: 'FLAG_FOR_REVIEW' },
       { type: 'action', icon: CheckCircle, label: 'Auto Approve', actionType: 'AUTO_APPROVE' },
       { type: 'action', icon: AlertTriangle, label: 'Escalate', actionType: 'ESCALATE_TO_COMPLIANCE' },
-    ],
-  },
-  {
-    category: 'Integrations',
-    color: 'bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800',
-    textColor: 'text-purple-900 dark:text-purple-100',
-    iconColor: 'text-purple-600 dark:text-purple-400',
-    nodes: [
-      { 
-        type: 'httpRequest', 
-        icon: Globe, 
-        label: 'HTTP Request',
-        data: { 
-          actionType: 'HTTP_REQUEST',
-          config: {
-            method: 'GET',
-            url: '',
-            authType: 'NONE',
-            authToken: '',
-            body: '',
-            timeout: 30000,
-          }
-        },
-      },
+      { type: 'action', icon: Globe, label: 'HTTP Request', actionType: 'HTTP_REQUEST' },
     ],
   },
 ];

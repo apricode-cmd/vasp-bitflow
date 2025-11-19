@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   XCircle,
   Loader2,
+  Globe,
 } from 'lucide-react';
 
 export type ExecutionStatus = 'idle' | 'running' | 'success' | 'error';
@@ -79,6 +80,12 @@ const ACTION_CONFIG = {
     label: 'Escalate to Compliance',
     color: 'bg-destructive/10 text-destructive border-destructive/30',
     iconColor: 'text-destructive',
+  },
+  HTTP_REQUEST: {
+    icon: Globe,
+    label: 'HTTP Request',
+    color: 'bg-primary/10 text-primary border-primary/30',
+    iconColor: 'text-primary',
   },
 };
 
@@ -207,6 +214,27 @@ function ActionNode({ data, selected }: NodeProps<ActionNodeData>) {
                 <div className="flex items-center justify-between">
                   <span className="font-medium opacity-70">Min Approvals:</span>
                   <span className="font-mono">{data.config.minApprovals}</span>
+                </div>
+              )}
+              {/* HTTP_REQUEST specific fields */}
+              {data.actionType === 'HTTP_REQUEST' && data.config.method && (
+                <div className="flex items-center justify-between">
+                  <span className="font-medium opacity-70">Method:</span>
+                  <Badge className="text-xs">{data.config.method}</Badge>
+                </div>
+              )}
+              {data.actionType === 'HTTP_REQUEST' && data.config.url && (
+                <div>
+                  <span className="font-medium opacity-70">URL:</span>
+                  <p className="mt-1 text-xs bg-background/60 rounded px-2 py-1 font-mono truncate">
+                    {data.config.url}
+                  </p>
+                </div>
+              )}
+              {data.actionType === 'HTTP_REQUEST' && data.config.auth?.type && data.config.auth.type !== 'NONE' && (
+                <div className="flex items-center justify-between">
+                  <span className="font-medium opacity-70">Auth:</span>
+                  <span className="font-mono text-xs">{data.config.auth.type.replace(/_/g, ' ')}</span>
                 </div>
               )}
             </div>
