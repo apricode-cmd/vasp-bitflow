@@ -254,23 +254,29 @@
 
 /* Yellow border when executing */
 .react-flow__node.node-executing {
-  outline: 2px solid #eab308;
-  outline-offset: 2px;
   position: relative;
+}
+
+.react-flow__node.node-executing > div {
+  box-shadow: 0 0 0 2px #eab308 !important;
 }
 
 /* Green border when success */
 .react-flow__node.node-success {
-  outline: 2px solid #22c55e;
-  outline-offset: 2px;
   position: relative;
+}
+
+.react-flow__node.node-success > div {
+  box-shadow: 0 0 0 2px #22c55e !important;
 }
 
 /* Red border when error */
 .react-flow__node.node-error {
-  outline: 2px solid #ef4444;
-  outline-offset: 2px;
   position: relative;
+}
+
+.react-flow__node.node-error > div {
+  box-shadow: 0 0 0 2px #ef4444 !important;
 }
 
 /* Spinner badge for running state */
