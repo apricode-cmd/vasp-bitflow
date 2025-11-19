@@ -27,6 +27,7 @@ import ExpressionInput from './ExpressionInput';
 import TriggerConfigDialog from './TriggerConfigDialog';
 import KeyValuePairBuilder, { type KeyValuePair } from '@/components/workflows/KeyValuePairBuilder';
 import { HTTP_REQUEST_TEMPLATES, type HttpRequestTemplate } from '@/lib/validations/http-request';
+import HttpRequestTester from './HttpRequestTester';
 import type { Edge } from '@xyflow/react';
 import type { TriggerConfig } from '@/lib/validations/trigger-config';
 import { useState as useReactState } from 'react';
@@ -679,6 +680,127 @@ export default function PropertiesPanel({
 
         <Separator />
 
+        {/* Response */}
+        <div>
+          <Label className="text-sm font-semibold mb-3 block">Response</Label>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Response Format</Label>
+              <Select
+                value={config.responseFormat || 'JSON'}
+                onValueChange={(value) => handleConfigChange('responseFormat', value)}
+              >
+                <SelectTrigger className="text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="JSON">JSON</SelectItem>
+                  <SelectItem value="TEXT">Text / String</SelectItem>
+                  <SelectItem value="BINARY">Binary Data</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="fullResponse"
+                checked={config.fullResponse === true}
+                onChange={(e) => handleConfigChange('fullResponse', e.target.checked)}
+                className="h-4 w-4"
+              />
+              <Label htmlFor="fullResponse" className="text-xs cursor-pointer">
+                Include Full Response (headers, status, body)
+              </Label>
+            </div>
+
+            {!config.fullResponse && (
+              <div>
+                <Label className="text-xs">Extract Property (JSONPath)</Label>
+                <Input
+                  value={config.extractPath || ''}
+                  onChange={(e) => handleConfigChange('extractPath', e.target.value)}
+                  placeholder="data.results or $.items[*]"
+                  className="text-xs font-mono"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Leave empty to return full body. Use JSONPath to extract specific data.
+                </p>
+              </div>
+            )}
+
+            <div>
+              <Label className="text-xs">Success Status Codes</Label>
+              <Input
+                value={(config.successStatusCodes || [200, 201, 204]).join(', ')}
+                onChange={(e) => {
+                  const codes = e.target.value.split(',').map(c => parseInt(c.trim())).filter(c => !isNaN(c));
+                  handleConfigChange('successStatusCodes', codes);
+                }}
+                placeholder="200, 201, 204"
+                className="text-xs font-mono"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Comma-separated status codes that indicate success
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Error Handling */}
+        <div>
+          <Label className="text-sm font-semibold mb-3 block">Error Handling</Label>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="retryOnFailure"
+                checked={config.retryOnFailure === true}
+                onChange={(e) => handleConfigChange('retryOnFailure', e.target.checked)}
+                className="h-4 w-4"
+              />
+              <Label htmlFor="retryOnFailure" className="text-xs cursor-pointer">
+                Retry on Failure
+              </Label>
+            </div>
+
+            {config.retryOnFailure && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">Retry Attempts</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="5"
+                      value={config.retryAttempts || 3}
+                      onChange={(e) => handleConfigChange('retryAttempts', parseInt(e.target.value) || 3)}
+                      className="text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Delay (ms)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={config.retryDelay || 1000}
+                      onChange={(e) => handleConfigChange('retryDelay', parseInt(e.target.value) || 1000)}
+                      className="text-xs"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Exponential backoff: delay × 2^attempt
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+
+        <Separator />
+
         {/* Options */}
         <div>
           <Label className="text-sm font-semibold mb-3 block">Options</Label>
@@ -718,6 +840,11 @@ export default function PropertiesPanel({
             </div>
           </div>
         </div>
+
+        <Separator />
+
+        {/* Test Panel */}
+        <HttpRequestTester config={formData.config || {}} />
       </div>
     );
   };
