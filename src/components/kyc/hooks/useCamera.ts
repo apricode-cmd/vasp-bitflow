@@ -160,12 +160,25 @@ export function useCamera(options: UseCameraOptions = {}): UseCameraReturn {
       let constraints: MediaStreamConstraints;
 
       if (isMobile) {
-        // Mobile: absolute minimal constraints (just get ANY camera)
+        // Mobile: minimal constraints BUT allow deviceId for switching
         console.log('📱 Mobile detected - using minimal constraints');
-        constraints = {
-          audio: false,
-          video: true  // Simplest possible - let browser decide everything
-        };
+        
+        if (currentDeviceId) {
+          // If specific device selected (switching cameras)
+          console.log('📷 Using specific device:', currentDeviceId);
+          constraints = {
+            audio: false,
+            video: {
+              deviceId: { exact: currentDeviceId }
+            }
+          };
+        } else {
+          // First time - just request any camera
+          constraints = {
+            audio: false,
+            video: true
+          };
+        }
       } else {
         // Desktop: use full constraints
         constraints = {
@@ -264,13 +277,15 @@ export function useCamera(options: UseCameraOptions = {}): UseCameraReturn {
     // Stop current stream
     stopCamera();
     
-    // Set new device
+    // Set new device and trigger restart
     setCurrentDeviceId(deviceId);
     
-    // Start with new device
-    // Note: startCamera will use the new currentDeviceId
-    // We need to wait for state update, so we'll start in useEffect
-  }, [stopCamera]);
+    // Small delay to ensure cleanup, then restart
+    setTimeout(async () => {
+      console.log('🔄 Restarting camera with new device:', deviceId);
+      await startCamera();
+    }, 100);
+  }, [stopCamera, startCamera]);
 
   /**
    * Cleanup on unmount
@@ -283,19 +298,6 @@ export function useCamera(options: UseCameraOptions = {}): UseCameraReturn {
       }
     };
   }, []);
-
-  /**
-   * Auto-start camera when deviceId changes (for switching)
-   */
-  useEffect(() => {
-    if (currentDeviceId && !stream) {
-      // Small delay to ensure state is updated
-      const timer = setTimeout(() => {
-        startCamera();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [currentDeviceId]); // Intentionally not including startCamera/stream to avoid loops
 
   return {
     stream,
