@@ -23,11 +23,15 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { X, Save } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import ExpressionInput from './ExpressionInput';
+import type { Edge } from '@xyflow/react';
 
 interface PropertiesPanelProps {
   selectedNode: Node | null;
   onClose: () => void;
   onUpdate: (nodeId: string, data: any) => void;
+  allNodes?: Node[];
+  allEdges?: Edge[];
 }
 
 // Field options for Condition nodes
@@ -116,6 +120,8 @@ export default function PropertiesPanel({
   selectedNode,
   onClose,
   onUpdate,
+  allNodes = [],
+  allEdges = [],
 }: PropertiesPanelProps) {
   const [formData, setFormData] = useState<any>({});
 
@@ -127,6 +133,81 @@ export default function PropertiesPanel({
   }, [selectedNode]);
 
   if (!selectedNode) return null;
+
+  // Get available variables from previous nodes (n8n-style)
+  const getAvailableVariables = () => {
+    if (!selectedNode) return [];
+
+    // Find all nodes that come BEFORE the selected node
+    const previousNodeIds = new Set<string>();
+    const visited = new Set<string>();
+
+    // Recursive function to find all upstream nodes
+    const findUpstream = (nodeId: string) => {
+      if (visited.has(nodeId)) return;
+      visited.add(nodeId);
+
+      const incomingEdges = allEdges.filter(e => e.target === nodeId);
+      incomingEdges.forEach(edge => {
+        previousNodeIds.add(edge.source);
+        findUpstream(edge.source);
+      });
+    };
+
+    findUpstream(selectedNode.id);
+
+    // Build variable groups from previous nodes
+    const variableGroups: any[] = [];
+
+    allNodes.forEach(node => {
+      if (!previousNodeIds.has(node.id)) return;
+
+      // Define what variables each node type exposes
+      let variables: any[] = [];
+
+      if (node.type === 'trigger') {
+        // Trigger exposes all context data
+        variables = [
+          { path: 'amount', label: 'Amount', type: 'number', example: 15000 },
+          { path: 'fiatAmount', label: 'Fiat Amount', type: 'number', example: 15000 },
+          { path: 'currency', label: 'Currency', type: 'string', example: 'BTC' },
+          { path: 'fiatCurrency', label: 'Fiat Currency', type: 'string', example: 'EUR' },
+          { path: 'userId', label: 'User ID', type: 'string', example: 'user_123' },
+          { path: 'email', label: 'Email', type: 'string', example: 'user@example.com' },
+          { path: 'country', label: 'Country', type: 'string', example: 'US' },
+          { path: 'kycStatus', label: 'KYC Status', type: 'string', example: 'APPROVED' },
+          { path: 'orderCount', label: 'Order Count', type: 'number', example: 5 },
+          { path: 'totalVolume', label: 'Total Volume', type: 'number', example: 50000 },
+        ];
+      } else if (node.type === 'condition') {
+        // Condition exposes its result
+        variables = [
+          { path: 'result', label: 'Condition Result', type: 'boolean', example: true },
+          { path: 'field', label: 'Checked Field', type: 'string', example: node.data.field },
+          { path: 'value', label: 'Comparison Value', type: 'any', example: node.data.value },
+        ];
+      } else if (node.type === 'action') {
+        // Action exposes its result
+        variables = [
+          { path: 'success', label: 'Action Success', type: 'boolean', example: true },
+          { path: 'actionType', label: 'Action Type', type: 'string', example: node.data.actionType },
+        ];
+      }
+
+      if (variables.length > 0) {
+        variableGroups.push({
+          nodeId: node.id,
+          nodeName: node.data.label || node.data.trigger || node.data.actionType || node.type,
+          nodeType: node.type,
+          variables,
+        });
+      }
+    });
+
+    return variableGroups;
+  };
+
+  const availableVariables = getAvailableVariables();
 
   const handleSave = () => {
     onUpdate(selectedNode.id, formData);
@@ -211,15 +292,16 @@ export default function PropertiesPanel({
 
         <div>
           <Label htmlFor="value" className="text-xs">Comparison Value</Label>
-          <Input
-            id="value"
-            type={selectedField?.type === 'number' ? 'number' : 'text'}
-            value={formData.value || ''}
-            onChange={(e) => handleFieldChange('value', selectedField?.type === 'number' ? parseFloat(e.target.value) : e.target.value)}
-            placeholder="Enter value..."
-            className="mt-1.5"
-          />
-          {['in', 'not_in'].includes(formData.operator) && (
+          <div className="mt-1.5">
+            <ExpressionInput
+              value={formData.value || ''}
+              onChange={(value) => handleFieldChange('value', value)}
+              placeholder="Enter value or use {{ }} expression..."
+              availableVariables={availableVariables}
+              type={selectedField?.type === 'number' ? 'number' : 'text'}
+            />
+          </div>
+          {['in', 'not_in'].includes(formData.operator) && !String(formData.value).includes('{{') && (
             <p className="text-xs text-muted-foreground mt-1">
               For array operators, use comma-separated values (e.g., "EUR,USD,GBP")
             </p>
@@ -278,14 +360,14 @@ export default function PropertiesPanel({
                     {field.label}
                   </Label>
                   {field.type === 'textarea' ? (
-                    <Textarea
-                      id={field.key}
-                      value={formData.config?.[field.key] || ''}
-                      onChange={(e) => handleConfigChange(field.key, e.target.value)}
-                      placeholder={`Enter ${field.label.toLowerCase()}...`}
-                      className="mt-1.5"
-                      rows={3}
-                    />
+                    <div className="mt-1.5">
+                      <ExpressionInput
+                        value={formData.config?.[field.key] || ''}
+                        onChange={(value) => handleConfigChange(field.key, value)}
+                        placeholder={`Enter ${field.label.toLowerCase()} or use {{ }} expression...`}
+                        availableVariables={availableVariables}
+                      />
+                    </div>
                   ) : field.type === 'select' ? (
                     <Select
                       value={formData.config?.[field.key] || ''}
@@ -302,18 +384,24 @@ export default function PropertiesPanel({
                         ))}
                       </SelectContent>
                     </Select>
-                  ) : (
+                  ) : field.type === 'number' ? (
                     <Input
                       id={field.key}
-                      type={field.type}
+                      type="number"
                       value={formData.config?.[field.key] || ''}
-                      onChange={(e) => handleConfigChange(
-                        field.key,
-                        field.type === 'number' ? parseInt(e.target.value) : e.target.value
-                      )}
+                      onChange={(e) => handleConfigChange(field.key, parseInt(e.target.value))}
                       placeholder={`Enter ${field.label.toLowerCase()}...`}
                       className="mt-1.5"
                     />
+                  ) : (
+                    <div className="mt-1.5">
+                      <ExpressionInput
+                        value={formData.config?.[field.key] || ''}
+                        onChange={(value) => handleConfigChange(field.key, value)}
+                        placeholder={`Enter ${field.label.toLowerCase()} or use {{ }} expression...`}
+                        availableVariables={availableVariables}
+                      />
+                    </div>
                   )}
                 </div>
               ))}

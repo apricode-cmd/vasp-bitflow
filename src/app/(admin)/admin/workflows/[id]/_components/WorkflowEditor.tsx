@@ -429,6 +429,8 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
             selectedNode={selectedNode}
             onClose={() => setSelectedNode(null)}
             onUpdate={handleNodeUpdate}
+            allNodes={nodes}
+            allEdges={edges}
           />
         )}
       </div>
