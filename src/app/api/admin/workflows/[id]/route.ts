@@ -192,7 +192,7 @@ export async function PATCH(
       AUDIT_ACTIONS.WORKFLOW_UPDATED,
       AUDIT_ENTITIES.WORKFLOW,
       workflow.id,
-      { workflowName: existingWorkflow.name }, // oldValue
+      { workflowName: existing.name }, // oldValue
       {
         workflowName: workflow.name,
         changes: validated,
