@@ -117,6 +117,18 @@ const ACTION_TYPES = [
     label: 'Escalate to Compliance',
     fields: [{ key: 'reason', label: 'Reason', type: 'text' }],
   },
+  {
+    value: 'HTTP_REQUEST',
+    label: 'HTTP Request',
+    fields: [
+      { key: 'method', label: 'HTTP Method', type: 'select', options: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] },
+      { key: 'url', label: 'URL', type: 'text' },
+      { key: 'authType', label: 'Auth Type', type: 'select', options: ['NONE', 'BEARER_TOKEN', 'BASIC_AUTH', 'API_KEY'] },
+      { key: 'authToken', label: 'Auth Token/Key', type: 'text' },
+      { key: 'body', label: 'Request Body (JSON)', type: 'textarea' },
+      { key: 'timeout', label: 'Timeout (ms)', type: 'number' },
+    ],
+  },
 ];
 
 export default function PropertiesPanel({

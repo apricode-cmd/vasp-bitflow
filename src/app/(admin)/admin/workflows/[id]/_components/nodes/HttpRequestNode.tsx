@@ -4,15 +4,11 @@
  * HTTP Request Node Component
  * 
  * n8n-style HTTP request node for external API integrations
+ * Styled to match ActionNode
  */
 
 import { memo } from 'react';
 import { Handle, Position, type Node } from '@xyflow/react';
-
-type NodeProps<T = any> = {
-  data: T;
-  selected: boolean;
-};
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -20,19 +16,22 @@ import {
   Loader2,
   CheckCircle,
   XCircle,
-  Lock,
-  Zap,
 } from 'lucide-react';
-import type { ExecutionStatus } from './TriggerNode';
-import type { HttpMethod, AuthType } from '@/lib/validations/http-request';
+
+type NodeProps<T = any> = {
+  data: T;
+  selected: boolean;
+};
+
+type ExecutionStatus = 'idle' | 'running' | 'success' | 'error';
 
 export interface HttpRequestNodeData {
   actionType: 'HTTP_REQUEST';
   config: {
-    method?: HttpMethod;
+    method?: string;
     url?: string;
     auth?: {
-      type?: AuthType;
+      type?: string;
     };
     timeout?: number;
     retryOnFailure?: boolean;
@@ -43,24 +42,15 @@ export interface HttpRequestNodeData {
   executionTime?: number;
 }
 
-const METHOD_COLORS: Record<HttpMethod, string> = {
-  GET: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
-  POST: 'bg-green-500/10 text-green-600 border-green-500/30',
-  PUT: 'bg-orange-500/10 text-orange-600 border-orange-500/30',
-  PATCH: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30',
-  DELETE: 'bg-red-500/10 text-red-600 border-red-500/30',
-  HEAD: 'bg-purple-500/10 text-purple-600 border-purple-500/30',
-  OPTIONS: 'bg-gray-500/10 text-gray-600 border-gray-500/30',
-};
-
 function HttpRequestNode({ data, selected }: NodeProps<HttpRequestNodeData>) {
   const method = data.config?.method || 'GET';
-  const url = data.config?.url || '';
-  const hasAuth = data.config?.auth && data.config.auth.type !== 'NONE';
-  const hasRetry = data.config?.retryOnFailure;
+  const url = data.config?.url || 'No URL configured';
 
   // Get hostname from URL
   const getHostname = (urlString: string) => {
+    if (!urlString || urlString === 'No URL configured') {
+      return urlString;
+    }
     try {
       // Handle expressions
       if (urlString.includes('{{')) {
@@ -103,10 +93,11 @@ function HttpRequestNode({ data, selected }: NodeProps<HttpRequestNodeData>) {
   return (
     <Card
       className={`
-        min-w-[320px] transition-all
+        min-w-[280px] transition-all
         ${selected ? 'ring-2 ring-primary shadow-lg' : 'shadow-md hover:shadow-lg'}
-        bg-card border-2 border-primary/20
+        bg-primary/10 text-primary border-primary/30
         ${getExecutionStyles()}
+        border-2
       `}
     >
       {/* Input Handle */}
@@ -119,12 +110,12 @@ function HttpRequestNode({ data, selected }: NodeProps<HttpRequestNodeData>) {
 
       <div className="p-4">
         {/* Header */}
-        <div className="flex items-center gap-3 mb-3">
-          <div className="p-2 rounded-lg bg-primary/10 text-primary">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 rounded-lg bg-background/80 text-primary">
             <Globe className="h-5 w-5" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <div className="flex items-center gap-2 mb-1">
               <Badge variant="outline" className="text-xs font-semibold">
                 HTTP REQUEST
               </Badge>
@@ -134,7 +125,7 @@ function HttpRequestNode({ data, selected }: NodeProps<HttpRequestNodeData>) {
                 </div>
               )}
             </div>
-            <h3 className="font-semibold text-sm leading-tight text-foreground">
+            <h3 className="font-semibold text-sm leading-tight">
               {getHostname(url)}
             </h3>
             {data.executionTime !== undefined && (
@@ -145,34 +136,48 @@ function HttpRequestNode({ data, selected }: NodeProps<HttpRequestNodeData>) {
           </div>
         </div>
 
-        {/* Method & URL */}
-        <div className="space-y-2 bg-muted/50 rounded-lg p-3 border border-border">
-          <div className="flex items-center gap-2">
-            <Badge className={`text-xs font-bold ${METHOD_COLORS[method]}`}>
-              {method}
-            </Badge>
-            <code className="text-xs font-mono text-foreground flex-1 truncate">
-              {url || 'No URL configured'}
-            </code>
-          </div>
+        {/* Config Details */}
+        <div className="mt-3 pt-3 border-t border-current/20">
+          <div className="text-xs space-y-2">
+            {/* Method */}
+            <div className="flex items-center justify-between">
+              <span className="font-medium opacity-70">Method:</span>
+              <Badge variant="secondary" className="text-xs font-bold">
+                {method}
+              </Badge>
+            </div>
 
-          {/* Features */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {hasAuth && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Lock className="h-3 w-3" />
-                <span>{data.config.auth?.type}</span>
+            {/* URL */}
+            {url && url !== 'No URL configured' && (
+              <div>
+                <span className="font-medium opacity-70">URL:</span>
+                <p className="mt-1 text-xs bg-background/60 rounded px-2 py-1 font-mono truncate">
+                  {url}
+                </p>
               </div>
             )}
-            {hasRetry && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Zap className="h-3 w-3" />
-                <span>Retry</span>
+
+            {/* Auth */}
+            {data.config?.auth && data.config.auth.type && data.config.auth.type !== 'NONE' && (
+              <div className="flex items-center justify-between">
+                <span className="font-medium opacity-70">Auth:</span>
+                <span className="font-mono">{data.config.auth.type}</span>
               </div>
             )}
+
+            {/* Timeout */}
             {data.config?.timeout && (
-              <div className="text-xs text-muted-foreground">
-                ⏱️ {data.config.timeout / 1000}s
+              <div className="flex items-center justify-between">
+                <span className="font-medium opacity-70">Timeout:</span>
+                <span className="font-mono">{data.config.timeout / 1000}s</span>
+              </div>
+            )}
+
+            {/* Retry */}
+            {data.config?.retryOnFailure && (
+              <div className="flex items-center justify-between">
+                <span className="font-medium opacity-70">Retry:</span>
+                <span className="font-mono">Enabled</span>
               </div>
             )}
           </div>
@@ -180,22 +185,25 @@ function HttpRequestNode({ data, selected }: NodeProps<HttpRequestNodeData>) {
 
         {/* Execution Result */}
         {data.executionResult && (
-          <div className="mt-3 pt-3 border-t border-border">
+          <div className="mt-3 pt-3 border-t border-current/20">
             <div className="text-xs space-y-1">
               {data.executionResult.status && (
                 <div className="flex items-center justify-between">
-                  <span className="font-medium text-muted-foreground">Status:</span>
+                  <span className="font-medium opacity-70">Status:</span>
                   <Badge 
                     variant={data.executionResult.status < 400 ? 'default' : 'destructive'}
                     className="text-xs"
                   >
-                    {data.executionResult.status} {data.executionResult.statusText}
+                    {data.executionResult.status}
                   </Badge>
                 </div>
               )}
               {data.executionResult.error && (
-                <div className="text-xs text-red-600 dark:text-red-400">
-                  Error: {data.executionResult.error}
+                <div>
+                  <span className="font-medium opacity-70">Error:</span>
+                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                    {data.executionResult.error}
+                  </p>
                 </div>
               )}
             </div>
@@ -215,4 +223,3 @@ function HttpRequestNode({ data, selected }: NodeProps<HttpRequestNodeData>) {
 }
 
 export default memo(HttpRequestNode);
-
