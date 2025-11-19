@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAdminRole } from '@/lib/auth/admin-auth-utils';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import {
   createWorkflowSchema,
   workflowFiltersSchema,
@@ -33,15 +33,21 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Parse query params
     const { searchParams } = new URL(request.url);
+    
+    const triggerParam = searchParams.get('trigger');
+    const statusParam = searchParams.get('status');
+    const sortByParam = searchParams.get('sortBy');
+    const sortOrderParam = searchParams.get('sortOrder');
+    
     const filters: Partial<WorkflowFiltersInput> = {
-      trigger: searchParams.get('trigger') as any,
-      status: searchParams.get('status') as any,
+      trigger: triggerParam ? (triggerParam as any) : undefined,
+      status: statusParam ? (statusParam as any) : undefined,
       isActive: searchParams.get('isActive') === 'true' ? true : searchParams.get('isActive') === 'false' ? false : undefined,
       search: searchParams.get('search') || undefined,
       page: Number(searchParams.get('page')) || 1,
       limit: Number(searchParams.get('limit')) || 20,
-      sortBy: (searchParams.get('sortBy') as any) || 'createdAt',
-      sortOrder: (searchParams.get('sortOrder') as any) || 'desc',
+      sortBy: sortByParam ? (sortByParam as any) : 'createdAt',
+      sortOrder: sortOrderParam ? (sortOrderParam as any) : 'desc',
     };
 
     // Validate filters
