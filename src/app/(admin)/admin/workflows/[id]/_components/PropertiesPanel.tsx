@@ -30,6 +30,12 @@ import KeyValuePairBuilder, { type KeyValuePair } from '@/components/workflows/K
 import { HTTP_REQUEST_TEMPLATES, type HttpRequestTemplate } from '@/lib/validations/http-request';
 import RejectTransactionForm from './actions/RejectTransactionForm';
 import FreezeOrderForm from './actions/FreezeOrderForm';
+import EscalateToComplianceForm from './actions/EscalateToComplianceForm';
+import RequireApprovalForm from './actions/RequireApprovalForm';
+import RequestDocumentForm from './actions/RequestDocumentForm';
+import SendNotificationForm from './actions/SendNotificationForm';
+import FlagForReviewForm from './actions/FlagForReviewForm';
+import AutoApproveForm from './actions/AutoApproveForm';
 import HttpRequestTester from './HttpRequestTester';
 import type { Edge } from '@xyflow/react';
 import type { TriggerConfig } from '@/lib/validations/trigger-config';
@@ -870,106 +876,67 @@ export default function PropertiesPanel({
     );
   };
 
+  // Helper to render action type selector
+  const renderActionTypeSelector = () => (
+    <div>
+      <Label htmlFor="actionType" className="text-xs">Action Type</Label>
+      <Select
+        value={formData.actionType || ''}
+        onValueChange={(value) => {
+          handleFieldChange('actionType', value);
+          handleFieldChange('config', {});
+        }}
+      >
+        <SelectTrigger id="actionType" className="mt-1.5">
+          <SelectValue placeholder="Select action..." />
+        </SelectTrigger>
+        <SelectContent>
+          {ACTION_TYPES.map((action) => (
+            <SelectItem key={action.value} value={action.value}>
+              {action.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
   const renderActionForm = () => {
     const actionType = ACTION_TYPES.find(a => a.value === formData.actionType);
+    const formProps = {
+      config: formData.config || {},
+      onChange: (newConfig: any) => handleFieldChange('config', newConfig),
+      availableVariables,
+    };
 
-    // Special handling for enterprise actions - use dedicated forms
-    if (formData.actionType === 'HTTP_REQUEST') {
-      return renderHttpRequestForm();
-    }
+    // Enterprise actions with dedicated forms
+    const enterpriseActions: Record<string, React.ReactNode> = {
+      HTTP_REQUEST: renderHttpRequestForm(),
+      REJECT_TRANSACTION: <RejectTransactionForm {...formProps} />,
+      FREEZE_ORDER: <FreezeOrderForm {...formProps} />,
+      ESCALATE_TO_COMPLIANCE: <EscalateToComplianceForm {...formProps} />,
+      REQUIRE_APPROVAL: <RequireApprovalForm {...formProps} />,
+      REQUEST_DOCUMENT: <RequestDocumentForm {...formProps} />,
+      SEND_NOTIFICATION: <SendNotificationForm {...formProps} />,
+      FLAG_FOR_REVIEW: <FlagForReviewForm {...formProps} />,
+      AUTO_APPROVE: <AutoApproveForm {...formProps} />,
+    };
 
-    if (formData.actionType === 'REJECT_TRANSACTION') {
+    // If enterprise form exists, render it
+    if (formData.actionType && enterpriseActions[formData.actionType]) {
       return (
         <div className="space-y-4">
-          <div>
-            <Label htmlFor="actionType" className="text-xs">Action Type</Label>
-            <Select
-              value={formData.actionType || ''}
-              onValueChange={(value) => {
-                handleFieldChange('actionType', value);
-                handleFieldChange('config', {});
-              }}
-            >
-              <SelectTrigger id="actionType" className="mt-1.5">
-                <SelectValue placeholder="Select action..." />
-              </SelectTrigger>
-              <SelectContent>
-                {ACTION_TYPES.map((action) => (
-                  <SelectItem key={action.value} value={action.value}>
-                    {action.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {renderActionTypeSelector()}
           <Separator />
-          <RejectTransactionForm
-            config={formData.config || {}}
-            onChange={(newConfig) => handleFieldChange('config', newConfig)}
-            availableVariables={availableVariables}
-          />
+          {enterpriseActions[formData.actionType]}
         </div>
       );
     }
 
-    if (formData.actionType === 'FREEZE_ORDER') {
-      return (
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="actionType" className="text-xs">Action Type</Label>
-            <Select
-              value={formData.actionType || ''}
-              onValueChange={(value) => {
-                handleFieldChange('actionType', value);
-                handleFieldChange('config', {});
-              }}
-            >
-              <SelectTrigger id="actionType" className="mt-1.5">
-                <SelectValue placeholder="Select action..." />
-              </SelectTrigger>
-              <SelectContent>
-                {ACTION_TYPES.map((action) => (
-                  <SelectItem key={action.value} value={action.value}>
-                    {action.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Separator />
-          <FreezeOrderForm
-            config={formData.config || {}}
-            onChange={(newConfig) => handleFieldChange('config', newConfig)}
-            availableVariables={availableVariables}
-          />
-        </div>
-      );
-    }
-
-    // Fallback to old basic form for other actions (will be enhanced later)
+    // Fallback to basic form for unknown actions
     return (
       <div className="space-y-4">
-        <div>
-          <Label htmlFor="actionType" className="text-xs">Action Type</Label>
-          <Select
-            value={formData.actionType || ''}
-            onValueChange={(value) => {
-              handleFieldChange('actionType', value);
-              handleFieldChange('config', {});
-            }}
-          >
-            <SelectTrigger id="actionType" className="mt-1.5">
-              <SelectValue placeholder="Select action..." />
-            </SelectTrigger>
-            <SelectContent>
-              {ACTION_TYPES.map((action) => (
-                <SelectItem key={action.value} value={action.value}>
-                  {action.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {renderActionTypeSelector()}
 
         {actionType && actionType.fields.length > 0 && (
           <>
