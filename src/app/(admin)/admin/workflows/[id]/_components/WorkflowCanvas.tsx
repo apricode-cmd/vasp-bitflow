@@ -323,11 +323,15 @@ export default function WorkflowCanvas({
     }
   }, [nodes.length]);
   
-  // Update node className based on execution status
+  // Update node className based on execution status from parent
   useEffect(() => {
+    if (!initialNodes) return;
+    
     setNodes((nds) =>
       nds.map((node) => {
-        const executionStatus = node.data?.executionStatus;
+        // Find corresponding node in initialNodes to get latest executionStatus
+        const initialNode = initialNodes.find(n => n.id === node.id);
+        const executionStatus = initialNode?.data?.executionStatus;
         let className = '';
         
         if (executionStatus === 'running') {
@@ -345,7 +349,7 @@ export default function WorkflowCanvas({
         return node;
       })
     );
-  }, [nodes.map(n => n.data?.executionStatus).join(','), setNodes]);
+  }, [initialNodes, setNodes]);
 
   // Handle select all nodes (Ctrl+A / Cmd+A)
   const selectAllPressed = useKeyPress(['Meta+a', 'Control+a']);
