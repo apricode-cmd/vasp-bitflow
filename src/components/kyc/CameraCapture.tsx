@@ -87,39 +87,73 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
   }, [isCameraSupported, open]);
 
   /**
-   * Attach stream to video element - MDN RECOMMENDED APPROACH
+   * Attach stream to video element - MDN RECOMMENDED APPROACH with EXTENSIVE LOGGING
    */
   useEffect(() => {
-    if (!stream || !videoRef.current || capturedImage) return;
+    if (!stream || !videoRef.current || capturedImage) {
+      console.log('⏭️ [Camera] Skipping stream attachment:', {
+        hasStream: !!stream,
+        hasVideo: !!videoRef.current,
+        hasCapturedImage: !!capturedImage
+      });
+      return;
+    }
 
     const video = videoRef.current;
     
     console.log('🎬 [Camera] Attaching stream to video', {
       streamId: stream.id,
-      tracks: stream.getTracks().length,
-      videoReady: video.readyState
+      streamActive: stream.active,
+      tracks: stream.getTracks().map(t => ({
+        kind: t.kind,
+        enabled: t.enabled,
+        readyState: t.readyState,
+        muted: t.muted
+      })),
+      videoElement: {
+        readyState: video.readyState,
+        paused: video.paused,
+        currentSrc: video.currentSrc,
+        networkState: video.networkState
+      }
     });
     
     // Handle canplay event (MDN recommended)
     const handleCanPlay = () => {
-      console.log('📹 [Camera] Can play - stream is ready');
+      console.log('📹 [Camera] ✅ CANPLAY EVENT - stream is ready, calling play()');
       video.play()
         .then(() => {
-          console.log('✅ [Camera] Video playing successfully');
+          console.log('✅ [Camera] Video playing successfully!', {
+            width: video.videoWidth,
+            height: video.videoHeight,
+            readyState: video.readyState
+          });
         })
         .catch(err => {
-          console.error('❌ [Camera] Play failed:', err);
+          console.error('❌ [Camera] Play() failed:', {
+            error: err,
+            name: err.name,
+            message: err.message
+          });
         });
     };
     
     // Set stream to video element
+    console.log('🔗 [Camera] Setting video.srcObject = stream');
     video.srcObject = stream;
     
-    // Listen for canplay event
+    console.log('👂 [Camera] Adding canplay event listener');
     video.addEventListener('canplay', handleCanPlay, { once: true });
+    
+    // Also try immediate play in case canplay already fired
+    if (video.readyState >= 3) { // HAVE_FUTURE_DATA or HAVE_ENOUGH_DATA
+      console.log('⚡ [Camera] Video already ready (readyState >= 3), playing immediately');
+      handleCanPlay();
+    }
     
     // Cleanup
     return () => {
+      console.log('🧹 [Camera] Cleaning up stream attachment');
       video.removeEventListener('canplay', handleCanPlay);
       if (video.srcObject) {
         video.srcObject = null;
@@ -388,15 +422,35 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
               }}
               onLoadedMetadata={(e) => {
                 const v = e.currentTarget;
-                console.log('📹 [Video] METADATA EVENT:', {
+                console.log('📹 [Video] METADATA LOADED:', {
                   width: v.videoWidth,
                   height: v.videoHeight,
+                  readyState: v.readyState,
+                  paused: v.paused,
+                  srcObject: !!v.srcObject
+                });
+              }}
+              onCanPlay={(e) => {
+                const v = e.currentTarget;
+                console.log('📹 [Video] CAN PLAY:', {
+                  readyState: v.readyState,
+                  paused: v.paused,
+                  size: `${v.videoWidth}x${v.videoHeight}`
+                });
+              }}
+              onPlay={() => console.log('📹 [Video] PLAY EVENT')}
+              onPlaying={(e) => {
+                const v = e.currentTarget;
+                console.log('📹 [Video] PLAYING:', {
+                  size: `${v.videoWidth}x${v.videoHeight}`,
                   readyState: v.readyState
                 });
               }}
-              onCanPlay={() => console.log('📹 [Video] CAN PLAY')}
-              onPlay={() => console.log('📹 [Video] PLAY EVENT')}
-              onPlaying={() => console.log('📹 [Video] PLAYING')}
+              onError={(e) => {
+                console.error('❌ [Video] ERROR:', e);
+              }}
+              onStalled={() => console.warn('⚠️ [Video] STALLED')}
+              onSuspend={() => console.warn('⚠️ [Video] SUSPENDED')}
             />
 
             {/* Document guide overlay - Compact and centered */}

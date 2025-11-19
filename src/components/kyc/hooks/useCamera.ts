@@ -156,18 +156,15 @@ export function useCamera(options: UseCameraOptions = {}): UseCameraReturn {
       // Detect mobile
       const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-      // Build constraints - more flexible for mobile
+      // Build constraints - ULTRA MINIMAL for mobile to avoid issues
       let constraints: MediaStreamConstraints;
 
       if (isMobile) {
-        // Mobile: use simpler constraints
+        // Mobile: absolute minimal constraints (just get ANY camera)
+        console.log('📱 Mobile detected - using minimal constraints');
         constraints = {
           audio: false,
-          video: {
-            facingMode: options.facingMode || 'environment',
-            width: { ideal: 1920, max: 3840 },
-            height: { ideal: 1080, max: 2160 }
-          }
+          video: true  // Simplest possible - let browser decide everything
         };
       } else {
         // Desktop: use full constraints
@@ -180,18 +177,17 @@ export function useCamera(options: UseCameraOptions = {}): UseCameraReturn {
             aspectRatio: options.aspectRatio || { ideal: 16/9 }
           }
         };
-      }
-
-      // Use specific device if selected (only on desktop or if specifically chosen)
-      if (currentDeviceId && !isMobile) {
-        constraints.video = {
-          ...constraints.video,
-          deviceId: { exact: currentDeviceId }
-        };
+        
+        // Use specific device if selected
+        if (currentDeviceId) {
+          constraints.video = {
+            ...constraints.video,
+            deviceId: { exact: currentDeviceId }
+          };
+        }
       }
 
       console.log('📷 Starting camera with constraints:', constraints);
-      console.log('📱 Device type:', isMobile ? 'Mobile' : 'Desktop');
 
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
 
