@@ -6,7 +6,7 @@
  * Main React Flow canvas for visual workflow builder
  */
 
-import { useCallback } from 'react';
+import { useCallback, useRef, DragEvent } from 'react';
 import {
   ReactFlow,
   Background,
@@ -20,13 +20,16 @@ import {
   type Node,
   type Edge,
   BackgroundVariant,
+  type ReactFlowInstance,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import { nodeTypes } from './nodes';
 import { Button } from '@/components/ui/button';
-import { Save, Play, Eye } from 'lucide-react';
+import { Save, Play, Eye, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { compileWorkflow, validateWorkflowGraph } from '@/lib/workflows/compiler/graphToJsonLogic';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface WorkflowCanvasProps {
   workflowId: string;
@@ -47,6 +50,8 @@ export default function WorkflowCanvas({
 }: WorkflowCanvasProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
 
   // Handle new connections
   const onConnect = useCallback(
@@ -69,11 +74,65 @@ export default function WorkflowCanvas({
     [setEdges]
   );
 
-  // Handle save
+  // Handle drop from NodeToolbar
+  const onDrop = useCallback(
+    (event: DragEvent) => {
+      event.preventDefault();
+
+      const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
+      const data = event.dataTransfer.getData('application/reactflow');
+
+      if (!data || !reactFlowBounds || !reactFlowInstance.current) return;
+
+      const { nodeType, nodeData } = JSON.parse(data);
+      const position = reactFlowInstance.current.screenToFlowPosition({
+        x: event.clientX - reactFlowBounds.left,
+        y: event.clientY - reactFlowBounds.top,
+      });
+
+      const newNode: Node = {
+        id: `${nodeType}-${Date.now()}`,
+        type: nodeType,
+        position,
+        data: nodeData,
+      };
+
+      setNodes((nds) => nds.concat(newNode));
+      toast.success('Node added');
+    },
+    [reactFlowInstance, setNodes]
+  );
+
+  const onDragOver = useCallback((event: DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  // Handle save with validation and compilation
   const handleSave = useCallback(() => {
-    if (onSave) {
-      onSave(nodes, edges);
-      toast.success('Workflow saved');
+    // Validate graph
+    const validation = validateWorkflowGraph(nodes, edges);
+    
+    if (!validation.valid) {
+      toast.error('Cannot save workflow', {
+        description: validation.errors[0],
+      });
+      return;
+    }
+
+    try {
+      // Compile to json-logic
+      const jsonLogic = compileWorkflow(nodes, edges);
+      
+      if (onSave) {
+        // Pass both visual state and compiled logic
+        onSave(nodes, edges);
+        toast.success('Workflow saved and compiled');
+      }
+    } catch (error) {
+      toast.error('Compilation failed', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   }, [nodes, edges, onSave]);
 
@@ -85,13 +144,18 @@ export default function WorkflowCanvas({
   }, [onTest]);
 
   return (
-    <div className="h-full w-full relative">
+    <div ref={reactFlowWrapper} className="h-full w-full relative">
       <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onInit={(instance) => {
+          reactFlowInstance.current = instance;
+        }}
+        onDrop={onDrop}
+        onDragOver={onDragOver}
         nodeTypes={nodeTypes}
         fitView
         snapToGrid
