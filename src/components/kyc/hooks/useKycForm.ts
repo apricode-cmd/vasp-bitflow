@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { KycField } from '@/lib/kyc/config';
 import { shouldShowField, isFieldConditionallyRequired } from '@/lib/kyc/conditionalLogic';
+import { validatePostalCode } from '@/lib/utils/postalCodeValidation';
 import { toast } from 'sonner';
 
 const KYC_FORM_STORAGE_KEY = 'kyc-form-draft';
@@ -150,6 +151,37 @@ export function useKycForm(initialData: Record<string, any> = {}): UseKycFormRet
             }
           }
           break;
+      }
+    }
+
+    // Postal Code validation (special case - not in fieldType)
+    const isPostalCode = field.fieldName.toLowerCase().includes('postal') ||
+                         field.fieldName.toLowerCase().includes('postcode') ||
+                         field.fieldName.toLowerCase().includes('zip');
+    
+    if (isPostalCode && value) {
+      // Get country from form data
+      const country = formData?.country || 
+                      formData?.address_country || 
+                      formData?.residence_country || 
+                      formData?.country_of_residence;
+      
+      if (!country) {
+        setErrors(prev => ({
+          ...prev,
+          [field.fieldName]: 'Please select country first'
+        }));
+        return false;
+      }
+      
+      // Validate postal code format
+      const validation = validatePostalCode(value, country);
+      if (!validation.isValid) {
+        setErrors(prev => ({
+          ...prev,
+          [field.fieldName]: validation.error || 'Invalid postal code format'
+        }));
+        return false;
       }
     }
 
