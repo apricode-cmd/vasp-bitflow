@@ -560,6 +560,12 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
           />
         ) : stream ? (
           <>
+            {/* Stream Status Indicator */}
+            <div className="absolute top-4 right-4 z-30 flex items-center gap-2 bg-black/70 px-3 py-1.5 rounded-full text-white text-xs backdrop-blur-sm">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <span>Camera Active</span>
+            </div>
+
             {/* Video stream - Fixed for mobile iOS/Android */}
             <video
               ref={videoRef}
@@ -574,9 +580,16 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
                 width: '100%',
                 height: '100%',
                 objectFit: 'cover',
-                transform: 'scaleX(1)' // Prevent mirror on some devices
+                transform: 'scaleX(1)', // Prevent mirror on some devices
+                backgroundColor: '#000', // Ensure black background
+                display: 'block'
               }}
-              className="absolute inset-0"
+              className="absolute inset-0 z-0"
+              onLoadStart={() => console.log('📹 [Video] loadstart event')}
+              onCanPlay={() => console.log('📹 [Video] canplay event')}
+              onPlaying={() => console.log('📹 [Video] playing event')}
+              onSuspend={() => console.log('⚠️ [Video] suspend event')}
+              onStalled={() => console.log('⚠️ [Video] stalled event')}
             />
 
             {/* Document guide overlay - Compact and centered */}
@@ -618,6 +631,22 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
                 </Button>
               </div>
             )}
+
+            {/* Real-time Stream Info (always visible for debugging) */}
+            <div className="absolute top-16 left-4 right-4 bg-green-500/90 text-white p-2 rounded text-[10px] z-30 backdrop-blur-sm">
+              <div className="font-mono space-y-0.5">
+                <div>✅ Stream: {stream ? 'ACTIVE' : 'NULL'} | ID: {stream?.id.slice(0, 8)}</div>
+                <div>📹 Video Tracks: {stream?.getVideoTracks().length || 0}</div>
+                {videoRef.current && (
+                  <>
+                    <div>🎬 Video Ready: {videoRef.current.readyState}/4</div>
+                    <div>▶️ Playing: {videoRef.current.paused ? 'NO (PAUSED)' : 'YES'}</div>
+                    <div>📐 Size: {videoRef.current.videoWidth}x{videoRef.current.videoHeight}</div>
+                    <div>🔊 Muted: {videoRef.current.muted ? 'YES' : 'NO'}</div>
+                  </>
+                )}
+              </div>
+            </div>
 
             {/* Diagnostics Overlay (dev mode) */}
             {process.env.NODE_ENV === 'development' && diagnostics && (
