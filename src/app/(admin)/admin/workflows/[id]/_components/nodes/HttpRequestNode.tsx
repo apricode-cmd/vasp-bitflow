@@ -7,7 +7,12 @@
  */
 
 import { memo } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Handle, Position, type Node } from '@xyflow/react';
+
+type NodeProps<T = any> = {
+  data: T;
+  selected: boolean;
+};
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -24,10 +29,10 @@ import type { HttpMethod, AuthType } from '@/lib/validations/http-request';
 export interface HttpRequestNodeData {
   actionType: 'HTTP_REQUEST';
   config: {
-    method: HttpMethod;
-    url: string;
+    method?: HttpMethod;
+    url?: string;
     auth?: {
-      type: AuthType;
+      type?: AuthType;
     };
     timeout?: number;
     retryOnFailure?: boolean;
@@ -49,10 +54,10 @@ const METHOD_COLORS: Record<HttpMethod, string> = {
 };
 
 function HttpRequestNode({ data, selected }: NodeProps<HttpRequestNodeData>) {
-  const method = data.config.method || 'GET';
-  const url = data.config.url || '';
-  const hasAuth = data.config.auth && data.config.auth.type !== 'NONE';
-  const hasRetry = data.config.retryOnFailure;
+  const method = data.config?.method || 'GET';
+  const url = data.config?.url || '';
+  const hasAuth = data.config?.auth && data.config.auth.type !== 'NONE';
+  const hasRetry = data.config?.retryOnFailure;
 
   // Get hostname from URL
   const getHostname = (urlString: string) => {
@@ -165,7 +170,7 @@ function HttpRequestNode({ data, selected }: NodeProps<HttpRequestNodeData>) {
                 <span>Retry</span>
               </div>
             )}
-            {data.config.timeout && (
+            {data.config?.timeout && (
               <div className="text-xs text-muted-foreground">
                 ⏱️ {data.config.timeout / 1000}s
               </div>
