@@ -17,7 +17,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import {
   Camera,
   X,
@@ -232,6 +233,9 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
     return (
       <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
         <DialogContent className="sm:max-w-md">
+          <VisuallyHidden>
+            <DialogTitle>Camera Not Supported</DialogTitle>
+          </VisuallyHidden>
           <div className="space-y-4 p-2">
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
@@ -252,6 +256,9 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
     return (
       <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
         <DialogContent className="sm:max-w-md">
+          <VisuallyHidden>
+            <DialogTitle>Camera Permission Required</DialogTitle>
+          </VisuallyHidden>
           <div className="space-y-4 p-2">
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
@@ -281,6 +288,11 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
           borderRadius: '0.75rem'
         }}
       >
+        <VisuallyHidden>
+          <DialogTitle>
+            {capturedImage ? 'Review Photo' : `Capture ${documentType || 'Document'}`}
+          </DialogTitle>
+        </VisuallyHidden>
         <div 
           className="flex flex-col h-full w-full bg-black rounded-lg overflow-hidden"
         >
