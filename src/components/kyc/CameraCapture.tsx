@@ -106,44 +106,47 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
   }, [stopCamera]);
 
   /**
-   * Attach stream to video element - NATIVE & SIMPLE
+   * Attach stream to video element - ULTRA SIMPLE NATIVE
    */
   useEffect(() => {
     if (!stream || !videoRef.current || capturedImage) return;
 
     const video = videoRef.current;
     
-    console.log('🎬 [Camera] Simple native attach - stream:', stream.id.slice(0, 8));
+    console.log('🎬 [Camera] ULTRA SIMPLE attach');
     
-    // NATIVE: Direct assignment
+    // Clear first
+    video.srcObject = null;
+    
+    // Set stream
     video.srcObject = stream;
     
-    // Simple play on loadedmetadata
-    const handleLoadedMetadata = () => {
-      console.log('📹 [Camera] Metadata loaded, playing...');
-      video.play()
-        .then(() => {
-          console.log('✅ [Camera] Playing!', {
-            dimensions: `${video.videoWidth}x${video.videoHeight}`,
-            paused: video.paused,
-            readyState: video.readyState
-          });
-          setStreamError(null);
-        })
-        .catch(err => {
-          console.error('❌ [Camera] Play failed:', err);
-          setStreamError(err.message);
-        });
+    // Force play immediately (no waiting!)
+    video.play().catch(err => {
+      console.warn('⚠️ First play attempt failed (expected), will retry:', err.message);
+    });
+    
+    // Also try on loadedmetadata
+    video.onloadedmetadata = () => {
+      console.log('📹 Metadata loaded');
+      video.play().then(() => {
+        console.log('✅ Playing!');
+        setStreamError(null);
+      }).catch(err => {
+        console.error('❌ Play error:', err);
+      });
     };
     
-    video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    // Force load if needed
+    if (video.readyState === 0) {
+      console.log('🔄 Forcing load()');
+      video.load();
+    }
     
     // Cleanup
     return () => {
-      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      if (video.srcObject === stream) {
-        video.srcObject = null;
-      }
+      video.onloadedmetadata = null;
+      video.srcObject = null;
     };
   }, [stream, capturedImage]);
 
@@ -417,30 +420,32 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
               <span>Camera Active</span>
             </div>
 
-            {/* Video stream - Fixed for mobile iOS/Android */}
+            {/* Video stream - SIMPLIFIED */}
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
-              {...({ 
-                'webkit-playsinline': 'true',
-                'x-webkit-airplay': 'allow' 
-              } as any)}
               style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
                 width: '100%',
                 height: '100%',
                 objectFit: 'cover',
-                transform: 'scaleX(1)', // Prevent mirror on some devices
-                backgroundColor: '#000', // Ensure black background
-                display: 'block'
+                backgroundColor: '#000'
               }}
-              className="absolute inset-0 z-0"
-              onLoadStart={() => console.log('📹 [Video] loadstart event')}
-              onCanPlay={() => console.log('📹 [Video] canplay event')}
-              onPlaying={() => console.log('📹 [Video] playing event')}
-              onSuspend={() => console.log('⚠️ [Video] suspend event')}
-              onStalled={() => console.log('⚠️ [Video] stalled event')}
+              onLoadedMetadata={(e) => {
+                const v = e.currentTarget;
+                console.log('📹 [Video] METADATA EVENT:', {
+                  width: v.videoWidth,
+                  height: v.videoHeight,
+                  readyState: v.readyState
+                });
+              }}
+              onCanPlay={() => console.log('📹 [Video] CAN PLAY')}
+              onPlay={() => console.log('📹 [Video] PLAY EVENT')}
+              onPlaying={() => console.log('📹 [Video] PLAYING')}
             />
 
             {/* Document guide overlay - Compact and centered */}
@@ -483,21 +488,23 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
               </div>
             )}
 
-            {/* Real-time Stream Info (always visible for debugging) */}
-            <div className="absolute top-16 left-4 right-4 bg-green-500/90 text-white p-2 rounded text-[10px] z-30 backdrop-blur-sm">
-              <div className="font-mono space-y-0.5">
-                <div>✅ Stream: {stream ? 'ACTIVE' : 'NULL'} | ID: {stream?.id.slice(0, 8)}</div>
-                <div>📹 Video Tracks: {stream?.getVideoTracks().length || 0}</div>
-                {videoRef.current && (
-                  <>
-                    <div>🎬 Video Ready: {videoRef.current.readyState}/4</div>
-                    <div>▶️ Playing: {videoRef.current.paused ? 'NO (PAUSED)' : 'YES'}</div>
-                    <div>📐 Size: {videoRef.current.videoWidth}x{videoRef.current.videoHeight}</div>
-                    <div>🔊 Muted: {videoRef.current.muted ? 'YES' : 'NO'}</div>
-                  </>
-                )}
+            {/* Real-time Stream Info (toggle visibility for debugging) */}
+            {process.env.NODE_ENV === 'development' && false && (
+              <div className="absolute top-16 left-4 right-4 bg-green-500/90 text-white p-2 rounded text-[10px] z-30 backdrop-blur-sm">
+                <div className="font-mono space-y-0.5">
+                  <div>✅ Stream: {stream ? 'ACTIVE' : 'NULL'} | ID: {stream?.id.slice(0, 8)}</div>
+                  <div>📹 Video Tracks: {stream?.getVideoTracks().length || 0}</div>
+                  {videoRef.current && (
+                    <>
+                      <div>🎬 Video Ready: {videoRef.current.readyState}/4</div>
+                      <div>▶️ Playing: {videoRef.current.paused ? 'NO (PAUSED)' : 'YES'}</div>
+                      <div>📐 Size: {videoRef.current.videoWidth}x{videoRef.current.videoHeight}</div>
+                      <div>🔊 Muted: {videoRef.current.muted ? 'YES' : 'NO'}</div>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Diagnostics Overlay (dev mode) */}
             {process.env.NODE_ENV === 'development' && diagnostics && (
