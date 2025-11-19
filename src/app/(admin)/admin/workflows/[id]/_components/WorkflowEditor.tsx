@@ -403,7 +403,7 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar with NodeToolbar */}
         <div className="w-64 border-r overflow-y-auto">
-          <NodeToolbar />
+          <NodeToolbar currentNodes={nodes} />
         </div>
 
         {/* Canvas */}
