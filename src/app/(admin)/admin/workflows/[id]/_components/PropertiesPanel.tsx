@@ -21,10 +21,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { X, Save } from 'lucide-react';
+import { X, Save, Filter } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import ExpressionInput from './ExpressionInput';
+import TriggerConfigDialog from './TriggerConfigDialog';
 import type { Edge } from '@xyflow/react';
+import type { TriggerConfig } from '@/lib/validations/trigger-config';
+import { useState as useReactState } from 'react';
 
 interface PropertiesPanelProps {
   selectedNode: Node | null;
@@ -124,6 +127,7 @@ export default function PropertiesPanel({
   allEdges = [],
 }: PropertiesPanelProps) {
   const [formData, setFormData] = useState<any>({});
+  const [showTriggerConfig, setShowTriggerConfig] = useReactState(false);
 
   // Initialize form data when node is selected
   useEffect(() => {
@@ -231,21 +235,102 @@ export default function PropertiesPanel({
     }));
   };
 
-  const renderTriggerForm = () => (
-    <div className="space-y-4">
-      <div>
-        <Label className="text-xs">Trigger Type</Label>
-        <div className="mt-2">
-          <Badge variant="outline" className="text-sm">
-            {formData.trigger}
-          </Badge>
+  const handleSaveTriggerConfig = (config: TriggerConfig) => {
+    handleConfigChange('triggerConfig', config);
+  };
+
+  const renderTriggerForm = () => {
+    const triggerConfig: TriggerConfig = formData.config?.triggerConfig || {
+      filters: [],
+      logic: 'OR',
+      enabled: true,
+    };
+
+    return (
+      <div className="space-y-4">
+        <div>
+          <Label className="text-xs">Trigger Type</Label>
+          <div className="mt-2">
+            <Badge variant="outline" className="text-sm">
+              {formData.trigger}
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Trigger type cannot be changed after creation
+          </p>
         </div>
-        <p className="text-xs text-muted-foreground mt-2">
-          Trigger type cannot be changed after creation
-        </p>
+
+        <Separator />
+
+        {/* Trigger Filters Configuration */}
+        <div>
+          <Label className="text-xs font-semibold">Trigger Filters</Label>
+          <p className="text-xs text-muted-foreground mt-1 mb-3">
+            Define conditions for when this workflow should execute
+          </p>
+
+          <div className="space-y-2">
+            {/* Filter Summary */}
+            {triggerConfig.filters.length > 0 ? (
+              <div className="rounded-lg border bg-muted/50 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs font-semibold">
+                      {triggerConfig.filters.length} active filter
+                      {triggerConfig.filters.length > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <Badge variant="secondary" className="text-[9px] px-1.5 py-0">
+                    {triggerConfig.logic}
+                  </Badge>
+                </div>
+                <div className="space-y-1">
+                  {triggerConfig.filters.slice(0, 3).map((filter, idx) => (
+                    <div key={idx} className="text-[10px] text-muted-foreground font-mono">
+                      • {filter.field} {filter.operator} {String(filter.value)}
+                    </div>
+                  ))}
+                  {triggerConfig.filters.length > 3 && (
+                    <div className="text-[10px] text-muted-foreground">
+                      ... and {triggerConfig.filters.length - 3} more
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border bg-muted/30 p-3 text-center">
+                <p className="text-xs text-muted-foreground">
+                  No filters configured - workflow will trigger for all events
+                </p>
+              </div>
+            )}
+
+            {/* Configure Button */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={() => setShowTriggerConfig(true)}
+            >
+              <Filter className="h-4 w-4 mr-2" />
+              {triggerConfig.filters.length > 0 ? 'Edit' : 'Configure'} Filters
+            </Button>
+          </div>
+        </div>
+
+        {/* Trigger Config Dialog */}
+        <TriggerConfigDialog
+          open={showTriggerConfig}
+          onOpenChange={setShowTriggerConfig}
+          trigger={formData.trigger}
+          config={triggerConfig}
+          onSave={handleSaveTriggerConfig}
+        />
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderConditionForm = () => {
     const selectedField = CONDITION_FIELDS.find(f => f.value === formData.field);

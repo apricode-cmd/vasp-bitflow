@@ -26,7 +26,14 @@ export type ExecutionStatus = 'idle' | 'running' | 'success' | 'error';
 
 export interface TriggerNodeData {
   trigger: string;
-  config?: Record<string, any>;
+  config?: {
+    triggerConfig?: {
+      filters: any[];
+      logic: 'AND' | 'OR';
+      enabled: boolean;
+    };
+    [key: string]: any;
+  };
   executionStatus?: ExecutionStatus;
   executionResult?: any;
   executionTime?: number;
@@ -152,16 +159,42 @@ function TriggerNode({ data, selected }: NodeProps<TriggerNodeData>) {
           </div>
         </div>
 
-        {/* Config (if any) */}
-        {data.config && Object.keys(data.config).length > 0 && (
+        {/* Trigger Filters */}
+        {data.config?.triggerConfig && data.config.triggerConfig.filters.length > 0 && (
           <div className="mt-3 pt-3 border-t border-current/20">
-            <div className="text-xs space-y-1">
-              {Object.entries(data.config).map(([key, value]) => (
-                <div key={key} className="flex items-center justify-between">
-                  <span className="font-medium opacity-70">{key}:</span>
-                  <span className="font-mono">{String(value)}</span>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-semibold opacity-70">FILTERS:</span>
+              <Badge variant="secondary" className="text-[9px] px-1.5 py-0">
+                {data.config.triggerConfig.filters.length} {data.config.triggerConfig.logic}
+              </Badge>
+            </div>
+            <div className="text-[10px] space-y-0.5 opacity-70">
+              {data.config.triggerConfig.filters.slice(0, 2).map((filter: any, idx: number) => (
+                <div key={idx} className="truncate">
+                  • {filter.field} {filter.operator} {String(filter.value).slice(0, 15)}
                 </div>
               ))}
+              {data.config.triggerConfig.filters.length > 2 && (
+                <div className="text-[9px]">
+                  +{data.config.triggerConfig.filters.length - 2} more...
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        
+        {/* Other Config (legacy) */}
+        {data.config && Object.keys(data.config).filter(k => k !== 'triggerConfig').length > 0 && (
+          <div className="mt-3 pt-3 border-t border-current/20">
+            <div className="text-xs space-y-1">
+              {Object.entries(data.config)
+                .filter(([key]) => key !== 'triggerConfig')
+                .map(([key, value]) => (
+                  <div key={key} className="flex items-center justify-between">
+                    <span className="font-medium opacity-70">{key}:</span>
+                    <span className="font-mono">{String(value)}</span>
+                  </div>
+                ))}
             </div>
           </div>
         )}
