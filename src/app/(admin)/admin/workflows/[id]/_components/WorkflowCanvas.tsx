@@ -6,7 +6,7 @@
  * Main React Flow canvas for visual workflow builder
  */
 
-import { useCallback, useRef, DragEvent } from 'react';
+import { useCallback, useRef, DragEvent, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import {
   ReactFlow,
@@ -17,6 +17,7 @@ import {
   useNodesState,
   useEdgesState,
   addEdge,
+  useKeyPress,
   type Connection,
   type Node,
   type Edge,
@@ -195,6 +196,41 @@ export default function WorkflowCanvas({
       onTest();
     }
   }, [onTest]);
+
+  // Handle select all nodes (Ctrl+A / Cmd+A)
+  const selectAllPressed = useKeyPress(['Meta+a', 'Control+a']);
+  
+  useEffect(() => {
+    if (selectAllPressed && !readOnly) {
+      setNodes((nds) =>
+        nds.map((node) => ({
+          ...node,
+          selected: true,
+        }))
+      );
+    }
+  }, [selectAllPressed, setNodes, readOnly]);
+
+  // Handle select all manually
+  const handleSelectAll = useCallback(() => {
+    if (!readOnly) {
+      setNodes((nds) =>
+        nds.map((node) => ({
+          ...node,
+          selected: true,
+        }))
+      );
+      toast.success('All nodes selected');
+    }
+  }, [setNodes, readOnly]);
+
+  // Handle fit view
+  const handleFitView = useCallback(() => {
+    if (reactFlowInstance.current) {
+      reactFlowInstance.current.fitView({ padding: 0.2 });
+      toast.success('View fitted');
+    }
+  }, []);
 
   return (
     <div ref={reactFlowWrapper} className="h-full w-full relative">

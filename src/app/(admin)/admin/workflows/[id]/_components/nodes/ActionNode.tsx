@@ -18,11 +18,17 @@ import {
   CheckCircle,
   AlertTriangle,
   XCircle,
+  Loader2,
 } from 'lucide-react';
+
+export type ExecutionStatus = 'idle' | 'running' | 'success' | 'error';
 
 export interface ActionNodeData {
   actionType: string;
   config: Record<string, any>;
+  executionStatus?: ExecutionStatus;
+  executionResult?: any;
+  executionTime?: number;
 }
 
 const ACTION_CONFIG = {
@@ -86,12 +92,40 @@ function ActionNode({ data, selected }: NodeProps<ActionNodeData>) {
 
   const Icon = config.icon;
 
+  // Execution status styling
+  const getExecutionStyles = () => {
+    switch (data.executionStatus) {
+      case 'running':
+        return 'ring-2 ring-yellow-500 ring-offset-2 animate-pulse';
+      case 'success':
+        return 'ring-2 ring-green-500 ring-offset-2';
+      case 'error':
+        return 'ring-2 ring-red-500 ring-offset-2';
+      default:
+        return '';
+    }
+  };
+
+  const ExecutionIcon = () => {
+    switch (data.executionStatus) {
+      case 'running':
+        return <Loader2 className="h-4 w-4 text-yellow-600 animate-spin" />;
+      case 'success':
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'error':
+        return <XCircle className="h-4 w-4 text-red-600" />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <Card
       className={`
         min-w-[280px] transition-all
         ${selected ? 'ring-2 ring-primary shadow-lg' : 'shadow-md hover:shadow-lg'}
         ${config.color}
+        ${getExecutionStyles()}
         border-2
       `}
     >
@@ -110,12 +144,24 @@ function ActionNode({ data, selected }: NodeProps<ActionNodeData>) {
             <Icon className="h-5 w-5" />
           </div>
           <div className="flex-1">
-            <Badge variant="outline" className="text-xs font-semibold mb-1">
-              ACTION
-            </Badge>
+            <div className="flex items-center gap-2 mb-1">
+              <Badge variant="outline" className="text-xs font-semibold">
+                ACTION
+              </Badge>
+              {data.executionStatus && data.executionStatus !== 'idle' && (
+                <div className="flex items-center gap-1">
+                  <ExecutionIcon />
+                </div>
+              )}
+            </div>
             <h3 className="font-semibold text-sm leading-tight">
               {config.label}
             </h3>
+            {data.executionTime !== undefined && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {data.executionTime}ms
+              </p>
+            )}
           </div>
         </div>
 
