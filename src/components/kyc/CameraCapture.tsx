@@ -385,19 +385,27 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
           justifyContent: 'center'
         }}
       >
-        {isLoading ? (
-          <div className="text-center text-white space-y-4">
-            <Loader2 className="h-12 w-12 animate-spin mx-auto" />
-            <p>Starting camera...</p>
+        {/* Loading overlay */}
+        {isLoading && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80">
+            <div className="text-center text-white space-y-4">
+              <Loader2 className="h-12 w-12 animate-spin mx-auto" />
+              <p>Starting camera...</p>
+            </div>
           </div>
-        ) : capturedImage ? (
-          // Show captured image preview
+        )}
+
+        {/* Captured image preview */}
+        {capturedImage && (
           <img
             src={capturedImage}
             alt="Captured"
-            className="max-w-full max-h-full object-contain"
+            className="max-w-full max-h-full object-contain relative z-10"
           />
-        ) : (
+        )}
+
+        {/* Video stream - ALWAYS RENDERED (hidden when captured) */}
+        {!capturedImage && (
           <>
             {/* Stream Status Indicator */}
             <div className="absolute top-4 right-4 z-30 flex items-center gap-2 bg-black/70 px-3 py-1.5 rounded-full text-white text-xs backdrop-blur-sm">
