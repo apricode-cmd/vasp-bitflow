@@ -223,6 +223,17 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
       )
     );
   }, []);
+  
+  // Handle edge execution animation
+  const handleEdgeExecutionUpdate = useCallback((edgeId: string, className: string) => {
+    setEdges((eds) =>
+      eds.map((edge) =>
+        edge.id === edgeId
+          ? { ...edge, className }
+          : edge
+      )
+    );
+  }, []);
 
   // Clear execution status from all nodes
   const clearExecutionStatus = useCallback(() => {
@@ -442,7 +453,9 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
           workflowId={workflowId}
           trigger={trigger}
           nodes={nodes}
+          edges={edges}
           onNodeExecutionUpdate={handleExecutionStatusUpdate}
+          onEdgeExecutionUpdate={handleEdgeExecutionUpdate}
         />
       )}
     </div>

@@ -204,3 +204,92 @@
   border-radius: 0.5rem;
 }
 
+/* Execution visualization styles */
+
+/* Animated execution flow - data flowing between nodes */
+.react-flow__edge.executing .react-flow__edge-path {
+  stroke: #eab308 !important; /* yellow-500 */
+  stroke-width: 4 !important;
+  opacity: 1;
+  animation: execution-flow 1.5s ease-in-out infinite;
+}
+
+.react-flow__edge.executing-success .react-flow__edge-path {
+  stroke: #22c55e !important; /* green-500 */
+  stroke-width: 4 !important;
+  opacity: 1;
+  animation: execution-pulse 0.5s ease-out;
+}
+
+.react-flow__edge.executing-error .react-flow__edge-path {
+  stroke: #ef4444 !important; /* red-500 */
+  stroke-width: 4 !important;
+  opacity: 1;
+  animation: execution-pulse 0.5s ease-out;
+}
+
+@keyframes execution-flow {
+  0% {
+    stroke-dasharray: 10 20;
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dasharray: 10 20;
+    stroke-dashoffset: 30;
+  }
+}
+
+@keyframes execution-pulse {
+  0%, 100% {
+    opacity: 1;
+    stroke-width: 4;
+  }
+  50% {
+    opacity: 0.6;
+    stroke-width: 5;
+  }
+}
+
+/* Node execution states */
+.react-flow__node.node-executing {
+  animation: node-pulse 1.5s ease-in-out infinite;
+}
+
+.react-flow__node.node-success {
+  animation: node-success-flash 0.5s ease-out;
+}
+
+.react-flow__node.node-error {
+  animation: node-error-shake 0.5s ease-out;
+}
+
+@keyframes node-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+@keyframes node-success-flash {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.2);
+  }
+}
+
+@keyframes node-error-shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+

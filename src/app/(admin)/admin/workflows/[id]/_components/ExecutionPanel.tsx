@@ -60,7 +60,9 @@ interface ExecutionPanelProps {
   workflowId: string;
   trigger: string;
   nodes: Node[];
+  edges: any[];
   onNodeExecutionUpdate: (nodeId: string, data: any) => void;
+  onEdgeExecutionUpdate?: (edgeId: string, className: string) => void;
 }
 
 // Sample data templates
@@ -93,7 +95,9 @@ export default function ExecutionPanel({
   workflowId,
   trigger,
   nodes,
+  edges,
   onNodeExecutionUpdate,
+  onEdgeExecutionUpdate,
 }: ExecutionPanelProps) {
   const [contextData, setContextData] = useState<string>(
     JSON.stringify(SAMPLE_DATA_TEMPLATES[trigger] || {}, null, 2)
@@ -154,9 +158,20 @@ export default function ExecutionPanel({
 
     for (let i = 0; i < sortedNodes.length; i++) {
       const node = sortedNodes[i];
+      const prevNode = i > 0 ? sortedNodes[i - 1] : null;
+      
+      // Animate edge if there's a connection
+      if (prevNode && onEdgeExecutionUpdate && edges) {
+        const edge = edges.find(e => e.source === prevNode.id && e.target === node.id);
+        if (edge) {
+          onEdgeExecutionUpdate(edge.id, 'executing');
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+      }
+      
       const step: ExecutionStep = {
         nodeId: node.id,
-        nodeName: node.data?.label || node.type || 'Unknown',
+        nodeName: String(node.data?.label || node.type || 'Unknown'),
         nodeType: node.type || 'unknown',
         status: 'running',
         startTime: Date.now(),
@@ -177,7 +192,7 @@ export default function ExecutionPanel({
       await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
 
       // Simulate result
-      const duration = Date.now() - step.startTime;
+      const duration = Date.now() - (step.startTime || Date.now());
       const isError = Math.random() < 0.1; // 10% chance of error
 
       if (isError) {
@@ -190,6 +205,14 @@ export default function ExecutionPanel({
           executionStatus: 'error',
           executionTime: duration,
         });
+        
+        // Update edge to error animation
+        if (prevNode && onEdgeExecutionUpdate && edges) {
+          const edge = edges.find(e => e.source === prevNode.id && e.target === node.id);
+          if (edge) {
+            onEdgeExecutionUpdate(edge.id, 'executing-error');
+          }
+        }
 
         // Stop execution on error
         setExecution(prev => prev ? {
@@ -229,6 +252,20 @@ export default function ExecutionPanel({
         executionResult,
         executionTime: duration,
       });
+      
+      // Update edge to success animation
+      if (prevNode && onEdgeExecutionUpdate && edges) {
+        const edge = edges.find(e => e.source === prevNode.id && e.target === node.id);
+        if (edge) {
+          onEdgeExecutionUpdate(edge.id, 'executing-success');
+          // Clear edge animation after a short delay
+          setTimeout(() => {
+            if (onEdgeExecutionUpdate) {
+              onEdgeExecutionUpdate(edge.id, '');
+            }
+          }, 500);
+        }
+      }
 
       setExecution(prev => prev ? { ...prev, steps: [...steps] } : null);
 
