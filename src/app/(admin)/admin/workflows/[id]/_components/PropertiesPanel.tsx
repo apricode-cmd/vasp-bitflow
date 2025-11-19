@@ -23,6 +23,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { X, Save, Filter } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import ExpressionInput from './ExpressionInput';
 import TriggerConfigDialog from './TriggerConfigDialog';
 import KeyValuePairBuilder, { type KeyValuePair } from '@/components/workflows/KeyValuePairBuilder';
@@ -455,9 +456,9 @@ export default function PropertiesPanel({
     };
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Quick Templates */}
-        <div>
+        <div className="pb-4 border-b">
           <Label className="text-sm font-semibold mb-3 block">Quick Start Templates</Label>
           <Select onValueChange={handleLoadTemplate}>
             <SelectTrigger>
@@ -473,12 +474,16 @@ export default function PropertiesPanel({
           </Select>
         </div>
 
-        <Separator />
+        {/* Accordion Sections */}
+        <Accordion type="multiple" defaultValue={["request", "auth", "response"]} className="w-full">
 
-        {/* Request Configuration */}
-        <div>
-          <Label className="text-base font-semibold mb-4 block">Request</Label>
-          <div className="space-y-4">
+          {/* Request Configuration */}
+          <AccordionItem value="request">
+            <AccordionTrigger className="text-base font-semibold">
+              Request
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="space-y-4">
             {/* Method + URL */}
             <div className="grid grid-cols-[100px,1fr] gap-2">
               <Select value={method} onValueChange={(value) => handleConfigChange('method', value)}>
@@ -527,15 +532,16 @@ export default function PropertiesPanel({
               />
             </div>
           </div>
-        </div>
-
-        <Separator />
+            </AccordionContent>
+          </AccordionItem>
 
         {/* Body */}
         {['POST', 'PUT', 'PATCH'].includes(method) && (
-          <>
-            <div>
-              <Label className="text-base font-semibold mb-4 block">Body</Label>
+          <AccordionItem value="body">
+            <AccordionTrigger className="text-base font-semibold">
+              Body
+            </AccordionTrigger>
+            <AccordionContent>
               <div className="space-y-4">
                 <div>
                   <Label className="text-xs font-medium mb-2 block">Body Type</Label>
@@ -574,15 +580,17 @@ export default function PropertiesPanel({
                   </div>
                 )}
               </div>
-            </div>
-            <Separator />
-          </>
+            </AccordionContent>
+          </AccordionItem>
         )}
 
         {/* Authentication */}
-        <div>
-          <Label className="text-base font-semibold mb-4 block">Authentication</Label>
-          <div className="space-y-4">
+        <AccordionItem value="auth">
+          <AccordionTrigger className="text-base font-semibold">
+            Authentication
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-4">
             <Select
               value={authType}
               onValueChange={(value) => handleConfigChange('auth', { type: value })}
@@ -672,15 +680,17 @@ export default function PropertiesPanel({
                 </div>
               </>
             )}
-          </div>
-        </div>
-
-        <Separator />
+            </div>
+          </AccordionContent>
+        </AccordionItem>
 
         {/* Response */}
-        <div>
-          <Label className="text-base font-semibold mb-4 block">Response</Label>
-          <div className="space-y-4">
+        <AccordionItem value="response">
+          <AccordionTrigger className="text-base font-semibold">
+            Response
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-4">
             <div>
               <Label className="text-xs">Response Format</Label>
               <Select
@@ -742,14 +752,16 @@ export default function PropertiesPanel({
               </p>
             </div>
           </div>
-        </div>
-
-        <Separator />
+          </AccordionContent>
+        </AccordionItem>
 
         {/* Error Handling */}
-        <div>
-          <Label className="text-base font-semibold mb-4 block">Error Handling</Label>
-          <div className="space-y-4">
+        <AccordionItem value="errors">
+          <AccordionTrigger className="text-base font-semibold">
+            Error Handling
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-4">
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -793,15 +805,17 @@ export default function PropertiesPanel({
                 </p>
               </>
             )}
-          </div>
-        </div>
-
-        <Separator />
+            </div>
+          </AccordionContent>
+        </AccordionItem>
 
         {/* Options */}
-        <div>
-          <Label className="text-base font-semibold mb-4 block">Options</Label>
-          <div className="space-y-4">
+        <AccordionItem value="options">
+          <AccordionTrigger className="text-base font-semibold">
+            Options
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-4">
             <div>
               <Label className="text-xs">Timeout (ms)</Label>
               <Input
@@ -835,13 +849,21 @@ export default function PropertiesPanel({
                 Validate SSL Certificates
               </Label>
             </div>
-          </div>
-        </div>
-
-        <Separator />
+            </div>
+          </AccordionContent>
+        </AccordionItem>
 
         {/* Test Panel */}
-        <HttpRequestTester config={formData.config || {}} />
+        <AccordionItem value="test">
+          <AccordionTrigger className="text-base font-semibold">
+            Test & Debug
+          </AccordionTrigger>
+          <AccordionContent>
+            <HttpRequestTester config={formData.config || {}} />
+          </AccordionContent>
+        </AccordionItem>
+
+        </Accordion>
       </div>
     );
   };
