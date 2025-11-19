@@ -327,11 +327,15 @@ export default function WorkflowCanvas({
   useEffect(() => {
     if (!initialNodes) return;
     
-    setNodes((nds) =>
-      nds.map((node) => {
-        // Find corresponding node in initialNodes to get latest executionStatus
-        const initialNode = initialNodes.find(n => n.id === node.id);
-        const executionStatus = initialNode?.data?.executionStatus;
+    // Create execution status map for quick lookup
+    const statusMap = new Map(
+      initialNodes.map(n => [n.id, n.data?.executionStatus])
+    );
+    
+    setNodes((nds) => {
+      let hasChanges = false;
+      const updatedNodes = nds.map((node) => {
+        const executionStatus = statusMap.get(node.id);
         let className = '';
         
         if (executionStatus === 'running') {
@@ -344,11 +348,15 @@ export default function WorkflowCanvas({
         
         // Only update if className changed
         if (node.className !== className) {
+          hasChanges = true;
           return { ...node, className };
         }
         return node;
-      })
-    );
+      });
+      
+      // Only return new array if something actually changed
+      return hasChanges ? updatedNodes : nds;
+    });
   }, [initialNodes, setNodes]);
 
   // Handle select all nodes (Ctrl+A / Cmd+A)
