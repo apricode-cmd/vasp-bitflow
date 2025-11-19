@@ -45,9 +45,6 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
   
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isCameraStarted, setIsCameraStarted] = useState(false);
-  const [streamError, setStreamError] = useState<string | null>(null);
-  const [diagnostics, setDiagnostics] = useState<any>(null);
   
   const {
     stream,
@@ -68,42 +65,25 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
   });
 
   /**
-   * Handle user clicking "Start Camera" button
-   */
-  const handleStartCamera = async () => {
-    console.log('🎬 [Camera] User initiated camera start');
-    setIsCameraStarted(true);
-    setStreamError(null);
-    setDiagnostics(null);
-    
-    // Stop any existing stream first
-    if (stream) {
-      console.log('🛑 [Camera] Stopping existing stream before restart');
-      stopCamera();
-      // Small delay to ensure cleanup
-      await new Promise(resolve => setTimeout(resolve, 300));
-    }
-    
-    const granted = await requestPermissions();
-    console.log('🔐 [Camera] Permission granted:', granted);
-    
-    if (granted) {
-      await startCamera();
-      console.log('✅ [Camera] Start camera completed');
-    } else {
-      console.error('❌ [Camera] Permission not granted');
-      setStreamError('Camera permission denied');
-    }
-  };
-
-  /**
-   * Cleanup on unmount
+   * Initialize camera on mount - ORIGINAL APPROACH
    */
   useEffect(() => {
+    const init = async () => {
+      if (isCameraSupported && open) {
+        const granted = await requestPermissions();
+        if (granted) {
+          await startCamera();
+        }
+      }
+    };
+
+    init();
+
+    // Cleanup on unmount
     return () => {
       stopCamera();
     };
-  }, [stopCamera]);
+  }, [isCameraSupported, open]);
 
   /**
    * Attach stream to video element - ULTRA SIMPLE NATIVE
@@ -367,40 +347,14 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
       <div 
         className="flex-1 relative bg-black"
         style={{
-          minHeight: 0, // Important for flex children
+          minHeight: 0,
           overflow: 'hidden',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center'
         }}
       >
-        {!isCameraStarted ? (
-          // Initial state - Show "Start Camera" button
-          <div className="text-center text-white space-y-6 p-6 max-w-md">
-            <div className="flex justify-center">
-              <div className="rounded-full bg-white/10 p-6">
-                <Camera className="h-16 w-16 text-white" />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-xl font-semibold">Camera Access Required</h3>
-              <p className="text-sm text-gray-400">
-                {documentType ? `Take a photo of your ${documentType}` : 'Take a photo of your document'}
-              </p>
-            </div>
-            <Button
-              onClick={handleStartCamera}
-              size="lg"
-              className="w-full bg-white text-black hover:bg-gray-200"
-            >
-              <Camera className="h-5 w-5 mr-2" />
-              Start Camera
-            </Button>
-            <p className="text-xs text-gray-500">
-              We need camera access to capture your document photo
-            </p>
-          </div>
-        ) : isLoading ? (
+        {isLoading ? (
           <div className="text-center text-white space-y-4">
             <Loader2 className="h-12 w-12 animate-spin mx-auto" />
             <p>Starting camera...</p>
@@ -412,7 +366,7 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
             alt="Captured"
             className="max-w-full max-h-full object-contain"
           />
-        ) : stream ? (
+        ) : (
           <>
             {/* Stream Status Indicator */}
             <div className="absolute top-4 right-4 z-30 flex items-center gap-2 bg-black/70 px-3 py-1.5 rounded-full text-white text-xs backdrop-blur-sm">
@@ -466,83 +420,15 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
               </div>
             </div>
 
-            {/* Stream Error Indicator */}
-            {streamError && (
-              <div className="absolute top-4 left-4 right-4 bg-red-500/95 text-white p-3 rounded-lg text-xs z-20 backdrop-blur-sm">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="font-semibold">Camera Stream Error</p>
-                    <p className="mt-1 opacity-90">{streamError}</p>
-                  </div>
-                </div>
-                <Button
-                  onClick={handleStartCamera}
-                  size="sm"
-                  variant="outline"
-                  className="w-full mt-2 text-xs border-white/30 text-white hover:bg-white/10"
-                >
-                  <RefreshCw className="h-3 w-3 mr-1" />
-                  Retry
-                </Button>
-              </div>
-            )}
-
-            {/* Real-time Stream Info (toggle visibility for debugging) */}
-            {process.env.NODE_ENV === 'development' && false && (
-              <div className="absolute top-16 left-4 right-4 bg-green-500/90 text-white p-2 rounded text-[10px] z-30 backdrop-blur-sm">
-                <div className="font-mono space-y-0.5">
-                  <div>✅ Stream: {stream ? 'ACTIVE' : 'NULL'} | ID: {stream?.id.slice(0, 8)}</div>
-                  <div>📹 Video Tracks: {stream?.getVideoTracks().length || 0}</div>
-                  {videoRef.current && (
-                    <>
-                      <div>🎬 Video Ready: {videoRef.current.readyState}/4</div>
-                      <div>▶️ Playing: {videoRef.current.paused ? 'NO (PAUSED)' : 'YES'}</div>
-                      <div>📐 Size: {videoRef.current.videoWidth}x{videoRef.current.videoHeight}</div>
-                      <div>🔊 Muted: {videoRef.current.muted ? 'YES' : 'NO'}</div>
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Diagnostics Overlay (dev mode) */}
-            {process.env.NODE_ENV === 'development' && diagnostics && (
-              <div className="absolute bottom-20 left-4 right-4 bg-black/90 text-white p-2 rounded text-[10px] z-20 backdrop-blur-sm max-h-32 overflow-auto">
-                <div className="font-mono">
-                  <div className="font-semibold mb-1">🔍 Diagnostics:</div>
-                  <pre className="whitespace-pre-wrap">{JSON.stringify(diagnostics, null, 2)}</pre>
-                </div>
-              </div>
-            )}
           </>
-        ) : (
-          // Fallback: camera started but no stream
-          <div className="text-center text-white space-y-4 p-6">
-            <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto" />
-            <div className="space-y-2">
-              <h3 className="text-lg font-semibold">Camera not available</h3>
-              <p className="text-sm text-gray-400">
-                Unable to access camera. Please check permissions or try uploading a file instead.
-              </p>
-            </div>
-            <Button
-              onClick={onCancel}
-              variant="outline"
-              className="border-white/20 text-white hover:bg-white/10"
-            >
-              Close
-            </Button>
-          </div>
         )}
 
         {/* Hidden canvas for capture */}
         <canvas ref={canvasRef} className="hidden" />
       </div>
 
-      {/* Controls - Compact bottom bar (only show when camera is started) */}
-      {isCameraStarted && (
-        <div 
+      {/* Controls - Compact bottom bar */}
+      <div 
           className="bg-black/90 backdrop-blur-sm border-t border-white/10 flex-shrink-0"
           style={{
             paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))', // Safe area for notch phones
@@ -614,7 +500,6 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
           </div>
         )}
       </div>
-      )}
     </div>
   </DialogContent>
 </Dialog>
