@@ -62,12 +62,16 @@ export function KycFormStep({ step, fields, formData, errors, onChange }: Props)
                 </div>
               </div>
 
-              {/* Fields Grid */}
-              <div className="grid gap-4 md:grid-cols-2">
+              {/* Fields Grid - Improved Responsive */}
+              <div className="grid gap-4 sm:gap-5 grid-cols-1 md:grid-cols-2">
                 {categoryFields.map(field => (
                   <div 
                     key={field.id}
-                    className={field.fieldType === 'textarea' ? 'md:col-span-2' : ''}
+                    className={`${
+                      field.fieldType === 'textarea' || field.fieldType === 'file' 
+                        ? 'md:col-span-2' 
+                        : ''
+                    }`}
                   >
                     <KycField
                       field={field}

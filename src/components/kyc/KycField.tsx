@@ -4,7 +4,7 @@
  */
 'use client';
 
-import { useState, Suspense, lazy } from 'react';
+import { useState, Suspense, lazy, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,9 +14,10 @@ import { CountryDropdown } from '@/components/ui/country-dropdown';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { Button } from '@/components/ui/button';
 import { KycField as KycFieldType } from '@/lib/kyc/config';
-import { Upload, FileText, CheckCircle, XCircle, Loader2, Camera } from 'lucide-react';
+import { Upload, FileText, CheckCircle, XCircle, Loader2, Camera, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Value as PhoneValue } from 'react-phone-number-input';
+import { validatePostalCode, formatPostalCode, getPostalCodePlaceholder } from '@/lib/utils/postalCodeValidation';
 
 // Lazy load camera component (только когда нужно)
 const CameraCapture = lazy(() => import('./CameraCapture').then(m => ({ default: m.CameraCapture })));
@@ -40,6 +41,14 @@ export function KycField({ field, value, onChange, error, formData = {} }: Props
   // Check if field is date of birth (needs age validation)
   const isDateOfBirth = field.fieldName.toLowerCase().includes('birth') || 
                         field.fieldName.toLowerCase().includes('dob');
+  
+  // Check if field is postal code
+  const isPostalCode = field.fieldName.toLowerCase().includes('postal') ||
+                       field.fieldName.toLowerCase().includes('postcode') ||
+                       field.fieldName.toLowerCase().includes('zip');
+  
+  // State for postal code validation
+  const [postalCodeValid, setPostalCodeValid] = useState<boolean | null>(null);
 
   const renderInput = () => {
     // Special handling for country fields
@@ -50,6 +59,44 @@ export function KycField({ field, value, onChange, error, formData = {} }: Props
           onChange={(country) => onChange(country.alpha3)}
           placeholder={`Select ${field.label}`}
         />
+      );
+    }
+
+    // Postal Code with validation
+    if (isPostalCode) {
+      const country = formData?.country || formData?.address_country || formData?.residence_country || formData?.country_of_residence;
+      const placeholder = country ? getPostalCodePlaceholder(country) : 'Enter postal code';
+      
+      const handlePostalCodeChange = (val: string) => {
+        onChange(val);
+        
+        // Validate if country is selected
+        if (country && val.trim()) {
+          const validation = validatePostalCode(val, country);
+          setPostalCodeValid(validation.isValid);
+        } else {
+          setPostalCodeValid(null);
+        }
+      };
+      
+      return (
+        <div className="relative">
+          <Input
+            type="text"
+            value={value || ''}
+            onChange={(e) => handlePostalCodeChange(e.target.value)}
+            placeholder={placeholder}
+            className={`pr-10 ${error ? 'border-destructive' : postalCodeValid === true ? 'border-green-500' : postalCodeValid === false ? 'border-orange-500' : ''}`}
+          />
+          {postalCodeValid === true && (
+            <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />
+          )}
+          {postalCodeValid === false && value && (
+            <p className="text-xs text-orange-600 mt-1">
+              {country ? validatePostalCode(value, country).error : 'Invalid format'}
+            </p>
+          )}
+        </div>
       );
     }
 
@@ -370,7 +417,7 @@ function FileUploadField({ field, value, onChange, error, formData = {} }: {
 
   // Upload UI
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* Camera Modal (lazy loaded) */}
       {showCamera && (
         <Suspense fallback={<div className="text-center py-4">Loading camera...</div>}>
@@ -383,14 +430,14 @@ function FileUploadField({ field, value, onChange, error, formData = {} }: {
       )}
 
       {/* Drag & Drop Upload Area */}
-      <div className={`group relative flex items-center justify-center border-2 border-dashed rounded-xl p-8 transition-all duration-200 ${
+      <div className={`group relative flex items-center justify-center border-2 border-dashed rounded-xl p-6 sm:p-8 transition-all duration-200 ${
         error 
           ? 'border-destructive bg-destructive/5' 
           : 'border-border bg-card hover:border-primary hover:bg-primary/5 hover:shadow-sm'
       } ${uploading ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}>
         <label htmlFor={`file-${field.fieldName}`} className="cursor-pointer text-center w-full">
           {uploading ? (
-            <div className="flex flex-col items-center gap-3">
+            <div className="flex flex-col items-center gap-3 py-2">
               <div className="relative">
                 <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl"></div>
                 <Loader2 className="relative h-10 w-10 animate-spin text-primary" />
@@ -433,12 +480,12 @@ function FileUploadField({ field, value, onChange, error, formData = {} }: {
       </div>
 
       {/* OR Divider */}
-      <div className="relative">
+      <div className="relative py-2">
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-border"></div>
         </div>
         <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-background px-2 text-muted-foreground">or</span>
+          <span className="bg-background px-3 text-muted-foreground font-medium">or</span>
         </div>
       </div>
 
@@ -446,7 +493,7 @@ function FileUploadField({ field, value, onChange, error, formData = {} }: {
       <Button
         type="button"
         variant="outline"
-        className="w-full h-12"
+        className="w-full h-11 text-sm font-medium"
         onClick={() => setShowCamera(true)}
         disabled={uploading}
       >
