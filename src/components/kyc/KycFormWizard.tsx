@@ -153,7 +153,7 @@ export function KycFormWizard({
           if (Object.keys(autoFillData).length > 0) {
             setFormData(autoFillData);
             console.log('✅ Auto-filled KYC form with profile data:', Object.keys(autoFillData));
-            toast.success(`Pre-filled ${Object.keys(autoFillData).length} fields from your profile`);
+            // Removed toast - silent auto-fill for better UX
           }
         }
       } catch (error) {
@@ -409,12 +409,6 @@ export function KycFormWizard({
                 <span className="text-muted-foreground">
                   {Math.round(progress)}% Complete
                 </span>
-                {filledFieldsCount > 0 && (
-                  <span className="flex items-center gap-1.5 text-xs text-green-600">
-                    <Save className="h-3 w-3" />
-                    {filledFieldsCount}/{totalFieldsCount} filled
-                  </span>
-                )}
               </div>
             </div>
             <Progress value={progress} className="h-2" />

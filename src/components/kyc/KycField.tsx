@@ -419,15 +419,14 @@ function FileUploadField({ field, value, onChange, error, formData = {} }: {
   return (
     <div className="space-y-4">
       {/* Camera Modal (lazy loaded) */}
-      {showCamera && (
-        <Suspense fallback={<div className="text-center py-4">Loading camera...</div>}>
-          <CameraCapture
-            onCapture={handleCameraCapture}
-            onCancel={() => setShowCamera(false)}
-            documentType={field.label}
-          />
-        </Suspense>
-      )}
+      <Suspense fallback={<div className="text-center py-4">Loading camera...</div>}>
+        <CameraCapture
+          open={showCamera}
+          onCapture={handleCameraCapture}
+          onCancel={() => setShowCamera(false)}
+          documentType={field.label}
+        />
+      </Suspense>
 
       {/* Drag & Drop Upload Area */}
       <div className={`group relative flex items-center justify-center border-2 border-dashed rounded-xl p-6 sm:p-8 transition-all duration-200 ${

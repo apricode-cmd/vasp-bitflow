@@ -17,6 +17,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import {
   Camera,
   X,
@@ -31,12 +32,13 @@ import { prepareImageForUpload } from '@/lib/utils/imageProcessor';
 import { toast } from 'sonner';
 
 interface CameraCaptureProps {
+  open: boolean;
   onCapture: (file: File) => void;
   onCancel: () => void;
   documentType?: string;
 }
 
-export function CameraCapture({ onCapture, onCancel, documentType }: CameraCaptureProps) {
+export function CameraCapture({ open, onCapture, onCancel, documentType }: CameraCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
@@ -224,64 +226,66 @@ export function CameraCapture({ onCapture, onCancel, documentType }: CameraCaptu
   };
 
   /**
-   * Error state
+   * Error states - wrapped in Dialog
    */
   if (!isCameraSupported) {
     return (
-      <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
-        <div className="bg-card rounded-lg p-6 max-w-md w-full space-y-4">
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              Camera is not supported in this browser. Please use a modern browser or upload a file instead.
-            </AlertDescription>
-          </Alert>
-          <Button onClick={onCancel} className="w-full">
-            Close
-          </Button>
-        </div>
-      </div>
+      <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
+        <DialogContent className="sm:max-w-md">
+          <div className="space-y-4 p-2">
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Camera is not supported in this browser. Please use a modern browser or upload a file instead.
+              </AlertDescription>
+            </Alert>
+            <Button onClick={onCancel} className="w-full">
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     );
   }
 
   if (error && !hasPermission) {
     return (
-      <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
-        <div className="bg-card rounded-lg p-6 max-w-md w-full space-y-4">
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-          <div className="flex gap-2">
-            <Button onClick={requestPermissions} className="flex-1">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Try Again
-            </Button>
-            <Button onClick={onCancel} variant="outline" className="flex-1">
-              Cancel
-            </Button>
+      <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
+        <DialogContent className="sm:max-w-md">
+          <div className="space-y-4 p-2">
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+            <div className="flex gap-2">
+              <Button onClick={requestPermissions} className="flex-1">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try Again
+              </Button>
+              <Button onClick={onCancel} variant="outline" className="flex-1">
+                Cancel
+              </Button>
+            </div>
           </div>
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
     );
   }
 
   return (
-    <div 
-      className="fixed inset-0 bg-black z-[9999] flex flex-col"
-      style={{
-        height: '100dvh', // Dynamic viewport height (supports mobile address bar)
-        maxHeight: '-webkit-fill-available', // Safari fallback
-        overflow: 'hidden',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0
-      }}
-    >
-      {/* Header - Compact */}
-      <div className="bg-black/90 backdrop-blur-sm p-2 sm:p-3 flex items-center justify-between flex-shrink-0 border-b border-white/10">
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
+      <DialogContent 
+        className="p-0 gap-0 max-w-full w-full h-[95vh] sm:h-[90vh] border-0 bg-black overflow-hidden"
+        style={{
+          maxWidth: '100vw',
+          borderRadius: '0.75rem'
+        }}
+      >
+        <div 
+          className="flex flex-col h-full w-full bg-black rounded-lg overflow-hidden"
+        >
+          {/* Header - Compact */}
+          <div className="bg-black/90 backdrop-blur-sm p-2 sm:p-3 flex items-center justify-between flex-shrink-0 border-b border-white/10">
         <div className="flex-1 min-w-0">
           <h3 className="text-white font-semibold text-sm sm:text-base truncate">
             {capturedImage ? 'Review Photo' : documentType || 'Take Photo'}
@@ -435,17 +439,19 @@ export function CameraCapture({ onCapture, onCancel, documentType }: CameraCaptu
           </div>
         )}
 
-        {/* Error message */}
-        {error && hasPermission && (
-          <div className="px-3 pb-2">
-            <Alert variant="destructive" className="py-1.5">
-              <AlertTriangle className="h-3.5 w-3.5" />
-              <AlertDescription className="text-xs leading-tight">{error}</AlertDescription>
-            </Alert>
-          </div>
-        )}
+          {/* Error message */}
+          {error && hasPermission && (
+            <div className="px-3 pb-2">
+              <Alert variant="destructive" className="py-1.5">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                <AlertDescription className="text-xs leading-tight">{error}</AlertDescription>
+              </Alert>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </DialogContent>
+  </Dialog>
   );
 }
 
