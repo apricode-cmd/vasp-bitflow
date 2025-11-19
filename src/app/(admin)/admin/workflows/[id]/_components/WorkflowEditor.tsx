@@ -15,7 +15,7 @@ import { ReactFlowProvider } from '@xyflow/react';
 import WorkflowCanvas from './WorkflowCanvas';
 import NodeToolbar from './NodeToolbar';
 import PropertiesPanel from './PropertiesPanel';
-import TestWorkflowDialog from './TestWorkflowDialog';
+import ExecutionPanel from './ExecutionPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -64,8 +64,7 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
   // UI state
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
-  const [testDialogOpen, setTestDialogOpen] = useState(false);
-  const [isExecuting, setIsExecuting] = useState(false);
+  const [isExecutionPanelOpen, setIsExecutionPanelOpen] = useState(false);
 
   const isNewWorkflow = workflowId === 'create';
 
@@ -159,14 +158,14 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
     }
   }, [name, description, trigger, priority, workflowId, isNewWorkflow, router]);
 
-  // Test workflow
+  // Test workflow - open execution panel
   const handleTest = useCallback(async () => {
     if (isNewWorkflow) {
       toast.error('Please save the workflow first');
       return;
     }
 
-    setTestDialogOpen(true);
+    setIsExecutionPanelOpen(true);
   }, [isNewWorkflow]);
 
   // Publish/Pause workflow
@@ -435,20 +434,15 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
         )}
       </div>
 
-      {/* Test Workflow Dialog */}
+      {/* Execution Panel (n8n-style) */}
       {!isNewWorkflow && (
-        <TestWorkflowDialog
-          open={testDialogOpen}
-          onOpenChange={setTestDialogOpen}
+        <ExecutionPanel
+          isOpen={isExecutionPanelOpen}
+          onClose={() => setIsExecutionPanelOpen(false)}
           workflowId={workflowId}
           trigger={trigger}
           nodes={nodes}
-          onExecutionStatusUpdate={handleExecutionStatusUpdate}
-          onExecutionStart={() => {
-            setIsExecuting(true);
-            clearExecutionStatus();
-          }}
-          onExecutionEnd={() => setIsExecuting(false)}
+          onNodeExecutionUpdate={handleExecutionStatusUpdate}
         />
       )}
     </div>
