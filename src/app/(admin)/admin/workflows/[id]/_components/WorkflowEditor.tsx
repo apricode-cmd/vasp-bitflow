@@ -199,8 +199,8 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="border-b p-4">
+      {/* Header - Compact */}
+      <div className="border-b px-4 py-2">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Button
@@ -213,12 +213,12 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
             </Button>
             <Separator orientation="vertical" className="h-6" />
             <div>
-              <h1 className="text-xl font-bold">
+              <h1 className="text-lg font-bold">
                 {isNewWorkflow ? 'Create Workflow' : 'Edit Workflow'}
               </h1>
               {workflow && (
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge variant={workflow.isActive ? 'default' : 'secondary'}>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <Badge variant={workflow.isActive ? 'default' : 'secondary'} className="text-xs">
                     {workflow.status}
                   </Badge>
                   <span className="text-xs text-muted-foreground">
@@ -262,22 +262,22 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
           </div>
         </div>
 
-        {/* Workflow Config */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+        {/* Workflow Config - Compact */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-3">
           <div className="col-span-2">
-            <Label htmlFor="name">Workflow Name *</Label>
+            <Label htmlFor="name" className="text-xs">Workflow Name *</Label>
             <Input
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., High-Value Order Review"
-              className="mt-1.5"
+              className="mt-1 h-8 text-sm"
             />
           </div>
           <div>
-            <Label htmlFor="trigger">Trigger Event *</Label>
+            <Label htmlFor="trigger" className="text-xs">Trigger Event *</Label>
             <Select value={trigger} onValueChange={setTrigger}>
-              <SelectTrigger className="mt-1.5">
+              <SelectTrigger className="mt-1 h-8 text-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -292,34 +292,34 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
             </Select>
           </div>
           <div>
-            <Label htmlFor="priority">Priority</Label>
+            <Label htmlFor="priority" className="text-xs">Priority</Label>
             <Input
               id="priority"
               type="number"
               value={priority}
               onChange={(e) => setPriority(parseInt(e.target.value) || 0)}
               placeholder="0"
-              className="mt-1.5"
+              className="mt-1 h-8 text-sm"
             />
           </div>
         </div>
 
-        <div className="mt-3">
-          <Label htmlFor="description">Description (Optional)</Label>
+        <div className="mt-2">
+          <Label htmlFor="description" className="text-xs">Description (Optional)</Label>
           <Textarea
             id="description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="What does this workflow do?"
-            className="mt-1.5 resize-none"
-            rows={2}
+            className="mt-1 resize-none text-sm"
+            rows={1}
           />
         </div>
 
         {!isNewWorkflow && !workflow?.isActive && (
-          <Alert className="mt-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
+          <Alert className="mt-2 py-2">
+            <AlertCircle className="h-3 w-3" />
+            <AlertDescription className="text-xs">
               This workflow is paused. Click <strong>Activate</strong> to start execution.
             </AlertDescription>
           </Alert>
