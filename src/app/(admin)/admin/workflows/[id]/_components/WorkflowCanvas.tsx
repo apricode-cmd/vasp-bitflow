@@ -188,10 +188,10 @@ export default function WorkflowCanvas({
         {/* Background with dots - like n8n */}
         <Background
           variant={BackgroundVariant.Dots}
-          gap={20}
-          size={1}
-          color="hsl(var(--border))"
-          style={{ opacity: 0.4 }}
+          gap={16}
+          size={1.5}
+          color={isDarkMode ? '#475569' : '#cbd5e1'}
+          style={{ opacity: 0.6 }}
         />
 
         {/* Controls */}

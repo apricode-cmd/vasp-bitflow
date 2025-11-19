@@ -25,7 +25,9 @@ import {
   Play, 
   Pause, 
   Trash2,
-  AlertCircle 
+  AlertCircle,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import {
   Select,
@@ -56,6 +58,9 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
   // Graph state
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
+
+  // UI state
+  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
 
   const isNewWorkflow = workflowId === 'create';
 
@@ -199,10 +204,10 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header - Compact */}
-      <div className="border-b px-4 py-2">
+      {/* Header - Collapsible */}
+      <div className="border-b px-4 py-2 transition-all">
         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
             <Button
               variant="ghost"
               size="sm"
@@ -212,24 +217,39 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
               Back
             </Button>
             <Separator orientation="vertical" className="h-6" />
-            <div>
-              <h1 className="text-lg font-bold">
-                {isNewWorkflow ? 'Create Workflow' : 'Edit Workflow'}
-              </h1>
-              {workflow && (
-                <div className="flex items-center gap-2 mt-0.5">
-                  <Badge variant={workflow.isActive ? 'default' : 'secondary'} className="text-xs">
-                    {workflow.status}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">
-                    v{workflow.version} • {workflow.executionCount || 0} executions
-                  </span>
-                </div>
-              )}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-bold truncate">
+                  {name || (isNewWorkflow ? 'Create Workflow' : 'Edit Workflow')}
+                </h1>
+                {workflow && (
+                  <>
+                    <Badge variant={workflow.isActive ? 'default' : 'secondary'} className="text-xs shrink-0">
+                      {workflow.status}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground shrink-0 hidden md:inline">
+                      v{workflow.version} • {workflow.executionCount || 0} executions
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
+              className="h-8 w-8 p-0"
+              title={isHeaderCollapsed ? 'Expand header' : 'Collapse header'}
+            >
+              {isHeaderCollapsed ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronUp className="h-4 w-4" />
+              )}
+            </Button>
             {!isNewWorkflow && (
               <>
                 <Button
@@ -237,8 +257,8 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
                   size="sm"
                   onClick={handleTest}
                 >
-                  <Play className="h-4 w-4 mr-2" />
-                  Test
+                  <Play className="h-4 w-4 md:mr-2" />
+                  <span className="hidden md:inline">Test</span>
                 </Button>
                 <Button
                   variant={workflow?.isActive ? 'secondary' : 'default'}
@@ -247,13 +267,13 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
                 >
                   {workflow?.isActive ? (
                     <>
-                      <Pause className="h-4 w-4 mr-2" />
-                      Pause
+                      <Pause className="h-4 w-4 md:mr-2" />
+                      <span className="hidden md:inline">Pause</span>
                     </>
                   ) : (
                     <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Activate
+                      <Play className="h-4 w-4 md:mr-2" />
+                      <span className="hidden md:inline">Activate</span>
                     </>
                   )}
                 </Button>
@@ -262,67 +282,71 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
           </div>
         </div>
 
-        {/* Workflow Config - Compact */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-3">
-          <div className="col-span-2">
-            <Label htmlFor="name" className="text-xs">Workflow Name *</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., High-Value Order Review"
-              className="mt-1 h-8 text-sm"
-            />
-          </div>
-          <div>
-            <Label htmlFor="trigger" className="text-xs">Trigger Event *</Label>
-            <Select value={trigger} onValueChange={setTrigger}>
-              <SelectTrigger className="mt-1 h-8 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ORDER_CREATED">Order Created</SelectItem>
-                <SelectItem value="PAYIN_RECEIVED">PayIn Received</SelectItem>
-                <SelectItem value="PAYOUT_REQUESTED">PayOut Requested</SelectItem>
-                <SelectItem value="KYC_SUBMITTED">KYC Submitted</SelectItem>
-                <SelectItem value="USER_REGISTERED">User Registered</SelectItem>
-                <SelectItem value="WALLET_ADDED">Wallet Added</SelectItem>
-                <SelectItem value="AMOUNT_THRESHOLD">Amount Threshold</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="priority" className="text-xs">Priority</Label>
-            <Input
-              id="priority"
-              type="number"
-              value={priority}
-              onChange={(e) => setPriority(parseInt(e.target.value) || 0)}
-              placeholder="0"
-              className="mt-1 h-8 text-sm"
-            />
-          </div>
-        </div>
+        {/* Workflow Config - Collapsible */}
+        {!isHeaderCollapsed && (
+          <div className="animate-in slide-in-from-top-2 duration-200">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-3">
+              <div className="col-span-2">
+                <Label htmlFor="name" className="text-xs">Workflow Name *</Label>
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g., High-Value Order Review"
+                  className="mt-1 h-8 text-sm"
+                />
+              </div>
+              <div>
+                <Label htmlFor="trigger" className="text-xs">Trigger Event *</Label>
+                <Select value={trigger} onValueChange={setTrigger}>
+                  <SelectTrigger className="mt-1 h-8 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ORDER_CREATED">Order Created</SelectItem>
+                    <SelectItem value="PAYIN_RECEIVED">PayIn Received</SelectItem>
+                    <SelectItem value="PAYOUT_REQUESTED">PayOut Requested</SelectItem>
+                    <SelectItem value="KYC_SUBMITTED">KYC Submitted</SelectItem>
+                    <SelectItem value="USER_REGISTERED">User Registered</SelectItem>
+                    <SelectItem value="WALLET_ADDED">Wallet Added</SelectItem>
+                    <SelectItem value="AMOUNT_THRESHOLD">Amount Threshold</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="priority" className="text-xs">Priority</Label>
+                <Input
+                  id="priority"
+                  type="number"
+                  value={priority}
+                  onChange={(e) => setPriority(parseInt(e.target.value) || 0)}
+                  placeholder="0"
+                  className="mt-1 h-8 text-sm"
+                />
+              </div>
+            </div>
 
-        <div className="mt-2">
-          <Label htmlFor="description" className="text-xs">Description (Optional)</Label>
-          <Textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="What does this workflow do?"
-            className="mt-1 resize-none text-sm"
-            rows={1}
-          />
-        </div>
+            <div className="mt-2">
+              <Label htmlFor="description" className="text-xs">Description (Optional)</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="What does this workflow do?"
+                className="mt-1 resize-none text-sm"
+                rows={1}
+              />
+            </div>
 
-        {!isNewWorkflow && !workflow?.isActive && (
-          <Alert className="mt-2 py-2">
-            <AlertCircle className="h-3 w-3" />
-            <AlertDescription className="text-xs">
-              This workflow is paused. Click <strong>Activate</strong> to start execution.
-            </AlertDescription>
-          </Alert>
+            {!isNewWorkflow && !workflow?.isActive && (
+              <Alert className="mt-2 py-2">
+                <AlertCircle className="h-3 w-3" />
+                <AlertDescription className="text-xs">
+                  This workflow is paused. Click <strong>Activate</strong> to start execution.
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
         )}
       </div>
 
