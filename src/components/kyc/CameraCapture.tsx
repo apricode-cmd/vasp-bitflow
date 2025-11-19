@@ -268,38 +268,44 @@ export function CameraCapture({ onCapture, onCancel, documentType }: CameraCaptu
 
   return (
     <div 
-      className="fixed inset-0 bg-black z-50 flex flex-col"
+      className="fixed inset-0 bg-black z-[9999] flex flex-col"
       style={{
         height: '100dvh', // Dynamic viewport height (supports mobile address bar)
         maxHeight: '-webkit-fill-available', // Safari fallback
-        overflow: 'hidden'
+        overflow: 'hidden',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0
       }}
     >
-      {/* Header */}
-      <div className="bg-black/80 backdrop-blur p-3 sm:p-4 flex items-center justify-between flex-shrink-0">
-        <div>
-          <h3 className="text-white font-semibold text-base sm:text-lg">
-            {capturedImage ? 'Review Photo' : 'Take Photo'}
+      {/* Header - Compact */}
+      <div className="bg-black/90 backdrop-blur-sm p-2 sm:p-3 flex items-center justify-between flex-shrink-0 border-b border-white/10">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-white font-semibold text-sm sm:text-base truncate">
+            {capturedImage ? 'Review Photo' : documentType || 'Take Photo'}
           </h3>
-          <p className="text-xs sm:text-sm text-gray-400">
-            {documentType ? `Capture ${documentType}` : 'Capture document'}
-          </p>
         </div>
         <Button
           onClick={onCancel}
           variant="ghost"
           size="icon"
-          className="text-white hover:bg-white/10 h-9 w-9"
+          className="text-white hover:bg-white/20 h-8 w-8 ml-2 flex-shrink-0"
         >
-          <X className="h-5 w-5" />
+          <X className="h-4 w-4" />
         </Button>
       </div>
 
       {/* Camera Preview / Captured Image */}
       <div 
-        className="flex-1 relative flex items-center justify-center bg-black overflow-hidden"
+        className="flex-1 relative bg-black"
         style={{
           minHeight: 0, // Important for flex children
+          overflow: 'hidden',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
         }}
       >
         {isLoading ? (
@@ -335,31 +341,28 @@ export function CameraCapture({ onCapture, onCancel, documentType }: CameraCaptu
               className="absolute inset-0"
             />
 
-            {/* Document guide overlay - Mobile optimized */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 p-4">
-              <div className="relative w-full max-w-md aspect-[3/2]">
-                {/* Corner guides */}
-                <div className="absolute top-0 left-0 w-6 h-6 sm:w-8 sm:h-8 border-t-[3px] border-l-[3px] sm:border-t-4 sm:border-l-4 border-white rounded-tl-lg" />
-                <div className="absolute top-0 right-0 w-6 h-6 sm:w-8 sm:h-8 border-t-[3px] border-r-[3px] sm:border-t-4 sm:border-r-4 border-white rounded-tr-lg" />
-                <div className="absolute bottom-0 left-0 w-6 h-6 sm:w-8 sm:h-8 border-b-[3px] border-l-[3px] sm:border-b-4 sm:border-l-4 border-white rounded-bl-lg" />
-                <div className="absolute bottom-0 right-0 w-6 h-6 sm:w-8 sm:h-8 border-b-[3px] border-r-[3px] sm:border-b-4 sm:border-r-4 border-white rounded-br-lg" />
+            {/* Document guide overlay - Compact and centered */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 px-4">
+              <div className="relative w-[85%] max-w-sm aspect-[4/3]">
+                {/* Corner guides - Minimalistic */}
+                <div className="absolute top-0 left-0 w-5 h-5 sm:w-6 sm:h-6 border-t-[2px] border-l-[2px] border-white/90 rounded-tl" />
+                <div className="absolute top-0 right-0 w-5 h-5 sm:w-6 sm:h-6 border-t-[2px] border-r-[2px] border-white/90 rounded-tr" />
+                <div className="absolute bottom-0 left-0 w-5 h-5 sm:w-6 sm:h-6 border-b-[2px] border-l-[2px] border-white/90 rounded-bl" />
+                <div className="absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 border-b-[2px] border-r-[2px] border-white/90 rounded-br" />
                 
-                {/* Instruction */}
-                <div className="absolute -bottom-10 sm:-bottom-12 left-0 right-0 text-center px-2">
-                  <p className="text-white text-xs sm:text-sm bg-black/60 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 inline-block font-medium">
+                {/* Instruction - Positioned better */}
+                <div className="absolute -bottom-8 left-0 right-0 text-center">
+                  <p className="text-white text-[11px] sm:text-xs bg-black/70 backdrop-blur-sm rounded-full px-3 py-1 inline-block font-medium">
                     Align document within frame
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Debug info (remove in production) */}
+            {/* Status indicator */}
             {!stream && !isLoading && (
-              <div className="absolute top-20 left-4 right-4 bg-red-500/90 text-white p-3 rounded-lg text-sm z-20">
-                <p className="font-semibold">Camera not streaming</p>
-                <p className="text-xs mt-1">
-                  {error || 'Please allow camera access and try again'}
-                </p>
+              <div className="absolute top-4 left-4 right-4 bg-red-500/95 text-white p-2 rounded-lg text-xs z-20 backdrop-blur-sm">
+                <p className="font-semibold text-center">Camera not available</p>
               </div>
             )}
           </>
@@ -369,47 +372,47 @@ export function CameraCapture({ onCapture, onCancel, documentType }: CameraCaptu
         <canvas ref={canvasRef} className="hidden" />
       </div>
 
-      {/* Controls - Mobile optimized */}
+      {/* Controls - Compact bottom bar */}
       <div 
-        className="bg-black/80 backdrop-blur p-4 sm:p-6 space-y-3 sm:space-y-4 flex-shrink-0"
+        className="bg-black/90 backdrop-blur-sm border-t border-white/10 flex-shrink-0"
         style={{
-          paddingBottom: 'max(1rem, env(safe-area-inset-bottom))', // Safe area for notch phones
+          paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))', // Safe area for notch phones
         }}
       >
         {capturedImage ? (
           // Confirm/Retake controls
-          <div className="flex gap-2 sm:gap-3">
+          <div className="flex gap-2 p-3 sm:p-4">
             <Button
               onClick={handleRetake}
               variant="outline"
-              className="flex-1 h-11 sm:h-12 text-sm sm:text-base"
+              className="flex-1 h-10 sm:h-11 text-sm border-white/20 text-white hover:bg-white/10"
               disabled={isProcessing}
             >
-              <RefreshCw className="h-4 w-4 mr-1.5 sm:mr-2" />
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
               Retake
             </Button>
             <Button
               onClick={handleConfirm}
-              className="flex-1 h-11 sm:h-12 text-sm sm:text-base bg-green-600 hover:bg-green-700"
+              className="flex-1 h-10 sm:h-11 text-sm bg-green-600 hover:bg-green-700"
               disabled={isProcessing}
             >
-              <Check className="h-4 w-4 mr-1.5 sm:mr-2" />
+              <Check className="h-3.5 w-3.5 mr-1.5" />
               Use Photo
             </Button>
           </div>
         ) : (
           // Capture controls
-          <div className="flex items-center justify-center gap-4 sm:gap-6 py-2">
+          <div className="flex items-center justify-center gap-6 py-3 px-4">
             {/* Switch camera (if multiple cameras) */}
             {devices.length > 1 && (
               <Button
                 onClick={handleSwitchCamera}
                 variant="ghost"
                 size="icon"
-                className="h-12 w-12 sm:h-14 sm:w-14 rounded-full text-white hover:bg-white/10"
+                className="h-10 w-10 rounded-full text-white hover:bg-white/10"
                 disabled={isLoading || isProcessing}
               >
-                <SwitchCamera className="h-5 w-5 sm:h-6 sm:w-6" />
+                <SwitchCamera className="h-5 w-5" />
               </Button>
             )}
 
@@ -418,26 +421,28 @@ export function CameraCapture({ onCapture, onCancel, documentType }: CameraCaptu
               onClick={handleCapture}
               size="icon"
               disabled={isLoading || isProcessing || !stream}
-              className="h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-white hover:bg-gray-200 disabled:bg-gray-600 shadow-lg"
+              className="h-14 w-14 rounded-full bg-white hover:bg-gray-200 disabled:bg-gray-600 disabled:opacity-50 shadow-xl ring-2 ring-white/20"
             >
               {isProcessing ? (
-                <Loader2 className="h-7 w-7 sm:h-9 sm:w-9 animate-spin text-black" />
+                <Loader2 className="h-6 w-6 animate-spin text-black" />
               ) : (
-                <Camera className="h-7 w-7 sm:h-9 sm:w-9 text-black" />
+                <Camera className="h-6 w-6 text-black" />
               )}
             </Button>
 
             {/* Spacer for symmetry */}
-            {devices.length > 1 && <div className="w-12 sm:w-14" />}
+            {devices.length > 1 && <div className="w-10" />}
           </div>
         )}
 
         {/* Error message */}
         {error && hasPermission && (
-          <Alert variant="destructive" className="py-2 sm:py-3">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription className="text-xs sm:text-sm">{error}</AlertDescription>
-          </Alert>
+          <div className="px-3 pb-2">
+            <Alert variant="destructive" className="py-1.5">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              <AlertDescription className="text-xs leading-tight">{error}</AlertDescription>
+            </Alert>
+          </div>
         )}
       </div>
     </div>
