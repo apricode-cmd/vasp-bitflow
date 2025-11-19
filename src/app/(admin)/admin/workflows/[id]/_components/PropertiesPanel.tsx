@@ -455,17 +455,17 @@ export default function PropertiesPanel({
     };
 
     return (
-      <div className="space-y-5">
+      <div className="space-y-6">
         {/* Quick Templates */}
         <div>
-          <Label className="text-xs font-semibold mb-2 block">Quick Start Templates</Label>
+          <Label className="text-sm font-semibold mb-3 block">Quick Start Templates</Label>
           <Select onValueChange={handleLoadTemplate}>
-            <SelectTrigger className="text-xs">
+            <SelectTrigger>
               <SelectValue placeholder="Load a template (optional)" />
             </SelectTrigger>
             <SelectContent>
               {Object.entries(HTTP_REQUEST_TEMPLATES).map(([key, template]) => (
-                <SelectItem key={key} value={key} className="text-xs">
+                <SelectItem key={key} value={key}>
                   {template.name}
                 </SelectItem>
               ))}
@@ -477,8 +477,8 @@ export default function PropertiesPanel({
 
         {/* Request Configuration */}
         <div>
-          <Label className="text-sm font-semibold mb-3 block">Request</Label>
-          <div className="space-y-3">
+          <Label className="text-base font-semibold mb-4 block">Request</Label>
+          <div className="space-y-4">
             {/* Method + URL */}
             <div className="grid grid-cols-[100px,1fr] gap-2">
               <Select value={method} onValueChange={(value) => handleConfigChange('method', value)}>
@@ -535,8 +535,8 @@ export default function PropertiesPanel({
         {['POST', 'PUT', 'PATCH'].includes(method) && (
           <>
             <div>
-              <Label className="text-sm font-semibold mb-3 block">Body</Label>
-              <div className="space-y-3">
+              <Label className="text-base font-semibold mb-4 block">Body</Label>
+              <div className="space-y-4">
                 <div>
                   <Label className="text-xs font-medium mb-2 block">Body Type</Label>
                   <Select value={bodyType} onValueChange={(value) => handleConfigChange('bodyType', value)}>
@@ -583,8 +583,8 @@ export default function PropertiesPanel({
 
         {/* Authentication */}
         <div>
-          <Label className="text-sm font-semibold mb-3 block">Authentication</Label>
-          <div className="space-y-3">
+          <Label className="text-base font-semibold mb-4 block">Authentication</Label>
+          <div className="space-y-4">
             <Select
               value={authType}
               onValueChange={(value) => handleConfigChange('auth', { type: value })}
@@ -682,8 +682,8 @@ export default function PropertiesPanel({
 
         {/* Response */}
         <div>
-          <Label className="text-sm font-semibold mb-3 block">Response</Label>
-          <div className="space-y-3">
+          <Label className="text-base font-semibold mb-4 block">Response</Label>
+          <div className="space-y-4">
             <div>
               <Label className="text-xs">Response Format</Label>
               <Select
@@ -751,8 +751,8 @@ export default function PropertiesPanel({
 
         {/* Error Handling */}
         <div>
-          <Label className="text-sm font-semibold mb-3 block">Error Handling</Label>
-          <div className="space-y-3">
+          <Label className="text-base font-semibold mb-4 block">Error Handling</Label>
+          <div className="space-y-4">
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -803,8 +803,8 @@ export default function PropertiesPanel({
 
         {/* Options */}
         <div>
-          <Label className="text-sm font-semibold mb-3 block">Options</Label>
-          <div className="space-y-3">
+          <Label className="text-base font-semibold mb-4 block">Options</Label>
+          <div className="space-y-4">
             <div>
               <Label className="text-xs">Timeout (ms)</Label>
               <Input
@@ -940,29 +940,48 @@ export default function PropertiesPanel({
   };
 
   return (
-    <div className="w-80 border-l bg-background flex flex-col h-full">
+    <div className="w-[520px] border-l bg-background flex flex-col h-full shadow-xl">
       {/* Header */}
       <div className="p-4 border-b">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-2">
           <div>
             <h3 className="font-semibold text-sm">Node Properties</h3>
             <Badge variant="outline" className="mt-1 text-xs capitalize">
               {selectedNode.type === 'httpRequest' ? 'HTTP Request' : selectedNode.type}
             </Badge>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0"
-            onClick={onClose}
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => {
+                // TODO: Open fullscreen dialog
+                alert('Fullscreen mode coming soon! For now, you can scroll in this panel.');
+              }}
+              title="Expand to fullscreen"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+              </svg>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={onClose}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
+        <p className="text-xs text-muted-foreground">
+          Tip: Scroll down for all options. Click expand icon for more space.
+        </p>
       </div>
 
       {/* Form */}
-      <div className="flex-1 p-4 overflow-y-auto">
+      <div className="flex-1 p-6 overflow-y-auto">
         {selectedNode.type === 'trigger' && renderTriggerForm()}
         {selectedNode.type === 'condition' && renderConditionForm()}
         {selectedNode.type === 'action' && renderActionForm()}
@@ -970,7 +989,7 @@ export default function PropertiesPanel({
       </div>
 
       {/* Footer */}
-      <div className="p-4 border-t bg-muted/30">
+      <div className="p-6 border-t bg-muted/30">
         <div className="flex gap-2">
           <Button
             variant="outline"
