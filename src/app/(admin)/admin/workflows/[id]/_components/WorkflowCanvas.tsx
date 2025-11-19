@@ -328,6 +328,89 @@ export default function WorkflowCanvas({
     }
   }, []);
 
+  // Alignment functions (defined BEFORE handleContextMenuAction)
+  const alignNodesHorizontally = useCallback((alignment: 'left' | 'center' | 'right') => {
+    const selectedNodes = nodes.filter(n => n.selected);
+    if (selectedNodes.length < 2) {
+      toast.error('Select at least 2 nodes to align');
+      return;
+    }
+
+    const positions = selectedNodes.map(n => n.position.x + (n.width || 280) / 2);
+    let targetX: number;
+
+    switch (alignment) {
+      case 'left':
+        targetX = Math.min(...selectedNodes.map(n => n.position.x));
+        break;
+      case 'center':
+        targetX = (Math.max(...positions) + Math.min(...positions)) / 2;
+        break;
+      case 'right':
+        targetX = Math.max(...selectedNodes.map(n => n.position.x + (n.width || 280)));
+        break;
+    }
+
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.selected) {
+          return {
+            ...node,
+            position: {
+              ...node.position,
+              x: alignment === 'left' ? targetX : 
+                 alignment === 'center' ? targetX - (node.width || 280) / 2 :
+                 targetX - (node.width || 280),
+            },
+          };
+        }
+        return node;
+      })
+    );
+    toast.success(`Nodes aligned ${alignment}`);
+  }, [nodes, setNodes]);
+
+  const alignNodesVertically = useCallback((alignment: 'top' | 'middle' | 'bottom') => {
+    const selectedNodes = nodes.filter(n => n.selected);
+    if (selectedNodes.length < 2) {
+      toast.error('Select at least 2 nodes to align');
+      return;
+    }
+
+    const positions = selectedNodes.map(n => n.position.y + (n.height || 150) / 2);
+    let targetY: number;
+
+    switch (alignment) {
+      case 'top':
+        targetY = Math.min(...selectedNodes.map(n => n.position.y));
+        break;
+      case 'middle':
+        targetY = (Math.max(...positions) + Math.min(...positions)) / 2;
+        break;
+      case 'bottom':
+        targetY = Math.max(...selectedNodes.map(n => n.position.y + (n.height || 150)));
+        break;
+    }
+
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.selected) {
+          return {
+            ...node,
+            position: {
+              ...node.position,
+              y: alignment === 'top' ? targetY :
+                 alignment === 'middle' ? targetY - (node.height || 150) / 2 :
+                 targetY - (node.height || 150),
+            },
+          };
+        }
+        return node;
+      })
+    );
+    toast.success(`Nodes aligned ${alignment}`);
+  }, [nodes, setNodes]);
+
   // Handle context menu actions
   const handleContextMenuAction = useCallback((action: string, data?: any) => {
     switch (action) {
@@ -456,89 +539,6 @@ export default function WorkflowCanvas({
         console.log('Unknown action:', action);
     }
   }, [onNodeClick, setNodes, setEdges, handleFitView, alignNodesHorizontally, alignNodesVertically, readOnly]);
-
-  // Alignment functions
-  const alignNodesHorizontally = useCallback((alignment: 'left' | 'center' | 'right') => {
-    const selectedNodes = nodes.filter(n => n.selected);
-    if (selectedNodes.length < 2) {
-      toast.error('Select at least 2 nodes to align');
-      return;
-    }
-
-    const positions = selectedNodes.map(n => n.position.x + (n.width || 280) / 2);
-    let targetX: number;
-
-    switch (alignment) {
-      case 'left':
-        targetX = Math.min(...selectedNodes.map(n => n.position.x));
-        break;
-      case 'center':
-        targetX = (Math.max(...positions) + Math.min(...positions)) / 2;
-        break;
-      case 'right':
-        targetX = Math.max(...selectedNodes.map(n => n.position.x + (n.width || 280)));
-        break;
-    }
-
-    setNodes((nds) =>
-      nds.map((node) => {
-        if (node.selected) {
-          return {
-            ...node,
-            position: {
-              ...node.position,
-              x: alignment === 'left' ? targetX : 
-                 alignment === 'center' ? targetX - (node.width || 280) / 2 :
-                 targetX - (node.width || 280),
-            },
-          };
-        }
-        return node;
-      })
-    );
-    toast.success(`Nodes aligned ${alignment}`);
-  }, [nodes, setNodes]);
-
-  const alignNodesVertically = useCallback((alignment: 'top' | 'middle' | 'bottom') => {
-    const selectedNodes = nodes.filter(n => n.selected);
-    if (selectedNodes.length < 2) {
-      toast.error('Select at least 2 nodes to align');
-      return;
-    }
-
-    const positions = selectedNodes.map(n => n.position.y + (n.height || 150) / 2);
-    let targetY: number;
-
-    switch (alignment) {
-      case 'top':
-        targetY = Math.min(...selectedNodes.map(n => n.position.y));
-        break;
-      case 'middle':
-        targetY = (Math.max(...positions) + Math.min(...positions)) / 2;
-        break;
-      case 'bottom':
-        targetY = Math.max(...selectedNodes.map(n => n.position.y + (n.height || 150)));
-        break;
-    }
-
-    setNodes((nds) =>
-      nds.map((node) => {
-        if (node.selected) {
-          return {
-            ...node,
-            position: {
-              ...node.position,
-              y: alignment === 'top' ? targetY :
-                 alignment === 'middle' ? targetY - (node.height || 150) / 2 :
-                 targetY - (node.height || 150),
-            },
-          };
-        }
-        return node;
-      })
-    );
-    toast.success(`Nodes aligned ${alignment}`);
-  }, [nodes, setNodes]);
 
   // Handle context menu
   const handleNodeContextMenu = useCallback(
