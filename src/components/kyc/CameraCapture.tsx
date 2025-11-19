@@ -45,6 +45,7 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
   
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isCameraStarted, setIsCameraStarted] = useState(false); // NEW: Track if user started camera
   
   const {
     stream,
@@ -65,25 +66,24 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
   });
 
   /**
-   * Initialize camera on mount
+   * Handle user clicking "Start Camera" button
+   */
+  const handleStartCamera = async () => {
+    setIsCameraStarted(true);
+    const granted = await requestPermissions();
+    if (granted) {
+      await startCamera();
+    }
+  };
+
+  /**
+   * Cleanup on unmount
    */
   useEffect(() => {
-    const init = async () => {
-      if (isCameraSupported) {
-        const granted = await requestPermissions();
-        if (granted) {
-          await startCamera();
-        }
-      }
-    };
-
-    init();
-
-    // Cleanup on unmount
     return () => {
       stopCamera();
     };
-  }, [isCameraSupported]);
+  }, [stopCamera]);
 
   /**
    * Attach stream to video element
@@ -138,17 +138,31 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
 
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      // Convert canvas to blob
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob(
-          (b) => {
-            if (b) resolve(b);
-            else reject(new Error('Failed to create blob'));
-          },
-          'image/jpeg',
-          0.85
-        );
-      });
+      // Convert canvas to blob (with fallback to base64)
+      let blob: Blob;
+      try {
+        blob = await new Promise<Blob>((resolve, reject) => {
+          canvas.toBlob(
+            (b) => {
+              if (b) resolve(b);
+              else reject(new Error('Failed to create blob'));
+            },
+            'image/jpeg',
+            0.85
+          );
+        });
+      } catch (blobError) {
+        console.warn('⚠️ Blob creation failed, using base64 fallback:', blobError);
+        // Fallback: use toDataURL and convert to blob
+        const base64 = canvas.toDataURL('image/jpeg', 0.85);
+        const base64Data = base64.split(',')[1];
+        const binaryData = atob(base64Data);
+        const arrayBuffer = new Uint8Array(binaryData.length);
+        for (let i = 0; i < binaryData.length; i++) {
+          arrayBuffer[i] = binaryData.charCodeAt(i);
+        }
+        blob = new Blob([arrayBuffer], { type: 'image/jpeg' });
+      }
 
       // Create temporary file
       const tempFile = new File(
@@ -324,7 +338,33 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
           justifyContent: 'center'
         }}
       >
-        {isLoading ? (
+        {!isCameraStarted ? (
+          // Initial state - Show "Start Camera" button
+          <div className="text-center text-white space-y-6 p-6 max-w-md">
+            <div className="flex justify-center">
+              <div className="rounded-full bg-white/10 p-6">
+                <Camera className="h-16 w-16 text-white" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-semibold">Camera Access Required</h3>
+              <p className="text-sm text-gray-400">
+                {documentType ? `Take a photo of your ${documentType}` : 'Take a photo of your document'}
+              </p>
+            </div>
+            <Button
+              onClick={handleStartCamera}
+              size="lg"
+              className="w-full bg-white text-black hover:bg-gray-200"
+            >
+              <Camera className="h-5 w-5 mr-2" />
+              Start Camera
+            </Button>
+            <p className="text-xs text-gray-500">
+              We need camera access to capture your document photo
+            </p>
+          </div>
+        ) : isLoading ? (
           <div className="text-center text-white space-y-4">
             <Loader2 className="h-12 w-12 animate-spin mx-auto" />
             <p>Starting camera...</p>
@@ -336,7 +376,7 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
             alt="Captured"
             className="max-w-full max-h-full object-contain"
           />
-        ) : (
+        ) : stream ? (
           <>
             {/* Video stream - Fixed for mobile iOS/Android */}
             <video
@@ -382,20 +422,39 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
               </div>
             )}
           </>
+        ) : (
+          // Fallback: camera started but no stream
+          <div className="text-center text-white space-y-4 p-6">
+            <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto" />
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold">Camera not available</h3>
+              <p className="text-sm text-gray-400">
+                Unable to access camera. Please check permissions or try uploading a file instead.
+              </p>
+            </div>
+            <Button
+              onClick={onCancel}
+              variant="outline"
+              className="border-white/20 text-white hover:bg-white/10"
+            >
+              Close
+            </Button>
+          </div>
         )}
 
         {/* Hidden canvas for capture */}
         <canvas ref={canvasRef} className="hidden" />
       </div>
 
-      {/* Controls - Compact bottom bar */}
-      <div 
-        className="bg-black/90 backdrop-blur-sm border-t border-white/10 flex-shrink-0"
-        style={{
-          paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))', // Safe area for notch phones
-        }}
-      >
-        {capturedImage ? (
+      {/* Controls - Compact bottom bar (only show when camera is started) */}
+      {isCameraStarted && (
+        <div 
+          className="bg-black/90 backdrop-blur-sm border-t border-white/10 flex-shrink-0"
+          style={{
+            paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))', // Safe area for notch phones
+          }}
+        >
+          {capturedImage ? (
           // Confirm/Retake controls
           <div className="flex gap-2 p-3 sm:p-4">
             <Button
@@ -451,19 +510,20 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
           </div>
         )}
 
-          {/* Error message */}
-          {error && hasPermission && (
-            <div className="px-3 pb-2">
-              <Alert variant="destructive" className="py-1.5">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                <AlertDescription className="text-xs leading-tight">{error}</AlertDescription>
-              </Alert>
-            </div>
-          )}
-        </div>
+        {/* Error message */}
+        {error && hasPermission && (
+          <div className="px-3 pb-2">
+            <Alert variant="destructive" className="py-1.5">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              <AlertDescription className="text-xs leading-tight">{error}</AlertDescription>
+            </Alert>
+          </div>
+        )}
       </div>
-    </DialogContent>
-  </Dialog>
+      )}
+    </div>
+  </DialogContent>
+</Dialog>
   );
 }
 
