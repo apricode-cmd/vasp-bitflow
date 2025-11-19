@@ -157,13 +157,37 @@ function HttpRequestNode({ data, selected }: NodeProps<HttpRequestNodeData>) {
               </div>
             )}
 
+            {/* Query Params Count */}
+            {data.config?.queryParams && Array.isArray(data.config.queryParams) && data.config.queryParams.length > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="font-medium opacity-70">Query Params:</span>
+                <span className="font-mono">{data.config.queryParams.length}</span>
+              </div>
+            )}
+
+            {/* Headers Count */}
+            {data.config?.headers && Array.isArray(data.config.headers) && data.config.headers.length > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="font-medium opacity-70">Headers:</span>
+                <span className="font-mono">{data.config.headers.length}</span>
+              </div>
+            )}
+
             {/* Auth */}
-            {data.config?.authType && data.config.authType !== 'NONE' && (
+            {data.config?.auth?.type && data.config.auth.type !== 'NONE' && (
               <div className="flex items-center justify-between">
                 <span className="font-medium opacity-70">Auth:</span>
                 <span className="font-mono text-xs">
-                  {data.config.authType.replace('_', ' ')}
+                  {data.config.auth.type.replace(/_/g, ' ')}
                 </span>
+              </div>
+            )}
+
+            {/* Body Type */}
+            {data.config?.bodyType && data.config.bodyType !== 'NONE' && (
+              <div className="flex items-center justify-between">
+                <span className="font-medium opacity-70">Body:</span>
+                <span className="font-mono text-xs">{data.config.bodyType}</span>
               </div>
             )}
 

@@ -25,6 +25,8 @@ import { X, Save, Filter } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import ExpressionInput from './ExpressionInput';
 import TriggerConfigDialog from './TriggerConfigDialog';
+import KeyValuePairBuilder, { type KeyValuePair } from '@/components/workflows/KeyValuePairBuilder';
+import { HTTP_REQUEST_TEMPLATES, type HttpRequestTemplate } from '@/lib/validations/http-request';
 import type { Edge } from '@xyflow/react';
 import type { TriggerConfig } from '@/lib/validations/trigger-config';
 import { useState as useReactState } from 'react';
@@ -422,125 +424,297 @@ export default function PropertiesPanel({
   };
 
   const renderHttpRequestForm = () => {
-    return (
-      <div className="space-y-6">
-        {/* Request Section */}
-        <div>
-          <Label className="text-sm font-semibold mb-3 block">Request Configuration</Label>
-          <div className="space-y-4">
-            {/* Method + URL in one row */}
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <Label htmlFor="method" className="text-xs">Method *</Label>
-                <Select
-                  value={formData.config?.method || 'GET'}
-                  onValueChange={(value) => handleConfigChange('method', value)}
-                >
-                  <SelectTrigger id="method" className="mt-1.5">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].map((method) => (
-                      <SelectItem key={method} value={method}>
-                        {method}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="col-span-2">
-                <Label htmlFor="url" className="text-xs">URL *</Label>
-                <div className="mt-1.5">
-                  <ExpressionInput
-                    value={formData.config?.url || ''}
-                    onChange={(value) => handleConfigChange('url', value)}
-                    placeholder="https://api.example.com/endpoint"
-                    availableVariables={availableVariables}
-                  />
-                </div>
-              </div>
-            </div>
+    // Initialize defaults if not set
+    const config = formData.config || {};
+    const method = config.method || 'GET';
+    const url = config.url || '';
+    const queryParams = (config.queryParams as KeyValuePair[]) || [];
+    const headers = (config.headers as KeyValuePair[]) || [];
+    const bodyType = config.bodyType || 'NONE';
+    const body = config.body || '';
+    const authType = config.auth?.type || 'NONE';
+    const timeout = config.timeout || 30000;
+    const followRedirects = config.followRedirects !== false;
+    const validateSSL = config.validateSSL !== false;
+    
+    const handleLoadTemplate = (templateKey: string) => {
+      const template = HTTP_REQUEST_TEMPLATES[templateKey as HttpRequestTemplate];
+      if (template) {
+        const { name, ...templateConfig } = template;
+        setFormData((prev: any) => ({
+          ...prev,
+          config: {
+            ...prev.config,
+            ...templateConfig,
+            queryParams: templateConfig.queryParams || [],
+            headers: templateConfig.headers || [],
+          },
+        }));
+      }
+    };
 
-            {/* Request Body */}
-            {['POST', 'PUT', 'PATCH'].includes(formData.config?.method || '') && (
-              <div>
-                <Label htmlFor="body" className="text-xs">Request Body (JSON)</Label>
-                <div className="mt-1.5">
-                  <ExpressionInput
-                    value={formData.config?.body || ''}
-                    onChange={(value) => handleConfigChange('body', value)}
-                    placeholder='{"key": "value"} or use {{ }} expressions'
-                    availableVariables={availableVariables}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+    return (
+      <div className="space-y-5">
+        {/* Quick Templates */}
+        <div>
+          <Label className="text-xs font-semibold mb-2 block">Quick Start Templates</Label>
+          <Select onValueChange={handleLoadTemplate}>
+            <SelectTrigger className="text-xs">
+              <SelectValue placeholder="Load a template (optional)" />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(HTTP_REQUEST_TEMPLATES).map(([key, template]) => (
+                <SelectItem key={key} value={key} className="text-xs">
+                  {template.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <Separator />
 
-        {/* Authentication Section */}
+        {/* Request Configuration */}
         <div>
-          <Label className="text-sm font-semibold mb-3 block">Authentication</Label>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="authType" className="text-xs">Auth Type</Label>
-              <Select
-                value={formData.config?.authType || 'NONE'}
-                onValueChange={(value) => handleConfigChange('authType', value)}
-              >
-                <SelectTrigger id="authType" className="mt-1.5">
+          <Label className="text-sm font-semibold mb-3 block">Request</Label>
+          <div className="space-y-3">
+            {/* Method + URL */}
+            <div className="grid grid-cols-[100px,1fr] gap-2">
+              <Select value={method} onValueChange={(value) => handleConfigChange('method', value)}>
+                <SelectTrigger className="text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="NONE">None</SelectItem>
-                  <SelectItem value="BEARER_TOKEN">Bearer Token</SelectItem>
-                  <SelectItem value="BASIC_AUTH">Basic Auth</SelectItem>
-                  <SelectItem value="API_KEY">API Key</SelectItem>
+                  {['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].map((m) => (
+                    <SelectItem key={m} value={m} className="text-xs font-bold">
+                      {m}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              <ExpressionInput
+                value={url}
+                onChange={(value) => handleConfigChange('url', value)}
+                placeholder="https://api.example.com/endpoint"
+                availableVariables={availableVariables}
+              />
             </div>
 
-            {formData.config?.authType && formData.config.authType !== 'NONE' && (
+            {/* Query Parameters */}
+            <div>
+              <Label className="text-xs font-medium mb-2 block">Query Parameters</Label>
+              <KeyValuePairBuilder
+                items={queryParams}
+                onChange={(items) => handleConfigChange('queryParams', items)}
+                placeholder={{ key: 'param_name', value: 'param_value' }}
+                expressionSupport={true}
+                availableVariables={availableVariables}
+                keyLabel="Parameter"
+              />
+            </div>
+
+            {/* Headers */}
+            <div>
+              <Label className="text-xs font-medium mb-2 block">Headers</Label>
+              <KeyValuePairBuilder
+                items={headers}
+                onChange={(items) => handleConfigChange('headers', items)}
+                placeholder={{ key: 'Header-Name', value: 'header value' }}
+                expressionSupport={true}
+                availableVariables={availableVariables}
+                keyLabel="Header"
+              />
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Body */}
+        {['POST', 'PUT', 'PATCH'].includes(method) && (
+          <>
+            <div>
+              <Label className="text-sm font-semibold mb-3 block">Body</Label>
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-xs font-medium mb-2 block">Body Type</Label>
+                  <Select value={bodyType} onValueChange={(value) => handleConfigChange('bodyType', value)}>
+                    <SelectTrigger className="text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NONE">None</SelectItem>
+                      <SelectItem value="JSON">JSON</SelectItem>
+                      <SelectItem value="FORM">Form URL Encoded</SelectItem>
+                      <SelectItem value="RAW">Raw / Custom</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {bodyType !== 'NONE' && (
+                  <div>
+                    <Label className="text-xs font-medium mb-2 block">
+                      {bodyType === 'JSON' && 'JSON Body'}
+                      {bodyType === 'FORM' && 'Form Data (use Key-Value pairs)'}
+                      {bodyType === 'RAW' && 'Raw Body'}
+                    </Label>
+                    <ExpressionInput
+                      value={body}
+                      onChange={(value) => handleConfigChange('body', value)}
+                      placeholder={
+                        bodyType === 'JSON'
+                          ? '{\n  "key": "{{ $node.value }}"\n}'
+                          : bodyType === 'FORM'
+                          ? 'key1=value1&key2={{ $node.value }}'
+                          : 'Raw content here'
+                      }
+                      availableVariables={availableVariables}
+                      rows={8}
+                      isJson={bodyType === 'JSON'}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+            <Separator />
+          </>
+        )}
+
+        {/* Authentication */}
+        <div>
+          <Label className="text-sm font-semibold mb-3 block">Authentication</Label>
+          <div className="space-y-3">
+            <Select
+              value={authType}
+              onValueChange={(value) => handleConfigChange('auth', { type: value })}
+            >
+              <SelectTrigger className="text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="NONE">None</SelectItem>
+                <SelectItem value="BEARER_TOKEN">Bearer Token</SelectItem>
+                <SelectItem value="BASIC_AUTH">Basic Auth</SelectItem>
+                <SelectItem value="API_KEY">API Key</SelectItem>
+                <SelectItem value="OAUTH2">OAuth2</SelectItem>
+                <SelectItem value="CUSTOM_HEADER">Custom Header</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {authType === 'BEARER_TOKEN' && (
               <div>
-                <Label htmlFor="authToken" className="text-xs">
-                  {formData.config.authType === 'BEARER_TOKEN' && 'Bearer Token'}
-                  {formData.config.authType === 'BASIC_AUTH' && 'Username:Password'}
-                  {formData.config.authType === 'API_KEY' && 'API Key'}
-                </Label>
-                <div className="mt-1.5">
+                <Label className="text-xs">Token</Label>
+                <ExpressionInput
+                  value={config.auth?.token || ''}
+                  onChange={(value) => handleConfigChange('auth', { ...config.auth, type: authType, token: value })}
+                  placeholder="Enter token or {{ $env.API_TOKEN }}"
+                  availableVariables={availableVariables}
+                />
+              </div>
+            )}
+
+            {authType === 'BASIC_AUTH' && (
+              <>
+                <div>
+                  <Label className="text-xs">Username</Label>
                   <ExpressionInput
-                    value={formData.config?.authToken || ''}
-                    onChange={(value) => handleConfigChange('authToken', value)}
-                    placeholder="Enter token or use {{ $env.API_KEY }}"
+                    value={config.auth?.username || ''}
+                    onChange={(value) => handleConfigChange('auth', { ...config.auth, type: authType, username: value })}
+                    placeholder="Username or {{ $env.API_USERNAME }}"
                     availableVariables={availableVariables}
                   />
                 </div>
-              </div>
+                <div>
+                  <Label className="text-xs">Password</Label>
+                  <ExpressionInput
+                    value={config.auth?.password || ''}
+                    onChange={(value) => handleConfigChange('auth', { ...config.auth, type: authType, password: value })}
+                    placeholder="Password or {{ $env.API_PASSWORD }}"
+                    availableVariables={availableVariables}
+                    type="password"
+                  />
+                </div>
+              </>
+            )}
+
+            {authType === 'API_KEY' && (
+              <>
+                <div>
+                  <Label className="text-xs">Key Location</Label>
+                  <Select
+                    value={config.auth?.apiKeyLocation || 'HEADER'}
+                    onValueChange={(value) => handleConfigChange('auth', { ...config.auth, type: authType, apiKeyLocation: value })}
+                  >
+                    <SelectTrigger className="text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="HEADER">Header</SelectItem>
+                      <SelectItem value="QUERY">Query Parameter</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Key Name</Label>
+                  <Input
+                    value={config.auth?.apiKeyName || ''}
+                    onChange={(e) => handleConfigChange('auth', { ...config.auth, type: authType, apiKeyName: e.target.value })}
+                    placeholder="X-API-Key"
+                    className="text-xs"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Key Value</Label>
+                  <ExpressionInput
+                    value={config.auth?.apiKeyValue || ''}
+                    onChange={(value) => handleConfigChange('auth', { ...config.auth, type: authType, apiKeyValue: value })}
+                    placeholder="{{ $env.API_KEY }}"
+                    availableVariables={availableVariables}
+                  />
+                </div>
+              </>
             )}
           </div>
         </div>
 
         <Separator />
 
-        {/* Options Section */}
+        {/* Options */}
         <div>
           <Label className="text-sm font-semibold mb-3 block">Options</Label>
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div>
-              <Label htmlFor="timeout" className="text-xs">Timeout (ms)</Label>
+              <Label className="text-xs">Timeout (ms)</Label>
               <Input
-                id="timeout"
                 type="number"
-                value={formData.config?.timeout || 30000}
+                value={timeout}
                 onChange={(e) => handleConfigChange('timeout', parseInt(e.target.value) || 30000)}
-                placeholder="30000"
-                className="mt-1.5"
+                className="text-xs"
               />
-              <p className="text-xs text-muted-foreground mt-1">
-                Default: 30000ms (30 seconds)
-              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="followRedirects"
+                checked={followRedirects}
+                onChange={(e) => handleConfigChange('followRedirects', e.target.checked)}
+                className="h-4 w-4"
+              />
+              <Label htmlFor="followRedirects" className="text-xs cursor-pointer">
+                Follow Redirects
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="validateSSL"
+                checked={validateSSL}
+                onChange={(e) => handleConfigChange('validateSSL', e.target.checked)}
+                className="h-4 w-4"
+              />
+              <Label htmlFor="validateSSL" className="text-xs cursor-pointer">
+                Validate SSL Certificates
+              </Label>
             </div>
           </div>
         </div>
