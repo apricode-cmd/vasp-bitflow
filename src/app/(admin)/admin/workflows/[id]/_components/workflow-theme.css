@@ -250,15 +250,11 @@
   }
 }
 
-/* Node execution indicators - Simple borders + badges */
+/* Node execution indicators - Override Tailwind ring classes */
 
 /* Yellow border when executing */
 .react-flow__node.node-executing {
   position: relative;
-}
-
-.react-flow__node.node-executing > div {
-  box-shadow: 0 0 0 2px #eab308 !important;
 }
 
 /* Green border when success */
@@ -266,17 +262,9 @@
   position: relative;
 }
 
-.react-flow__node.node-success > div {
-  box-shadow: 0 0 0 2px #22c55e !important;
-}
-
 /* Red border when error */
 .react-flow__node.node-error {
   position: relative;
-}
-
-.react-flow__node.node-error > div {
-  box-shadow: 0 0 0 2px #ef4444 !important;
 }
 
 /* Spinner badge for running state */

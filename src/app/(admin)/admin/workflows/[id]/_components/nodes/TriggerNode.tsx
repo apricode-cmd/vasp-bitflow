@@ -98,7 +98,7 @@ function TriggerNode({ data, selected }: NodeProps<TriggerNodeData>) {
   const getExecutionStyles = () => {
     switch (data.executionStatus) {
       case 'running':
-        return 'ring-2 ring-yellow-500 ring-offset-2 animate-pulse';
+        return 'ring-2 ring-yellow-500 ring-offset-2';
       case 'success':
         return 'ring-2 ring-green-500 ring-offset-2';
       case 'error':
