@@ -25,10 +25,27 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 
-const NODE_LIBRARY = [
+interface NodeCategory {
+  category: string;
+  color: string;
+  textColor: string;
+  iconColor: string;
+  nodes: Array<{
+    type: string;
+    icon: any;
+    label: string;
+    trigger?: string;
+    actionType?: string;
+    data?: any;
+  }>;
+}
+
+const NODE_LIBRARY: NodeCategory[] = [
   {
     category: 'Triggers',
-    color: 'bg-blue-50 border-blue-200',
+    color: 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800',
+    textColor: 'text-blue-900 dark:text-blue-100',
+    iconColor: 'text-blue-600 dark:text-blue-400',
     nodes: [
       { type: 'trigger', icon: DollarSign, label: 'Order Created', trigger: 'ORDER_CREATED' },
       { type: 'trigger', icon: TrendingUp, label: 'PayIn Received', trigger: 'PAYIN_RECEIVED' },
@@ -41,7 +58,9 @@ const NODE_LIBRARY = [
   },
   {
     category: 'Conditions',
-    color: 'bg-amber-50 border-amber-200',
+    color: 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800',
+    textColor: 'text-amber-900 dark:text-amber-100',
+    iconColor: 'text-amber-600 dark:text-amber-400',
     nodes: [
       { 
         type: 'condition', 
@@ -53,7 +72,9 @@ const NODE_LIBRARY = [
   },
   {
     category: 'Actions',
-    color: 'bg-green-50 border-green-200',
+    color: 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800',
+    textColor: 'text-green-900 dark:text-green-100',
+    iconColor: 'text-green-600 dark:text-green-400',
     nodes: [
       { type: 'action', icon: Ban, label: 'Freeze Order', actionType: 'FREEZE_ORDER' },
       { type: 'action', icon: XCircle, label: 'Reject Transaction', actionType: 'REJECT_TRANSACTION' },
@@ -78,9 +99,9 @@ export default function NodeToolbar({ onAddNode }: NodeToolbarProps) {
   };
 
   return (
-    <div className="space-y-4 p-4 bg-white border rounded-lg shadow-sm">
+    <div className="space-y-4 p-4 bg-background dark:bg-card border rounded-lg shadow-sm">
       <div>
-        <h3 className="font-semibold text-sm mb-1">Node Library</h3>
+        <h3 className="font-semibold text-sm mb-1 text-foreground">Node Library</h3>
         <p className="text-xs text-muted-foreground">Drag and drop to canvas</p>
       </div>
 
@@ -106,13 +127,13 @@ export default function NodeToolbar({ onAddNode }: NodeToolbarProps) {
                   className={`
                     p-3 cursor-grab active:cursor-grabbing
                     ${category.color}
-                    hover:shadow-md transition-shadow
+                    hover:shadow-lg hover:scale-[1.02] transition-all duration-200
                     border
                   `}
                 >
                   <div className="flex items-center gap-2">
-                    <Icon className="h-4 w-4 flex-shrink-0" />
-                    <span className="text-xs font-medium truncate">{node.label}</span>
+                    <Icon className={`h-4 w-4 flex-shrink-0 ${category.iconColor}`} />
+                    <span className={`text-xs font-medium truncate ${category.textColor}`}>{node.label}</span>
                   </div>
                 </Card>
               );

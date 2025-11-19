@@ -28,44 +28,44 @@ const TRIGGER_CONFIG = {
   ORDER_CREATED: {
     icon: DollarSign,
     label: 'Order Created',
-    color: 'bg-blue-100 text-blue-700 border-blue-200',
-    iconColor: 'text-blue-600',
+    color: 'bg-primary/10 text-primary border-primary/30',
+    iconColor: 'text-primary',
   },
   PAYIN_RECEIVED: {
     icon: TrendingUp,
     label: 'PayIn Received',
-    color: 'bg-green-100 text-green-700 border-green-200',
-    iconColor: 'text-green-600',
+    color: 'bg-primary/10 text-primary border-primary/30',
+    iconColor: 'text-primary',
   },
   PAYOUT_REQUESTED: {
     icon: DollarSign,
     label: 'PayOut Requested',
-    color: 'bg-orange-100 text-orange-700 border-orange-200',
-    iconColor: 'text-orange-600',
+    color: 'bg-primary/10 text-primary border-primary/30',
+    iconColor: 'text-primary',
   },
   KYC_SUBMITTED: {
     icon: FileCheck,
     label: 'KYC Submitted',
-    color: 'bg-purple-100 text-purple-700 border-purple-200',
-    iconColor: 'text-purple-600',
+    color: 'bg-primary/10 text-primary border-primary/30',
+    iconColor: 'text-primary',
   },
   USER_REGISTERED: {
     icon: UserPlus,
     label: 'User Registered',
-    color: 'bg-indigo-100 text-indigo-700 border-indigo-200',
-    iconColor: 'text-indigo-600',
+    color: 'bg-primary/10 text-primary border-primary/30',
+    iconColor: 'text-primary',
   },
   WALLET_ADDED: {
     icon: Wallet,
     label: 'Wallet Added',
-    color: 'bg-teal-100 text-teal-700 border-teal-200',
-    iconColor: 'text-teal-600',
+    color: 'bg-primary/10 text-primary border-primary/30',
+    iconColor: 'text-primary',
   },
   AMOUNT_THRESHOLD: {
     icon: Zap,
     label: 'Amount Threshold',
-    color: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-    iconColor: 'text-yellow-600',
+    color: 'bg-primary/10 text-primary border-primary/30',
+    iconColor: 'text-primary',
   },
 };
 
@@ -91,7 +91,7 @@ function TriggerNode({ data, selected }: NodeProps<TriggerNodeData>) {
       <div className="p-4">
         {/* Header */}
         <div className="flex items-center gap-3 mb-2">
-          <div className={`p-2 rounded-lg bg-white/80 ${config.iconColor}`}>
+          <div className={`p-2 rounded-lg bg-background/80 ${config.iconColor}`}>
             <Icon className="h-5 w-5" />
           </div>
           <div className="flex-1">
@@ -124,7 +124,7 @@ function TriggerNode({ data, selected }: NodeProps<TriggerNodeData>) {
         type="source"
         position={Position.Right}
         id="output"
-        className="!w-3 !h-3 !bg-primary !border-2 !border-white"
+        className="!w-3 !h-3 !bg-primary !border-2 !border-background"
       />
     </Card>
   );

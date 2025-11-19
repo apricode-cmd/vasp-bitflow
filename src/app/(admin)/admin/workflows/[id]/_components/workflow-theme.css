@@ -1,0 +1,143 @@
+/**
+ * React Flow Dark Theme Support
+ * 
+ * Custom styles for React Flow to work with shadcn/ui dark mode
+ */
+
+/* Dark mode overrides for React Flow */
+.dark .react-flow {
+  background-color: hsl(var(--background));
+}
+
+.dark .react-flow__node {
+  color: hsl(var(--foreground));
+}
+
+.dark .react-flow__edge-path {
+  stroke: hsl(var(--border));
+}
+
+.dark .react-flow__edge.selected .react-flow__edge-path {
+  stroke: hsl(var(--primary));
+}
+
+.dark .react-flow__handle {
+  background-color: hsl(var(--primary));
+  border-color: hsl(var(--background));
+}
+
+.dark .react-flow__handle-connecting {
+  background-color: hsl(var(--primary));
+}
+
+.dark .react-flow__handle-valid {
+  background-color: hsl(var(--primary));
+}
+
+/* Controls styling */
+.dark .react-flow__controls {
+  background-color: hsl(var(--background) / 0.95);
+  border-color: hsl(var(--border));
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+}
+
+.dark .react-flow__controls-button {
+  background-color: transparent;
+  border-bottom-color: hsl(var(--border));
+  color: hsl(var(--foreground));
+}
+
+.dark .react-flow__controls-button:hover {
+  background-color: hsl(var(--accent));
+}
+
+.dark .react-flow__controls-button:disabled {
+  opacity: 0.3;
+}
+
+.dark .react-flow__controls-button svg {
+  fill: hsl(var(--foreground));
+}
+
+/* MiniMap styling */
+.dark .react-flow__minimap {
+  background-color: hsl(var(--background) / 0.95);
+  border-color: hsl(var(--border));
+}
+
+.dark .react-flow__minimap-mask {
+  fill: hsl(var(--background) / 0.7);
+}
+
+/* Selection styling */
+.dark .react-flow__selection {
+  background: hsl(var(--primary) / 0.1);
+  border: 1px solid hsl(var(--primary));
+}
+
+/* Edge label styling */
+.dark .react-flow__edge-textbg {
+  fill: hsl(var(--background));
+}
+
+.dark .react-flow__edge-text {
+  fill: hsl(var(--foreground));
+}
+
+/* Light mode enhancements */
+.react-flow__controls {
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.react-flow__minimap {
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+/* Smooth transitions */
+.react-flow__node,
+.react-flow__edge,
+.react-flow__controls-button {
+  transition: all 0.2s ease;
+}
+
+/* Custom edge styles */
+.react-flow__edge-path {
+  stroke-width: 2;
+}
+
+.react-flow__edge.animated path {
+  stroke-dasharray: 5;
+  animation: dashdraw 0.5s linear infinite;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke-width: 3;
+}
+
+@keyframes dashdraw {
+  from {
+    stroke-dashoffset: 10;
+  }
+}
+
+/* Node selection styling */
+.react-flow__node.selected {
+  box-shadow: 0 0 0 2px hsl(var(--primary));
+}
+
+.dark .react-flow__node.selected {
+  box-shadow: 0 0 0 2px hsl(var(--primary)), 0 4px 6px -1px rgb(0 0 0 / 0.3);
+}
+
+/* Handle hover effects */
+.react-flow__handle:hover {
+  transform: scale(1.2);
+}
+
+/* Panel styling */
+.react-flow__panel {
+  border-radius: 0.5rem;
+}
+

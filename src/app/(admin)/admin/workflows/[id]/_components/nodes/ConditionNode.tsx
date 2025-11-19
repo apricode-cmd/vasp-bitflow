@@ -40,7 +40,7 @@ function ConditionNode({ data, selected }: NodeProps<ConditionNodeData>) {
       className={`
         min-w-[300px] transition-all
         ${selected ? 'ring-2 ring-primary shadow-lg' : 'shadow-md hover:shadow-lg'}
-        bg-white border-2 border-amber-200
+        bg-card border-2 border-accent
       `}
     >
       {/* Input Handle */}
@@ -48,35 +48,35 @@ function ConditionNode({ data, selected }: NodeProps<ConditionNodeData>) {
         type="target"
         position={Position.Left}
         id="input"
-        className="!w-3 !h-3 !bg-primary !border-2 !border-white"
+        className="!w-3 !h-3 !bg-primary !border-2 !border-background"
       />
 
       <div className="p-4">
         {/* Header */}
         <div className="flex items-center gap-3 mb-3">
-          <div className="p-2 rounded-lg bg-amber-100 text-amber-700">
+          <div className="p-2 rounded-lg bg-accent text-primary">
             <GitBranch className="h-5 w-5" />
           </div>
           <div className="flex-1">
             <Badge variant="outline" className="text-xs font-semibold mb-1">
               CONDITION
             </Badge>
-            <h3 className="font-semibold text-sm text-gray-700">
+            <h3 className="font-semibold text-sm text-foreground">
               {data.label || 'Logic Branch'}
             </h3>
           </div>
         </div>
 
         {/* Condition Logic */}
-        <div className="space-y-2 bg-gray-50 rounded-lg p-3 border border-gray-200">
+        <div className="space-y-2 bg-muted/50 rounded-lg p-3 border border-border">
           <div className="flex items-center gap-2 text-sm">
-            <span className="font-mono text-xs bg-white px-2 py-1 rounded border border-gray-300">
+            <span className="font-mono text-xs bg-background px-2 py-1 rounded border border-border">
               {data.field}
             </span>
-            <span className="text-xs font-semibold text-amber-600">
+            <span className="text-xs font-semibold text-primary">
               {operatorLabel}
             </span>
-            <span className="font-mono text-xs bg-white px-2 py-1 rounded border border-gray-300 flex-1 truncate">
+            <span className="font-mono text-xs bg-background px-2 py-1 rounded border border-border flex-1 truncate">
               {typeof data.value === 'object' 
                 ? JSON.stringify(data.value) 
                 : String(data.value)}
@@ -86,11 +86,11 @@ function ConditionNode({ data, selected }: NodeProps<ConditionNodeData>) {
 
         {/* Output Labels */}
         <div className="flex items-center justify-between mt-4 text-xs font-semibold">
-          <div className="flex items-center gap-1 text-green-600">
+          <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
             <div className="w-2 h-2 rounded-full bg-green-500" />
             <span>TRUE</span>
           </div>
-          <div className="flex items-center gap-1 text-red-600">
+          <div className="flex items-center gap-1 text-red-600 dark:text-red-400">
             <div className="w-2 h-2 rounded-full bg-red-500" />
             <span>FALSE</span>
           </div>
@@ -103,14 +103,14 @@ function ConditionNode({ data, selected }: NodeProps<ConditionNodeData>) {
         position={Position.Right}
         id="true"
         style={{ top: '40%' }}
-        className="!w-3 !h-3 !bg-green-500 !border-2 !border-white"
+        className="!w-3 !h-3 !bg-green-500 !border-2 !border-background"
       />
       <Handle
         type="source"
         position={Position.Right}
         id="false"
         style={{ top: '60%' }}
-        className="!w-3 !h-3 !bg-red-500 !border-2 !border-white"
+        className="!w-3 !h-3 !bg-red-500 !border-2 !border-background"
       />
     </Card>
   );

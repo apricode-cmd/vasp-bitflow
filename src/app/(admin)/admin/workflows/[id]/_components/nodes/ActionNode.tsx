@@ -29,50 +29,50 @@ const ACTION_CONFIG = {
   FREEZE_ORDER: {
     icon: Ban,
     label: 'Freeze Order',
-    color: 'bg-red-100 text-red-700 border-red-200',
-    iconColor: 'text-red-600',
+    color: 'bg-destructive/10 text-destructive border-destructive/30',
+    iconColor: 'text-destructive',
   },
   REJECT_TRANSACTION: {
     icon: XCircle,
     label: 'Reject Transaction',
-    color: 'bg-red-100 text-red-700 border-red-200',
-    iconColor: 'text-red-600',
+    color: 'bg-destructive/10 text-destructive border-destructive/30',
+    iconColor: 'text-destructive',
   },
   REQUEST_DOCUMENT: {
     icon: FileText,
     label: 'Request Document',
-    color: 'bg-orange-100 text-orange-700 border-orange-200',
-    iconColor: 'text-orange-600',
+    color: 'bg-secondary/50 text-secondary-foreground border-secondary',
+    iconColor: 'text-secondary-foreground',
   },
   REQUIRE_APPROVAL: {
     icon: UserCheck,
     label: 'Require Approval',
-    color: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-    iconColor: 'text-yellow-600',
+    color: 'bg-secondary/50 text-secondary-foreground border-secondary',
+    iconColor: 'text-secondary-foreground',
   },
   SEND_NOTIFICATION: {
     icon: Bell,
     label: 'Send Notification',
-    color: 'bg-blue-100 text-blue-700 border-blue-200',
-    iconColor: 'text-blue-600',
+    color: 'bg-primary/10 text-primary border-primary/30',
+    iconColor: 'text-primary',
   },
   FLAG_FOR_REVIEW: {
     icon: AlertTriangle,
     label: 'Flag for Review',
-    color: 'bg-amber-100 text-amber-700 border-amber-200',
-    iconColor: 'text-amber-600',
+    color: 'bg-secondary/50 text-secondary-foreground border-secondary',
+    iconColor: 'text-secondary-foreground',
   },
   AUTO_APPROVE: {
     icon: CheckCircle,
     label: 'Auto Approve',
-    color: 'bg-green-100 text-green-700 border-green-200',
-    iconColor: 'text-green-600',
+    color: 'bg-primary/10 text-primary border-primary/30',
+    iconColor: 'text-primary',
   },
   ESCALATE_TO_COMPLIANCE: {
     icon: AlertTriangle,
     label: 'Escalate to Compliance',
-    color: 'bg-purple-100 text-purple-700 border-purple-200',
-    iconColor: 'text-purple-600',
+    color: 'bg-destructive/10 text-destructive border-destructive/30',
+    iconColor: 'text-destructive',
   },
 };
 
@@ -80,8 +80,8 @@ function ActionNode({ data, selected }: NodeProps<ActionNodeData>) {
   const config = ACTION_CONFIG[data.actionType as keyof typeof ACTION_CONFIG] || {
     icon: FileText,
     label: data.actionType,
-    color: 'bg-gray-100 text-gray-700 border-gray-200',
-    iconColor: 'text-gray-600',
+    color: 'bg-muted text-muted-foreground border-border',
+    iconColor: 'text-muted-foreground',
   };
 
   const Icon = config.icon;
@@ -100,13 +100,13 @@ function ActionNode({ data, selected }: NodeProps<ActionNodeData>) {
         type="target"
         position={Position.Left}
         id="input"
-        className="!w-3 !h-3 !bg-primary !border-2 !border-white"
+        className="!w-3 !h-3 !bg-primary !border-2 !border-background"
       />
 
       <div className="p-4">
         {/* Header */}
         <div className="flex items-center gap-3 mb-2">
-          <div className={`p-2 rounded-lg bg-white/80 ${config.iconColor}`}>
+          <div className={`p-2 rounded-lg bg-background/80 ${config.iconColor}`}>
             <Icon className="h-5 w-5" />
           </div>
           <div className="flex-1">
@@ -126,7 +126,7 @@ function ActionNode({ data, selected }: NodeProps<ActionNodeData>) {
               {data.config.reason && (
                 <div>
                   <span className="font-medium opacity-70">Reason:</span>
-                  <p className="mt-1 text-xs bg-white/60 rounded px-2 py-1">
+                  <p className="mt-1 text-xs bg-background/60 rounded px-2 py-1">
                     {data.config.reason}
                   </p>
                 </div>
@@ -140,7 +140,7 @@ function ActionNode({ data, selected }: NodeProps<ActionNodeData>) {
               {data.config.message && (
                 <div>
                   <span className="font-medium opacity-70">Message:</span>
-                  <p className="mt-1 text-xs bg-white/60 rounded px-2 py-1">
+                  <p className="mt-1 text-xs bg-background/60 rounded px-2 py-1">
                     {data.config.message}
                   </p>
                 </div>

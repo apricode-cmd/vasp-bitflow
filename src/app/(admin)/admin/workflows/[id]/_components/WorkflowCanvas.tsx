@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useRef, DragEvent } from 'react';
+import { useTheme } from 'next-themes';
 import {
   ReactFlow,
   Background,
@@ -23,6 +24,7 @@ import {
   type ReactFlowInstance,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import './workflow-theme.css';
 
 import { nodeTypes } from './nodes';
 import { Button } from '@/components/ui/button';
@@ -48,10 +50,13 @@ export default function WorkflowCanvas({
   onTest,
   readOnly = false,
 }: WorkflowCanvasProps) {
+  const { theme } = useTheme();
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
+  
+  const isDarkMode = theme === 'dark';
 
   // Handle new connections
   const onConnect = useCallback(
@@ -185,7 +190,7 @@ export default function WorkflowCanvas({
           variant={BackgroundVariant.Dots}
           gap={15}
           size={1}
-          color="#e2e8f0"
+          color={isDarkMode ? '#334155' : '#e2e8f0'}
         />
 
         {/* Controls */}
@@ -201,19 +206,20 @@ export default function WorkflowCanvas({
           nodeColor={(node) => {
             switch (node.type) {
               case 'trigger':
-                return '#3b82f6';
+                return isDarkMode ? '#60a5fa' : '#3b82f6';
               case 'condition':
-                return '#f59e0b';
+                return isDarkMode ? '#fbbf24' : '#f59e0b';
               case 'action':
-                return '#10b981';
+                return isDarkMode ? '#34d399' : '#10b981';
               default:
-                return '#6b7280';
+                return isDarkMode ? '#9ca3af' : '#6b7280';
             }
           }}
-          maskColor="rgba(0, 0, 0, 0.1)"
+          maskColor={isDarkMode ? 'rgba(15, 23, 42, 0.7)' : 'rgba(255, 255, 255, 0.7)'}
           position="bottom-right"
           pannable
           zoomable
+          className="!bg-background/95 !border !border-border !rounded-lg !shadow-lg"
         />
 
         {/* Top Panel (Toolbar) */}
@@ -242,7 +248,7 @@ export default function WorkflowCanvas({
         {/* Read-only indicator */}
         {readOnly && (
           <Panel position="top-right">
-            <div className="flex items-center gap-2 bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium">
+            <div className="flex items-center gap-2 bg-muted text-foreground px-3 py-1.5 rounded-lg text-sm font-medium border shadow-sm">
               <Eye className="h-4 w-4" />
               Preview Mode
             </div>
@@ -250,16 +256,16 @@ export default function WorkflowCanvas({
         )}
 
         {/* Stats Panel */}
-        <Panel position="top-left" className="bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-md text-sm">
+        <Panel position="top-left" className="bg-background/95 backdrop-blur-sm rounded-lg px-3 py-2 shadow-md text-sm border border-border">
           <div className="flex items-center gap-4">
             <div>
-              <span className="font-semibold text-gray-700">{nodes.length}</span>
-              <span className="text-gray-500 ml-1">Nodes</span>
+              <span className="font-semibold text-foreground">{nodes.length}</span>
+              <span className="text-muted-foreground ml-1">Nodes</span>
             </div>
-            <div className="w-px h-4 bg-gray-300" />
+            <div className="w-px h-4 bg-border" />
             <div>
-              <span className="font-semibold text-gray-700">{edges.length}</span>
-              <span className="text-gray-500 ml-1">Connections</span>
+              <span className="font-semibold text-foreground">{edges.length}</span>
+              <span className="text-muted-foreground ml-1">Connections</span>
             </div>
           </div>
         </Panel>
