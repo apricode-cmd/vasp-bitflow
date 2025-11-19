@@ -14,6 +14,7 @@ import { ReactFlowProvider } from '@xyflow/react';
 
 import WorkflowCanvas from './WorkflowCanvas';
 import NodeToolbar from './NodeToolbar';
+import PropertiesPanel from './PropertiesPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -61,6 +62,7 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
 
   // UI state
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
+  const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
   const isNewWorkflow = workflowId === 'create';
 
@@ -190,6 +192,24 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
       console.error(error);
     }
   }, [workflowId, workflow, isNewWorkflow]);
+
+  // Handle node click
+  const handleNodeClick = useCallback((node: Node) => {
+    setSelectedNode(node);
+  }, []);
+
+  // Handle node update from Properties Panel
+  const handleNodeUpdate = useCallback((nodeId: string, newData: any) => {
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === nodeId
+          ? { ...node, data: { ...node.data, ...newData } }
+          : node
+      )
+    );
+    setSelectedNode(null);
+    toast.success('Node updated');
+  }, []);
 
   if (loading) {
     return (
@@ -366,10 +386,22 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
               initialEdges={edges}
               onSave={handleSave}
               onTest={handleTest}
+              onNodeClick={handleNodeClick}
+              onNodesChange={(newNodes) => setNodes(newNodes as Node[])}
+              onEdgesChange={(newEdges) => setEdges(newEdges as Edge[])}
               readOnly={false}
             />
           </ReactFlowProvider>
         </div>
+
+        {/* Properties Panel */}
+        {selectedNode && (
+          <PropertiesPanel
+            selectedNode={selectedNode}
+            onClose={() => setSelectedNode(null)}
+            onUpdate={handleNodeUpdate}
+          />
+        )}
       </div>
     </div>
   );

@@ -1,0 +1,380 @@
+'use client';
+
+/**
+ * Properties Panel Component
+ * 
+ * Right sidebar for editing selected node configuration
+ */
+
+import { useEffect, useState } from 'react';
+import type { Node } from '@xyflow/react';
+import { Card } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { X, Save } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+
+interface PropertiesPanelProps {
+  selectedNode: Node | null;
+  onClose: () => void;
+  onUpdate: (nodeId: string, data: any) => void;
+}
+
+// Field options for Condition nodes
+const CONDITION_FIELDS = [
+  { value: 'amount', label: 'Order Amount', type: 'number' },
+  { value: 'fiatAmount', label: 'Fiat Amount', type: 'number' },
+  { value: 'currency', label: 'Crypto Currency', type: 'string' },
+  { value: 'fiatCurrency', label: 'Fiat Currency', type: 'string' },
+  { value: 'country', label: 'User Country', type: 'string' },
+  { value: 'kycStatus', label: 'KYC Status', type: 'string' },
+  { value: 'userId', label: 'User ID', type: 'string' },
+  { value: 'email', label: 'User Email', type: 'string' },
+  { value: 'orderCount', label: 'User Order Count', type: 'number' },
+  { value: 'totalVolume', label: 'User Total Volume', type: 'number' },
+];
+
+// Operators
+const OPERATORS = [
+  { value: '==', label: 'Equals (==)' },
+  { value: '!=', label: 'Not Equals (!=)' },
+  { value: '>', label: 'Greater Than (>)' },
+  { value: '<', label: 'Less Than (<)' },
+  { value: '>=', label: 'Greater or Equal (>=)' },
+  { value: '<=', label: 'Less or Equal (<=)' },
+  { value: 'in', label: 'In Array (in)' },
+  { value: 'not_in', label: 'Not In Array (not_in)' },
+  { value: 'contains', label: 'Contains (string)' },
+  { value: 'matches', label: 'Regex Match' },
+];
+
+// Action types with their config fields
+const ACTION_TYPES = [
+  {
+    value: 'FREEZE_ORDER',
+    label: 'Freeze Order',
+    fields: [{ key: 'reason', label: 'Reason', type: 'text' }],
+  },
+  {
+    value: 'REJECT_TRANSACTION',
+    label: 'Reject Transaction',
+    fields: [{ key: 'reason', label: 'Reason', type: 'text' }],
+  },
+  {
+    value: 'REQUEST_DOCUMENT',
+    label: 'Request Document',
+    fields: [
+      { key: 'documentType', label: 'Document Type', type: 'text' },
+      { key: 'message', label: 'Message', type: 'textarea' },
+    ],
+  },
+  {
+    value: 'REQUIRE_APPROVAL',
+    label: 'Require Approval',
+    fields: [
+      { key: 'approverRole', label: 'Approver Role', type: 'select', options: ['ADMIN', 'COMPLIANCE', 'SUPER_ADMIN'] },
+      { key: 'minApprovals', label: 'Min Approvals', type: 'number' },
+    ],
+  },
+  {
+    value: 'SEND_NOTIFICATION',
+    label: 'Send Notification',
+    fields: [
+      { key: 'recipientRole', label: 'Recipient Role', type: 'select', options: ['ADMIN', 'COMPLIANCE', 'SUPER_ADMIN'] },
+      { key: 'template', label: 'Template', type: 'text' },
+      { key: 'message', label: 'Message', type: 'textarea' },
+    ],
+  },
+  {
+    value: 'FLAG_FOR_REVIEW',
+    label: 'Flag for Review',
+    fields: [{ key: 'reason', label: 'Reason', type: 'text' }],
+  },
+  {
+    value: 'AUTO_APPROVE',
+    label: 'Auto Approve',
+    fields: [],
+  },
+  {
+    value: 'ESCALATE_TO_COMPLIANCE',
+    label: 'Escalate to Compliance',
+    fields: [{ key: 'reason', label: 'Reason', type: 'text' }],
+  },
+];
+
+export default function PropertiesPanel({
+  selectedNode,
+  onClose,
+  onUpdate,
+}: PropertiesPanelProps) {
+  const [formData, setFormData] = useState<any>({});
+
+  // Initialize form data when node is selected
+  useEffect(() => {
+    if (selectedNode) {
+      setFormData(selectedNode.data || {});
+    }
+  }, [selectedNode]);
+
+  if (!selectedNode) return null;
+
+  const handleSave = () => {
+    onUpdate(selectedNode.id, formData);
+    onClose();
+  };
+
+  const handleFieldChange = (key: string, value: any) => {
+    setFormData((prev: any) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
+
+  const handleConfigChange = (key: string, value: any) => {
+    setFormData((prev: any) => ({
+      ...prev,
+      config: {
+        ...prev.config,
+        [key]: value,
+      },
+    }));
+  };
+
+  const renderTriggerForm = () => (
+    <div className="space-y-4">
+      <div>
+        <Label className="text-xs">Trigger Type</Label>
+        <div className="mt-2">
+          <Badge variant="outline" className="text-sm">
+            {formData.trigger}
+          </Badge>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          Trigger type cannot be changed after creation
+        </p>
+      </div>
+    </div>
+  );
+
+  const renderConditionForm = () => {
+    const selectedField = CONDITION_FIELDS.find(f => f.value === formData.field);
+    
+    return (
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="field" className="text-xs">Field to Check</Label>
+          <Select
+            value={formData.field || ''}
+            onValueChange={(value) => handleFieldChange('field', value)}
+          >
+            <SelectTrigger id="field" className="mt-1.5">
+              <SelectValue placeholder="Select field..." />
+            </SelectTrigger>
+            <SelectContent>
+              {CONDITION_FIELDS.map((field) => (
+                <SelectItem key={field.value} value={field.value}>
+                  {field.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label htmlFor="operator" className="text-xs">Operator</Label>
+          <Select
+            value={formData.operator || ''}
+            onValueChange={(value) => handleFieldChange('operator', value)}
+          >
+            <SelectTrigger id="operator" className="mt-1.5">
+              <SelectValue placeholder="Select operator..." />
+            </SelectTrigger>
+            <SelectContent>
+              {OPERATORS.map((op) => (
+                <SelectItem key={op.value} value={op.value}>
+                  {op.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label htmlFor="value" className="text-xs">Comparison Value</Label>
+          <Input
+            id="value"
+            type={selectedField?.type === 'number' ? 'number' : 'text'}
+            value={formData.value || ''}
+            onChange={(e) => handleFieldChange('value', selectedField?.type === 'number' ? parseFloat(e.target.value) : e.target.value)}
+            placeholder="Enter value..."
+            className="mt-1.5"
+          />
+          {['in', 'not_in'].includes(formData.operator) && (
+            <p className="text-xs text-muted-foreground mt-1">
+              For array operators, use comma-separated values (e.g., "EUR,USD,GBP")
+            </p>
+          )}
+        </div>
+
+        <div>
+          <Label htmlFor="label" className="text-xs">Label (Optional)</Label>
+          <Input
+            id="label"
+            value={formData.label || ''}
+            onChange={(e) => handleFieldChange('label', e.target.value)}
+            placeholder="e.g., High value check"
+            className="mt-1.5"
+          />
+        </div>
+      </div>
+    );
+  };
+
+  const renderActionForm = () => {
+    const actionType = ACTION_TYPES.find(a => a.value === formData.actionType);
+
+    return (
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="actionType" className="text-xs">Action Type</Label>
+          <Select
+            value={formData.actionType || ''}
+            onValueChange={(value) => {
+              handleFieldChange('actionType', value);
+              handleFieldChange('config', {});
+            }}
+          >
+            <SelectTrigger id="actionType" className="mt-1.5">
+              <SelectValue placeholder="Select action..." />
+            </SelectTrigger>
+            <SelectContent>
+              {ACTION_TYPES.map((action) => (
+                <SelectItem key={action.value} value={action.value}>
+                  {action.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {actionType && actionType.fields.length > 0 && (
+          <>
+            <Separator />
+            <div className="space-y-4">
+              <Label className="text-xs font-semibold">Action Configuration</Label>
+              {actionType.fields.map((field) => (
+                <div key={field.key}>
+                  <Label htmlFor={field.key} className="text-xs">
+                    {field.label}
+                  </Label>
+                  {field.type === 'textarea' ? (
+                    <Textarea
+                      id={field.key}
+                      value={formData.config?.[field.key] || ''}
+                      onChange={(e) => handleConfigChange(field.key, e.target.value)}
+                      placeholder={`Enter ${field.label.toLowerCase()}...`}
+                      className="mt-1.5"
+                      rows={3}
+                    />
+                  ) : field.type === 'select' ? (
+                    <Select
+                      value={formData.config?.[field.key] || ''}
+                      onValueChange={(value) => handleConfigChange(field.key, value)}
+                    >
+                      <SelectTrigger id={field.key} className="mt-1.5">
+                        <SelectValue placeholder={`Select ${field.label.toLowerCase()}...`} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {field.options?.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      id={field.key}
+                      type={field.type}
+                      value={formData.config?.[field.key] || ''}
+                      onChange={(e) => handleConfigChange(
+                        field.key,
+                        field.type === 'number' ? parseInt(e.target.value) : e.target.value
+                      )}
+                      placeholder={`Enter ${field.label.toLowerCase()}...`}
+                      className="mt-1.5"
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="w-80 border-l bg-background flex flex-col h-full">
+      {/* Header */}
+      <div className="p-4 border-b">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-sm">Node Properties</h3>
+            <Badge variant="outline" className="mt-1 text-xs">
+              {selectedNode.type}
+            </Badge>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={onClose}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Form */}
+      <div className="flex-1 p-4 overflow-y-auto">
+        {selectedNode.type === 'trigger' && renderTriggerForm()}
+        {selectedNode.type === 'condition' && renderConditionForm()}
+        {selectedNode.type === 'action' && renderActionForm()}
+      </div>
+
+      {/* Footer */}
+      <div className="p-4 border-t bg-muted/30">
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onClose}
+            className="flex-1"
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleSave}
+            className="flex-1"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Save
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+

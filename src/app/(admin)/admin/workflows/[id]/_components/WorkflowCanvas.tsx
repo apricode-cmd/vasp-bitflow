@@ -39,6 +39,9 @@ interface WorkflowCanvasProps {
   initialEdges?: Edge[];
   onSave?: (nodes: Node[], edges: Edge[]) => void;
   onTest?: () => void;
+  onNodeClick?: (node: Node) => void;
+  onNodesChange?: (nodes: Node[]) => void;
+  onEdgesChange?: (edges: Edge[]) => void;
   readOnly?: boolean;
 }
 
@@ -48,6 +51,9 @@ export default function WorkflowCanvas({
   initialEdges = [],
   onSave,
   onTest,
+  onNodeClick,
+  onNodesChange: onNodesChangeProp,
+  onEdgesChange: onEdgesChangeProp,
   readOnly = false,
 }: WorkflowCanvasProps) {
   const { theme } = useTheme();
@@ -57,6 +63,48 @@ export default function WorkflowCanvas({
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
   
   const isDarkMode = theme === 'dark';
+
+  // Wrap onNodesChange to notify parent
+  const handleNodesChange = useCallback(
+    (changes: any) => {
+      onNodesChange(changes);
+      if (onNodesChangeProp) {
+        // Get updated nodes after changes
+        setTimeout(() => {
+          if (reactFlowInstance.current) {
+            onNodesChangeProp(reactFlowInstance.current.getNodes());
+          }
+        }, 0);
+      }
+    },
+    [onNodesChange, onNodesChangeProp]
+  );
+
+  // Wrap onEdgesChange to notify parent
+  const handleEdgesChange = useCallback(
+    (changes: any) => {
+      onEdgesChange(changes);
+      if (onEdgesChangeProp) {
+        // Get updated edges after changes
+        setTimeout(() => {
+          if (reactFlowInstance.current) {
+            onEdgesChangeProp(reactFlowInstance.current.getEdges());
+          }
+        }, 0);
+      }
+    },
+    [onEdgesChange, onEdgesChangeProp]
+  );
+
+  // Handle node click
+  const handleNodeClick = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      if (onNodeClick && !readOnly) {
+        onNodeClick(node);
+      }
+    },
+    [onNodeClick, readOnly]
+  );
 
   // Handle new connections
   const onConnect = useCallback(
@@ -153,9 +201,10 @@ export default function WorkflowCanvas({
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
+        onNodesChange={handleNodesChange}
+        onEdgesChange={handleEdgesChange}
         onConnect={onConnect}
+        onNodeClick={handleNodeClick}
         onInit={(instance) => {
           reactFlowInstance.current = instance;
         }}
