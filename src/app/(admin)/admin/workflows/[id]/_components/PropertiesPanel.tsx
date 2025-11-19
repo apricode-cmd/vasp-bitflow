@@ -28,6 +28,8 @@ import ExpressionInput from './ExpressionInput';
 import TriggerConfigDialog from './TriggerConfigDialog';
 import KeyValuePairBuilder, { type KeyValuePair } from '@/components/workflows/KeyValuePairBuilder';
 import { HTTP_REQUEST_TEMPLATES, type HttpRequestTemplate } from '@/lib/validations/http-request';
+import RejectTransactionForm from './actions/RejectTransactionForm';
+import FreezeOrderForm from './actions/FreezeOrderForm';
 import HttpRequestTester from './HttpRequestTester';
 import type { Edge } from '@xyflow/react';
 import type { TriggerConfig } from '@/lib/validations/trigger-config';
@@ -871,11 +873,80 @@ export default function PropertiesPanel({
   const renderActionForm = () => {
     const actionType = ACTION_TYPES.find(a => a.value === formData.actionType);
 
-    // Special handling for HTTP_REQUEST - use dedicated form
+    // Special handling for enterprise actions - use dedicated forms
     if (formData.actionType === 'HTTP_REQUEST') {
       return renderHttpRequestForm();
     }
 
+    if (formData.actionType === 'REJECT_TRANSACTION') {
+      return (
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="actionType" className="text-xs">Action Type</Label>
+            <Select
+              value={formData.actionType || ''}
+              onValueChange={(value) => {
+                handleFieldChange('actionType', value);
+                handleFieldChange('config', {});
+              }}
+            >
+              <SelectTrigger id="actionType" className="mt-1.5">
+                <SelectValue placeholder="Select action..." />
+              </SelectTrigger>
+              <SelectContent>
+                {ACTION_TYPES.map((action) => (
+                  <SelectItem key={action.value} value={action.value}>
+                    {action.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Separator />
+          <RejectTransactionForm
+            config={formData.config || {}}
+            onChange={(newConfig) => handleFieldChange('config', newConfig)}
+            availableVariables={availableVariables}
+          />
+        </div>
+      );
+    }
+
+    if (formData.actionType === 'FREEZE_ORDER') {
+      return (
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="actionType" className="text-xs">Action Type</Label>
+            <Select
+              value={formData.actionType || ''}
+              onValueChange={(value) => {
+                handleFieldChange('actionType', value);
+                handleFieldChange('config', {});
+              }}
+            >
+              <SelectTrigger id="actionType" className="mt-1.5">
+                <SelectValue placeholder="Select action..." />
+              </SelectTrigger>
+              <SelectContent>
+                {ACTION_TYPES.map((action) => (
+                  <SelectItem key={action.value} value={action.value}>
+                    {action.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Separator />
+          <FreezeOrderForm
+            config={formData.config || {}}
+            onChange={(newConfig) => handleFieldChange('config', newConfig)}
+            availableVariables={availableVariables}
+          />
+        </div>
+      );
+    }
+
+    // Fallback to old basic form for other actions (will be enhanced later)
     return (
       <div className="space-y-4">
         <div>

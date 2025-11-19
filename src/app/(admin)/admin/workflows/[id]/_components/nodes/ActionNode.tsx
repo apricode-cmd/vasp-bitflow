@@ -237,6 +237,42 @@ function ActionNode({ data, selected }: NodeProps<ActionNodeData>) {
                   <span className="font-mono text-xs">{data.config.auth.type.replace(/_/g, ' ')}</span>
                 </div>
               )}
+              {/* REJECT_TRANSACTION specific fields */}
+              {data.actionType === 'REJECT_TRANSACTION' && data.config.rejectionType && (
+                <div className="flex items-center justify-between">
+                  <span className="font-medium opacity-70">Type:</span>
+                  <Badge className="text-xs">{data.config.rejectionType}</Badge>
+                </div>
+              )}
+              {data.actionType === 'REJECT_TRANSACTION' && data.config.reasonCategory && (
+                <div className="flex items-center justify-between">
+                  <span className="font-medium opacity-70">Category:</span>
+                  <span className="font-mono text-xs">{data.config.reasonCategory.replace(/_/g, ' ')}</span>
+                </div>
+              )}
+              {data.actionType === 'REJECT_TRANSACTION' && data.config.processRefund && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs">Refund: {data.config.refundTiming || '24H'}</Badge>
+                </div>
+              )}
+              {/* FREEZE_ORDER specific fields */}
+              {data.actionType === 'FREEZE_ORDER' && data.config.freezeDuration && (
+                <div className="flex items-center justify-between">
+                  <span className="font-medium opacity-70">Duration:</span>
+                  <Badge className="text-xs">{data.config.freezeDuration}</Badge>
+                </div>
+              )}
+              {data.actionType === 'FREEZE_ORDER' && data.config.reasonCategory && (
+                <div className="flex items-center justify-between">
+                  <span className="font-medium opacity-70">Category:</span>
+                  <span className="font-mono text-xs">{data.config.reasonCategory.replace(/_/g, ' ')}</span>
+                </div>
+              )}
+              {data.actionType === 'FREEZE_ORDER' && data.config.autoUnfreezeEnabled && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs">Auto-unfreeze enabled</Badge>
+                </div>
+              )}
             </div>
           </div>
         )}
