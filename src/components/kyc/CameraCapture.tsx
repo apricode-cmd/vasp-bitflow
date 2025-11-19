@@ -45,7 +45,9 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
   
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isCameraStarted, setIsCameraStarted] = useState(false); // NEW: Track if user started camera
+  const [isCameraStarted, setIsCameraStarted] = useState(false);
+  const [streamError, setStreamError] = useState<string | null>(null);
+  const [diagnostics, setDiagnostics] = useState<any>(null);
   
   const {
     stream,
@@ -69,10 +71,28 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
    * Handle user clicking "Start Camera" button
    */
   const handleStartCamera = async () => {
+    console.log('🎬 [Camera] User initiated camera start');
     setIsCameraStarted(true);
+    setStreamError(null);
+    setDiagnostics(null);
+    
+    // Stop any existing stream first
+    if (stream) {
+      console.log('🛑 [Camera] Stopping existing stream before restart');
+      stopCamera();
+      // Small delay to ensure cleanup
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+    
     const granted = await requestPermissions();
+    console.log('🔐 [Camera] Permission granted:', granted);
+    
     if (granted) {
       await startCamera();
+      console.log('✅ [Camera] Start camera completed');
+    } else {
+      console.error('❌ [Camera] Permission not granted');
+      setStreamError('Camera permission denied');
     }
   };
 
@@ -86,32 +106,194 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
   }, [stopCamera]);
 
   /**
-   * Attach stream to video element
+   * Attach stream to video element - ENTERPRISE GRADE
    */
   useEffect(() => {
-    if (stream && videoRef.current && !capturedImage) {
-      console.log('🎬 Attaching stream to video element...');
-      const video = videoRef.current;
-      
-      video.srcObject = stream;
-      
-      // Ensure video plays (important for iOS/mobile)
-      video.onloadedmetadata = () => {
-        console.log('📹 Video metadata loaded, attempting to play...');
-        video.play()
-          .then(() => {
-            console.log('✅ Video playing successfully');
-            console.log('Video dimensions:', {
-              width: video.videoWidth,
-              height: video.videoHeight
-            });
-          })
-          .catch(err => {
-            console.error('❌ Failed to play video:', err);
-            setError('Failed to display camera feed. Please try again.');
-          });
-      };
+    if (!stream || !videoRef.current || capturedImage) return;
+
+    const video = videoRef.current;
+    let retryCount = 0;
+    const MAX_RETRIES = 3;
+    
+    console.log('🎬 [Camera] Attaching stream to video element...');
+    console.log('📊 [Camera] Stream info:', {
+      id: stream.id,
+      active: stream.active,
+      tracks: stream.getTracks().map(t => ({
+        kind: t.kind,
+        enabled: t.enabled,
+        readyState: t.readyState,
+        muted: t.muted,
+        label: t.label
+      }))
+    });
+
+    // Validate stream
+    const videoTracks = stream.getVideoTracks();
+    if (videoTracks.length === 0) {
+      console.error('❌ [Camera] No video tracks in stream');
+      setStreamError('No video tracks available');
+      return;
     }
+
+    if (!stream.active) {
+      console.error('❌ [Camera] Stream is not active');
+      setStreamError('Camera stream is not active');
+      return;
+    }
+
+    const attachStream = async (attempt = 1) => {
+      try {
+        console.log(`🔄 [Camera] Attach attempt ${attempt}/${MAX_RETRIES}`);
+        
+        // Check if video element is visible
+        const isVisible = video.offsetParent !== null;
+        console.log('👁️  [Camera] Video element visible:', isVisible);
+        
+        if (!isVisible && attempt === 1) {
+          console.warn('⚠️  [Camera] Video element not visible, waiting...');
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+        // Clear any existing srcObject
+        if (video.srcObject) {
+          video.srcObject = null;
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        // Set srcObject
+        video.srcObject = stream;
+        console.log('📎 [Camera] srcObject set');
+        
+        // Force attributes for mobile compatibility
+        video.setAttribute('playsinline', 'true');
+        video.setAttribute('autoplay', 'true');
+        video.setAttribute('muted', 'true');
+        video.muted = true;
+        video.playsInline = true;
+        
+        // Wait for metadata
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('Metadata load timeout (5s)'));
+          }, 5000);
+
+          video.onloadedmetadata = () => {
+            clearTimeout(timeout);
+            console.log('📹 [Camera] Video metadata loaded');
+            console.log('📐 [Camera] Video dimensions:', {
+              videoWidth: video.videoWidth,
+              videoHeight: video.videoHeight,
+              clientWidth: video.clientWidth,
+              clientHeight: video.clientHeight,
+              offsetWidth: video.offsetWidth,
+              offsetHeight: video.offsetHeight
+            });
+            
+            // Validate dimensions
+            if (video.videoWidth === 0 || video.videoHeight === 0) {
+              reject(new Error('Video dimensions are zero'));
+              return;
+            }
+            
+            resolve();
+          };
+
+          video.onerror = (e) => {
+            clearTimeout(timeout);
+            console.error('❌ [Camera] Video element error:', e);
+            reject(new Error(`Video element error: ${e}`));
+          };
+          
+          // Fallback: if metadata doesn't load, try to play anyway after delay
+          setTimeout(() => {
+            if (video.readyState === 0) {
+              console.warn('⚠️  [Camera] Metadata not loaded after 3s, forcing play...');
+              video.load();
+            }
+          }, 3000);
+        });
+
+        // Try to play
+        console.log('▶️  [Camera] Attempting to play video...');
+        await video.play();
+        
+        console.log('✅ [Camera] Video playing successfully');
+        console.log('📊 [Camera] Final state:', {
+          playing: !video.paused,
+          currentTime: video.currentTime,
+          readyState: video.readyState,
+          networkState: video.networkState
+        });
+        
+        setStreamError(null);
+        
+        // Set diagnostics
+        setDiagnostics({
+          success: true,
+          attempt,
+          videoTrack: videoTracks[0].getSettings(),
+          videoElement: {
+            videoWidth: video.videoWidth,
+            videoHeight: video.videoHeight,
+            readyState: video.readyState,
+            paused: video.paused,
+            muted: video.muted,
+            currentTime: video.currentTime
+          },
+          userAgent: navigator.userAgent
+        });
+
+      } catch (err: any) {
+        console.error(`❌ [Camera] Attach attempt ${attempt} failed:`, err);
+        console.error('📊 [Camera] Error state:', {
+          videoReadyState: video.readyState,
+          videoPaused: video.paused,
+          srcObject: video.srcObject ? 'set' : 'null',
+          streamActive: stream.active,
+          videoTracksCount: videoTracks.length
+        });
+        
+        if (attempt < MAX_RETRIES) {
+          retryCount = attempt;
+          console.log(`⏳ [Camera] Retrying in 1 second...`);
+          // Retry with delay
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          await attachStream(attempt + 1);
+        } else {
+          console.error('❌ [Camera] All attach attempts failed');
+          setStreamError(`Camera display failed: ${err.message}`);
+          setDiagnostics({
+            success: false,
+            error: err.message,
+            stack: err.stack,
+            attempts: MAX_RETRIES,
+            videoState: {
+              readyState: video.readyState,
+              networkState: video.networkState,
+              paused: video.paused
+            },
+            streamState: {
+              active: stream.active,
+              tracks: stream.getTracks().map(t => ({
+                kind: t.kind,
+                readyState: t.readyState,
+                enabled: t.enabled
+              }))
+            }
+          });
+        }
+      }
+    };
+
+    attachStream();
+
+    // Cleanup
+    return () => {
+      if (video.srcObject) {
+        video.srcObject = null;
+      }
+    };
   }, [stream, capturedImage]);
 
   /**
@@ -415,10 +597,35 @@ export function CameraCapture({ open, onCapture, onCancel, documentType }: Camer
               </div>
             </div>
 
-            {/* Status indicator */}
-            {!stream && !isLoading && (
-              <div className="absolute top-4 left-4 right-4 bg-red-500/95 text-white p-2 rounded-lg text-xs z-20 backdrop-blur-sm">
-                <p className="font-semibold text-center">Camera not available</p>
+            {/* Stream Error Indicator */}
+            {streamError && (
+              <div className="absolute top-4 left-4 right-4 bg-red-500/95 text-white p-3 rounded-lg text-xs z-20 backdrop-blur-sm">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-semibold">Camera Stream Error</p>
+                    <p className="mt-1 opacity-90">{streamError}</p>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleStartCamera}
+                  size="sm"
+                  variant="outline"
+                  className="w-full mt-2 text-xs border-white/30 text-white hover:bg-white/10"
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  Retry
+                </Button>
+              </div>
+            )}
+
+            {/* Diagnostics Overlay (dev mode) */}
+            {process.env.NODE_ENV === 'development' && diagnostics && (
+              <div className="absolute bottom-20 left-4 right-4 bg-black/90 text-white p-2 rounded text-[10px] z-20 backdrop-blur-sm max-h-32 overflow-auto">
+                <div className="font-mono">
+                  <div className="font-semibold mb-1">🔍 Diagnostics:</div>
+                  <pre className="whitespace-pre-wrap">{JSON.stringify(diagnostics, null, 2)}</pre>
+                </div>
               </div>
             )}
           </>
