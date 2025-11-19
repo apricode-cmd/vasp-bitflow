@@ -1433,6 +1433,8 @@ model Admin {
   payOutsApproved   PayOut[]                @relation("PayOutApprover")
   payOutsInitiated  PayOut[]                @relation("PayOutInitiator")
   webAuthnCreds     WebAuthnCredential[]
+  workflowsCreated  Workflow[]              @relation("WorkflowCreator")
+  workflowsUpdated  Workflow[]              @relation("WorkflowUpdater")
 
   @@unique([ssoProvider, ssoSubject])
   @@index([workEmail])
@@ -2086,4 +2088,107 @@ enum NotificationType {
   KYC
   PAYMENT
   SYSTEM
+}
+
+// ============================================
+// WORKFLOW ENGINE
+// ============================================
+
+enum WorkflowTrigger {
+  ORDER_CREATED
+  PAYIN_RECEIVED
+  PAYOUT_REQUESTED
+  KYC_SUBMITTED
+  USER_REGISTERED
+  WALLET_ADDED
+  AMOUNT_THRESHOLD
+}
+
+enum WorkflowStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum WorkflowActionType {
+  FREEZE_ORDER
+  REJECT_TRANSACTION
+  REQUEST_DOCUMENT
+  REQUIRE_APPROVAL
+  SEND_NOTIFICATION
+  FLAG_FOR_REVIEW
+  AUTO_APPROVE
+  ESCALATE_TO_COMPLIANCE
+}
+
+model Workflow {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  
+  // Trigger configuration
+  trigger     WorkflowTrigger
+  triggerConfig Json?  // Additional trigger params
+  
+  // Dual storage strategy
+  visualState Json     // { nodes: [], edges: [] } for React Flow
+  logicState  Json     // Compiled json-logic for execution
+  
+  // Metadata
+  status      WorkflowStatus @default(DRAFT)
+  priority    Int            @default(0)  // Higher = runs first
+  isActive    Boolean        @default(false)
+  
+  // Version control
+  version     Int            @default(1)
+  parentId    String?        // For versioning
+  parent      Workflow?      @relation("WorkflowVersions", fields: [parentId], references: [id])
+  versions    Workflow[]     @relation("WorkflowVersions")
+  
+  // Audit
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  createdBy   String
+  creator     Admin          @relation("WorkflowCreator", fields: [createdBy], references: [id])
+  updatedBy   String?
+  updater     Admin?         @relation("WorkflowUpdater", fields: [updatedBy], references: [id])
+  
+  // Stats
+  executionCount Int          @default(0)
+  lastExecutedAt DateTime?
+  
+  // Execution logs
+  executions  WorkflowExecution[]
+  
+  @@index([trigger, isActive])
+  @@index([status, isActive])
+  @@index([createdBy])
+}
+
+model WorkflowExecution {
+  id          String   @id @default(cuid())
+  workflowId  String
+  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  
+  // Context
+  trigger     WorkflowTrigger
+  contextData Json     // The data that triggered the workflow (order, payIn, etc.)
+  
+  // Result
+  success     Boolean
+  result      Json     // Actions returned by workflow
+  error       String?
+  
+  // Performance
+  executionTimeMs Int
+  
+  // Audit
+  executedAt  DateTime @default(now())
+  entityType  String?  // 'Order', 'PayIn', 'KYC', etc.
+  entityId    String?  // Related entity ID
+  
+  @@index([workflowId, executedAt])
+  @@index([trigger, executedAt])
+  @@index([entityType, entityId])
 }
