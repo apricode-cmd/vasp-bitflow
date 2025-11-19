@@ -153,19 +153,37 @@ export function useCamera(options: UseCameraOptions = {}): UseCameraReturn {
       setIsLoading(true);
       setError(null);
 
-      // Build constraints
-      const constraints: MediaStreamConstraints = {
-        audio: false,
-        video: {
-          facingMode: options.facingMode || 'environment',
-          width: options.width ? { ideal: options.width } : { ideal: 1920 },
-          height: options.height ? { ideal: options.height } : { ideal: 1080 },
-          aspectRatio: options.aspectRatio || { ideal: 16/9 }
-        }
-      };
+      // Detect mobile
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-      // Use specific device if selected
-      if (currentDeviceId) {
+      // Build constraints - more flexible for mobile
+      let constraints: MediaStreamConstraints;
+
+      if (isMobile) {
+        // Mobile: use simpler constraints
+        constraints = {
+          audio: false,
+          video: {
+            facingMode: options.facingMode || 'environment',
+            width: { ideal: 1920, max: 3840 },
+            height: { ideal: 1080, max: 2160 }
+          }
+        };
+      } else {
+        // Desktop: use full constraints
+        constraints = {
+          audio: false,
+          video: {
+            facingMode: options.facingMode || 'environment',
+            width: options.width ? { ideal: options.width } : { ideal: 1920 },
+            height: options.height ? { ideal: options.height } : { ideal: 1080 },
+            aspectRatio: options.aspectRatio || { ideal: 16/9 }
+          }
+        };
+      }
+
+      // Use specific device if selected (only on desktop or if specifically chosen)
+      if (currentDeviceId && !isMobile) {
         constraints.video = {
           ...constraints.video,
           deviceId: { exact: currentDeviceId }
@@ -173,6 +191,7 @@ export function useCamera(options: UseCameraOptions = {}): UseCameraReturn {
       }
 
       console.log('📷 Starting camera with constraints:', constraints);
+      console.log('📱 Device type:', isMobile ? 'Mobile' : 'Desktop');
 
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
 
@@ -181,12 +200,18 @@ export function useCamera(options: UseCameraOptions = {}): UseCameraReturn {
       setHasPermission(true);
 
       console.log('✅ Camera started successfully');
+      console.log('📊 Video track settings:', mediaStream.getVideoTracks()[0]?.getSettings());
 
       // Get devices after permission granted
       await getDevices();
 
     } catch (err: any) {
       console.error('❌ Failed to start camera:', err);
+      console.error('Error details:', {
+        name: err.name,
+        message: err.message,
+        constraint: err.constraint
+      });
       
       if (err.name === 'NotAllowedError') {
         setError('Camera access denied. Please allow camera access.');
@@ -195,20 +220,24 @@ export function useCamera(options: UseCameraOptions = {}): UseCameraReturn {
       } else if (err.name === 'NotReadableError') {
         setError('Camera is already in use.');
       } else if (err.name === 'OverconstrainedError') {
-        setError('Camera does not meet requirements. Trying with lower quality...');
-        // Retry with lower constraints
+        console.log('⚠️ Overconstrained, trying fallback...');
+        // Retry with minimal constraints
         try {
           const fallbackStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: options.facingMode || 'environment' }
+            video: { 
+              facingMode: options.facingMode || 'environment'
+            }
           });
+          console.log('✅ Fallback camera started');
           streamRef.current = fallbackStream;
           setStream(fallbackStream);
           setError(null);
-        } catch {
+        } catch (fallbackErr: any) {
+          console.error('❌ Fallback also failed:', fallbackErr);
           setError('Failed to start camera with any settings.');
         }
       } else {
-        setError('Failed to access camera. Please try again.');
+        setError(`Failed to access camera: ${err.message || 'Unknown error'}`);
       }
 
     } finally {
