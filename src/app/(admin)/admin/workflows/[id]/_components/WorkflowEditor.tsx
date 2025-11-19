@@ -15,6 +15,7 @@ import { ReactFlowProvider } from '@xyflow/react';
 import WorkflowCanvas from './WorkflowCanvas';
 import NodeToolbar from './NodeToolbar';
 import PropertiesPanel from './PropertiesPanel';
+import TestWorkflowDialog from './TestWorkflowDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -63,6 +64,7 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
   // UI state
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [testDialogOpen, setTestDialogOpen] = useState(false);
 
   const isNewWorkflow = workflowId === 'create';
 
@@ -163,7 +165,7 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
       return;
     }
 
-    toast.info('Test workflow feature coming soon');
+    setTestDialogOpen(true);
   }, [isNewWorkflow]);
 
   // Publish/Pause workflow
@@ -403,6 +405,16 @@ export function WorkflowEditor({ workflowId }: WorkflowEditorProps) {
           />
         )}
       </div>
+
+      {/* Test Workflow Dialog */}
+      {!isNewWorkflow && (
+        <TestWorkflowDialog
+          open={testDialogOpen}
+          onOpenChange={setTestDialogOpen}
+          workflowId={workflowId}
+          trigger={trigger}
+        />
+      )}
     </div>
   );
 }

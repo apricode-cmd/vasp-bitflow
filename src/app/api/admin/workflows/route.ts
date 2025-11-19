@@ -56,13 +56,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const validated = workflowFiltersSchema.parse(filters);
 
     // Build where clause
-    const where: any = {};
+    const where: any = {
+      // Exclude archived workflows by default
+      status: {
+        not: 'ARCHIVED'
+      }
+    };
 
     if (validated.trigger) {
       where.trigger = validated.trigger;
     }
 
     if (validated.status) {
+      // If specific status is requested, override the default filter
       where.status = validated.status;
     }
 
