@@ -23,16 +23,18 @@ import {
   type Edge,
   BackgroundVariant,
   type ReactFlowInstance,
+  getConnectedEdges,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import './workflow-theme.css';
 
 import { nodeTypes } from './nodes';
 import { Button } from '@/components/ui/button';
-import { Save, Play, Eye, AlertCircle, Maximize2, MousePointer2 } from 'lucide-react';
+import { Save, Play, Eye, AlertCircle, Maximize2, MousePointer2, Layout } from 'lucide-react';
 import { toast } from 'sonner';
 import { compileWorkflow, validateWorkflowGraph } from '@/lib/workflows/compiler/graphToJsonLogic';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ContextMenu, useContextMenu } from './ContextMenu';
 
 interface WorkflowCanvasProps {
   workflowId: string;
@@ -62,6 +64,7 @@ export default function WorkflowCanvas({
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
+  const { menu, showMenu, hideMenu } = useContextMenu();
   
   const isDarkMode = theme === 'dark';
 
@@ -118,25 +121,103 @@ export default function WorkflowCanvas({
     [onNodeClick, readOnly]
   );
 
+  // Validate connection before allowing
+  const isValidConnection = useCallback(
+    (connection: Connection) => {
+      const sourceNode = nodes.find(n => n.id === connection.source);
+      const targetNode = nodes.find(n => n.id === connection.target);
+
+      if (!sourceNode || !targetNode) return false;
+
+      // Prevent self-connections
+      if (connection.source === connection.target) return false;
+
+      // Trigger nodes cannot be targets (must be at start)
+      if (targetNode.type === 'trigger') return false;
+
+      // Check for existing connection
+      const existingEdge = edges.find(
+        e => e.source === connection.source && 
+             e.target === connection.target &&
+             e.sourceHandle === connection.sourceHandle &&
+             e.targetHandle === connection.targetHandle
+      );
+      if (existingEdge) return false;
+
+      // Prevent cycles (simple check - walk backwards from target)
+      const hasCycle = (targetId: string, visited = new Set<string>()): boolean => {
+        if (visited.has(targetId)) return true;
+        visited.add(targetId);
+
+        const incomingEdges = edges.filter(e => e.target === targetId);
+        for (const edge of incomingEdges) {
+          if (edge.source === connection.target) return true; // Would create cycle
+          if (hasCycle(edge.source, visited)) return true;
+        }
+        return false;
+      };
+
+      if (hasCycle(targetNode.id)) return false;
+
+      return true;
+    },
+    [nodes, edges]
+  );
+
   // Handle new connections
   const onConnect = useCallback(
     (connection: Connection) => {
-      // Validate connection (basic rules)
+      // Validate connection
       if (!connection.source || !connection.target) {
         return;
       }
 
-      // Prevent self-connections
       if (connection.source === connection.target) {
         toast.error('Cannot connect a node to itself');
         return;
       }
 
-      // Add edge
-      setEdges((eds) => addEdge(connection, eds));
+      if (!isValidConnection(connection)) {
+        toast.error('Invalid connection', {
+          description: 'This connection would create a cycle or violate workflow rules',
+        });
+        return;
+      }
+
+      // Get source node type for styling
+      const sourceNode = nodes.find(n => n.id === connection.source);
+      const edgeType = sourceNode?.type === 'condition' ? 'smoothstep' : 'default';
+      
+      // Determine edge color based on handle and node type
+      let edgeColor = '#94a3b8'; // Default gray
+      if (sourceNode?.type === 'trigger') edgeColor = '#60a5fa'; // Blue
+      else if (sourceNode?.type === 'condition') {
+        // Condition edges: green for true, red for false
+        edgeColor = connection.sourceHandle === 'true' ? '#34d399' : '#f87171';
+      }
+      else if (sourceNode?.type === 'action') edgeColor = '#a3a3a3'; // Light gray
+
+      // Add edge with styling
+      const newEdge = {
+        ...connection,
+        type: edgeType,
+        animated: sourceNode?.type === 'trigger',
+        style: { 
+          strokeWidth: 2.5,
+          stroke: edgeColor,
+        },
+        markerEnd: {
+          type: 'arrowclosed' as const,
+          color: edgeColor,
+          width: 20,
+          height: 20,
+        },
+      };
+
+      setEdges((eds) => addEdge(newEdge, eds));
       toast.success('Connection created');
     },
-    [setEdges]
+    [setEdges, isValidConnection, nodes]
   );
 
   // Handle drop from NodeToolbar
@@ -243,6 +324,176 @@ export default function WorkflowCanvas({
     }
   }, []);
 
+  // Handle context menu actions
+  const handleContextMenuAction = useCallback((action: string, data?: any) => {
+    switch (action) {
+      case 'edit':
+        if (data && onNodeClick) onNodeClick(data);
+        break;
+      
+      case 'duplicate':
+        if (data) {
+          const newNode: Node = {
+            ...data,
+            id: `${data.type}-${Date.now()}`,
+            position: {
+              x: data.position.x + 50,
+              y: data.position.y + 50,
+            },
+            selected: false,
+          };
+          setNodes((nds) => [...nds, newNode]);
+          toast.success('Node duplicated');
+        }
+        break;
+      
+      case 'delete':
+        if (data) {
+          setNodes((nds) => nds.filter((n) => n.id !== data.id));
+          setEdges((eds) => eds.filter((e) => e.source !== data.id && e.target !== data.id));
+          toast.success('Node deleted');
+        }
+        break;
+      
+      case 'deleteEdge':
+        if (data) {
+          setEdges((eds) => eds.filter((e) => e.id !== data.id));
+          toast.success('Connection deleted');
+        }
+        break;
+      
+      case 'fitView':
+        handleFitView();
+        break;
+      
+      case 'alignLeft':
+      case 'alignCenter':
+      case 'alignRight':
+        alignNodesHorizontally(action.replace('align', '').toLowerCase() as 'left' | 'center' | 'right');
+        break;
+      
+      case 'alignTop':
+      case 'alignMiddle':
+      case 'alignBottom':
+        alignNodesVertically(action.replace('align', '').toLowerCase() as 'top' | 'middle' | 'bottom');
+        break;
+      
+      default:
+        console.log('Unknown action:', action);
+    }
+  }, [onNodeClick, setNodes, setEdges, handleFitView]);
+
+  // Alignment functions
+  const alignNodesHorizontally = useCallback((alignment: 'left' | 'center' | 'right') => {
+    const selectedNodes = nodes.filter(n => n.selected);
+    if (selectedNodes.length < 2) {
+      toast.error('Select at least 2 nodes to align');
+      return;
+    }
+
+    const positions = selectedNodes.map(n => n.position.x + (n.width || 280) / 2);
+    let targetX: number;
+
+    switch (alignment) {
+      case 'left':
+        targetX = Math.min(...selectedNodes.map(n => n.position.x));
+        break;
+      case 'center':
+        targetX = (Math.max(...positions) + Math.min(...positions)) / 2;
+        break;
+      case 'right':
+        targetX = Math.max(...selectedNodes.map(n => n.position.x + (n.width || 280)));
+        break;
+    }
+
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.selected) {
+          return {
+            ...node,
+            position: {
+              ...node.position,
+              x: alignment === 'left' ? targetX : 
+                 alignment === 'center' ? targetX - (node.width || 280) / 2 :
+                 targetX - (node.width || 280),
+            },
+          };
+        }
+        return node;
+      })
+    );
+    toast.success(`Nodes aligned ${alignment}`);
+  }, [nodes, setNodes]);
+
+  const alignNodesVertically = useCallback((alignment: 'top' | 'middle' | 'bottom') => {
+    const selectedNodes = nodes.filter(n => n.selected);
+    if (selectedNodes.length < 2) {
+      toast.error('Select at least 2 nodes to align');
+      return;
+    }
+
+    const positions = selectedNodes.map(n => n.position.y + (n.height || 150) / 2);
+    let targetY: number;
+
+    switch (alignment) {
+      case 'top':
+        targetY = Math.min(...selectedNodes.map(n => n.position.y));
+        break;
+      case 'middle':
+        targetY = (Math.max(...positions) + Math.min(...positions)) / 2;
+        break;
+      case 'bottom':
+        targetY = Math.max(...selectedNodes.map(n => n.position.y + (n.height || 150)));
+        break;
+    }
+
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.selected) {
+          return {
+            ...node,
+            position: {
+              ...node.position,
+              y: alignment === 'top' ? targetY :
+                 alignment === 'middle' ? targetY - (node.height || 150) / 2 :
+                 targetY - (node.height || 150),
+            },
+          };
+        }
+        return node;
+      })
+    );
+    toast.success(`Nodes aligned ${alignment}`);
+  }, [nodes, setNodes]);
+
+  // Handle context menu
+  const handleNodeContextMenu = useCallback(
+    (event: React.MouseEvent, node: Node) => {
+      if (!readOnly) {
+        showMenu(event, 'node', node);
+      }
+    },
+    [showMenu, readOnly]
+  );
+
+  const handleEdgeContextMenu = useCallback(
+    (event: React.MouseEvent, edge: Edge) => {
+      if (!readOnly) {
+        showMenu(event, 'edge', edge);
+      }
+    },
+    [showMenu, readOnly]
+  );
+
+  const handlePaneContextMenu = useCallback(
+    (event: React.MouseEvent | MouseEvent) => {
+      if (!readOnly) {
+        showMenu(event as React.MouseEvent, 'canvas');
+      }
+    },
+    [showMenu, readOnly]
+  );
+
   return (
     <div ref={reactFlowWrapper} className="h-full w-full relative">
       <ReactFlow
@@ -253,6 +504,9 @@ export default function WorkflowCanvas({
         onConnect={onConnect}
         onNodeClick={handleNodeClick}
         onNodeDoubleClick={handleNodeDoubleClick}
+        onNodeContextMenu={handleNodeContextMenu}
+        onEdgeContextMenu={handleEdgeContextMenu}
+        onPaneContextMenu={handlePaneContextMenu}
         onInit={(instance) => {
           reactFlowInstance.current = instance;
           // Set initial zoom to 75% for better overview (like n8n)
@@ -266,9 +520,21 @@ export default function WorkflowCanvas({
         snapGrid={[15, 15]}
         defaultEdgeOptions={{
           type: 'smoothstep',
-          animated: true,
-          style: { strokeWidth: 2 },
+          animated: false,
+          style: { strokeWidth: 2.5 },
+          markerEnd: {
+            type: 'arrowclosed',
+            width: 20,
+            height: 20,
+          },
         }}
+        connectionLineStyle={{
+          strokeWidth: 2.5,
+          stroke: '#94a3b8',
+          strokeDasharray: '5 5',
+        }}
+        connectionLineType={'smoothstep' as any}
+        isValidConnection={isValidConnection as any}
         defaultViewport={{ x: 100, y: 100, zoom: 0.75 }}
         deleteKeyCode="Delete"
         selectionKeyCode="Shift"
@@ -396,6 +662,17 @@ export default function WorkflowCanvas({
           </div>
         </Panel>
       </ReactFlow>
+
+      {/* Context Menu */}
+      {menu.show && (
+        <ContextMenu
+          position={{ x: menu.x, y: menu.y }}
+          type={menu.type}
+          data={menu.data}
+          onClick={handleContextMenuAction}
+          onClose={hideMenu}
+        />
+      )}
     </div>
   );
 }
