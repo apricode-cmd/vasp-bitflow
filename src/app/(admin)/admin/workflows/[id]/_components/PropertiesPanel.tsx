@@ -321,13 +321,15 @@ export default function PropertiesPanel({
         </div>
 
         {/* Trigger Config Dialog */}
-        <TriggerConfigDialog
-          open={showTriggerConfig}
-          onOpenChange={setShowTriggerConfig}
-          trigger={formData.trigger}
-          config={triggerConfig}
-          onSave={handleSaveTriggerConfig}
-        />
+        {formData.trigger && (
+          <TriggerConfigDialog
+            open={showTriggerConfig}
+            onOpenChange={setShowTriggerConfig}
+            trigger={formData.trigger}
+            config={triggerConfig}
+            onSave={handleSaveTriggerConfig}
+          />
+        )}
       </div>
     );
   };

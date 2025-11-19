@@ -60,7 +60,9 @@ export default function TriggerConfigDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Configure Trigger Filters - {trigger.replace('_', ' ')}</DialogTitle>
+          <DialogTitle>
+            Configure Trigger Filters - {trigger ? String(trigger).replace(/_/g, ' ') : 'Trigger'}
+          </DialogTitle>
           <DialogDescription>
             Define conditions that must be met for this workflow to execute. Leave empty to always trigger.
           </DialogDescription>
