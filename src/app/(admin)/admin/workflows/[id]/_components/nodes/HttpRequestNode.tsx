@@ -158,10 +158,12 @@ function HttpRequestNode({ data, selected }: NodeProps<HttpRequestNodeData>) {
             )}
 
             {/* Auth */}
-            {data.config?.auth && data.config.auth.type && data.config.auth.type !== 'NONE' && (
+            {data.config?.authType && data.config.authType !== 'NONE' && (
               <div className="flex items-center justify-between">
                 <span className="font-medium opacity-70">Auth:</span>
-                <span className="font-mono">{data.config.auth.type}</span>
+                <span className="font-mono text-xs">
+                  {data.config.authType.replace('_', ' ')}
+                </span>
               </div>
             )}
 
@@ -170,14 +172,6 @@ function HttpRequestNode({ data, selected }: NodeProps<HttpRequestNodeData>) {
               <div className="flex items-center justify-between">
                 <span className="font-medium opacity-70">Timeout:</span>
                 <span className="font-mono">{data.config.timeout / 1000}s</span>
-              </div>
-            )}
-
-            {/* Retry */}
-            {data.config?.retryOnFailure && (
-              <div className="flex items-center justify-between">
-                <span className="font-medium opacity-70">Retry:</span>
-                <span className="font-mono">Enabled</span>
               </div>
             )}
           </div>

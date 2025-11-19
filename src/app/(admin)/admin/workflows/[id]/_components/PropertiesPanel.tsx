@@ -421,6 +421,133 @@ export default function PropertiesPanel({
     );
   };
 
+  const renderHttpRequestForm = () => {
+    return (
+      <div className="space-y-6">
+        {/* Request Section */}
+        <div>
+          <Label className="text-sm font-semibold mb-3 block">Request Configuration</Label>
+          <div className="space-y-4">
+            {/* Method + URL in one row */}
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label htmlFor="method" className="text-xs">Method *</Label>
+                <Select
+                  value={formData.config?.method || 'GET'}
+                  onValueChange={(value) => handleConfigChange('method', value)}
+                >
+                  <SelectTrigger id="method" className="mt-1.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].map((method) => (
+                      <SelectItem key={method} value={method}>
+                        {method}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2">
+                <Label htmlFor="url" className="text-xs">URL *</Label>
+                <div className="mt-1.5">
+                  <ExpressionInput
+                    value={formData.config?.url || ''}
+                    onChange={(value) => handleConfigChange('url', value)}
+                    placeholder="https://api.example.com/endpoint"
+                    availableVariables={availableVariables}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Request Body */}
+            {['POST', 'PUT', 'PATCH'].includes(formData.config?.method || '') && (
+              <div>
+                <Label htmlFor="body" className="text-xs">Request Body (JSON)</Label>
+                <div className="mt-1.5">
+                  <ExpressionInput
+                    value={formData.config?.body || ''}
+                    onChange={(value) => handleConfigChange('body', value)}
+                    placeholder='{"key": "value"} or use {{ }} expressions'
+                    availableVariables={availableVariables}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Authentication Section */}
+        <div>
+          <Label className="text-sm font-semibold mb-3 block">Authentication</Label>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="authType" className="text-xs">Auth Type</Label>
+              <Select
+                value={formData.config?.authType || 'NONE'}
+                onValueChange={(value) => handleConfigChange('authType', value)}
+              >
+                <SelectTrigger id="authType" className="mt-1.5">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NONE">None</SelectItem>
+                  <SelectItem value="BEARER_TOKEN">Bearer Token</SelectItem>
+                  <SelectItem value="BASIC_AUTH">Basic Auth</SelectItem>
+                  <SelectItem value="API_KEY">API Key</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {formData.config?.authType && formData.config.authType !== 'NONE' && (
+              <div>
+                <Label htmlFor="authToken" className="text-xs">
+                  {formData.config.authType === 'BEARER_TOKEN' && 'Bearer Token'}
+                  {formData.config.authType === 'BASIC_AUTH' && 'Username:Password'}
+                  {formData.config.authType === 'API_KEY' && 'API Key'}
+                </Label>
+                <div className="mt-1.5">
+                  <ExpressionInput
+                    value={formData.config?.authToken || ''}
+                    onChange={(value) => handleConfigChange('authToken', value)}
+                    placeholder="Enter token or use {{ $env.API_KEY }}"
+                    availableVariables={availableVariables}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Options Section */}
+        <div>
+          <Label className="text-sm font-semibold mb-3 block">Options</Label>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="timeout" className="text-xs">Timeout (ms)</Label>
+              <Input
+                id="timeout"
+                type="number"
+                value={formData.config?.timeout || 30000}
+                onChange={(e) => handleConfigChange('timeout', parseInt(e.target.value) || 30000)}
+                placeholder="30000"
+                className="mt-1.5"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Default: 30000ms (30 seconds)
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderActionForm = () => {
     const actionType = ACTION_TYPES.find(a => a.value === formData.actionType);
 
@@ -518,8 +645,8 @@ export default function PropertiesPanel({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-semibold text-sm">Node Properties</h3>
-            <Badge variant="outline" className="mt-1 text-xs">
-              {selectedNode.type}
+            <Badge variant="outline" className="mt-1 text-xs capitalize">
+              {selectedNode.type === 'httpRequest' ? 'HTTP Request' : selectedNode.type}
             </Badge>
           </div>
           <Button
@@ -538,6 +665,7 @@ export default function PropertiesPanel({
         {selectedNode.type === 'trigger' && renderTriggerForm()}
         {selectedNode.type === 'condition' && renderConditionForm()}
         {selectedNode.type === 'action' && renderActionForm()}
+        {selectedNode.type === 'httpRequest' && renderHttpRequestForm()}
       </div>
 
       {/* Footer */}
