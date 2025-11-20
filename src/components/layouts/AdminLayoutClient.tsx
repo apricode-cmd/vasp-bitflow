@@ -64,7 +64,7 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps): React.R
         </ResizableHandle>
         <ResizablePanel defaultSize={82} minSize={50}>
           <div className="flex flex-col h-full relative">
-            <main className="flex-1 relative">
+            <main className="flex-1 relative overflow-y-auto p-6">
               {children}
             </main>
           </div>
@@ -104,7 +104,7 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps): React.R
         {/* Main Content Panel */}
         <ResizablePanel defaultSize={82} minSize={50}>
           <div className="flex flex-col h-full relative">
-            <main className="flex-1 relative">
+            <main className="flex-1 relative overflow-y-auto p-6">
               {children}
             </main>
           </div>
