@@ -222,3 +222,117 @@ export async function PATCH(
   }
 }
 
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
+  try {
+    // Check admin permission - only SUPER_ADMIN can delete users
+    const sessionOrError = await requireAdminRole('SUPER_ADMIN');
+    if (sessionOrError instanceof NextResponse) {
+      return sessionOrError;
+    }
+
+    const { id } = await params;
+
+    // Get admin ID
+    const adminId = await getCurrentUserId();
+    if (!adminId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Unauthorized'
+        },
+        { status: 401 }
+      );
+    }
+
+    // Prevent self-deletion
+    if (adminId === id) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'You cannot delete yourself'
+        },
+        { status: 400 }
+      );
+    }
+
+    // Get user before deletion for audit log
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        isActive: true,
+        profile: {
+          select: {
+            firstName: true,
+            lastName: true
+          }
+        }
+      }
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'User not found'
+        },
+        { status: 404 }
+      );
+    }
+
+    // Delete user (cascade will handle related records)
+    await prisma.user.delete({
+      where: { id }
+    });
+
+    // Log admin action
+    await auditService.logAdminAction(
+      adminId,
+      AUDIT_ACTIONS.USER_DELETED,
+      AUDIT_ENTITIES.USER,
+      id,
+      {
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
+        name: user.profile ? `${user.profile.firstName} ${user.profile.lastName}` : null
+      },
+      null,
+      {
+        deletedAt: new Date().toISOString()
+      }
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: 'User deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete user error:', error);
+
+    // Check for foreign key constraint errors
+    if (error instanceof Error && error.message.includes('foreign key constraint')) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Cannot delete user with existing orders or related data. Consider deactivating instead.'
+        },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Failed to delete user'
+      },
+      { status: 500 }
+    );
+  }
+}
+

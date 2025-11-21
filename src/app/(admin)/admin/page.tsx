@@ -99,7 +99,7 @@ export default function AdminDashboardPage(): JSX.Element {
   const currencyDistribution = stats.chartData?.currencies || [];
 
   return (
-    <div className="p-6 space-y-6 animate-in">
+    <div className="space-y-6 animate-in">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>

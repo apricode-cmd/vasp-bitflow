@@ -33,6 +33,7 @@ interface SumsubConfig extends BaseIntegrationConfig {
   levelName?: string;
   baseUrl?: string;
   webhookSecret?: string; // ✅ For webhook signature verification
+  tokenTtlSeconds?: number; // ✅ Access token TTL (default: 3600 = 60 minutes)
 }
 
 /**
@@ -509,7 +510,11 @@ export class SumsubAdapter implements IKycProvider {
     }
 
     try {
-      const path = `/resources/accessTokens?userId=${encodeURIComponent(externalUserId)}&levelName=${encodeURIComponent(this.config.levelName!)}`;
+      // Use config value or default to 3600 seconds (60 minutes)
+      // Can be increased: 7200 (2h), 10800 (3h), 21600 (6h)
+      // Maximum: Not documented, test incrementally
+      const ttlInSecs = this.config.tokenTtlSeconds || 3600;
+      const path = `/resources/accessTokens?userId=${encodeURIComponent(externalUserId)}&levelName=${encodeURIComponent(this.config.levelName!)}&ttlInSecs=${ttlInSecs}`;
       
       const { headers } = this.buildRequest('POST', path);
 
@@ -537,7 +542,7 @@ export class SumsubAdapter implements IKycProvider {
             
             // Generate unique userId with timestamp + random
             const newUserId = `${externalUserId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-            const retryPath = `/resources/accessTokens?userId=${encodeURIComponent(newUserId)}&levelName=${encodeURIComponent(this.config.levelName!)}`;
+            const retryPath = `/resources/accessTokens?userId=${encodeURIComponent(newUserId)}&levelName=${encodeURIComponent(this.config.levelName!)}&ttlInSecs=${ttlInSecs}`;
             const { headers: retryHeaders } = this.buildRequest('POST', retryPath);
             
             console.log(`🔄 Retry ${retryCount}/${maxRetries} with userId:`, newUserId);
@@ -553,7 +558,7 @@ export class SumsubAdapter implements IKycProvider {
               
               return {
                 token: retryData.token,
-                expiresAt: new Date(Date.now() + 30 * 60 * 1000)
+                expiresAt: new Date(Date.now() + 60 * 60 * 1000) // 60 minutes (maximum)
               };
             }
             
@@ -583,7 +588,7 @@ export class SumsubAdapter implements IKycProvider {
 
       return {
         token: data.token,
-        expiresAt: new Date(Date.now() + 30 * 60 * 1000) // 30 minutes
+        expiresAt: new Date(Date.now() + ttlInSecs * 1000)
       };
     } catch (error: any) {
       console.error('❌ Sumsub access token creation failed:', error);
