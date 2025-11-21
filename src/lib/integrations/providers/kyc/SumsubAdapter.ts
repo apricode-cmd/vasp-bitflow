@@ -510,10 +510,10 @@ export class SumsubAdapter implements IKycProvider {
     }
 
     try {
-      // Use config value or default to 3600 seconds (60 minutes)
-      // Can be increased: 7200 (2h), 10800 (3h), 21600 (6h)
+      // Use config value or default to 7200 seconds (120 minutes = 2 hours)
+      // Can be increased: 10800 (3h), 21600 (6h)
       // Maximum: Not documented, test incrementally
-      const ttlInSecs = this.config.tokenTtlSeconds || 3600;
+      const ttlInSecs = this.config.tokenTtlSeconds || 7200;
       const path = `/resources/accessTokens?userId=${encodeURIComponent(externalUserId)}&levelName=${encodeURIComponent(this.config.levelName!)}&ttlInSecs=${ttlInSecs}`;
       
       const { headers } = this.buildRequest('POST', path);

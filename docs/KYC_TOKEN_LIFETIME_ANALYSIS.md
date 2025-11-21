@@ -287,9 +287,9 @@ return {
 
 **Наша Реализация:**
 - **Было:** 30 минут (1800 секунд) - hardcoded
-- **Стало:** 60 минут (3600 секунд) - configurable
+- **Стало:** 120 минут (7200 секунд = 2 часа) - configurable ✅
 - **Configurable:** Да, через `config.tokenTtlSeconds`
-- **API Parameter:** `ttlInSecs=3600` передается явно
+- **API Parameter:** `ttlInSecs=7200` передается явно
 
 **Рекомендуемые значения:**
 - **Sumsub Default:** 600 сек (10 минут) - минимальный UX
