@@ -27,6 +27,11 @@ interface UploadedDocument {
   fileUrl?: string;
 }
 
+interface ExistingDocument {
+  documentType: string;
+  fileUrl: string;
+}
+
 export default function ResubmitDocumentsPage() {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
@@ -36,6 +41,7 @@ export default function ResubmitDocumentsPage() {
   const [kycSession, setKycSession] = useState<any>(null);
   const [uploadedDocs, setUploadedDocs] = useState<Map<string, File>>(new Map());
   const [requirements, setRequirements] = useState<ResubmitRequirement[]>([]);
+  const [existingDocs, setExistingDocs] = useState<Map<string, string>>(new Map()); // documentType -> fileUrl
 
   // Fetch KYC session and analyze rejection
   useEffect(() => {
@@ -85,6 +91,22 @@ export default function ResubmitDocumentsPage() {
         setRequirements(analysis.requirements.filter(
           r => r.action === 'UPLOAD_IDENTITY' || r.action === 'UPLOAD_ADDRESS'
         ));
+
+        // Fetch existing documents to determine what was originally uploaded
+        try {
+          const docsResponse = await fetch('/api/kyc/documents');
+          if (docsResponse.ok) {
+            const docsData = await docsResponse.json();
+            const docsMap = new Map<string, string>();
+            docsData.documents?.forEach((doc: ExistingDocument) => {
+              docsMap.set(doc.documentType, doc.fileUrl);
+            });
+            setExistingDocs(docsMap);
+            console.log('📄 Existing documents types:', Array.from(docsMap.keys()));
+          }
+        } catch (err) {
+          console.error('Failed to fetch existing documents:', err);
+        }
         
       } catch (error: any) {
         console.error('Error fetching KYC session:', error);
@@ -213,14 +235,30 @@ export default function ResubmitDocumentsPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           {requirements.map((req, idx) => {
-            // Determine which document to show based on reject label
-            const docType = req.label === 'BAD_PROOF_OF_ADDRESS' || req.label === 'WRONG_ADDRESS'
-              ? 'UTILITY_BILL'
-              : 'ID_CARD'; // For all identity issues - показываем ID карту
+            // Determine document type based on what was originally uploaded
+            let docType: string;
+            let docLabel: string;
             
-            const docLabel = docType === 'UTILITY_BILL' 
-              ? 'Proof of Address' 
-              : 'ID Document';
+            if (req.documentType === 'IDENTITY') {
+              // Check what identity document was originally uploaded
+              if (existingDocs.has('PASSPORT')) {
+                docType = 'PASSPORT';
+                docLabel = 'Passport';
+              } else if (existingDocs.has('ID_CARD') || existingDocs.has('ID_CARD_FRONT')) {
+                docType = 'ID_CARD';
+                docLabel = 'ID Card (Front & Back)';
+              } else {
+                // Default to ID card if unknown
+                docType = 'ID_CARD';
+                docLabel = 'ID Document';
+              }
+            } else if (req.documentType === 'PROOF_OF_ADDRESS') {
+              docType = 'UTILITY_BILL';
+              docLabel = 'Proof of Address';
+            } else {
+              docType = 'ID_CARD';
+              docLabel = 'ID Document';
+            }
             
             return (
               <div key={`${docType}-${idx}`} className="space-y-3">
