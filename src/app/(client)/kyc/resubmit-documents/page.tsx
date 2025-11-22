@@ -15,11 +15,14 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Upload, AlertCircle, CheckCircle2, Loader2, ArrowLeft, 
-  FileText, Camera, Home
+  FileText, Camera, Home, XCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { DocumentUploader } from '@/components/kyc/DocumentUploader';
 import { analyzeRejection, type ResubmitRequirement } from '@/lib/kyc/resubmit-helper';
+import { Suspense, lazy } from 'react';
+
+// Lazy load camera component
+const CameraCapture = lazy(() => import('@/components/kyc/CameraCapture').then(m => ({ default: m.CameraCapture })));
 
 interface UploadedDocument {
   documentType: string;
@@ -42,6 +45,8 @@ export default function ResubmitDocumentsPage() {
   const [uploadedDocs, setUploadedDocs] = useState<Map<string, File>>(new Map());
   const [requirements, setRequirements] = useState<ResubmitRequirement[]>([]);
   const [existingDocs, setExistingDocs] = useState<Map<string, string>>(new Map()); // documentType -> fileUrl
+  const [showCamera, setShowCamera] = useState<string | null>(null); // which document is being captured
+  const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
 
   // Fetch KYC session and analyze rejection
   useEffect(() => {
@@ -121,9 +126,36 @@ export default function ResubmitDocumentsPage() {
   }, [session, sessionStatus, router]);
 
   const handleFileSelect = (docType: string, file: File) => {
+    // Validate file
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      toast.error('File size exceeds 10MB limit');
+      return;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Invalid file type. Only JPEG, PNG, and PDF are allowed');
+      return;
+    }
+
     setUploadedDocs(prev => {
       const newMap = new Map(prev);
       newMap.set(docType, file);
+      return newMap;
+    });
+    toast.success('File selected successfully');
+  };
+
+  const handleCameraCapture = (docType: string, file: File) => {
+    setShowCamera(null);
+    handleFileSelect(docType, file);
+  };
+
+  const handleRemoveFile = (docType: string) => {
+    setUploadedDocs(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(docType);
       return newMap;
     });
   };
@@ -137,8 +169,11 @@ export default function ResubmitDocumentsPage() {
     try {
       setSubmitting(true);
 
-      // Upload each document
+      // Upload each document individually
+      let successCount = 0;
       for (const [docType, file] of uploadedDocs.entries()) {
+        console.log(`📤 Uploading ${docType}:`, file.name);
+        
         const formData = new FormData();
         formData.append('file', file);
         formData.append('documentType', docType);
@@ -150,12 +185,16 @@ export default function ResubmitDocumentsPage() {
 
         if (!uploadResponse.ok) {
           const error = await uploadResponse.json();
-          throw new Error(error.error || 'Failed to upload document');
+          throw new Error(error.error || `Failed to upload ${docType}`);
         }
+
+        const result = await uploadResponse.json();
+        console.log(`✅ ${docType} uploaded:`, result);
+        successCount++;
       }
 
       // All uploads successful
-      toast.success('Documents uploaded successfully! Awaiting review...');
+      toast.success(`${successCount} document(s) uploaded successfully! Awaiting review...`);
       
       // Redirect back to KYC status page
       setTimeout(() => {
@@ -163,7 +202,7 @@ export default function ResubmitDocumentsPage() {
       }, 1500);
       
     } catch (error: any) {
-      console.error('Upload error:', error);
+      console.error('❌ Upload error:', error);
       toast.error(error.message || 'Failed to upload documents');
     } finally {
       setSubmitting(false);
@@ -234,63 +273,135 @@ export default function ResubmitDocumentsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {requirements.map((req, idx) => {
-            // Determine document type based on what was originally uploaded
-            let docType: string;
-            let docLabel: string;
+          {requirements.flatMap((req, idx) => {
+            // Determine document types based on what was originally uploaded
+            const docTypes: Array<{ type: string; label: string }> = [];
             
             if (req.documentType === 'IDENTITY') {
               // Check what identity document was originally uploaded
               if (existingDocs.has('PASSPORT')) {
-                docType = 'PASSPORT';
-                docLabel = 'Passport';
+                docTypes.push({ type: 'PASSPORT', label: 'Passport' });
               } else if (existingDocs.has('ID_CARD') || existingDocs.has('ID_CARD_FRONT')) {
-                docType = 'ID_CARD';
-                docLabel = 'ID Card (Front & Back)';
+                // ID Card requires BOTH sides
+                docTypes.push({ type: 'ID_CARD_FRONT', label: 'ID Card - Front Side' });
+                docTypes.push({ type: 'ID_CARD_BACK', label: 'ID Card - Back Side' });
               } else {
                 // Default to ID card if unknown
-                docType = 'ID_CARD';
-                docLabel = 'ID Document';
+                docTypes.push({ type: 'ID_CARD_FRONT', label: 'ID Card - Front Side' });
+                docTypes.push({ type: 'ID_CARD_BACK', label: 'ID Card - Back Side' });
               }
             } else if (req.documentType === 'PROOF_OF_ADDRESS') {
-              docType = 'UTILITY_BILL';
-              docLabel = 'Proof of Address';
+              docTypes.push({ type: 'UTILITY_BILL', label: 'Proof of Address' });
             } else {
-              docType = 'ID_CARD';
-              docLabel = 'ID Document';
+              docTypes.push({ type: 'ID_CARD_FRONT', label: 'ID Card - Front Side' });
+              docTypes.push({ type: 'ID_CARD_BACK', label: 'ID Card - Back Side' });
             }
+
+            // Render upload UI for each document type
+            return docTypes.map((doc, subIdx) => {
+              const docType = doc.type;
+              const docLabel = doc.label;
             
-            return (
-              <div key={`${docType}-${idx}`} className="space-y-3">
-                <div className="flex items-start gap-3 pb-2 border-b">
-                  <div className="rounded-md bg-primary/10 p-2 mt-0.5">
-                    <FileText className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-medium">{docLabel}</h3>
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                      Issue: {req.label.replace(/_/g, ' ').toLowerCase()}
-                    </p>
-                    {req.label && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {req.description}
-                      </p>
+              return (
+                <div key={`${docType}-${idx}-${subIdx}`} className="space-y-3">
+                  <div className="flex items-start gap-3 pb-2 border-b">
+                    <div className="rounded-md bg-primary/10 p-2 mt-0.5">
+                      <FileText className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium">{docLabel}</h3>
+                      {subIdx === 0 && (
+                        <>
+                          <p className="text-sm text-muted-foreground mt-0.5">
+                            Issue: {req.label.replace(/_/g, ' ').toLowerCase()}
+                          </p>
+                          {req.label && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {req.description}
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    {uploadedDocs.has(docType) && (
+                      <CheckCircle2 className="h-5 w-5 text-green-600 mt-1" />
                     )}
                   </div>
-                  {uploadedDocs.has(docType) && (
-                    <CheckCircle2 className="h-5 w-5 text-green-600 mt-1" />
-                  )}
-                </div>
 
-                <DocumentUploader
-                  type={docType as any}
-                  label={docLabel}
-                  required={true}
-                  onFileSelect={(file) => handleFileSelect(docType, file)}
-                  existingUrl={undefined}
-                />
-              </div>
-            );
+                {/* File Upload UI (same as KycField FileUploadField) */}
+                {uploadedDocs.has(docType) ? (
+                  // File uploaded preview
+                  <div className="flex items-center gap-3 p-4 border border-green-500/50 bg-green-500/10 rounded-lg">
+                    <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {uploadedDocs.get(docType)!.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {(uploadedDocs.get(docType)!.size / 1024).toFixed(1)} KB
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveFile(docType)}
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  // Upload UI
+                  <div className="space-y-3">
+                    {/* Camera Modal */}
+                    {showCamera === docType && (
+                      <Suspense fallback={<div className="text-center py-4">Loading camera...</div>}>
+                        <CameraCapture
+                          open={true}
+                          onCapture={(file) => handleCameraCapture(docType, file)}
+                          onCancel={() => setShowCamera(null)}
+                          documentType={docLabel}
+                        />
+                      </Suspense>
+                    )}
+
+                    {/* Drag & Drop Area */}
+                    <div className="group relative flex items-center justify-center border-2 border-dashed rounded-xl p-6 transition-all duration-200 border-border bg-card hover:border-primary hover:bg-primary/5 hover:shadow-sm cursor-pointer">
+                      <label htmlFor={`file-${docType}`} className="flex flex-col items-center cursor-pointer w-full">
+                        <Upload className="h-10 w-10 text-muted-foreground group-hover:text-primary mb-3 transition-colors" />
+                        <p className="text-sm font-medium text-center mb-1">
+                          Drop file here or <span className="text-primary">browse</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground text-center">
+                          JPEG, PNG, PDF (max 10MB)
+                        </p>
+                      </label>
+                      <input
+                        id={`file-${docType}`}
+                        type="file"
+                        accept="image/jpeg,image/png,image/jpg,application/pdf"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleFileSelect(docType, file);
+                        }}
+                        className="hidden"
+                      />
+                    </div>
+
+                    {/* Camera Button */}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowCamera(docType)}
+                      className="w-full"
+                    >
+                      <Camera className="h-4 w-4 mr-2" />
+                      Take Photo
+                    </Button>
+                  </div>
+                )}
+                </div>
+              );
+            });
           })}
         </CardContent>
       </Card>

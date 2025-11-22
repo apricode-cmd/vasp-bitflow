@@ -67,19 +67,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('📄 [RESUBMIT] Uploading document:', { 
+    console.log('📄 [RESUBMIT] Processing document:', { 
       documentType, 
       fileName: file.name, 
       size: file.size 
     });
 
-    // 5. Upload to Vercel Blob
-    const blob = await put(`kyc/${session.user.id}/${Date.now()}-${file.name}`, file, {
-      access: 'public',
-      addRandomSuffix: true
-    });
-
-    console.log('✅ [RESUBMIT] Document uploaded to blob:', blob.url);
+    // 5. Upload to Vercel Blob (optional - only if available)
+    let fileUrl = '';
+    try {
+      if (process.env.BLOB_READ_WRITE_TOKEN) {
+        const blob = await put(`kyc/${session.user.id}/${Date.now()}-${file.name}`, file, {
+          access: 'public',
+          addRandomSuffix: true
+        });
+        fileUrl = blob.url;
+        console.log('✅ [RESUBMIT] Document uploaded to Blob:', fileUrl);
+      } else {
+        // Blob not available - will use direct Sumsub upload only
+        fileUrl = `temp://kyc/${session.user.id}/${file.name}`;
+        console.log('ℹ️ [RESUBMIT] Blob not configured, using direct Sumsub upload');
+      }
+    } catch (blobError) {
+      console.warn('⚠️ [RESUBMIT] Blob upload failed, continuing with direct Sumsub upload:', blobError);
+      fileUrl = `temp://kyc/${session.user.id}/${file.name}`;
+    }
 
     // 6. Save to database
     const kycDocument = await prisma.kycDocument.create({
@@ -87,7 +99,7 @@ export async function POST(request: NextRequest) {
         userId: session.user.id,
         kycSessionId: kycSession.id,
         documentType,
-        fileUrl: blob.url,
+        fileUrl,
         fileName: file.name,
         fileSize: file.size,
         mimeType: file.type,
