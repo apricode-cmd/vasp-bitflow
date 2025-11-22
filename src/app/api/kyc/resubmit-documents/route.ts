@@ -113,60 +113,102 @@ export async function POST(request: NextRequest) {
 
     // 7. Upload to Sumsub (if Sumsub provider)
     if (kycSession.kycProviderId === 'sumsub' && kycSession.applicantId) {
+      console.log('🔍 [RESUBMIT] Checking Sumsub integration...');
+      console.log('📋 [RESUBMIT] KYC Session:', {
+        id: kycSession.id,
+        providerId: kycSession.kycProviderId,
+        applicantId: kycSession.applicantId,
+        isLastDocument
+      });
+
       try {
         const provider = await integrationFactory.getProviderByService('sumsub');
+        console.log('✅ [RESUBMIT] Provider found:', !!provider);
         
-        if (provider) {
-          const integration = await prisma.integration.findUnique({
-            where: { service: 'sumsub' }
+        if (!provider) {
+          throw new Error('Sumsub provider not found in factory');
+        }
+
+        const integration = await prisma.integration.findUnique({
+          where: { service: 'sumsub' }
+        });
+        console.log('✅ [RESUBMIT] Integration config found:', !!integration);
+
+        if (!integration) {
+          throw new Error('Sumsub integration not configured in database');
+        }
+
+        await provider.initialize({
+          apiKey: integration.apiKey ?? undefined,
+          apiEndpoint: integration.apiEndpoint ?? undefined,
+          ...(integration.config as Record<string, any> || {})
+        });
+        console.log('✅ [RESUBMIT] Provider initialized');
+
+        const sumsubAdapter = provider as SumsubAdapter;
+
+        // Upload document to Sumsub
+        console.log('📤 [RESUBMIT] Uploading document to Sumsub...');
+        console.log('📄 [RESUBMIT] Document details:', {
+          applicantId: kycSession.applicantId,
+          documentType,
+          fileName: file.name
+        });
+        
+        await sumsubAdapter.uploadDocumentForResubmission(
+          kycSession.applicantId,
+          file,
+          documentType
+        );
+
+        console.log('✅ [RESUBMIT] Document uploaded to Sumsub successfully');
+
+        // Request new review ONLY if this is the last document
+        if (isLastDocument) {
+          console.log('🔄 [RESUBMIT] This is the LAST document, requesting new review...');
+          console.log('🔍 [RESUBMIT] Calling requestApplicantCheck for applicant:', kycSession.applicantId);
+          
+          await sumsubAdapter.requestApplicantCheck(kycSession.applicantId);
+
+          console.log('✅ [RESUBMIT] Review requested successfully from Sumsub');
+
+          // Update KYC session in database
+          console.log('💾 [RESUBMIT] Updating KYC session status to PENDING...');
+          await prisma.kycSession.update({
+            where: { id: kycSession.id },
+            data: {
+              status: 'PENDING',
+              attempts: (kycSession.attempts || 0) + 1,
+              lastAttemptAt: new Date()
+            }
           });
 
-          if (integration) {
-            await provider.initialize({
-              apiKey: integration.apiKey ?? undefined,
-              apiEndpoint: integration.apiEndpoint ?? undefined,
-              ...(integration.config as Record<string, any> || {})
-            });
-
-            const sumsubAdapter = provider as SumsubAdapter;
-
-            // Upload document to Sumsub
-            console.log('📤 [RESUBMIT] Uploading to Sumsub...');
-            
-            await sumsubAdapter.uploadDocumentForResubmission(
-              kycSession.applicantId,
-              file,
-              documentType
-            );
-
-            console.log('✅ [RESUBMIT] Document uploaded to Sumsub');
-
-            // Request new review ONLY if this is the last document
-            if (isLastDocument) {
-              console.log('🔄 [RESUBMIT] Last document uploaded, requesting new review...');
-              
-              await sumsubAdapter.requestApplicantCheck(kycSession.applicantId);
-
-              console.log('✅ [RESUBMIT] Review requested, status set to PENDING');
-
-              // Update KYC session
-              await prisma.kycSession.update({
-                where: { id: kycSession.id },
-                data: {
-                  status: 'PENDING',
-                  attempts: (kycSession.attempts || 0) + 1,
-                  lastAttemptAt: new Date()
-                }
-              });
-            } else {
-              console.log('ℹ️ [RESUBMIT] More documents pending, not requesting review yet');
-            }
-          }
+          console.log('✅ [RESUBMIT] KYC session updated: status=PENDING, attempts=' + ((kycSession.attempts || 0) + 1));
+        } else {
+          console.log('ℹ️ [RESUBMIT] NOT the last document, skipping review request');
         }
-      } catch (sumsubError) {
-        console.error('❌ [RESUBMIT] Sumsub upload error:', sumsubError);
-        // Continue anyway - document is saved locally
+      } catch (sumsubError: any) {
+        console.error('❌ [RESUBMIT] Sumsub error:', {
+          message: sumsubError.message,
+          stack: sumsubError.stack,
+          applicantId: kycSession.applicantId,
+          documentType,
+          isLastDocument
+        });
+        
+        // Re-throw error for critical operations (review request)
+        if (isLastDocument) {
+          throw new Error(`Failed to request Sumsub review: ${sumsubError.message}`);
+        }
+        
+        // For non-last documents, log but continue
+        console.warn('⚠️ [RESUBMIT] Document upload failed, but continuing (not last document)');
       }
+    } else {
+      console.log('ℹ️ [RESUBMIT] Skipping Sumsub upload:', {
+        providerId: kycSession.kycProviderId,
+        hasApplicantId: !!kycSession.applicantId
+      });
     }
 
     return NextResponse.json({
