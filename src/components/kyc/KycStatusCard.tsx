@@ -491,85 +491,129 @@ export function KycStatusCard({ kycSession, onRefresh, userId, onStartResubmissi
                   <div className="space-y-4">
                     {/* SDK Launch for selfie/liveness issues */}
                     {rejectionAnalysis.needsSdk && kycSession.kycProviderId === 'sumsub' && (
-                      <div>
-                        <Button 
-                          className="w-full"
-                          size="lg"
-                          onClick={async () => {
-                            try {
-                              toast.info('Loading verification interface...');
-                              
-                              const response = await fetch('/api/kyc/sdk-token');
-                              if (!response.ok) throw new Error('Failed to get SDK token');
-                              const { token } = await response.json();
-                              
-                              const modal = document.createElement('div');
-                              modal.id = 'sumsub-modal';
-                              modal.className = 'fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4';
-                              modal.innerHTML = `
-                                <div class="bg-white dark:bg-gray-900 rounded-lg w-full max-w-4xl max-h-[90vh] overflow-auto relative">
-                                  <button id="close-modal" class="absolute top-4 right-4 z-10 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                    </svg>
-                                  </button>
-                                  <div id="sumsub-websdk-container" class="p-6 min-h-[600px]"></div>
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <Camera className="h-5 w-5 text-primary" />
+                            Retry Selfie / Liveness Check
+                          </CardTitle>
+                          <CardDescription>
+                            Complete the liveness verification on this device or scan the QR code with your phone ({MAX_ATTEMPTS - currentAttempt} attempts remaining)
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid md:grid-cols-[1fr,auto] gap-6">
+                            {/* Left: Desktop button */}
+                            <div className="flex flex-col gap-4">
+                              <Button 
+                                className="w-full"
+                                size="lg"
+                                onClick={async () => {
+                                  try {
+                                    toast.info('Loading verification interface...');
+                                    
+                                    const response = await fetch('/api/kyc/sdk-token');
+                                    if (!response.ok) throw new Error('Failed to get SDK token');
+                                    const { token } = await response.json();
+                                    
+                                    const modal = document.createElement('div');
+                                    modal.id = 'sumsub-modal';
+                                    modal.className = 'fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4';
+                                    modal.innerHTML = `
+                                      <div class="bg-white dark:bg-gray-900 rounded-lg w-full max-w-4xl max-h-[90vh] overflow-auto relative">
+                                        <button id="close-modal" class="absolute top-4 right-4 z-10 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                                          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                          </svg>
+                                        </button>
+                                        <div id="sumsub-websdk-container" class="p-6 min-h-[600px]"></div>
+                                      </div>
+                                    `;
+                                    document.body.appendChild(modal);
+                                    
+                                    document.getElementById('close-modal')?.addEventListener('click', () => modal.remove());
+                                    
+                                    const loadScript = () => {
+                                      return new Promise((resolve, reject) => {
+                                        if (document.getElementById('sumsub-websdk-script')) { resolve(true); return; }
+                                        const script = document.createElement('script');
+                                        script.id = 'sumsub-websdk-script';
+                                        script.src = 'https://static.sumsub.com/idensic/static/sns-websdk-builder.js';
+                                        script.async = true;
+                                        script.onload = () => resolve(true);
+                                        script.onerror = () => reject(new Error('Failed to load SDK'));
+                                        document.body.appendChild(script);
+                                      });
+                                    };
+                                    
+                                    await loadScript();
+                                    
+                                    const snsWebSdk = (window as any).snsWebSdk;
+                                    if (!snsWebSdk) throw new Error('Sumsub SDK not loaded');
+                                    
+                                    const instance = snsWebSdk
+                                      .init(token, async () => {
+                                        const refreshResponse = await fetch('/api/kyc/sdk-token');
+                                        const refreshData = await refreshResponse.json();
+                                        return refreshData.token;
+                                      })
+                                      .withConf({ lang: 'en', theme: 'light' })
+                                      .on('idCheck.onApplicantSubmitted', () => {
+                                        toast.success('Verification submitted! Please wait for review.');
+                                        modal.remove();
+                                        onRefresh();
+                                      })
+                                      .on('idCheck.onError', (error: any) => {
+                                        toast.error('Verification error: ' + (error.message || 'Unknown error'));
+                                      })
+                                      .build();
+                                    
+                                    instance.launch('#sumsub-websdk-container');
+                                    
+                                  } catch (error: any) {
+                                    toast.error('Failed to load verification: ' + error.message);
+                                    console.error('Sumsub modal error:', error);
+                                  }
+                                }}
+                              >
+                                <Camera className="h-5 w-5 mr-2" />
+                                Start Liveness Check
+                              </Button>
+                              <p className="text-xs text-muted-foreground">
+                                Opens verification interface in a modal window
+                              </p>
+                            </div>
+
+                            {/* Right: Mobile QR */}
+                            <div className="flex flex-col items-center justify-center gap-3 md:border-l md:pl-8 py-2">
+                              <div className="text-xs font-medium text-muted-foreground text-center">
+                                Or scan with phone
+                              </div>
+                              {sumsubMobileUrl ? (
+                                <>
+                                  <QRCode
+                                    className="size-32 rounded-lg border bg-background p-2.5 shadow-sm hover:shadow-md transition-all"
+                                    data={sumsubMobileUrl}
+                                  />
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => copyLink(sumsubMobileUrl)}
+                                    className="text-xs"
+                                  >
+                                    <Copy className="h-3 w-3 mr-1" />
+                                    Copy Link
+                                  </Button>
+                                </>
+                              ) : (
+                                <div className="size-32 rounded-lg border bg-muted/20 flex items-center justify-center">
+                                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                                 </div>
-                              `;
-                              document.body.appendChild(modal);
-                              
-                              document.getElementById('close-modal')?.addEventListener('click', () => modal.remove());
-                              
-                              const loadScript = () => {
-                                return new Promise((resolve, reject) => {
-                                  if (document.getElementById('sumsub-websdk-script')) { resolve(true); return; }
-                                  const script = document.createElement('script');
-                                  script.id = 'sumsub-websdk-script';
-                                  script.src = 'https://static.sumsub.com/idensic/static/sns-websdk-builder.js';
-                                  script.async = true;
-                                  script.onload = () => resolve(true);
-                                  script.onerror = () => reject(new Error('Failed to load SDK'));
-                                  document.body.appendChild(script);
-                                });
-                              };
-                              
-                              await loadScript();
-                              
-                              const snsWebSdk = (window as any).snsWebSdk;
-                              if (!snsWebSdk) throw new Error('Sumsub SDK not loaded');
-                              
-                              const instance = snsWebSdk
-                                .init(token, async () => {
-                                  const refreshResponse = await fetch('/api/kyc/sdk-token');
-                                  const refreshData = await refreshResponse.json();
-                                  return refreshData.token;
-                                })
-                                .withConf({ lang: 'en', theme: 'light' })
-                                .on('idCheck.onApplicantSubmitted', () => {
-                                  toast.success('Verification submitted! Please wait for review.');
-                                  modal.remove();
-                                  onRefresh();
-                                })
-                                .on('idCheck.onError', (error: any) => {
-                                  toast.error('Verification error: ' + (error.message || 'Unknown error'));
-                                })
-                                .build();
-                              
-                              instance.launch('#sumsub-websdk-container');
-                              
-                            } catch (error: any) {
-                              toast.error('Failed to load verification: ' + error.message);
-                              console.error('Sumsub modal error:', error);
-                            }
-                          }}
-                        >
-                          <Camera className="h-5 w-5 mr-2" />
-                          Retry Selfie / Liveness
-                        </Button>
-                        <p className="text-xs text-center text-muted-foreground mt-2">
-                          Retake your selfie ({MAX_ATTEMPTS - currentAttempt} attempts remaining)
-                        </p>
-                      </div>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
                     )}
 
                     {/* Document Upload for identity/address issues */}
