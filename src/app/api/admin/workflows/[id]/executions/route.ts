@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAdminRole } from '@/lib/auth/admin-auth-utils';
+import { getAdminSession } from '@/auth-admin';
 
 interface RouteContext {
   params: {
@@ -27,7 +27,12 @@ export async function GET(
 ): Promise<NextResponse> {
   try {
     // Check admin permission
-    const authResult = await requireAdminRole(['SUPER_ADMIN', 'COMPLIANCE']);
+    const session = await getAdminSession();
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    const authResult = { admin: session.admin };
     if (authResult instanceof NextResponse) {
       return authResult;
     }
