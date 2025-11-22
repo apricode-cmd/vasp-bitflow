@@ -1435,6 +1435,111 @@ export class SumsubAdapter implements IKycProvider {
     
     return result;
   }
+
+  /**
+   * Request applicant check (trigger new review)
+   * POST /resources/applicants/{applicantId}/status/pending
+   * 
+   * Used after uploading corrected documents to trigger a new review
+   * https://docs.sumsub.com/reference/request-applicant-check
+   */
+  async requestApplicantCheck(applicantId: string): Promise<void> {
+    if (!this.isConfigured()) {
+      throw new Error('Sumsub provider not configured');
+    }
+
+    const path = `/resources/applicants/${applicantId}/status/pending`;
+    const method = 'POST';
+
+    const signature = this.generateSignature(
+      method,
+      path,
+      Math.floor(Date.now() / 1000)
+    );
+
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      method,
+      headers: {
+        'X-App-Token': this.config.appToken!,
+        'X-App-Access-Sig': signature.signature,
+        'X-App-Access-Ts': signature.timestamp.toString(),
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('❌ Sumsub requestApplicantCheck failed:', error);
+      throw new Error(`Failed to request applicant check: ${error}`);
+    }
+
+    console.log('✅ Sumsub applicant check requested');
+  }
+
+  /**
+   * Upload document for resubmission (simplified wrapper)
+   * 
+   * Maps document types to Sumsub idDocType
+   * Automatically detects file type and creates proper metadata
+   */
+  async uploadDocumentForResubmission(
+    applicantId: string,
+    file: File,
+    documentType: string
+  ): Promise<void> {
+    // Map our document types to Sumsub idDocType
+    let idDocType: string;
+    let idDocSubType: string | undefined;
+
+    switch (documentType) {
+      case 'PASSPORT':
+        idDocType = 'PASSPORT';
+        break;
+      case 'ID_CARD':
+      case 'ID_CARD_FRONT':
+        idDocType = 'ID_CARD';
+        idDocSubType = 'FRONT_SIDE';
+        break;
+      case 'ID_CARD_BACK':
+        idDocType = 'ID_CARD';
+        idDocSubType = 'BACK_SIDE';
+        break;
+      case 'UTILITY_BILL':
+      case 'PROOF_OF_ADDRESS':
+        idDocType = 'UTILITY_BILL';
+        break;
+      case 'SELFIE':
+        idDocType = 'SELFIE';
+        break;
+      default:
+        // Default to IDENTITY if unknown
+        idDocType = 'ID_CARD';
+        idDocSubType = 'FRONT_SIDE';
+    }
+
+    // Build metadata
+    const metadata: any = {
+      idDocType,
+      country: 'POL' // Default country, should be from user profile
+    };
+
+    if (idDocSubType) {
+      metadata.idDocSubType = idDocSubType;
+    }
+
+    // Convert File to Buffer
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Upload using existing method
+    await this.uploadDocument(
+      applicantId,
+      buffer,
+      file.name,
+      metadata,
+      true
+    );
+  }
 }
 
 // Export singleton instance
