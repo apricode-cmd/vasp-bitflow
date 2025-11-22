@@ -1450,30 +1450,40 @@ export class SumsubAdapter implements IKycProvider {
 
     const path = `/resources/applicants/${applicantId}/status/pending`;
     const method = 'POST';
+    const ts = Math.floor(Date.now() / 1000).toString();
 
-    const signature = this.generateSignature(
+    // Build signature using existing method
+    const signature = this.buildSignature(ts, method, path, '');
+
+    console.log('🔐 [SUMSUB] requestApplicantCheck signature:', {
+      applicantId,
       method,
       path,
-      Math.floor(Date.now() / 1000)
-    );
+      timestamp: ts
+    });
 
     const response = await fetch(`${this.baseUrl}${path}`, {
       method,
       headers: {
         'X-App-Token': this.config.appToken!,
-        'X-App-Access-Sig': signature.signature,
-        'X-App-Access-Ts': signature.timestamp.toString(),
+        'X-App-Access-Sig': signature,
+        'X-App-Access-Ts': ts,
         'Content-Type': 'application/json'
       }
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      console.error('❌ Sumsub requestApplicantCheck failed:', error);
-      throw new Error(`Failed to request applicant check: ${error}`);
+      const errorText = await response.text();
+      console.error('❌ Sumsub requestApplicantCheck failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText
+      });
+      throw new Error(`Failed to request applicant check: ${response.status} ${errorText}`);
     }
 
-    console.log('✅ Sumsub applicant check requested');
+    const result = await response.json();
+    console.log('✅ Sumsub applicant check requested:', result);
   }
 
   /**
