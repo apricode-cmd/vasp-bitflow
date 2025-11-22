@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     const documentType = formData.get('documentType') as string | null;
+    const isLastDocument = formData.get('isLastDocument') === 'true'; // Flag: is this the last document?
 
     if (!file || !documentType) {
       return NextResponse.json(
@@ -140,22 +141,26 @@ export async function POST(request: NextRequest) {
 
             console.log('✅ [RESUBMIT] Document uploaded to Sumsub');
 
-            // Request new review (set status to PENDING)
-            console.log('🔄 [RESUBMIT] Requesting new review...');
-            
-            await sumsubAdapter.requestApplicantCheck(kycSession.applicantId);
+            // Request new review ONLY if this is the last document
+            if (isLastDocument) {
+              console.log('🔄 [RESUBMIT] Last document uploaded, requesting new review...');
+              
+              await sumsubAdapter.requestApplicantCheck(kycSession.applicantId);
 
-            console.log('✅ [RESUBMIT] Review requested, status set to PENDING');
+              console.log('✅ [RESUBMIT] Review requested, status set to PENDING');
 
-            // Update KYC session
-            await prisma.kycSession.update({
-              where: { id: kycSession.id },
-              data: {
-                status: 'PENDING',
-                attempts: (kycSession.attempts || 0) + 1,
-                lastAttemptAt: new Date()
-              }
-            });
+              // Update KYC session
+              await prisma.kycSession.update({
+                where: { id: kycSession.id },
+                data: {
+                  status: 'PENDING',
+                  attempts: (kycSession.attempts || 0) + 1,
+                  lastAttemptAt: new Date()
+                }
+              });
+            } else {
+              console.log('ℹ️ [RESUBMIT] More documents pending, not requesting review yet');
+            }
           }
         }
       } catch (sumsubError) {

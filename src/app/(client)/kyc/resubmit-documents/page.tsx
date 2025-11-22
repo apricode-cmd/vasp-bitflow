@@ -171,12 +171,19 @@ export default function ResubmitDocumentsPage() {
 
       // Upload each document individually
       let successCount = 0;
+      const totalDocs = uploadedDocs.size;
+      let currentDoc = 0;
+      
       for (const [docType, file] of uploadedDocs.entries()) {
-        console.log(`📤 Uploading ${docType}:`, file.name);
+        currentDoc++;
+        const isLastDocument = currentDoc === totalDocs;
+        
+        console.log(`📤 Uploading ${docType} (${currentDoc}/${totalDocs}):`, file.name);
         
         const formData = new FormData();
         formData.append('file', file);
         formData.append('documentType', docType);
+        formData.append('isLastDocument', isLastDocument ? 'true' : 'false');
 
         const uploadResponse = await fetch('/api/kyc/resubmit-documents', {
           method: 'POST',
@@ -189,9 +196,11 @@ export default function ResubmitDocumentsPage() {
         }
 
         const result = await uploadResponse.json();
-        console.log(`✅ ${docType} uploaded:`, result);
+        console.log(`✅ ${docType} uploaded (${currentDoc}/${totalDocs}):`, result);
         successCount++;
       }
+      
+      console.log(`🎉 All ${successCount} documents uploaded successfully!`);
 
       // All uploads successful
       toast.success(`${successCount} document(s) uploaded successfully! Awaiting review...`);
