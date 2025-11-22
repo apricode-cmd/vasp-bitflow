@@ -213,21 +213,31 @@ export default function ResubmitDocumentsPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           {requirements.map((req, idx) => {
-            const docType = req.documentType === 'IDENTITY' ? 'ID_CARD' : 
-                           req.documentType === 'PROOF_OF_ADDRESS' ? 'UTILITY_BILL' : 
-                           'ID_CARD';
+            // Determine which document to show based on reject label
+            const docType = req.label === 'BAD_PROOF_OF_ADDRESS' || req.label === 'WRONG_ADDRESS'
+              ? 'UTILITY_BILL'
+              : 'ID_CARD'; // For all identity issues - показываем ID карту
+            
+            const docLabel = docType === 'UTILITY_BILL' 
+              ? 'Proof of Address' 
+              : 'ID Document';
             
             return (
-              <div key={idx} className="space-y-3">
+              <div key={`${docType}-${idx}`} className="space-y-3">
                 <div className="flex items-start gap-3 pb-2 border-b">
                   <div className="rounded-md bg-primary/10 p-2 mt-0.5">
                     <FileText className="h-4 w-4 text-primary" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-medium">{req.description}</h3>
+                    <h3 className="font-medium">{docLabel}</h3>
                     <p className="text-sm text-muted-foreground mt-0.5">
                       Issue: {req.label.replace(/_/g, ' ').toLowerCase()}
                     </p>
+                    {req.label && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {req.description}
+                      </p>
+                    )}
                   </div>
                   {uploadedDocs.has(docType) && (
                     <CheckCircle2 className="h-5 w-5 text-green-600 mt-1" />
@@ -236,7 +246,7 @@ export default function ResubmitDocumentsPage() {
 
                 <DocumentUploader
                   type={docType as any}
-                  label={req.description}
+                  label={docLabel}
                   required={true}
                   onFileSelect={(file) => handleFileSelect(docType, file)}
                   existingUrl={undefined}
