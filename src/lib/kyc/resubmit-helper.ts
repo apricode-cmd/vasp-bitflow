@@ -123,7 +123,10 @@ export function mapRejectLabelToRequirement(
       label === 'BLOCKLIST' ||
       label === 'DUPLICATE' ||
       label === 'CRIMINAL' ||
-      label === 'ADVERSE_MEDIA') {
+      label === 'ADVERSE_MEDIA' ||
+      label === 'WRONG_USER_REGION' ||
+      label === 'REGULATIONS_VIOLATIONS' ||
+      label === 'UNSUPPORTED_LANGUAGE') {
     return {
       action: 'FULL_RESET',
       label,
