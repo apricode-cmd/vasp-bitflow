@@ -22,8 +22,14 @@ export interface ResubmitRequirement {
 
 /**
  * Map Sumsub rejectLabel to resubmit requirement
+ * 
+ * @param label - Sumsub reject label
+ * @param context - Optional context (which document types were uploaded)
  */
-export function mapRejectLabelToRequirement(label: string): ResubmitRequirement {
+export function mapRejectLabelToRequirement(
+  label: string,
+  context?: { hasIdentityDoc?: boolean; hasAddressDoc?: boolean }
+): ResubmitRequirement {
   // Selfie/Liveness issues → Launch SDK
   if (label === 'BAD_SELFIE' || 
       label === 'BAD_VIDEO_SELFIE' || 
@@ -63,13 +69,34 @@ export function mapRejectLabelToRequirement(label: string): ResubmitRequirement 
   // Address document issues → Upload new proof of address
   if (label === 'BAD_PROOF_OF_ADDRESS' ||
       label === 'WRONG_ADDRESS' ||
-      label === 'INCOMPATIBLE_LANGUAGE' ||
-      label === 'DOCUMENT_PAGE_MISSING') {
+      label === 'INCOMPATIBLE_LANGUAGE') {
     return {
       action: 'UPLOAD_ADDRESS',
       label,
       description: 'Upload valid proof of address',
       documentType: 'PROOF_OF_ADDRESS'
+    };
+  }
+  
+  // DOCUMENT_PAGE_MISSING - ambiguous label, needs context
+  // Try to determine from uploaded documents
+  if (label === 'DOCUMENT_PAGE_MISSING') {
+    // If only address doc was uploaded, it's probably address issue
+    if (context?.hasAddressDoc && !context?.hasIdentityDoc) {
+      return {
+        action: 'UPLOAD_ADDRESS',
+        label,
+        description: 'Document is incomplete - upload all pages',
+        documentType: 'PROOF_OF_ADDRESS'
+      };
+    }
+    
+    // Default to identity document (most common case)
+    return {
+      action: 'UPLOAD_IDENTITY',
+      label,
+      description: 'Document is incomplete - upload all pages',
+      documentType: 'IDENTITY'
     };
   }
 
@@ -130,15 +157,25 @@ export interface ResubmitAnalysis {
 
 export function analyzeRejection(
   reviewRejectType: string | null | undefined,
-  rejectLabels: string[] = []
+  rejectLabels: string[] = [],
+  uploadedDocTypes?: string[]
 ): ResubmitAnalysis {
+  // Determine context from uploaded documents
+  const context = {
+    hasIdentityDoc: uploadedDocTypes?.some(type => 
+      type === 'PASSPORT' || type === 'ID_CARD' || type === 'ID_CARD_FRONT' || type === 'DRIVING_LICENSE'
+    ),
+    hasAddressDoc: uploadedDocTypes?.some(type =>
+      type === 'UTILITY_BILL' || type === 'BANK_STATEMENT' || type === 'PROOF_OF_ADDRESS'
+    )
+  };
   // FINAL rejection
   if (reviewRejectType === 'FINAL') {
     return {
       canResubmit: false,
       reviewRejectType: 'FINAL',
       primaryAction: 'FULL_RESET',
-      requirements: rejectLabels.map(mapRejectLabelToRequirement),
+      requirements: rejectLabels.map(label => mapRejectLabelToRequirement(label, context)),
       needsSdk: false,
       needsDocumentUpload: false,
       needsFormEdit: false,
@@ -148,7 +185,7 @@ export function analyzeRejection(
 
   // RETRY rejection
   if (reviewRejectType === 'RETRY') {
-    const requirements = rejectLabels.map(mapRejectLabelToRequirement);
+    const requirements = rejectLabels.map(label => mapRejectLabelToRequirement(label, context));
     
     const needsSdk = requirements.some(r => r.action === 'LAUNCH_SDK');
     const needsDocumentUpload = requirements.some(

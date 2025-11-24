@@ -23,6 +23,7 @@ import {
 } from '../../types';
 import crypto from 'crypto';
 import { normalizeCountryCodeForProvider } from '@/lib/utils/country-codes';
+import { kycApiLogger } from '@/lib/services/kyc-api-logger.service';
 
 /**
  * Sumsub-specific configuration
@@ -262,12 +263,12 @@ export class SumsubAdapter implements IKycProvider {
   /**
    * Step 1: Create applicant in Sumsub
    */
-  async createApplicant(userData: KycUserData): Promise<KycApplicant> {
+  async createApplicant(userData: KycUserData, kycSessionId?: string): Promise<KycApplicant> {
     if (!this.isConfigured()) {
       throw new Error('Sumsub provider not configured');
     }
 
-    return this.createApplicantWithRetry(userData, userData.externalId, 0);
+    return this.createApplicantWithRetry(userData, userData.externalId, 0, kycSessionId);
   }
 
   /**
@@ -277,7 +278,8 @@ export class SumsubAdapter implements IKycProvider {
   private async createApplicantWithRetry(
     userData: KycUserData, 
     externalUserId: string,
-    attempt: number
+    attempt: number,
+    kycSessionId?: string
   ): Promise<KycApplicant> {
     const MAX_ATTEMPTS = 3;
 
@@ -347,15 +349,31 @@ export class SumsubAdapter implements IKycProvider {
         taxResidence: residenceAlpha3
       });
 
+      const startTime = Date.now();
       const response = await fetch(this.baseUrl + path, {
         method: 'POST',
         headers,
         body
       });
+      const responseTime = `${Date.now() - startTime}ms`;
 
       if (response.ok) {
         const data = await response.json();
         console.log('✅ Sumsub applicant created:', data.id, 'externalUserId:', externalUserId);
+
+        // Log successful API call
+        if (kycSessionId) {
+          await kycApiLogger.logApiRequest({
+            kycSessionId,
+            provider: 'sumsub',
+            endpoint: path,
+            method: 'POST',
+            requestPayload: bodyObj,
+            responsePayload: data,
+            responseTime,
+            statusCode: 200
+          });
+        }
 
         return {
           applicantId: data.id,
@@ -405,7 +423,7 @@ export class SumsubAdapter implements IKycProvider {
               const newExternalUserId = `${userData.externalId}-${Date.now()}`;
               console.log(`🔄 Retry ${attempt + 1}/${MAX_ATTEMPTS} with new externalUserId:`, newExternalUserId);
               
-              return this.createApplicantWithRetry(userData, newExternalUserId, attempt + 1);
+              return this.createApplicantWithRetry(userData, newExternalUserId, attempt + 1, kycSessionId);
             }
           }
         }
@@ -415,17 +433,63 @@ export class SumsubAdapter implements IKycProvider {
           const newExternalUserId = `${userData.externalId}-${Date.now()}`;
           console.log(`🔄 Retry ${attempt + 1}/${MAX_ATTEMPTS} with new externalUserId:`, newExternalUserId);
           
-          return this.createApplicantWithRetry(userData, newExternalUserId, attempt + 1);
+          return this.createApplicantWithRetry(userData, newExternalUserId, attempt + 1, kycSessionId);
+        }
+        
+        // Log 409 error
+        if (kycSessionId) {
+          await kycApiLogger.logApiRequest({
+            kycSessionId,
+            provider: 'sumsub',
+            endpoint: path,
+            method: 'POST',
+            requestPayload: bodyObj,
+            error: errorText,
+            responseTime,
+            statusCode: 409,
+            note: 'Applicant already exists, max retries exceeded'
+          });
         }
       }
 
       // Other errors
       const error = await response.text();
       console.error('❌ Sumsub applicant creation failed:', error);
+      
+      // Log error
+      if (kycSessionId) {
+        await kycApiLogger.logApiRequest({
+          kycSessionId,
+          provider: 'sumsub',
+          endpoint: path,
+          method: 'POST',
+          requestPayload: bodyObj,
+          error,
+          responseTime,
+          statusCode: response.status
+        });
+      }
+      
       throw new Error(`Failed to create applicant: ${error}`);
 
     } catch (error: any) {
       console.error('❌ Sumsub applicant creation error:', error);
+      
+      // Log exception
+      if (kycSessionId) {
+        await kycApiLogger.logApiRequest({
+          kycSessionId,
+          provider: 'sumsub',
+          endpoint: '/resources/applicants',
+          method: 'POST',
+          requestPayload: {
+            externalUserId,
+            email: userData.email
+          },
+          error: error.message
+        });
+      }
+      
       throw new Error(`Failed to create Sumsub applicant: ${error.message}`);
     }
   }
@@ -1034,7 +1098,8 @@ export class SumsubAdapter implements IKycProvider {
     file: Buffer | Blob,
     fileName: string,
     metadata: any,
-    returnWarnings: boolean = true
+    returnWarnings: boolean = true,
+    kycSessionId?: string
   ): Promise<any> {
     try {
       if (!this.isConfigured()) {
@@ -1144,6 +1209,7 @@ export class SumsubAdapter implements IKycProvider {
       const https = require('https');
       const url = new URL(`${this.baseUrl}${path}`);
       
+      const uploadStartTime = Date.now();
       const responseData: any = await new Promise((resolve, reject) => {
         const req = https.request(
           {
@@ -1171,11 +1237,27 @@ export class SumsubAdapter implements IKycProvider {
         req.end();
       });
 
+      const uploadTime = `${Date.now() - uploadStartTime}ms`;
+
       if (responseData.status !== 200 && responseData.status !== 201) {
         console.error('❌ [SUMSUB] Upload failed:', {
           status: responseData.status,
           data: responseData.data
         });
+
+        // Log failed upload
+        if (kycSessionId) {
+          await kycApiLogger.logApiRequest({
+            kycSessionId,
+            provider: 'sumsub',
+            endpoint: path,
+            method: 'POST',
+            requestPayload: { applicantId, fileName, metadata, fileSize: fileBuffer.length },
+            error: responseData.data.description || responseData.data.message,
+            responseTime: uploadTime,
+            statusCode: responseData.status
+          });
+        }
 
         return {
           success: false,
@@ -1184,6 +1266,24 @@ export class SumsubAdapter implements IKycProvider {
       }
 
       console.log('✅ [SUMSUB] Document uploaded:', responseData.data);
+
+      // Log successful upload
+      if (kycSessionId) {
+        await kycApiLogger.logApiRequest({
+          kycSessionId,
+          provider: 'sumsub',
+          endpoint: path,
+          method: 'POST',
+          requestPayload: { applicantId, fileName, metadata, fileSize: fileBuffer.length },
+          responsePayload: {
+            documentId: responseData.data.documentId,
+            imageIds: responseData.data.imageIds,
+            reviewStatus: responseData.data.reviewStatus
+          },
+          responseTime: uploadTime,
+          statusCode: responseData.status
+        });
+      }
 
       return {
         success: true,
@@ -1195,6 +1295,19 @@ export class SumsubAdapter implements IKycProvider {
 
     } catch (error: any) {
       console.error('❌ [SUMSUB] Upload error:', error);
+      
+      // Log exception
+      if (kycSessionId) {
+        await kycApiLogger.logApiRequest({
+          kycSessionId,
+          provider: 'sumsub',
+          endpoint: path,
+          method: 'POST',
+          requestPayload: { applicantId, fileName, metadata },
+          error: error.message
+        });
+      }
+      
       return {
         success: false,
         error: error.message || 'Failed to upload document'
@@ -1443,7 +1556,7 @@ export class SumsubAdapter implements IKycProvider {
    * Used after uploading corrected documents to trigger a new review
    * https://docs.sumsub.com/reference/request-applicant-check
    */
-  async requestApplicantCheck(applicantId: string): Promise<void> {
+  async requestApplicantCheck(applicantId: string, kycSessionId?: string): Promise<void> {
     if (!this.isConfigured()) {
       throw new Error('Sumsub provider not configured');
     }
@@ -1462,6 +1575,7 @@ export class SumsubAdapter implements IKycProvider {
       timestamp: ts
     });
 
+    const startTime = Date.now();
     const response = await fetch(`${this.baseUrl}${path}`, {
       method,
       headers: {
@@ -1471,6 +1585,7 @@ export class SumsubAdapter implements IKycProvider {
         'Content-Type': 'application/json'
       }
     });
+    const responseTime = `${Date.now() - startTime}ms`;
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -1479,11 +1594,41 @@ export class SumsubAdapter implements IKycProvider {
         statusText: response.statusText,
         error: errorText
       });
+      
+      // Log error
+      if (kycSessionId) {
+        await kycApiLogger.logApiRequest({
+          kycSessionId,
+          provider: 'sumsub',
+          endpoint: path,
+          method: 'POST',
+          requestPayload: { applicantId },
+          error: errorText,
+          responseTime,
+          statusCode: response.status
+        });
+      }
+      
       throw new Error(`Failed to request applicant check: ${response.status} ${errorText}`);
     }
 
     const result = await response.json();
     console.log('✅ Sumsub applicant check requested:', result);
+    
+    // Log successful call
+    if (kycSessionId) {
+      await kycApiLogger.logApiRequest({
+        kycSessionId,
+        provider: 'sumsub',
+        endpoint: path,
+        method: 'POST',
+        requestPayload: { applicantId },
+        responsePayload: result,
+        responseTime,
+        statusCode: 200,
+        note: 'Review requested after document submission'
+      });
+    }
   }
 
   /**
@@ -1495,7 +1640,8 @@ export class SumsubAdapter implements IKycProvider {
   async uploadDocumentForResubmission(
     applicantId: string,
     file: File,
-    documentType: string
+    documentType: string,
+    kycSessionId?: string
   ): Promise<void> {
     // Map our document types to Sumsub idDocType
     let idDocType: string;
@@ -1547,7 +1693,8 @@ export class SumsubAdapter implements IKycProvider {
       buffer,
       file.name,
       metadata,
-      true
+      true,
+      kycSessionId
     );
   }
 }

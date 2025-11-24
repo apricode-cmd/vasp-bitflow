@@ -14,6 +14,7 @@ import { revalidatePath, revalidateTag } from 'next/cache';
 import { requireAdminAuth } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 
 interface RouteContext {
   params: {
@@ -124,6 +125,18 @@ export async function PUT(
       );
     }
 
+    // Get old session state for audit
+    const oldSession = await prisma.kycSession.findUnique({
+      where: { id }
+    });
+
+    if (!oldSession) {
+      return NextResponse.json(
+        { success: false, error: 'KYC session not found' },
+        { status: 404 }
+      );
+    }
+
     const kycSession = await prisma.kycSession.update({
       where: { id },
       data: {
@@ -139,6 +152,23 @@ export async function PUT(
         },
       },
     });
+
+    // Log admin action
+    const action = status === 'APPROVED' ? AUDIT_ACTIONS.KYC_APPROVED : AUDIT_ACTIONS.KYC_REJECTED;
+    await auditService.logAdminAction(
+      authResult.admin.id,
+      action,
+      AUDIT_ENTITIES.KYC_SESSION,
+      id,
+      { status: oldSession.status },
+      { status, rejectionReason },
+      {
+        userId: kycSession.userId,
+        userEmail: kycSession.user.email,
+        provider: kycSession.kycProviderId,
+        attempt: kycSession.attempts
+      }
+    );
 
     // Revalidate cache after status update
     revalidatePath('/admin/kyc');

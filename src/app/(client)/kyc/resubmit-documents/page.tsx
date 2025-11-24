@@ -75,9 +75,23 @@ export default function ResubmitDocumentsPage() {
           return;
         }
 
+        // Fetch existing documents first to provide context
+        let uploadedDocTypes: string[] = [];
+        try {
+          const docsResponse = await fetch('/api/kyc/documents');
+          if (docsResponse.ok) {
+            const docsData = await docsResponse.json();
+            uploadedDocTypes = docsData.documents?.map((doc: any) => doc.documentType) || [];
+            console.log('📄 Existing document types for context:', uploadedDocTypes);
+          }
+        } catch (err) {
+          console.error('Failed to fetch existing documents for context:', err);
+        }
+
         const analysis = analyzeRejection(
           data.reviewRejectType,
-          data.rejectLabels || []
+          data.rejectLabels || [],
+          uploadedDocTypes
         );
 
         if (!analysis.canResubmit || analysis.isFinal) {
@@ -97,7 +111,7 @@ export default function ResubmitDocumentsPage() {
           r => r.action === 'UPLOAD_IDENTITY' || r.action === 'UPLOAD_ADDRESS'
         ));
 
-        // Fetch existing documents to determine what was originally uploaded
+        // Create map of existing documents
         try {
           const docsResponse = await fetch('/api/kyc/documents');
           if (docsResponse.ok) {
@@ -107,7 +121,7 @@ export default function ResubmitDocumentsPage() {
               docsMap.set(doc.documentType, doc.fileUrl);
             });
             setExistingDocs(docsMap);
-            console.log('📄 Existing documents types:', Array.from(docsMap.keys()));
+            console.log('📄 Existing documents map:', Array.from(docsMap.keys()));
           }
         } catch (err) {
           console.error('Failed to fetch existing documents:', err);

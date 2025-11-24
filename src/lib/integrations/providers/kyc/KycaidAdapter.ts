@@ -22,6 +22,7 @@ import {
   IntegrationMetadata
 } from '../../types';
 import crypto from 'crypto';
+import { kycApiLogger } from '@/lib/services/kyc-api-logger.service';
 
 /**
  * KYCAID-specific configuration
@@ -192,7 +193,7 @@ export class KycaidAdapter implements IKycProvider {
   /**
    * Step 1: Create applicant in KYCAID
    */
-  async createApplicant(userData: KycUserData): Promise<KycApplicant> {
+  async createApplicant(userData: KycUserData, kycSessionId?: string): Promise<KycApplicant> {
     if (!this.isConfigured()) {
       throw new Error('KYCAID provider not configured');
     }
@@ -212,20 +213,51 @@ export class KycaidAdapter implements IKycProvider {
 
       console.log('📝 Creating KYCAID applicant:', { email: userData.email, externalId: userData.externalId });
 
+      const startTime = Date.now();
       const response = await fetch(`${this.baseUrl}/applicants`, {
         method: 'POST',
         headers: this.getHeaders(),
         body: JSON.stringify(payload)
       });
+      const responseTime = `${Date.now() - startTime}ms`;
 
       if (!response.ok) {
         const error = await response.text();
+        
+        // Log error
+        if (kycSessionId) {
+          await kycApiLogger.logApiRequest({
+            kycSessionId,
+            provider: 'kycaid',
+            endpoint: '/applicants',
+            method: 'POST',
+            requestPayload: payload,
+            error,
+            responseTime,
+            statusCode: response.status
+          });
+        }
+        
         throw new Error(`Failed to create applicant: ${error}`);
       }
 
       const data = await response.json();
 
       console.log('✅ KYCAID applicant created:', data.applicant_id);
+
+      // Log successful call
+      if (kycSessionId) {
+        await kycApiLogger.logApiRequest({
+          kycSessionId,
+          provider: 'kycaid',
+          endpoint: '/applicants',
+          method: 'POST',
+          requestPayload: payload,
+          responsePayload: data,
+          responseTime,
+          statusCode: 200
+        });
+      }
 
       return {
         applicantId: data.applicant_id,
@@ -237,6 +269,22 @@ export class KycaidAdapter implements IKycProvider {
       };
     } catch (error: any) {
       console.error('❌ KYCAID applicant creation failed:', error);
+      
+      // Log exception
+      if (kycSessionId) {
+        await kycApiLogger.logApiRequest({
+          kycSessionId,
+          provider: 'kycaid',
+          endpoint: '/applicants',
+          method: 'POST',
+          requestPayload: {
+            email: userData.email,
+            external_applicant_id: userData.externalId
+          },
+          error: error.message
+        });
+      }
+      
       throw new Error(`Failed to create KYCAID applicant: ${error.message}`);
     }
   }

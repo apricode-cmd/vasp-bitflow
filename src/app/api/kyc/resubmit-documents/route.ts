@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma';
 import { put } from '@vercel/blob';
 import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
 import { SumsubAdapter } from '@/lib/integrations/providers/kyc/SumsubAdapter';
+import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -158,23 +159,39 @@ export async function POST(request: NextRequest) {
         await sumsubAdapter.uploadDocumentForResubmission(
           kycSession.applicantId,
           file,
-          documentType
+          documentType,
+          kycSession.id // Pass kycSessionId for API logging
         );
 
         console.log('✅ [RESUBMIT] Document uploaded to Sumsub successfully');
+        
+        // Log document upload
+        await auditService.logUserAction(
+          session.user.id,
+          AUDIT_ACTIONS.KYC_DOCUMENT_UPLOADED,
+          AUDIT_ENTITIES.KYC_SESSION,
+          kycSession.id,
+          {
+            documentType,
+            fileName: file.name,
+            fileSize: file.size,
+            isResubmission: true,
+            attempt: (kycSession.attempts || 0) + 1
+          }
+        );
 
         // Request new review ONLY if this is the last document
         if (isLastDocument) {
           console.log('🔄 [RESUBMIT] This is the LAST document, requesting new review...');
           console.log('🔍 [RESUBMIT] Calling requestApplicantCheck for applicant:', kycSession.applicantId);
           
-          await sumsubAdapter.requestApplicantCheck(kycSession.applicantId);
+          await sumsubAdapter.requestApplicantCheck(kycSession.applicantId, kycSession.id);
 
           console.log('✅ [RESUBMIT] Review requested successfully from Sumsub');
 
           // Update KYC session in database
           console.log('💾 [RESUBMIT] Updating KYC session status to PENDING...');
-          await prisma.kycSession.update({
+          const updatedSession = await prisma.kycSession.update({
             where: { id: kycSession.id },
             data: {
               status: 'PENDING',
@@ -183,7 +200,21 @@ export async function POST(request: NextRequest) {
             }
           });
 
-          console.log('✅ [RESUBMIT] KYC session updated: status=PENDING, attempts=' + ((kycSession.attempts || 0) + 1));
+          console.log('✅ [RESUBMIT] KYC session updated: status=PENDING, attempts=' + updatedSession.attempts);
+          
+          // Log resubmission
+          await auditService.logUserAction(
+            session.user.id,
+            AUDIT_ACTIONS.KYC_RESUBMITTED,
+            AUDIT_ENTITIES.KYC_SESSION,
+            kycSession.id,
+            {
+              provider: kycSession.kycProviderId,
+              applicantId: kycSession.applicantId,
+              previousRejectLabels: kycSession.rejectLabels,
+              attempt: updatedSession.attempts
+            }
+          );
         } else {
           console.log('ℹ️ [RESUBMIT] NOT the last document, skipping review request');
         }

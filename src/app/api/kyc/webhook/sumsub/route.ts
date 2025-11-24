@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
 import { prisma } from '@/lib/prisma';
+import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -236,6 +237,29 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`✅ Updated KYC session: ${updated.id}`);
+
+    // Log webhook received
+    await auditService.logAdminAction(
+      'system', // System actor for webhook events
+      'KYC_WEBHOOK_RECEIVED',
+      AUDIT_ENTITIES.KYC_SESSION,
+      session.id,
+      { status: session.status }, // Before
+      { status: updated.status }, // After
+      {
+        provider: 'sumsub',
+        webhookType: payload.type,
+        applicantId: event.applicantId,
+        verificationId: event.verificationId,
+        reviewResult: {
+          reviewAnswer: reviewResult.reviewAnswer,
+          reviewRejectType,
+          rejectLabels,
+          moderationComment: moderationComment?.substring(0, 100)
+        },
+        signatureVerified: true
+      }
+    );
 
     // Revalidate cache after status change
     revalidatePath('/admin/kyc');
