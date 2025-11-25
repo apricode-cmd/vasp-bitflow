@@ -76,3 +76,4 @@ echo "Удалить конкретный образ:"
 echo "  docker rmi <IMAGE_ID>"
 
 
+

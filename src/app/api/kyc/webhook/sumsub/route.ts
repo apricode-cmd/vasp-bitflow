@@ -238,19 +238,19 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ Updated KYC session: ${updated.id}`);
 
-    // Log webhook received
-    await auditService.logAdminAction(
-      'system', // System actor for webhook events
-      'KYC_WEBHOOK_RECEIVED',
-      AUDIT_ENTITIES.KYC_SESSION,
-      session.id,
-      { status: session.status }, // Before
-      { status: updated.status }, // After
-      {
+    // Log webhook received (use general audit log for system events)
+    await auditService.log({
+      actorType: 'SYSTEM',
+      action: AUDIT_ACTIONS.KYC_WEBHOOK_RECEIVED,
+      entityType: AUDIT_ENTITIES.KYC_SESSION,
+      entityId: session.id,
+      context: {
         provider: 'sumsub',
         webhookType: payload.type,
         applicantId: event.applicantId,
         verificationId: event.verificationId,
+        oldStatus: session.status,
+        newStatus: updated.status,
         reviewResult: {
           reviewAnswer: reviewResult.reviewAnswer,
           reviewRejectType,
@@ -258,8 +258,28 @@ export async function POST(request: NextRequest) {
           moderationComment: moderationComment?.substring(0, 100)
         },
         signatureVerified: true
-      }
-    );
+      },
+      severity: 'INFO'
+    });
+
+    // Log status change if status actually changed
+    if (session.status !== updated.status) {
+      await auditService.log({
+        actorType: 'SYSTEM',
+        action: AUDIT_ACTIONS.KYC_STATUS_CHANGED,
+        entityType: AUDIT_ENTITIES.KYC_SESSION,
+        entityId: session.id,
+        context: {
+          provider: 'sumsub',
+          oldStatus: session.status,
+          newStatus: updated.status,
+          reason: event.reason,
+          reviewRejectType,
+          rejectLabels
+        },
+        severity: updated.status === 'APPROVED' ? 'INFO' : updated.status === 'REJECTED' ? 'WARNING' : 'INFO'
+      });
+    }
 
     // Revalidate cache after status change
     revalidatePath('/admin/kyc');
