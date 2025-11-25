@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma';
 import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
 import { KycUserData } from '@/lib/integrations/categories/IKycProvider';
 import { alpha3ToIso2, formatDateForKyc } from '@/lib/utils/country-codes';
+import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -60,6 +61,23 @@ export async function POST(request: NextRequest) {
       });
       
       console.log('✅ Created KYC session:', kycSession.id);
+
+      // Log KYC session creation
+      await auditService.log({
+        actorType: 'USER',
+        actorId: session.user.id,
+        actorEmail: session.user.email,
+        action: AUDIT_ACTIONS.KYC_CREATED,
+        entityType: AUDIT_ENTITIES.KYC_SESSION,
+        entityId: kycSession.id,
+        context: {
+          createdVia: 'form-submit',
+          formFieldsCount: Object.keys(formData).length
+        },
+        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || undefined,
+        userAgent: request.headers.get('user-agent') || undefined,
+        severity: 'INFO'
+      });
       
       // Revalidate cache when creating new session
       revalidatePath('/admin/kyc');
@@ -109,6 +127,22 @@ export async function POST(request: NextRequest) {
     });
 
     console.log('✅ KYC form data saved successfully!');
+
+    // Log form submission
+    await auditService.log({
+      actorType: 'USER',
+      actorId: session.user.id,
+      actorEmail: session.user.email,
+      action: AUDIT_ACTIONS.KYC_SUBMITTED,
+      entityType: AUDIT_ENTITIES.KYC_SESSION,
+      entityId: kycSession.id,
+      context: {
+        formFieldsCount: formDataRecords.length
+      },
+      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || undefined,
+      userAgent: request.headers.get('user-agent') || undefined,
+      severity: 'INFO'
+    });
 
     // Link any uploaded documents to this session
     const documentsLinked = await prisma.kycDocument.updateMany({

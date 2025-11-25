@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getClientSession } from '@/auth-client';
 import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
 import { prisma } from '@/lib/prisma';
+import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audit.service';
 
 export async function GET(request: NextRequest) {
   try {
@@ -96,6 +97,24 @@ export async function GET(request: NextRequest) {
       });
 
       console.log('✅ KYC session created:', kycSession.id, 'applicantId:', applicant.applicantId);
+
+      // Log KYC session creation
+      await auditService.log({
+        actorType: 'USER',
+        actorId: user.id,
+        actorEmail: user.email,
+        action: AUDIT_ACTIONS.KYC_CREATED,
+        entityType: AUDIT_ENTITIES.KYC_SESSION,
+        entityId: kycSession.id,
+        context: {
+          provider: provider.providerId,
+          applicantId: applicant.applicantId,
+          method: 'sdk-token'
+        },
+        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || undefined,
+        userAgent: request.headers.get('user-agent') || undefined,
+        severity: 'INFO'
+      });
     }
 
     // 5. Create access token (Sumsub-specific method)

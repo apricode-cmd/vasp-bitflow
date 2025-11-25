@@ -574,10 +574,10 @@ export class SumsubAdapter implements IKycProvider {
     }
 
     try {
-      // Use config value or default to 7200 seconds (120 minutes = 2 hours)
-      // Can be increased: 10800 (3h), 21600 (6h)
-      // Maximum: Not documented, test incrementally
-      const ttlInSecs = this.config.tokenTtlSeconds || 7200;
+      // Use config value or default to 1209600 seconds (14 days = 2 weeks)
+      // This is the maximum TTL supported by Sumsub
+      // https://docs.sumsub.com/reference/access-tokens-for-sdks
+      const ttlInSecs = this.config.tokenTtlSeconds || 1209600;
       const path = `/resources/accessTokens?userId=${encodeURIComponent(externalUserId)}&levelName=${encodeURIComponent(this.config.levelName!)}&ttlInSecs=${ttlInSecs}`;
       
       const { headers } = this.buildRequest('POST', path);
@@ -591,7 +591,13 @@ export class SumsubAdapter implements IKycProvider {
 
       if (!response.ok) {
         const error = await response.text();
-        console.error('❌ Sumsub access token creation failed:', error);
+        console.error('❌ Sumsub access token creation failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error,
+          externalUserId,
+          ttlInSecs
+        });
         
         // Handle deactivated applicant - retry with new userId
         if (response.status === 404 && error.includes('deactivated')) {
@@ -618,16 +624,25 @@ export class SumsubAdapter implements IKycProvider {
             
             if (retryResponse.ok) {
               const retryData = await retryResponse.json();
-              console.log('✅ Sumsub access token created with new applicant');
+              console.log('✅ Sumsub access token created with new applicant', {
+                newUserId,
+                ttlInSecs,
+                expiresAt: new Date(Date.now() + ttlInSecs * 1000)
+              });
               
               return {
                 token: retryData.token,
-                expiresAt: new Date(Date.now() + 60 * 60 * 1000) // 60 minutes (maximum)
+                expiresAt: new Date(Date.now() + ttlInSecs * 1000)
               };
             }
             
             const retryError = await retryResponse.text();
-            console.error(`❌ Retry ${retryCount} failed:`, retryResponse.status, retryError);
+            console.error(`❌ Retry ${retryCount} failed:`, {
+              status: retryResponse.status,
+              statusText: retryResponse.statusText,
+              error: retryError,
+              userId: newUserId
+            });
             
             // If still deactivated, try again
             if (retryResponse.status === 404 && retryError.includes('deactivated')) {
@@ -636,27 +651,46 @@ export class SumsubAdapter implements IKycProvider {
             }
             
             // Other error - stop retrying
-            throw new Error(`Failed to create access token: ${retryError}`);
+            const errorMessage = this.parseErrorMessage(retryError, retryResponse.status);
+            throw new Error(`KYC verification unavailable: ${errorMessage}`);
           }
           
           // Max retries reached
-          throw new Error('Failed to create access token: All applicants deactivated. Please contact support.');
+          throw new Error('KYC verification temporarily unavailable. All verification sessions are deactivated. Please contact support or try again later.');
         }
         
-        throw new Error(`Failed to create access token: ${error}`);
+        // Handle other errors with user-friendly messages
+        const errorMessage = this.parseErrorMessage(error, response.status);
+        throw new Error(`Unable to start KYC verification: ${errorMessage}`);
       }
 
       const data = await response.json();
 
-      console.log('✅ Sumsub access token created');
+      console.log('✅ Sumsub access token created', {
+        externalUserId,
+        ttlInSecs,
+        ttlHours: (ttlInSecs / 3600).toFixed(1),
+        ttlDays: (ttlInSecs / 86400).toFixed(1),
+        expiresAt: new Date(Date.now() + ttlInSecs * 1000)
+      });
 
       return {
         token: data.token,
         expiresAt: new Date(Date.now() + ttlInSecs * 1000)
       };
     } catch (error: any) {
-      console.error('❌ Sumsub access token creation failed:', error);
-      throw new Error(`Failed to create Sumsub access token: ${error.message}`);
+      console.error('❌ Sumsub access token creation failed:', {
+        error: error.message,
+        stack: error.stack,
+        externalUserId
+      });
+      
+      // Return user-friendly error message
+      const userMessage = error.message.includes('KYC verification') 
+        ? error.message 
+        : `Unable to initialize KYC verification. Please try again later or contact support if the problem persists. (Error: ${error.message})`;
+      
+      throw new Error(userMessage);
     }
   }
 
@@ -1696,6 +1730,55 @@ export class SumsubAdapter implements IKycProvider {
       true,
       kycSessionId
     );
+  }
+
+  /**
+   * Parse Sumsub API error and return user-friendly message
+   * 
+   * @private
+   */
+  private parseErrorMessage(errorText: string, statusCode: number): string {
+    try {
+      // Try to parse JSON error response
+      const errorJson = JSON.parse(errorText);
+      
+      if (errorJson.description) {
+        return errorJson.description;
+      }
+      
+      if (errorJson.message) {
+        return errorJson.message;
+      }
+    } catch {
+      // Not JSON, use raw text
+    }
+
+    // Map common HTTP status codes to user-friendly messages
+    switch (statusCode) {
+      case 400:
+        return 'Invalid verification request. Please check your information and try again.';
+      case 401:
+        return 'Authentication failed. Please contact support.';
+      case 403:
+        return 'Access denied. Your account may not have permission to perform KYC verification.';
+      case 404:
+        if (errorText.includes('deactivated')) {
+          return 'Your previous verification session was deactivated. A new session will be created automatically.';
+        }
+        return 'Verification session not found. Please try again.';
+      case 409:
+        return 'A verification session already exists. Please refresh the page.';
+      case 429:
+        return 'Too many requests. Please wait a few minutes and try again.';
+      case 500:
+      case 502:
+      case 503:
+      case 504:
+        return 'Verification service is temporarily unavailable. Please try again in a few minutes.';
+      default:
+        // Return sanitized error text (max 200 chars)
+        return errorText.substring(0, 200);
+    }
   }
 }
 
