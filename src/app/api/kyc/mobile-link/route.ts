@@ -174,7 +174,7 @@ export async function GET(request: NextRequest) {
         sessionId: kycSession.id,
         provider: providerId,
         originalUrl: mobileUrl, // Store original Sumsub URL (not used, but for reference)
-        exp: Math.floor(Date.now() / 1000) + 3600 // 1 hour expiration
+        exp: Math.floor(Date.now() / 1000) + 1209600 // 14 days (2 weeks) expiration
       },
       secret
     );
