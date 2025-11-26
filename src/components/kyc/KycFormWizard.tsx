@@ -368,7 +368,7 @@ export function KycFormWizard({
         </h1>
         <p className="text-muted-foreground">
           {isResubmission 
-            ? `Attempt ${kycSession?.attempts || 1} - Please correct the issues and resubmit`
+            ? `Resubmission Attempt ${kycSession?.attempts || 1} - Please correct the issues and resubmit`
             : 'Complete your KYC verification to start trading cryptocurrency'
           }
         </p>

@@ -13,8 +13,8 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
 
-// Maximum number of resubmission attempts allowed
-const MAX_ATTEMPTS = 5;
+// Maximum number of resubmission attempts allowed - REMOVED: unlimited attempts now
+// const MAX_ATTEMPTS = 5;
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Validate: can resubmit (REJECTED + under MAX_ATTEMPTS)
+    // 2. Validate: can resubmit (REJECTED status only - no attempt limits)
     const currentAttempt = kycSession.attempts || 1;
     
     if (kycSession.status !== 'REJECTED') {
@@ -64,19 +64,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (currentAttempt >= MAX_ATTEMPTS) {
-      return NextResponse.json(
-        { 
-          error: 'Maximum attempts reached',
-          reason: `You have used all ${MAX_ATTEMPTS} resubmission attempts. Please contact support.`,
-          attempts: currentAttempt,
-          maxAttempts: MAX_ATTEMPTS
-        },
-        { status: 400 }
-      );
-    }
+    // Removed: MAX_ATTEMPTS check - users can now resubmit unlimited times
+    // if (currentAttempt >= MAX_ATTEMPTS) {
+    //   return NextResponse.json(
+    //     { 
+    //       error: 'Maximum attempts reached',
+    //       reason: `You have used all ${MAX_ATTEMPTS} resubmission attempts. Please contact support.`,
+    //       attempts: currentAttempt,
+    //       maxAttempts: MAX_ATTEMPTS
+    //     },
+    //     { status: 400 }
+    //   );
+    // }
 
-    console.log(`✅ [RESUBMIT] Validation passed (attempt ${currentAttempt}/${MAX_ATTEMPTS}), updating session...`);
+    console.log(`✅ [RESUBMIT] Validation passed (attempt ${currentAttempt}), updating session...`);
 
     // 3. Update KYC session
     await prisma.kycSession.update({

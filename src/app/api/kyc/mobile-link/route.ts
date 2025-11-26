@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
     const requestBody = {
       levelName,
       userId: externalUserId, // Our internal user ID (externalUserId)
-      ttlInSecs: 3600 // 1 hour
+      ttlInSecs: 1209600 // 14 days (2 weeks)
     };
     const body = JSON.stringify(requestBody);
 

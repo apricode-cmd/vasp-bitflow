@@ -72,7 +72,8 @@ export async function POST(
       );
     }
 
-    const { expiresInHours = 72 } = await request.json().catch(() => ({ expiresInHours: 72 }));
+    // Default: 336 hours = 14 days (2 weeks)
+    const { expiresInHours = 336 } = await request.json().catch(() => ({ expiresInHours: 336 }));
     const expirationSeconds = expiresInHours * 3600;
 
     const whitelabelToken = jwt.sign(

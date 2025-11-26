@@ -21,8 +21,8 @@ import { formatDateTime } from '@/lib/formatters';
 import { analyzeRejection, formatRejectLabel } from '@/lib/kyc/resubmit-helper';
 import { useRouter } from 'next/navigation';
 
-// Maximum number of resubmission attempts allowed
-const MAX_ATTEMPTS = 5;
+// Maximum number of resubmission attempts allowed - REMOVED: unlimited attempts now
+// const MAX_ATTEMPTS = 5;
 
 interface KycSession {
   id: string;
@@ -418,7 +418,8 @@ export function KycStatusCard({ kycSession, onRefresh, userId, onStartResubmissi
           {/* REJECTED */}
           {kycSession.status === 'REJECTED' && (() => {
             const currentAttempt = kycSession.attempts || 1;
-            const hasAttemptsLeft = currentAttempt < MAX_ATTEMPTS;
+            // Removed: attempt limits - users can now resubmit unlimited times
+            const hasAttemptsLeft = true; // Always true now
             
             return (
               <div className="space-y-6">
@@ -431,17 +432,13 @@ export function KycStatusCard({ kycSession, onRefresh, userId, onStartResubmissi
                     <h3 className="font-semibold text-lg">
                       {rejectionAnalysis.isFinal 
                         ? 'Verification Rejected (Final)'
-                        : !hasAttemptsLeft
-                        ? 'Maximum Attempts Reached'
                         : 'Verification Rejected'
                       }
                     </h3>
                     <p className="text-sm text-muted-foreground mt-0.5">
                       {rejectionAnalysis.isFinal
                         ? 'This rejection is final - Please contact support'
-                        : !hasAttemptsLeft
-                        ? `You've used all ${MAX_ATTEMPTS} attempts - Please contact support`
-                        : `Attempt ${currentAttempt} of ${MAX_ATTEMPTS} - Fix the issues and resubmit`
+                        : `Attempt ${currentAttempt} - Fix the issues and resubmit`
                       }
                     </p>
                   </div>
@@ -498,7 +495,7 @@ export function KycStatusCard({ kycSession, onRefresh, userId, onStartResubmissi
                             Retry Selfie / Liveness Check
                           </CardTitle>
                           <CardDescription>
-                            Complete the liveness verification on this device or scan the QR code with your phone ({MAX_ATTEMPTS - currentAttempt} attempts remaining)
+                            Complete the liveness verification on this device or scan the QR code with your phone
                           </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -660,11 +657,12 @@ export function KycStatusCard({ kycSession, onRefresh, userId, onStartResubmissi
 
                   </div>
                 ) : (
+                  // This branch is no longer reachable (hasAttemptsLeft is always true)
+                  // Keeping for backward compatibility
                   <div className="space-y-3">
                     <Alert variant="destructive">
                       <AlertDescription>
-                        <strong>Maximum Attempts Reached:</strong> You've used all {MAX_ATTEMPTS} resubmission attempts. 
-                        Please contact support for further assistance.
+                        <strong>Contact Support:</strong> Please reach out to our support team for assistance.
                       </AlertDescription>
                     </Alert>
                     <Button 
