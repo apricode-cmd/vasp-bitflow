@@ -129,10 +129,19 @@ export default function ResubmitDocumentsPage() {
               toast.success('Loaded detailed document issues from verification service');
             } else if (problematicData.fallback) {
               console.log('⚠️ Using fallback to general rejectLabels');
+              toast.warning('Could not load specific document details. Showing all document types.');
+            } else {
+              console.warn('⚠️ API returned empty problematic documents array');
+              toast.warning('Could not identify specific problematic documents. Please check all document types.');
             }
+          } else {
+            const errorData = await problematicResponse.json().catch(() => ({}));
+            console.error('❌ API error:', problematicResponse.status, errorData);
+            toast.error(`Failed to load document details: ${errorData.error || 'Unknown error'}`);
           }
         } catch (err) {
           console.error('⚠️ Failed to fetch fresh problematic documents:', err);
+          toast.error('Could not connect to verification service. Please check all documents.');
           // Continue with existing data
         }
         
@@ -187,28 +196,44 @@ export default function ResubmitDocumentsPage() {
           console.log('📋 Processed requirements from problematicSteps:', uniqueStepsReqs);
           
         } else {
-          console.log('⚠️ No problematicSteps data, using rejectLabels fallback');
+          console.log('⚠️ No problematicSteps data, using IMPROVED fallback');
+          console.warn('⚠️ Cannot determine specific problematic documents!');
+          console.warn('⚠️ Showing ALL document types for user to check');
           
-          // Fallback to old logic: use general rejectLabels
-          const filteredRequirements = analysis.requirements.filter(
-            r => r.action === 'UPLOAD_IDENTITY' || r.action === 'UPLOAD_ADDRESS'
-          );
+          // IMPROVED FALLBACK: Show ALL document types, not just guessed ones
+          // This is safer because we don't know which specific document is problematic
+          const allPossibleRequirements: ResubmitRequirement[] = [];
           
-          // Remove duplicates based on documentType
-          const uniqueRequirements = filteredRequirements.reduce((acc, req) => {
-            const existing = acc.find(r => r.documentType === req.documentType);
-            if (!existing) {
-              acc.push(req);
-            } else {
-              // Merge labels if same documentType (for display purposes)
-              if (req.label && !existing.label.includes(req.label)) {
-                existing.label = `${existing.label}, ${req.label}`;
-              }
+          // Always show IDENTITY documents
+          allPossibleRequirements.push({
+            action: 'UPLOAD_IDENTITY',
+            label: data.rejectLabels?.join(', ') || 'DOCUMENT_ISSUE',
+            description: data.moderationComment || 'Please upload clear photos of your identity document',
+            documentType: 'IDENTITY',
+            metadata: {
+              warning: 'Specific problematic documents could not be determined. Please review all documents.'
             }
-            return acc;
-          }, [] as ResubmitRequirement[]);
+          });
           
-          setRequirements(uniqueRequirements);
+          // Also show PROOF_OF_ADDRESS if it might be relevant
+          if (uploadedDocTypes.some(t => t.includes('UTILITY_BILL') || t.includes('PROOF_OF_ADDRESS') || t.includes('BANK_STATEMENT'))) {
+            allPossibleRequirements.push({
+              action: 'UPLOAD_ADDRESS',
+              label: data.rejectLabels?.join(', ') || 'DOCUMENT_ISSUE',
+              description: data.moderationComment || 'Please upload a clear photo of your proof of address document',
+              documentType: 'PROOF_OF_ADDRESS',
+              metadata: {
+                warning: 'Specific problematic documents could not be determined. Please review all documents.'
+              }
+            });
+          }
+          
+          setRequirements(allPossibleRequirements);
+          
+          // Show clear warning to user
+          toast.warning('⚠️ Could not determine specific problematic documents. Please review and re-upload all required documents.', {
+            duration: 6000
+          });
         }
 
         // Create map of existing documents
