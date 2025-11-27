@@ -107,9 +107,27 @@ export default function ResubmitDocumentsPage() {
         }
 
         setKycSession(data);
-        setRequirements(analysis.requirements.filter(
+        
+        // Filter and deduplicate requirements by documentType to avoid duplicates
+        const filteredRequirements = analysis.requirements.filter(
           r => r.action === 'UPLOAD_IDENTITY' || r.action === 'UPLOAD_ADDRESS'
-        ));
+        );
+        
+        // Remove duplicates based on documentType
+        const uniqueRequirements = filteredRequirements.reduce((acc, req) => {
+          const existing = acc.find(r => r.documentType === req.documentType);
+          if (!existing) {
+            acc.push(req);
+          } else {
+            // Merge labels if same documentType (for display purposes)
+            if (req.label && !existing.label.includes(req.label)) {
+              existing.label = `${existing.label}, ${req.label}`;
+            }
+          }
+          return acc;
+        }, [] as ResubmitRequirement[]);
+        
+        setRequirements(uniqueRequirements);
 
         // Create map of existing documents
         try {
