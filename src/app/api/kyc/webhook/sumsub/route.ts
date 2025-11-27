@@ -209,31 +209,11 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // If RETRY rejection, fetch problematic documents details
+    // Note: Problematic documents are now fetched on-demand when user opens resubmit page
+    // This is more reliable and provides fresh data
+    // See: /api/kyc/problematic-documents
     if (canResubmit && event.applicantId) {
-      try {
-        console.log('📥 [WEBHOOK] Fetching problematic documents for resubmission...');
-        
-        const sumsubAdapter = provider as any;
-        if (sumsubAdapter.getProblematicDocuments) {
-          const problematicSteps = await sumsubAdapter.getProblematicDocuments(event.applicantId);
-          
-          // Update session with problematic steps
-          await prisma.kycSession.update({
-            where: { id: session.id },
-            data: {
-              problematicSteps: problematicSteps as any
-            }
-          });
-          
-          console.log('✅ [WEBHOOK] Problematic documents saved for resubmission');
-        } else {
-          console.warn('⚠️ [WEBHOOK] SumsubAdapter does not support getProblematicDocuments yet');
-        }
-      } catch (error) {
-        console.error('❌ [WEBHOOK] Failed to fetch problematic documents:', error);
-        // Don't fail the webhook, just log the error
-      }
+      console.log('ℹ️ [WEBHOOK] RETRY rejection detected. User can fetch problematic docs via /api/kyc/problematic-documents');
     }
 
     console.log(`✅ Updated KYC session: ${updated.id}`);

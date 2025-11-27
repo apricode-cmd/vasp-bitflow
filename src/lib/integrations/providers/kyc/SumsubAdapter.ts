@@ -1436,6 +1436,9 @@ export class SumsubAdapter implements IKycProvider {
       const data = await response.json();
       
       console.log('📄 [SUMSUB] Steps response structure:', Object.keys(data));
+      
+      // 🔍 DETAILED DEBUG: Log full response for debugging
+      console.log('📋 [SUMSUB] Full response sample:', JSON.stringify(data, null, 2).substring(0, 1000));
 
       const problematicImages: any[] = [];
 
@@ -1453,6 +1456,14 @@ export class SumsubAdapter implements IKycProvider {
           for (const [imageId, imageData] of Object.entries(step.imageReviewResults)) {
             const image = imageData as any;
             const reviewResult = image.reviewResult || {};
+            
+            // 🔍 DETAILED DEBUG: Log each image structure
+            console.log(`   📸 Image ${imageId}:`, {
+              hasReviewResult: !!image.reviewResult,
+              reviewAnswer: reviewResult.reviewAnswer || 'NONE',
+              rejectLabels: reviewResult.rejectLabels || [],
+              keys: Object.keys(image)
+            });
             
             // Check if image has RED reviewAnswer (rejected)
             if (reviewResult.reviewAnswer === 'RED') {

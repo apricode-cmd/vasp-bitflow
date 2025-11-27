@@ -108,8 +108,33 @@ export default function ResubmitDocumentsPage() {
 
         setKycSession(data);
         
-        // Check if we have detailed problematicSteps data from Sumsub
-        const hasProblematicSteps = data.problematicSteps && Array.isArray(data.problematicSteps) && data.problematicSteps.length > 0;
+        // 🆕 Fetch fresh problematic documents data from Sumsub API
+        let hasProblematicSteps = data.problematicSteps && Array.isArray(data.problematicSteps) && data.problematicSteps.length > 0;
+        
+        // Try to fetch fresh data from API
+        try {
+          console.log('🔍 Fetching fresh problematic documents from Sumsub...');
+          const problematicResponse = await fetch('/api/kyc/problematic-documents');
+          
+          if (problematicResponse.ok) {
+            const problematicData = await problematicResponse.json();
+            
+            if (problematicData.success && problematicData.problematicDocuments.length > 0) {
+              console.log('✅ Got fresh problematic documents:', problematicData.problematicDocuments);
+              
+              // Update kycSession with fresh data
+              data.problematicSteps = problematicData.problematicDocuments;
+              hasProblematicSteps = true;
+              
+              toast.success('Loaded detailed document issues from verification service');
+            } else if (problematicData.fallback) {
+              console.log('⚠️ Using fallback to general rejectLabels');
+            }
+          }
+        } catch (err) {
+          console.error('⚠️ Failed to fetch fresh problematic documents:', err);
+          // Continue with existing data
+        }
         
         if (hasProblematicSteps) {
           console.log('✅ Using detailed problematicSteps data:', data.problematicSteps);
