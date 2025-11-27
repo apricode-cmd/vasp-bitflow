@@ -108,26 +108,83 @@ export default function ResubmitDocumentsPage() {
 
         setKycSession(data);
         
-        // Filter and deduplicate requirements by documentType to avoid duplicates
-        const filteredRequirements = analysis.requirements.filter(
-          r => r.action === 'UPLOAD_IDENTITY' || r.action === 'UPLOAD_ADDRESS'
-        );
+        // Check if we have detailed problematicSteps data from Sumsub
+        const hasProblematicSteps = data.problematicSteps && Array.isArray(data.problematicSteps) && data.problematicSteps.length > 0;
         
-        // Remove duplicates based on documentType
-        const uniqueRequirements = filteredRequirements.reduce((acc, req) => {
-          const existing = acc.find(r => r.documentType === req.documentType);
-          if (!existing) {
-            acc.push(req);
-          } else {
-            // Merge labels if same documentType (for display purposes)
-            if (req.label && !existing.label.includes(req.label)) {
-              existing.label = `${existing.label}, ${req.label}`;
+        if (hasProblematicSteps) {
+          console.log('✅ Using detailed problematicSteps data:', data.problematicSteps);
+          
+          // Convert problematicSteps to requirements format
+          const stepsRequirements: ResubmitRequirement[] = data.problematicSteps.map((step: any) => {
+            // Determine action based on document type
+            let action: 'UPLOAD_IDENTITY' | 'UPLOAD_ADDRESS' = 'UPLOAD_IDENTITY';
+            let documentType: 'IDENTITY' | 'PROOF_OF_ADDRESS' = 'IDENTITY';
+            
+            if (step.stepName === 'PROOF_OF_RESIDENCE' || step.documentType === 'PROOF_OF_ADDRESS') {
+              action = 'UPLOAD_ADDRESS';
+              documentType = 'PROOF_OF_ADDRESS';
             }
-          }
-          return acc;
-        }, [] as ResubmitRequirement[]);
-        
-        setRequirements(uniqueRequirements);
+            
+            return {
+              action,
+              label: step.rejectLabels?.join(', ') || 'ISSUE_DETECTED',
+              description: step.moderationComment || step.clientComment || 'Please upload a clear photo of the document',
+              documentType,
+              metadata: {
+                imageId: step.imageId,
+                stepName: step.stepName,
+                country: step.country,
+                buttonIds: step.buttonIds,
+                specificDocumentType: step.documentType // DRIVERS, PASSPORT, ID_CARD, etc.
+              }
+            };
+          });
+          
+          // Deduplicate by documentType but keep most detailed info
+          const uniqueStepsReqs = stepsRequirements.reduce((acc, req) => {
+            const existing = acc.find(r => r.documentType === req.documentType);
+            if (!existing) {
+              acc.push(req);
+            } else {
+              // Merge labels and descriptions
+              if (req.label && !existing.label.includes(req.label)) {
+                existing.label = `${existing.label}, ${req.label}`;
+              }
+              // Keep longer description
+              if (req.description && req.description.length > existing.description.length) {
+                existing.description = req.description;
+              }
+            }
+            return acc;
+          }, [] as ResubmitRequirement[]);
+          
+          setRequirements(uniqueStepsReqs);
+          console.log('📋 Processed requirements from problematicSteps:', uniqueStepsReqs);
+          
+        } else {
+          console.log('⚠️ No problematicSteps data, using rejectLabels fallback');
+          
+          // Fallback to old logic: use general rejectLabels
+          const filteredRequirements = analysis.requirements.filter(
+            r => r.action === 'UPLOAD_IDENTITY' || r.action === 'UPLOAD_ADDRESS'
+          );
+          
+          // Remove duplicates based on documentType
+          const uniqueRequirements = filteredRequirements.reduce((acc, req) => {
+            const existing = acc.find(r => r.documentType === req.documentType);
+            if (!existing) {
+              acc.push(req);
+            } else {
+              // Merge labels if same documentType (for display purposes)
+              if (req.label && !existing.label.includes(req.label)) {
+                existing.label = `${existing.label}, ${req.label}`;
+              }
+            }
+            return acc;
+          }, [] as ResubmitRequirement[]);
+          
+          setRequirements(uniqueRequirements);
+        }
 
         // Create map of existing documents
         try {
@@ -301,6 +358,28 @@ export default function ResubmitDocumentsPage() {
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             <strong>Moderator:</strong> {kycSession.moderationComment}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Detailed Problematic Steps Info */}
+      {kycSession.problematicSteps && Array.isArray(kycSession.problematicSteps) && kycSession.problematicSteps.length > 0 && (
+        <Alert className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
+          <AlertCircle className="h-4 w-4 text-orange-600" />
+          <AlertDescription>
+            <strong className="text-orange-900 dark:text-orange-100">Specific Issues Detected:</strong>
+            <ul className="mt-2 space-y-1 text-sm">
+              {kycSession.problematicSteps.map((step: any, idx: number) => (
+                <li key={idx} className="text-orange-800 dark:text-orange-200">
+                  • {step.documentType || step.stepName}: {step.rejectLabels?.join(', ')}
+                  {step.moderationComment && (
+                    <span className="block ml-4 text-xs text-orange-700 dark:text-orange-300 mt-0.5">
+                      "{step.moderationComment.substring(0, 150)}{step.moderationComment.length > 150 ? '...' : ''}"
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
           </AlertDescription>
         </Alert>
       )}

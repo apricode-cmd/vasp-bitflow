@@ -1395,6 +1395,190 @@ export class SumsubAdapter implements IKycProvider {
   }
 
   /**
+   * Get problematic documents for RETRY rejection
+   * Fetches detailed step-level and image-level information
+   * GET /resources/applicants/{applicantId}/requiredIdDocsStatus
+   * 
+   * Returns array of problematic images with:
+   * - imageId
+   * - documentType (IDENTITY, DRIVERS, PASSPORT, etc.)
+   * - side (FRONT_SIDE, BACK_SIDE, etc.)
+   * - rejectLabels (GRAPHIC_EDITOR, UNSATISFACTORY_PHOTOS, etc.)
+   * - moderationComment
+   * - fileName
+   */
+  async getProblematicDocuments(applicantId: string): Promise<any[]> {
+    try {
+      if (!this.isConfigured()) {
+        throw new Error('Sumsub provider not configured');
+      }
+
+      const path = `/resources/applicants/${applicantId}/requiredIdDocsStatus`;
+      const method = 'GET';
+      
+      const { headers } = this.buildRequest(method, path);
+
+      const url = `${this.baseUrl}${path}`;
+      
+      console.log('🔍 [SUMSUB] Fetching verification steps:', applicantId);
+      
+      const response = await fetch(url, {
+        method,
+        headers
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [SUMSUB] Failed to fetch steps:', response.status, errorText);
+        return [];
+      }
+
+      const data = await response.json();
+      
+      console.log('📄 [SUMSUB] Steps response structure:', Object.keys(data));
+
+      const problematicImages: any[] = [];
+
+      // Parse each step (IDENTITY, PROOF_OF_RESIDENCE, etc.)
+      for (const [stepName, stepData] of Object.entries(data)) {
+        if (typeof stepData !== 'object' || stepData === null) continue;
+        
+        const step = stepData as any;
+        
+        // Check if step has imageReviewResults
+        if (step.imageReviewResults && typeof step.imageReviewResults === 'object') {
+          console.log(`🔍 [SUMSUB] Analyzing step "${stepName}" with ${Object.keys(step.imageReviewResults).length} images`);
+          
+          // Parse each image in the step
+          for (const [imageId, imageData] of Object.entries(step.imageReviewResults)) {
+            const image = imageData as any;
+            const reviewResult = image.reviewResult || {};
+            
+            // Check if image has RED reviewAnswer (rejected)
+            if (reviewResult.reviewAnswer === 'RED') {
+              const rejectLabels = reviewResult.rejectLabels || [];
+              const moderationComment = reviewResult.moderationComment || '';
+              const clientComment = reviewResult.clientComment || '';
+              
+              console.log(`❌ [SUMSUB] Found problematic image ${imageId}:`, {
+                stepName,
+                rejectLabels,
+                moderationComment: moderationComment.substring(0, 100)
+              });
+              
+              // Extract document type info (may be in step or image level)
+              const idDocSetType = step.idDocSetType || image.idDocSetType || 'UNKNOWN';
+              const country = image.country || step.country || null;
+              
+              problematicImages.push({
+                imageId,
+                stepName, // IDENTITY, PROOF_OF_RESIDENCE, etc.
+                documentType: idDocSetType, // IDENTITY, DRIVERS, PASSPORT, etc.
+                country,
+                reviewAnswer: reviewResult.reviewAnswer, // RED
+                rejectLabels, // ["GRAPHIC_EDITOR", "UNSATISFACTORY_PHOTOS"]
+                reviewRejectType: reviewResult.reviewRejectType || 'RETRY',
+                moderationComment,
+                clientComment,
+                buttonIds: reviewResult.buttonIds || []
+              });
+            }
+          }
+        }
+      }
+
+      console.log(`✅ [SUMSUB] Found ${problematicImages.length} problematic images`);
+      
+      return problematicImages;
+
+    } catch (error: any) {
+      console.error('❌ [SUMSUB] Get problematic documents error:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get detailed information about document images
+   * GET /resources/applicants/{applicantId}/one/images
+   * 
+   * Alternative method to get image-level details with more metadata
+   */
+  async getDocumentImages(applicantId: string): Promise<any[]> {
+    try {
+      if (!this.isConfigured()) {
+        throw new Error('Sumsub provider not configured');
+      }
+
+      const path = `/resources/applicants/${applicantId}/one/images`;
+      const method = 'GET';
+      
+      const { headers } = this.buildRequest(method, path);
+
+      const url = `${this.baseUrl}${path}`;
+      
+      console.log('🔍 [SUMSUB] Fetching document images:', applicantId);
+      
+      const response = await fetch(url, {
+        method,
+        headers
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [SUMSUB] Failed to fetch images:', response.status, errorText);
+        return [];
+      }
+
+      const data = await response.json();
+      
+      // Response structure: { items: [...], totalItems: N }
+      const items = data.items || [];
+      
+      console.log(`📄 [SUMSUB] Found ${items.length} document images`);
+
+      const problematicImages: any[] = [];
+
+      for (const image of items) {
+        const reviewResult = image.reviewResult || {};
+        
+        // Only return rejected images (RED)
+        if (reviewResult.reviewAnswer === 'RED') {
+          const idDocDef = image.idDocDef || {};
+          const fileMetadata = image.fileMetadata || {};
+          
+          console.log(`❌ [SUMSUB] Problematic image ${image.id}:`, {
+            fileName: fileMetadata.fileName,
+            docType: idDocDef.idDocType,
+            rejectLabels: reviewResult.rejectLabels
+          });
+          
+          problematicImages.push({
+            imageId: image.id,
+            fileName: fileMetadata.fileName,
+            documentType: idDocDef.idDocType, // DRIVERS, PASSPORT, ID_CARD, etc.
+            documentSubType: idDocDef.idDocSubType, // FRONT_SIDE, BACK_SIDE, etc.
+            country: idDocDef.country,
+            reviewAnswer: reviewResult.reviewAnswer, // RED
+            rejectLabels: reviewResult.rejectLabels || [],
+            reviewRejectType: reviewResult.reviewRejectType || 'RETRY',
+            moderationComment: reviewResult.moderationComment || '',
+            clientComment: reviewResult.clientComment || '',
+            buttonIds: reviewResult.buttonIds || []
+          });
+        }
+      }
+
+      console.log(`✅ [SUMSUB] Found ${problematicImages.length} problematic images (detailed)`);
+      
+      return problematicImages;
+
+    } catch (error: any) {
+      console.error('❌ [SUMSUB] Get document images error:', error);
+      return [];
+    }
+  }
+
+  /**
    * Check if all required documents are uploaded
    * GET /resources/applicants/{applicantId}/requiredIdDocsStatus
    */
