@@ -1455,21 +1455,25 @@ export class SumsubAdapter implements IKycProvider {
           // Parse each image in the step
           for (const [imageId, imageData] of Object.entries(step.imageReviewResults)) {
             const image = imageData as any;
-            const reviewResult = image.reviewResult || {};
+            
+            // ✅ FIX: Sumsub returns data directly in image object, not nested in reviewResult
+            // Structure: imageReviewResults[imageId] = { reviewAnswer, rejectLabels, moderationComment, ... }
+            const reviewAnswer = image.reviewAnswer || 'NONE';
+            const rejectLabels = image.rejectLabels || [];
+            const moderationComment = image.moderationComment || '';
+            const clientComment = image.clientComment || '';
+            const reviewRejectType = image.reviewRejectType || 'RETRY';
+            const buttonIds = image.buttonIds || [];
             
             // 🔍 DETAILED DEBUG: Log each image structure
             console.log(`   📸 Image ${imageId}:`, {
-              hasReviewResult: !!image.reviewResult,
-              reviewAnswer: reviewResult.reviewAnswer || 'NONE',
-              rejectLabels: reviewResult.rejectLabels || [],
-              keys: Object.keys(image)
+              reviewAnswer,
+              rejectLabels,
+              moderationComment: moderationComment.substring(0, 50)
             });
             
             // Check if image has RED reviewAnswer (rejected)
-            if (reviewResult.reviewAnswer === 'RED') {
-              const rejectLabels = reviewResult.rejectLabels || [];
-              const moderationComment = reviewResult.moderationComment || '';
-              const clientComment = reviewResult.clientComment || '';
+            if (reviewAnswer === 'RED') {
               
               console.log(`❌ [SUMSUB] Found problematic image ${imageId}:`, {
                 stepName,
@@ -1478,20 +1482,20 @@ export class SumsubAdapter implements IKycProvider {
               });
               
               // Extract document type info (may be in step or image level)
-              const idDocSetType = step.idDocSetType || image.idDocSetType || 'UNKNOWN';
-              const country = image.country || step.country || null;
+              const idDocType = step.idDocType || step.idDocSetType || 'UNKNOWN';
+              const country = step.country || null;
               
               problematicImages.push({
                 imageId,
                 stepName, // IDENTITY, PROOF_OF_RESIDENCE, etc.
-                documentType: idDocSetType, // IDENTITY, DRIVERS, PASSPORT, etc.
+                documentType: idDocType, // ID_CARD, DRIVERS, PASSPORT, etc.
                 country,
-                reviewAnswer: reviewResult.reviewAnswer, // RED
-                rejectLabels, // ["GRAPHIC_EDITOR", "UNSATISFACTORY_PHOTOS"]
-                reviewRejectType: reviewResult.reviewRejectType || 'RETRY',
+                reviewAnswer, // RED
+                rejectLabels, // ["BAD_PROOF_OF_IDENTITY", "GRAPHIC_EDITOR", etc]
+                reviewRejectType,
                 moderationComment,
                 clientComment,
-                buttonIds: reviewResult.buttonIds || []
+                buttonIds
               });
             }
           }
