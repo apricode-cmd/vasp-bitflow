@@ -39,6 +39,13 @@ interface KycSession {
   clientComment?: string | null;
   rejectLabels?: string[];
   attempts?: number;
+  problematicSteps?: Array<{
+    stepName: string;
+    documentType?: string;
+    rejectLabels: string[];
+    moderationComment?: string;
+    clientComment?: string;
+  }>;
 }
 
 interface Props {
@@ -59,6 +66,16 @@ export function KycStatusCard({ kycSession, onRefresh, userId, onStartResubmissi
     kycSession.reviewRejectType,
     kycSession.rejectLabels || []
   );
+
+  // Debug: log rejection analysis
+  console.log('🔍 [KYC STATUS CARD] Rejection Analysis:', {
+    reviewRejectType: kycSession.reviewRejectType,
+    rejectLabels: kycSession.rejectLabels,
+    canResubmit: rejectionAnalysis.canResubmit,
+    needsSdk: rejectionAnalysis.needsSdk,
+    needsDocumentUpload: rejectionAnalysis.needsDocumentUpload,
+    requirements: rejectionAnalysis.requirements
+  });
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -468,17 +485,31 @@ export function KycStatusCard({ kycSession, onRefresh, userId, onStartResubmissi
                   <div className="rounded-lg border bg-muted/30 p-4">
                     <p className="text-sm font-medium mb-3">Issues to Fix:</p>
                     <ul className="text-sm space-y-2">
-                      {rejectionAnalysis.requirements.map((req, idx) => (
-                        <li key={idx} className="flex items-start gap-3">
-                          <div className={`h-1.5 w-1.5 rounded-full mt-1.5 shrink-0 ${
-                            req.isCritical ? 'bg-destructive' : 'bg-orange-500'
-                          }`} />
-                          <div className="flex-1">
-                            <p className="font-medium">{formatRejectLabel(req.label)}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">{req.description}</p>
-                          </div>
-                        </li>
-                      ))}
+                      {rejectionAnalysis.requirements.map((req, idx) => {
+                        // Find matching problematic step for this requirement
+                        const matchingStep = kycSession.problematicSteps?.find(step =>
+                          step.rejectLabels.includes(req.label)
+                        );
+                        
+                        return (
+                          <li key={idx} className="flex items-start gap-3">
+                            <div className={`h-1.5 w-1.5 rounded-full mt-1.5 shrink-0 ${
+                              req.isCritical ? 'bg-destructive' : 'bg-orange-500'
+                            }`} />
+                            <div className="flex-1">
+                              <p className="font-medium">{formatRejectLabel(req.label)}</p>
+                              {/* Show real moderator comment if available, otherwise template */}
+                              {matchingStep?.moderationComment ? (
+                                <p className="text-xs mt-0.5 italic text-orange-700 dark:text-orange-400">
+                                  "{matchingStep.moderationComment}"
+                                </p>
+                              ) : (
+                                <p className="text-xs text-muted-foreground mt-0.5">{req.description}</p>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 )}

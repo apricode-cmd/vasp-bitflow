@@ -53,7 +53,7 @@ function getFormId(session: any, secrets: any): string | null {
  * Ensures all responses include kycProviderId for frontend routing
  */
 function formatStatusResponse(session: any, message?: string) {
-  return {
+  const response = {
     status: session.status,
     sessionId: session.id,
     completedAt: session.completedAt || null,
@@ -69,6 +69,22 @@ function formatStatusResponse(session: any, message?: string) {
     rejectLabels: session.rejectLabels || [],
     attempts: session.attempts || 0
   };
+  
+  // Debug log for REJECTED status
+  if (session.status === 'REJECTED') {
+    console.log('📊 [KYC STATUS] formatStatusResponse for REJECTED:', {
+      canResubmit: response.canResubmit,
+      reviewRejectType: response.reviewRejectType,
+      rejectLabelsCount: response.rejectLabels?.length || 0,
+      rejectLabels: response.rejectLabels,
+      fromDB: {
+        canResubmit: session.canResubmit,
+        reviewRejectType: session.reviewRejectType
+      }
+    });
+  }
+  
+  return response;
 }
 
 /**
@@ -460,8 +476,9 @@ export async function checkKycStatus(userId: string) {
       };
     }
 
-    // If already completed/rejected, return cached status
-    if (session.status === 'APPROVED' || session.status === 'REJECTED' || session.status === 'EXPIRED') {
+    // If already completed, return cached status
+    // Note: REJECTED status is NOT cached - we always poll Sumsub to get fresh rejectLabels and reviewRejectType
+    if (session.status === 'APPROVED' || session.status === 'EXPIRED') {
       return formatStatusResponse(session);
     }
 
@@ -504,14 +521,20 @@ export async function checkKycStatus(userId: string) {
       try {
         const result = await provider.getVerificationStatus(verificationId);
 
-        // Update session if status changed
-        if (result.status !== session.status.toLowerCase()) {
+        // Update session if status changed OR if it's rejected (to update resubmission fields)
+        if (result.status !== session.status.toLowerCase() || result.status === 'rejected') {
           const updatedSession = await prisma.kycSession.update({
             where: { id: session.id },
             data: {
               status: result.status.toUpperCase() as any,
               completedAt: result.completedAt || new Date(),
               rejectionReason: result.rejectionReason || undefined,
+              // Resubmission fields
+              rejectLabels: result.rejectLabels || [],
+              reviewRejectType: result.reviewRejectType || null,
+              canResubmit: result.canResubmit || false,
+              moderationComment: result.moderationComment || null,
+              clientComment: result.clientComment || null,
               metadata: mergeMetadata(session.metadata, {
                 lastChecked: new Date(),
                 providerResponse: result.metadata

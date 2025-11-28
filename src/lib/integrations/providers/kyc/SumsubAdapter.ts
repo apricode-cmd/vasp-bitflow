@@ -765,10 +765,18 @@ export class SumsubAdapter implements IKycProvider {
       // Collect rejection reasons
       const rejectLabels = data.reviewResult?.rejectLabels || [];
       const rejectionReason = rejectLabels.length > 0 ? rejectLabels.join(', ') : undefined;
+      
+      // Extract resubmission fields
+      const reviewRejectType = data.reviewResult?.reviewRejectType || null;
+      const canResubmit = reviewRejectType === 'RETRY';
+      const moderationComment = data.reviewResult?.moderationComment || data.moderationComment || null;
+      const clientComment = data.reviewResult?.clientComment || null;
 
       console.log('📊 Mapped status:', status);
       if (rejectionReason) {
         console.log('❌ Rejection reason:', rejectionReason);
+        console.log('🔄 Review reject type:', reviewRejectType);
+        console.log('🔄 Can resubmit:', canResubmit);
       }
 
       return {
@@ -776,6 +784,12 @@ export class SumsubAdapter implements IKycProvider {
         verificationId,
         rejectionReason,
         completedAt: data.reviewStatus === 'completed' ? new Date() : undefined,
+        // Resubmission fields
+        rejectLabels,
+        reviewRejectType,
+        canResubmit,
+        moderationComment,
+        clientComment,
         metadata: {
           reviewStatus: data.reviewStatus,
           reviewResult: data.reviewResult,

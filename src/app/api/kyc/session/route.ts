@@ -45,6 +45,8 @@ export async function GET(request: NextRequest) {
 
     // 3. Return session data
     return NextResponse.json({
+      success: true,
+      sessionId: kycSession.id,
       id: kycSession.id,
       status: kycSession.status,
       reviewRejectType: kycSession.reviewRejectType,
@@ -58,7 +60,9 @@ export async function GET(request: NextRequest) {
       applicantId: kycSession.applicantId,
       submittedAt: kycSession.submittedAt,
       reviewedAt: kycSession.reviewedAt,
-      rejectionReason: kycSession.rejectionReason
+      completedAt: kycSession.reviewedAt,
+      rejectionReason: kycSession.rejectionReason,
+      problematicSteps: kycSession.problematicSteps || []
     });
 
   } catch (error: any) {

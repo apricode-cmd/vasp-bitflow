@@ -72,6 +72,12 @@ export interface KycVerificationResult {
   rejectionReason?: string;
   completedAt?: Date;
   metadata?: Record<string, any>;
+  // Resubmission fields (for rejected status)
+  rejectLabels?: string[];
+  reviewRejectType?: string | null;
+  canResubmit?: boolean;
+  moderationComment?: string | null;
+  clientComment?: string | null;
 }
 
 /**

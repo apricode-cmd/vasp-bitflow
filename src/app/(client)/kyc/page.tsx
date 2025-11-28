@@ -39,6 +39,13 @@ interface KycSession {
   clientComment?: string | null;
   rejectLabels?: string[];
   attempts?: number;
+  problematicSteps?: Array<{
+    stepName: string;
+    documentType?: string;
+    rejectLabels: string[];
+    moderationComment?: string;
+    clientComment?: string;
+  }>;
 }
 
 export default function KycPage(): React.ReactElement {
@@ -81,6 +88,27 @@ export default function KycPage(): React.ReactElement {
         const data = await response.json();
         
         if (data.success && data.status !== 'NOT_STARTED') {
+          // 🆕 Fetch fresh problematic documents if status is REJECTED
+          let problematicSteps = data.problematicSteps || [];
+          
+          if (data.status === 'REJECTED' && data.canResubmit) {
+            try {
+              console.log('🔍 [KYC STATUS] Fetching fresh problematic documents from Sumsub...');
+              const problematicResponse = await fetch('/api/kyc/problematic-documents');
+              
+              if (problematicResponse.ok) {
+                const problematicData = await problematicResponse.json();
+                
+                if (problematicData.success && problematicData.problematicDocuments.length > 0) {
+                  problematicSteps = problematicData.problematicDocuments;
+                  console.log('✅ [KYC STATUS] Loaded fresh problematic documents:', problematicSteps.length);
+                }
+              }
+            } catch (err) {
+              console.warn('⚠️ [KYC STATUS] Failed to fetch problematic documents:', err);
+            }
+          }
+          
           setKycSession({
             id: data.sessionId || '',
             status: data.status,
@@ -96,7 +124,8 @@ export default function KycPage(): React.ReactElement {
             moderationComment: data.moderationComment || null,
             clientComment: data.clientComment || null,
             rejectLabels: data.rejectLabels || [],
-            attempts: data.attempts || 0
+            attempts: data.attempts || 0,
+            problematicSteps
           });
           
           // If already submitted, skip consents
