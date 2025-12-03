@@ -492,22 +492,22 @@ export function KycStatusCard({ kycSession, onRefresh, userId, onStartResubmissi
                         );
                         
                         return (
-                          <li key={idx} className="flex items-start gap-3">
-                            <div className={`h-1.5 w-1.5 rounded-full mt-1.5 shrink-0 ${
-                              req.isCritical ? 'bg-destructive' : 'bg-orange-500'
-                            }`} />
-                            <div className="flex-1">
-                              <p className="font-medium">{formatRejectLabel(req.label)}</p>
+                        <li key={idx} className="flex items-start gap-3">
+                          <div className={`h-1.5 w-1.5 rounded-full mt-1.5 shrink-0 ${
+                            req.isCritical ? 'bg-destructive' : 'bg-orange-500'
+                          }`} />
+                          <div className="flex-1">
+                            <p className="font-medium">{formatRejectLabel(req.label)}</p>
                               {/* Show real moderator comment if available, otherwise template */}
                               {matchingStep?.moderationComment ? (
                                 <p className="text-xs mt-0.5 italic text-orange-700 dark:text-orange-400">
                                   "{matchingStep.moderationComment}"
                                 </p>
                               ) : (
-                                <p className="text-xs text-muted-foreground mt-0.5">{req.description}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{req.description}</p>
                               )}
-                            </div>
-                          </li>
+                          </div>
+                        </li>
                         );
                       })}
                     </ul>

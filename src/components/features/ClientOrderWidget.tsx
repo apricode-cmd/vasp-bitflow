@@ -127,6 +127,10 @@ export function ClientOrderWidget() {
     kycRequired: boolean;
   } | null>(null);
 
+  // Virtual IBAN balance
+  const [virtualIbanBalance, setVirtualIbanBalance] = useState<number | null>(null);
+  const [hasVirtualIban, setHasVirtualIban] = useState<boolean>(false);
+
   // Form state
   const [selectedCrypto, setSelectedCrypto] = useState<string>('');
   const [selectedFiat, setSelectedFiat] = useState<string>('');
@@ -142,17 +146,26 @@ export function ClientOrderWidget() {
     const fetchData = async () => {
       try {
         // Use client-friendly endpoint instead of admin endpoints
-        const [configRes, walletsRes, limitRes] = await Promise.all([
+        const [configRes, walletsRes, limitRes, virtualIbanRes] = await Promise.all([
           fetch('/api/buy/config'), // Returns currencies, fiatCurrencies, paymentMethods, platformFee
           fetch('/api/wallets'),
-          fetch('/api/orders/limit-check')
+          fetch('/api/orders/limit-check'),
+          fetch('/api/client/virtual-iban')
         ]);
 
-        const [configData, walletsData, limitData] = await Promise.all([
+        const [configData, walletsData, limitData, virtualIbanData] = await Promise.all([
           configRes.json(),
           walletsRes.json(),
-          limitRes.json()
+          limitRes.json(),
+          virtualIbanRes.json()
         ]);
+
+        // Parse Virtual IBAN data
+        if (virtualIbanData.success && virtualIbanData.data && virtualIbanData.data.length > 0) {
+          const account = virtualIbanData.data[0];
+          setVirtualIbanBalance(account.balance);
+          setHasVirtualIban(account.status === 'ACTIVE');
+        }
 
         // Parse buy config response
         if (configData.success) {
@@ -471,8 +484,11 @@ export function ClientOrderWidget() {
     description: fiat.symbol
   })) || [];
 
-  const paymentOptions = config?.paymentMethods
+  // Base payment options (without VIRTUAL_IBAN - added dynamically later)
+  const basePaymentOptions = config?.paymentMethods
     .filter(method => {
+      // Filter out VIRTUAL_IBAN from config (we'll add it conditionally)
+      if (method.code === 'VIRTUAL_IBAN') return false;
       // Only show IN or BOTH methods for buying
       const direction = ['IN', 'BOTH'];
       return method.direction && direction.includes(method.direction);
@@ -855,7 +871,26 @@ export function ClientOrderWidget() {
           <div className="space-y-2">
             <Label>Payment Method *</Label>
             <Combobox
-              options={paymentOptions}
+              options={(() => {
+                // Dynamically add VIRTUAL_IBAN if balance is sufficient
+                const methods = [...basePaymentOptions];
+                const totalFiatNum = calculation?.totalFiat || 0;
+                
+                if (
+                  hasVirtualIban && 
+                  virtualIbanBalance !== null && 
+                  virtualIbanBalance >= totalFiatNum && 
+                  totalFiatNum > 0
+                ) {
+                  methods.unshift({
+                    value: 'VIRTUAL_IBAN',
+                    label: '💳 Pay from Balance',
+                    description: `€${virtualIbanBalance.toFixed(2)} available - Instant payment`
+                  });
+                }
+                
+                return methods;
+              })()}
               value={selectedPaymentMethod}
               onValueChange={(value) => {
                 setSelectedPaymentMethod(value);

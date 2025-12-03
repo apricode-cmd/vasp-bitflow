@@ -15,6 +15,7 @@ import {
 import { IKycProvider } from './categories/IKycProvider';
 import { IRatesProvider } from './categories/IRatesProvider';
 import { IEmailProvider } from './categories/IEmailProvider';
+import { IVirtualIbanProvider } from './categories/IVirtualIbanProvider';
 import { decrypt } from '@/lib/services/encryption.service';
 
 /**
@@ -62,6 +63,19 @@ class IntegrationFactory {
     }
 
     return provider as IEmailProvider;
+  }
+
+  /**
+   * Get active Virtual IBAN provider from database
+   */
+  async getVirtualIbanProvider(): Promise<IVirtualIbanProvider> {
+    const provider = await this.getActiveProvider(IntegrationCategory.VIRTUAL_IBAN);
+    
+    if (!provider) {
+      throw new Error('No active Virtual IBAN provider configured');
+    }
+
+    return provider as IVirtualIbanProvider;
   }
 
   /**
@@ -124,34 +138,54 @@ class IntegrationFactory {
     // Decrypt API key if it exists
     let decryptedApiKey: string | undefined;
     if (integration.apiKey) {
-      decryptedApiKey = decrypt(integration.apiKey);
-      
-      // Log decryption result
-      if (decryptedApiKey && !decryptedApiKey.startsWith('encrypted:')) {
-        console.log(`✅ Decrypted API key for ${integration.service}: ${decryptedApiKey.substring(0, 10)}...`);
-      } else {
-        console.warn(`⚠️ API key for ${integration.service} could not be decrypted, using as-is`);
+      try {
+        decryptedApiKey = decrypt(integration.apiKey);
+        console.log(`✅ Decrypted API key for ${integration.service}`);
+      } catch (e) {
+        console.warn(`⚠️ Could not decrypt API key for ${integration.service}`);
       }
     }
+
+    // Decrypt clientSecret from config (for OAuth-based providers like BCB Group)
+    let decryptedClientSecret: string | undefined;
+    if (integrationConfig.clientSecret) {
+      try {
+        decryptedClientSecret = decrypt(integrationConfig.clientSecret);
+        console.log(`✅ Decrypted clientSecret for ${integration.service}`);
+      } catch (e) {
+        console.warn(`⚠️ Could not decrypt clientSecret for ${integration.service}`);
+        decryptedClientSecret = integrationConfig.clientSecret; // Use as-is if not encrypted
+      }
+    }
+    
+    // Use decrypted clientSecret as apiKey for OAuth providers
+    if (!decryptedApiKey && decryptedClientSecret) {
+      decryptedApiKey = decryptedClientSecret;
+    }
+    
+    // Build config object - spread all config fields except sensitive ones
+    const safeConfigFields = Object.fromEntries(
+      Object.entries(integrationConfig).filter(([key]) => 
+        !['apiKey', 'api_key', 'secret', 'credentials', 'webhookSecret', 'clientSecret'].includes(key)
+      )
+    );
     
     const config: BaseIntegrationConfig = {
       apiKey: decryptedApiKey || undefined,
       apiEndpoint: integration.apiEndpoint || undefined,
-      webhookSecret: integrationConfig.webhookSecret || undefined,
-      // Merge integration.config EXCEPT apiKey and other sensitive fields
-      ...Object.fromEntries(
-        Object.entries(integrationConfig).filter(([key]) => 
-          key !== 'apiKey' && key !== 'api_key' && key !== 'secret'
-        )
-      ),
-      metadata: {
-        ...Object.fromEntries(
-          Object.entries(integrationConfig).filter(([key]) => 
-            key !== 'apiKey' && key !== 'api_key' && key !== 'secret'
-          )
-        )
-      }
+      // Include decrypted clientSecret for providers that need it
+      ...(decryptedClientSecret ? { clientSecret: decryptedClientSecret } : {}),
+      // Spread safe config fields (sandbox, counterpartyId, baseUrl, authUrl, etc.)
+      ...safeConfigFields,
+      metadata: safeConfigFields
     };
+    
+    console.log(`🔧 Initializing ${integration.service} with config:`, {
+      hasApiKey: !!config.apiKey,
+      hasClientSecret: !!decryptedClientSecret,
+      apiEndpoint: config.apiEndpoint,
+      ...safeConfigFields
+    });
 
     await this.initializeProvider(provider, config);
     
@@ -265,4 +299,5 @@ class IntegrationFactory {
 
 // Export singleton instance
 export const integrationFactory = new IntegrationFactory();
+
 

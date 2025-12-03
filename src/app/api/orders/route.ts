@@ -19,6 +19,8 @@ import { auditService, AUDIT_ACTIONS, AUDIT_ENTITIES } from '@/lib/services/audi
 import { userActivityService } from '@/lib/services/user-activity.service';
 import { eventEmitter } from '@/lib/services/event-emitter.service';
 import { CacheService } from '@/lib/services/cache.service';
+import { virtualIbanService } from '@/lib/services/virtual-iban.service';
+import { virtualIbanBalanceService } from '@/lib/services/virtual-iban-balance.service';
 import { z } from 'zod';
 
 /**
@@ -199,6 +201,131 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       paymentReference: order.paymentReference,
     });
 
+    // ==========================================
+    // VIRTUAL_IBAN PAYMENT PROCESSING
+    // ==========================================
+    if (validatedData.paymentMethodCode === 'virtual_iban_balance') {
+      try {
+        console.log(`[ORDER] Processing Virtual IBAN payment for order ${order.id}`);
+        
+        // 1. Get user's Virtual IBAN account
+        const virtualIbanAccounts = await virtualIbanService.getUserAccounts(userId);
+        console.log(`[ORDER] Found ${virtualIbanAccounts.length} Virtual IBAN accounts for user ${userId}`);
+        
+        if (virtualIbanAccounts.length === 0) {
+          // Rollback: Delete the order
+          await prisma.order.delete({ where: { id: order.id } });
+          console.error('[ORDER] No Virtual IBAN account found');
+          return NextResponse.json({ 
+            error: 'Virtual IBAN account not found. Please create one first.' 
+          }, { status: 400 });
+        }
+        const account = virtualIbanAccounts[0];
+
+        // 2. Check sufficient balance (with small tolerance for floating point precision)
+        const requiredAmount = calculation.totalFiat;
+        const availableBalance = account.balance; // Float
+        const tolerance = 0.01; // 1 cent tolerance for floating point errors
+        
+        console.log(`[ORDER] Balance check: Required=${requiredAmount}, Available=${availableBalance}`);
+        
+        if (availableBalance < (requiredAmount - tolerance)) {
+          // Rollback: Delete the order
+          await prisma.order.delete({ where: { id: order.id } });
+          console.error(`[ORDER] Insufficient balance: ${availableBalance} < ${requiredAmount}`);
+          return NextResponse.json({ 
+            error: 'Insufficient balance',
+            required: requiredAmount,
+            available: availableBalance,
+            message: `Insufficient balance. Required: €${requiredAmount.toFixed(2)}, Available: €${availableBalance.toFixed(2)}`
+          }, { status: 400 });
+        }
+
+        console.log(`[ORDER] Deducting ${requiredAmount} from account ${account.id}`);
+
+        // 3. Deduct balance atomically
+        const { transaction } = await virtualIbanBalanceService.deductBalance(
+          account.id,
+          requiredAmount,
+          order.id,
+          `Payment for order ${order.paymentReference || order.id}`
+        );
+
+        console.log(`[ORDER] Balance deducted, transaction created: ${transaction.id}`);
+
+        // 4. Create PayIn record (instant - already reconciled)
+        await prisma.payIn.create({
+          data: {
+            orderId: order.id,
+            userId,
+            amount: requiredAmount,
+            expectedAmount: requiredAmount,
+            receivedAmount: requiredAmount,
+            fiatCurrencyCode: validatedData.fiatCurrencyCode,
+            currencyType: 'FIAT',
+            status: 'RECONCILED', // Already matched to order
+            paymentMethodCode: 'virtual_iban_balance',
+            transactionId: transaction.id,
+            reference: order.paymentReference,
+            paymentDate: new Date(),
+            receivedDate: new Date(),
+            reconciledAt: new Date(),
+            reconciledBy: userId, // Reconciled by user (automatic)
+            // initiatedBy and initiatedAt omitted - this is automatic payment, not admin-initiated
+          }
+        });
+
+        // 5. Update Order status to PAYMENT_RECEIVED (ready for processing)
+        const updatedOrder = await prisma.order.update({
+          where: { id: order.id },
+          data: { 
+            status: 'PAYMENT_RECEIVED',
+            processedAt: new Date()
+          },
+          include: {
+            currency: true,
+            fiatCurrency: true,
+            paymentMethod: true
+          }
+        });
+
+        console.log(`[ORDER] Virtual IBAN payment completed instantly for order ${order.id}`);
+
+        // Emit PAYMENT_COMPLETED event
+        await eventEmitter.emit('PAYMENT_COMPLETED', {
+          userId,
+          recipientEmail: session.user.email || undefined,
+          orderId: updatedOrder.id,
+          amount: requiredAmount,
+          currency: updatedOrder.fiatCurrencyCode,
+          paymentMethod: 'VIRTUAL_IBAN',
+        });
+
+        return NextResponse.json({
+          ...updatedOrder,
+          paymentMethod: 'VIRTUAL_IBAN',
+          balanceDeducted: requiredAmount,
+          message: 'Payment completed instantly from your Virtual IBAN balance'
+        }, { status: 201 });
+
+      } catch (error) {
+        console.error('[ORDER] Virtual IBAN payment failed:', error);
+        
+        // Rollback: Delete the order if it still exists
+        try {
+          await prisma.order.delete({ where: { id: order.id } });
+        } catch (e) {
+          // Order might already be deleted
+        }
+        
+        return NextResponse.json({ 
+          error: 'Payment processing failed',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        }, { status: 500 });
+      }
+    }
+
+    // Regular payment (bank transfer) - return pending order
     return NextResponse.json(order, { status: 201 });
   } catch (error) {
     console.error('Create order error:', error);

@@ -66,7 +66,7 @@ export async function generateInvoicePDF(orderId: string): Promise<Buffer> {
     // Fallback: get active payment account for the fiat currency
     bankDetails = await prisma.paymentAccount.findFirst({
       where: {
-        type: 'BANK',
+        type: 'BANK_ACCOUNT', // Correct enum value
         currency: order.fiatCurrencyCode,
         isActive: true
       },

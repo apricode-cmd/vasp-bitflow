@@ -14,6 +14,7 @@ import { IKycProvider } from './categories/IKycProvider';
 import { IRatesProvider } from './categories/IRatesProvider';
 import { IEmailProvider } from './categories/IEmailProvider';
 import { IBlockchainProvider } from './categories/IBlockchainProvider';
+import { IVirtualIbanProvider } from './categories/IVirtualIbanProvider';
 
 // Import adapters
 import { kycaidAdapter } from './providers/kyc/KycaidAdapter';
@@ -22,6 +23,7 @@ import { coinGeckoAdapter } from './providers/rates/CoinGeckoAdapter';
 import { krakenAdapter } from './providers/rates/KrakenAdapter';
 import { resendAdapter } from './providers/email/ResendAdapter';
 import { tatumAdapter } from './providers/blockchain/TatumAdapter';
+import { BCBGroupAdapter } from './providers/virtual-iban/BCBGroupAdapter';
 
 /**
  * Provider registration info
@@ -115,6 +117,17 @@ class IntegrationRegistry {
       icon: '⛓️',
       documentationUrl: 'https://docs.tatum.io/',
       instance: tatumAdapter
+    });
+
+    // Virtual IBAN Providers
+    this.register({
+      providerId: 'BCB_GROUP_VIRTUAL_IBAN',
+      category: IntegrationCategory.VIRTUAL_IBAN,
+      displayName: 'BCB Group Virtual IBAN',
+      description: 'Virtual IBAN accounts for automated payment reconciliation (GPG authenticated)',
+      icon: '🏦',
+      documentationUrl: 'https://bcbdigital.docs.apiary.io',
+      instance: new BCBGroupAdapter()
     });
   }
 

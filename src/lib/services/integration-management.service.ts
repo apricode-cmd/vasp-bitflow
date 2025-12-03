@@ -377,7 +377,7 @@ export async function updateIntegrationConfig(params: UpdateIntegrationParams) {
 }
 
 /**
- * Get integration with decrypted API key (for testing/usage)
+ * Get integration with decrypted secrets (for testing/usage)
  */
 export async function getIntegrationWithSecrets(service: string) {
   const integration = await prisma.integration.findUnique({
@@ -388,9 +388,42 @@ export async function getIntegrationWithSecrets(service: string) {
     return null;
   }
 
+  // Decrypt API key if present
+  let decryptedApiKey: string | null = null;
+  if (integration.apiKey) {
+    try {
+      decryptedApiKey = decrypt(integration.apiKey);
+    } catch (e) {
+      console.warn('Could not decrypt apiKey, using raw value');
+      decryptedApiKey = integration.apiKey;
+    }
+  }
+
+  // Decrypt secrets in config if present (for BCB Group and similar)
+  let decryptedConfig = integration.config as Record<string, unknown> | null;
+  if (decryptedConfig && typeof decryptedConfig === 'object') {
+    const configCopy = { ...decryptedConfig };
+    
+    // Decrypt clientSecret if encrypted
+    if (configCopy.clientSecret && typeof configCopy.clientSecret === 'string') {
+      try {
+        const secret = configCopy.clientSecret as string;
+        // Check if it's encrypted (starts with 'encrypted:' or has format iv:authTag:data)
+        if (secret.startsWith('encrypted:') || secret.startsWith('plain:') || secret.split(':').length === 3) {
+          configCopy.clientSecret = decrypt(secret);
+        }
+      } catch (e) {
+        console.warn('Could not decrypt clientSecret from config:', e);
+      }
+    }
+    
+    decryptedConfig = configCopy;
+  }
+
   return {
     ...integration,
-    apiKey: integration.apiKey ? decrypt(integration.apiKey) : null
+    apiKey: decryptedApiKey,
+    config: decryptedConfig
   };
 }
 

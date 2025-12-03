@@ -42,6 +42,8 @@ model User {
   userAuditLogs             UserAuditLog[]             @relation("UserAuditLogs")
   kycLevelData              UserKycLevel?              @relation("UserKycLevelRelation")
   userWallets               UserWallet[]
+  virtualIbanAccounts       VirtualIbanAccount[] // Virtual IBAN accounts
+  topUpRequests             TopUpRequest[] // Top-up requests for Virtual IBAN
 
   @@index([email])
   @@index([role])
@@ -196,40 +198,41 @@ model RateHistory {
 }
 
 model Order {
-  id                String               @id @default(cuid())
-  userId            String
-  currencyCode      String
-  fiatCurrencyCode  String
-  paymentReference  String               @unique
-  cryptoAmount      Float
-  fiatAmount        Float
-  rate              Float
-  feePercent        Float
-  feeAmount         Float
-  totalFiat         Float
-  userWalletId      String?
-  walletAddress     String
-  blockchainCode    String?
-  paymentMethodCode String?
-  status            OrderStatus          @default(PENDING)
-  createdByAdmin    Boolean              @default(false)
-  adminNotes        String?
-  transactionHash   String?
-  processedBy       String?
-  processedAt       DateTime?
-  expiresAt         DateTime
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
-  blockchain        BlockchainNetwork?   @relation(fields: [blockchainCode], references: [code])
-  currency          Currency             @relation(fields: [currencyCode], references: [code])
-  fiatCurrency      FiatCurrency         @relation(fields: [fiatCurrencyCode], references: [code])
-  paymentMethod     PaymentMethod?       @relation(fields: [paymentMethodCode], references: [code])
-  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userWallet        UserWallet?          @relation(fields: [userWalletId], references: [id])
-  statusHistory     OrderStatusHistory[]
-  payIn             PayIn?
-  payOut            PayOut?
-  paymentProofs     PaymentProof[]
+  id                     String                  @id @default(cuid())
+  userId                 String
+  currencyCode           String
+  fiatCurrencyCode       String
+  paymentReference       String                  @unique
+  cryptoAmount           Float
+  fiatAmount             Float
+  rate                   Float
+  feePercent             Float
+  feeAmount              Float
+  totalFiat              Float
+  userWalletId           String?
+  walletAddress          String
+  blockchainCode         String?
+  paymentMethodCode      String?
+  status                 OrderStatus             @default(PENDING)
+  createdByAdmin         Boolean                 @default(false)
+  adminNotes             String?
+  transactionHash        String?
+  processedBy            String?
+  processedAt            DateTime?
+  expiresAt              DateTime
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  blockchain             BlockchainNetwork?      @relation(fields: [blockchainCode], references: [code])
+  currency               Currency                @relation(fields: [currencyCode], references: [code])
+  fiatCurrency           FiatCurrency            @relation(fields: [fiatCurrencyCode], references: [code])
+  paymentMethod          PaymentMethod?          @relation(fields: [paymentMethodCode], references: [code])
+  user                   User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userWallet             UserWallet?             @relation(fields: [userWalletId], references: [id])
+  statusHistory          OrderStatusHistory[]
+  payIn                  PayIn?
+  payOut                 PayOut?
+  paymentProofs          PaymentProof[]
+  virtualIbanTransaction VirtualIbanTransaction? // Link to Virtual IBAN transaction
 
   @@index([userId])
   @@index([status])
@@ -337,55 +340,56 @@ model PlatformWallet {
 }
 
 model PayIn {
-  id                 String             @id @default(cuid())
-  orderId            String             @unique
-  userId             String
-  amount             Float
-  fiatCurrencyCode   String?
-  cryptocurrencyCode String?
-  currencyType       CurrencyType
-  paymentMethodCode  String?
-  senderName         String?
-  senderAccount      String?
-  senderBank         String?
-  reference          String?
-  networkCode        String?
-  senderAddress      String?
-  transactionHash    String?
-  blockNumber        Int?
-  confirmations      Int                @default(0)
-  transactionId      String?            @unique
-  status             PayInStatus        @default(PENDING)
-  expectedAmount     Float
-  receivedAmount     Float?
-  amountMismatch     Boolean            @default(false)
-  verifiedBy         String?
-  verifiedAt         DateTime?
-  verificationNotes  String?
-  reconciledWith     String?
-  reconciledAt       DateTime?
-  reconciledBy       String?
-  proofUrls          String[]
-  explorerUrl        String?
-  paymentDate        DateTime?
-  receivedDate       DateTime?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  approvalRequired   Boolean            @default(true)
-  approvedAt         DateTime?
-  approvedBy         String?
-  initiatedAt        DateTime?
-  initiatedBy        String?
-  approver           Admin?             @relation("PayInApprover", fields: [approvedBy], references: [id])
-  cryptocurrency     Currency?          @relation("PayInCrypto", fields: [cryptocurrencyCode], references: [code])
-  fiatCurrency       FiatCurrency?      @relation(fields: [fiatCurrencyCode], references: [code])
-  initiator          Admin?             @relation("PayInInitiator", fields: [initiatedBy], references: [id])
-  network            BlockchainNetwork? @relation("PayInNetwork", fields: [networkCode], references: [code])
-  order              Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  paymentMethod      PaymentMethod?     @relation(fields: [paymentMethodCode], references: [code])
-  reconciler         User?              @relation("PayInReconciler", fields: [reconciledBy], references: [id])
-  user               User               @relation("PayInUser", fields: [userId], references: [id], onDelete: Cascade)
-  verifier           User?              @relation("PayInVerifier", fields: [verifiedBy], references: [id])
+  id                     String                  @id @default(cuid())
+  orderId                String                  @unique
+  userId                 String
+  amount                 Float
+  fiatCurrencyCode       String?
+  cryptocurrencyCode     String?
+  currencyType           CurrencyType
+  paymentMethodCode      String?
+  senderName             String?
+  senderAccount          String?
+  senderBank             String?
+  reference              String?
+  networkCode            String?
+  senderAddress          String?
+  transactionHash        String?
+  blockNumber            Int?
+  confirmations          Int                     @default(0)
+  transactionId          String?                 @unique
+  status                 PayInStatus             @default(PENDING)
+  expectedAmount         Float
+  receivedAmount         Float?
+  amountMismatch         Boolean                 @default(false)
+  verifiedBy             String?
+  verifiedAt             DateTime?
+  verificationNotes      String?
+  reconciledWith         String?
+  reconciledAt           DateTime?
+  reconciledBy           String?
+  proofUrls              String[]
+  explorerUrl            String?
+  paymentDate            DateTime?
+  receivedDate           DateTime?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  approvalRequired       Boolean                 @default(true)
+  approvedAt             DateTime?
+  approvedBy             String?
+  initiatedAt            DateTime?
+  initiatedBy            String?
+  approver               Admin?                  @relation("PayInApprover", fields: [approvedBy], references: [id])
+  cryptocurrency         Currency?               @relation("PayInCrypto", fields: [cryptocurrencyCode], references: [code])
+  fiatCurrency           FiatCurrency?           @relation(fields: [fiatCurrencyCode], references: [code])
+  initiator              Admin?                  @relation("PayInInitiator", fields: [initiatedBy], references: [id])
+  network                BlockchainNetwork?      @relation("PayInNetwork", fields: [networkCode], references: [code])
+  order                  Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentMethod          PaymentMethod?          @relation(fields: [paymentMethodCode], references: [code])
+  reconciler             User?                   @relation("PayInReconciler", fields: [reconciledBy], references: [id])
+  user                   User                    @relation("PayInUser", fields: [userId], references: [id], onDelete: Cascade)
+  verifier               User?                   @relation("PayInVerifier", fields: [verifiedBy], references: [id])
+  virtualIbanTransaction VirtualIbanTransaction? // Link to Virtual IBAN transaction (if payment via vIBAN)
 
   @@index([orderId])
   @@index([userId])
@@ -2124,72 +2128,280 @@ enum WorkflowActionType {
 }
 
 model Workflow {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   name        String
   description String?
-  
+
   // Trigger configuration
-  trigger     WorkflowTrigger
-  triggerConfig Json?  // Additional trigger params
-  
+  trigger       WorkflowTrigger
+  triggerConfig Json? // Additional trigger params
+
   // Dual storage strategy
-  visualState Json     // { nodes: [], edges: [] } for React Flow
-  logicState  Json     // Compiled json-logic for execution
-  
+  visualState Json // { nodes: [], edges: [] } for React Flow
+  logicState  Json // Compiled json-logic for execution
+
   // Metadata
-  status      WorkflowStatus @default(DRAFT)
-  priority    Int            @default(0)  // Higher = runs first
-  isActive    Boolean        @default(false)
-  
+  status   WorkflowStatus @default(DRAFT)
+  priority Int            @default(0) // Higher = runs first
+  isActive Boolean        @default(false)
+
   // Version control
-  version     Int            @default(1)
-  parentId    String?        // For versioning
-  parent      Workflow?      @relation("WorkflowVersions", fields: [parentId], references: [id])
-  versions    Workflow[]     @relation("WorkflowVersions")
-  
+  version  Int        @default(1)
+  parentId String? // For versioning
+  parent   Workflow?  @relation("WorkflowVersions", fields: [parentId], references: [id])
+  versions Workflow[] @relation("WorkflowVersions")
+
   // Audit
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  createdBy   String
-  creator     Admin          @relation("WorkflowCreator", fields: [createdBy], references: [id])
-  updatedBy   String?
-  updater     Admin?         @relation("WorkflowUpdater", fields: [updatedBy], references: [id])
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String
+  creator   Admin    @relation("WorkflowCreator", fields: [createdBy], references: [id])
+  updatedBy String?
+  updater   Admin?   @relation("WorkflowUpdater", fields: [updatedBy], references: [id])
+
   // Stats
-  executionCount Int          @default(0)
+  executionCount Int       @default(0)
   lastExecutedAt DateTime?
-  
+
   // Execution logs
-  executions  WorkflowExecution[]
-  
+  executions WorkflowExecution[]
+
   @@index([trigger, isActive])
   @@index([status, isActive])
   @@index([createdBy])
 }
 
 model WorkflowExecution {
-  id          String   @id @default(cuid())
-  workflowId  String
-  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  
+  id         String   @id @default(cuid())
+  workflowId String
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
   // Context
   trigger     WorkflowTrigger
-  contextData Json     // The data that triggered the workflow (order, payIn, etc.)
-  
+  contextData Json // The data that triggered the workflow (order, payIn, etc.)
+
   // Result
-  success     Boolean
-  result      Json     // Actions returned by workflow
-  error       String?
-  
+  success Boolean
+  result  Json // Actions returned by workflow
+  error   String?
+
   // Performance
   executionTimeMs Int
-  
+
   // Audit
-  executedAt  DateTime @default(now())
-  entityType  String?  // 'Order', 'PayIn', 'KYC', etc.
-  entityId    String?  // Related entity ID
-  
+  executedAt DateTime @default(now())
+  entityType String? // 'Order', 'PayIn', 'KYC', etc.
+  entityId   String? // Related entity ID
+
   @@index([workflowId, executedAt])
   @@index([trigger, executedAt])
   @@index([entityType, entityId])
+}
+
+// ============================================
+// VIRTUAL IBAN MODULE
+// ============================================
+
+enum VirtualIbanStatus {
+  ACTIVE // Account is active and ready to receive payments
+  SUSPENDED // Temporarily suspended by admin
+  CLOSED // Permanently closed
+  PENDING // Being created
+  FAILED // Creation failed
+}
+
+enum VirtualIbanTransactionType {
+  CREDIT // Incoming payment
+  DEBIT // Outgoing payment (future)
+}
+
+enum VirtualIbanTransactionStatus {
+  PENDING // Transaction is being processed
+  COMPLETED // Transaction completed successfully
+  FAILED // Transaction failed
+  REVERSED // Transaction was reversed/refunded
+  VOP_HELD // Held for Verification of Payee review (EUR only)
+}
+
+enum VopStatus {
+  MATCH // Exact name match - auto-approved
+  CLOSE_MATCH // Close match - requires review
+  NO_MATCH // No match - requires review
+  IMPOSSIBLE_MATCH // VOP check failed - requires review
+}
+
+enum TopUpRequestStatus {
+  PENDING // Awaiting payment
+  COMPLETED // Payment received, balance credited
+  EXPIRED // Request expired (24h)
+  CANCELLED // Manually cancelled
+}
+
+model VirtualIbanAccount {
+  id String @id @default(cuid())
+
+  // User relationship
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Provider info
+  providerId        String // 'BCB_GROUP_VIRTUAL_IBAN', 'CURRENCY_CLOUD', etc.
+  providerAccountId String // External account ID from provider
+
+  // IBAN details
+  iban          String  @unique
+  bic           String? // BIC/SWIFT code
+  bankName      String // Bank name shown to users
+  accountHolder String // Account holder name
+
+  // Account details
+  currency String // EUR, USD, GBP, PLN
+  country  String // ISO2 country code (where IBAN is issued)
+
+  // Status
+  status VirtualIbanStatus @default(PENDING)
+
+  // Balance (cached from provider)
+  balance           Float     @default(0)
+  lastBalanceUpdate DateTime?
+
+  // Metadata from provider
+  metadata Json? // Provider-specific data
+
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Admin actions
+  suspendedAt   DateTime?
+  suspendedBy   String?
+  suspendReason String?
+  closedAt      DateTime?
+  closedBy      String?
+  closeReason   String?
+
+  // Relations
+  transactions  VirtualIbanTransaction[]
+  topUpRequests TopUpRequest[]
+
+  @@index([userId])
+  @@index([providerId])
+  @@index([status])
+  @@index([currency])
+  @@index([createdAt])
+  @@map("virtual_iban_accounts")
+}
+
+model VirtualIbanTransaction {
+  id String @id @default(cuid())
+
+  // Virtual IBAN account
+  virtualIbanId String
+  virtualIban   VirtualIbanAccount @relation(fields: [virtualIbanId], references: [id], onDelete: Cascade)
+
+  // Provider transaction ID
+  providerTransactionId String @unique
+
+  // Transaction details
+  type     VirtualIbanTransactionType
+  amount   Float
+  currency String
+
+  // Sender info (for incoming payments)
+  senderName String?
+  senderIban String?
+  reference  String? // Payment reference/memo
+
+  // Status
+  status VirtualIbanTransactionStatus @default(PENDING)
+  
+  // Verification of Payee (VOP) for EUR payments
+  vopStatus        VopStatus? // VOP check result
+  vopMatchedName   String?    // Suggested name from VOP (if close_match)
+  vopReviewedBy    String?    // Admin who reviewed VOP (if manual review)
+  vopReviewedAt    DateTime?  // When VOP was reviewed
+  vopApproved      Boolean?   // Admin decision (true = approved, false = cancelled)
+
+  // Timestamps
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  // Auto-reconciliation
+  orderId String? @unique // Linked order (if matched)
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  payInId String? @unique // Linked PayIn (if created)
+  payIn   PayIn?  @relation(fields: [payInId], references: [id], onDelete: SetNull)
+
+  reconciledAt         DateTime?
+  reconciledBy         String? // Admin who manually reconciled (if manual)
+  reconciliationMethod String? // 'auto_reference', 'auto_amount', 'manual'
+
+  // Metadata
+  metadata Json? // Provider-specific data (e2eId, network, etc.)
+
+  // Webhook info
+  webhookReceivedAt DateTime?
+  webhookPayload    Json?
+
+  // TopUp request link (if this transaction completed a top-up request)
+  topUpRequest TopUpRequest?
+
+  @@index([virtualIbanId, createdAt])
+  @@index([orderId])
+  @@index([payInId])
+  @@index([status])
+  @@index([reference]) // For reference-based matching
+  @@index([amount, currency]) // For amount-based matching
+  @@index([reconciledAt])
+  @@map("virtual_iban_transactions")
+}
+
+// ============================================
+// TOP UP REQUEST (Balance replenishment)
+// ============================================
+
+model TopUpRequest {
+  id String @id @default(cuid())
+
+  // === USER RELATION ===
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // === VIRTUAL IBAN RELATION ===
+  virtualIbanId String
+  virtualIban   VirtualIbanAccount @relation(fields: [virtualIbanId], references: [id], onDelete: Cascade)
+
+  // === TRANSACTION RELATION (when payment received) ===
+  transactionId String?                 @unique
+  transaction   VirtualIbanTransaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  // === REQUEST DATA ===
+  reference     String  @unique // Unique code: TU-{IBAN4}-{RANDOM} for matching
+  invoiceNumber String? // Invoice number for PDF
+  amount        Float // Requested top-up amount
+  currency      String // EUR, USD, etc.
+
+  // === STATUS ===
+  status TopUpRequestStatus @default(PENDING)
+
+  // === TIMESTAMPS ===
+  expiresAt   DateTime // When request expires (24h)
+  completedAt DateTime? // When payment received
+  cancelledAt DateTime? // When cancelled by user
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // === METADATA ===
+  metadata Json? // Additional data (IP, user agent, etc.)
+
+  // === INDEXES ===
+  @@index([userId])
+  @@index([virtualIbanId])
+  @@index([reference])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([createdAt])
+  @@map("top_up_requests")
 }

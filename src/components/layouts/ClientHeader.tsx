@@ -121,6 +121,7 @@ export function ClientHeader(): React.ReactElement {
     { href: '/buy', label: 'Buy Crypto', icon: CreditCard },
     { href: '/orders', label: 'Orders', icon: Package },
     { href: '/wallets', label: 'Wallets', icon: Wallet },
+    { href: '/virtual-iban', label: 'Virtual IBAN', icon: CreditCard }, // Using CreditCard instead of Landmark
     { href: '/kyc', label: 'KYC', icon: Shield },
     { href: '/notifications', label: 'Notifications', icon: Bell }
   ];

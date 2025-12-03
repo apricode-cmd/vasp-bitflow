@@ -464,7 +464,7 @@ export default function IntegrationsPage(): JSX.Element {
       {/* Configuration Modal */}
       {selectedIntegration && (
         <Dialog open={configModalOpen} onOpenChange={setConfigModalOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Settings className="h-5 w-5" />
@@ -476,8 +476,94 @@ export default function IntegrationsPage(): JSX.Element {
             </DialogHeader>
 
             <div className="space-y-4 py-4">
-              {/* Sumsub-specific fields */}
-              {selectedIntegration.service === 'sumsub' ? (
+              {/* BCB Group Virtual IBAN - OAuth authentication */}
+              {selectedIntegration.service === 'BCB_GROUP_VIRTUAL_IBAN' ? (
+                <>
+                  {/* Environment */}
+                  <div className="space-y-2">
+                    <Label htmlFor="modal-sandbox">Environment</Label>
+                    <Select
+                      value={(selectedIntegration.config as Record<string, unknown>)?.sandbox ? 'sandbox' : 'production'}
+                      onValueChange={(value) => updateIntegration(selectedIntegration.service, {
+                        config: { ...selectedIntegration.config, sandbox: value === 'sandbox' }
+                      })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select environment" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sandbox">Sandbox (UAT)</SelectItem>
+                        <SelectItem value="production">Production</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Sandbox: api.uat.bcb.group | Production: api.bcb.group
+                    </p>
+                  </div>
+
+                  {/* Client ID */}
+                  <div className="space-y-2">
+                    <Label htmlFor="modal-client-id">Client ID *</Label>
+                    <Input
+                      id="modal-client-id"
+                      type="text"
+                      value={(selectedIntegration.config as Record<string, unknown>)?.clientId as string || ''}
+                      onChange={(e) => updateIntegration(selectedIntegration.service, {
+                        config: { ...selectedIntegration.config, clientId: e.target.value }
+                      })}
+                      placeholder="Nzc482UW1smHy7HEZSmlQrXUrbS3oBnw"
+                      autoComplete="off"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      OAuth client_id from BCB credentials file
+                    </p>
+                  </div>
+
+                  {/* Client Secret */}
+                  <div className="space-y-2">
+                    <Label htmlFor="modal-client-secret">Client Secret *</Label>
+                    <Input
+                      id="modal-client-secret"
+                      type="password"
+                      value={(selectedIntegration.config as Record<string, unknown>)?.clientSecret as string || ''}
+                      onChange={(e) => updateIntegration(selectedIntegration.service, {
+                        config: { ...selectedIntegration.config, clientSecret: e.target.value }
+                      })}
+                      placeholder="lSN7mBUF3eV88lnWSTwc..."
+                      autoComplete="off"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      OAuth client_secret (will be encrypted with AES-256-GCM)
+                    </p>
+                  </div>
+
+                  {/* Counterparty ID */}
+                  <div className="space-y-2">
+                    <Label htmlFor="modal-counterparty-id">Counterparty ID *</Label>
+                    <Input
+                      id="modal-counterparty-id"
+                      type="text"
+                      value={(selectedIntegration.config as Record<string, unknown>)?.counterpartyId as string || ''}
+                      onChange={(e) => updateIntegration(selectedIntegration.service, {
+                        config: { ...selectedIntegration.config, counterpartyId: e.target.value }
+                      })}
+                      placeholder="13608"
+                      autoComplete="off"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Your BCB Group counterparty ID for API requests
+                    </p>
+                  </div>
+
+                  {/* Info Alert */}
+                  <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      <strong>Authentication:</strong> OAuth 2.0 Client Credentials flow.
+                      Token endpoint: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">https://auth.bcb.group/oauth/token</code>
+                    </p>
+                  </div>
+                </>
+              ) : selectedIntegration.service === 'sumsub' ? (
                 <>
                   {/* App Token */}
                   <div className="space-y-2">

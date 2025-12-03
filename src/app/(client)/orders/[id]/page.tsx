@@ -64,17 +64,29 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
   // Get payment account for the fiat currency (from payment method or fallback)
   let paymentAccount = order.paymentMethod?.paymentAccount;
   
-  if (!paymentAccount) {
-    // Fallback: get active payment account for the fiat currency
+  // Check if this is Virtual IBAN payment (instant payment from balance)
+  const isVirtualIbanPayment = order.paymentMethodCode === 'virtual_iban_balance';
+  
+  if (!paymentAccount && !isVirtualIbanPayment) {
+    // Fallback: get active payment account for the fiat currency (only for bank transfers)
     paymentAccount = await prisma.paymentAccount.findFirst({
       where: {
-        type: 'BANK',
+        type: 'BANK_ACCOUNT', // Correct enum value
         currency: order.fiatCurrencyCode,
         isActive: true
       },
       orderBy: {
         priority: 'desc'
       }
+    });
+  }
+
+  // Get PayIn info for Virtual IBAN payments
+  let payInInfo = null;
+  if (isVirtualIbanPayment) {
+    payInInfo = await prisma.payIn.findFirst({
+      where: { orderId: order.id },
+      orderBy: { createdAt: 'desc' }
     });
   }
 
@@ -103,14 +115,31 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
         </div>
         <div className="flex items-center gap-3">
           <OrderStatusBadge status={order.status} />
-          {order.status !== 'CANCELLED' && (
+          {order.status !== 'CANCELLED' && !isVirtualIbanPayment && (
             <DownloadInvoiceButton orderId={order.id} />
           )}
         </div>
       </div>
 
       {/* Status Messages */}
-      {order.status === 'PENDING' && (
+      {isVirtualIbanPayment && order.status === 'PAYMENT_RECEIVED' && (
+        <Card className="border-green-200 bg-green-50">
+          <CardContent className="p-4">
+            <div className="flex gap-3">
+              <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+              <div>
+                <h3 className="font-semibold text-green-900">Payment Completed from Virtual IBAN Balance</h3>
+                <p className="text-sm text-green-800 mt-1">
+                  {formatFiatCurrency(order.totalFiat, order.fiatCurrencyCode)} was deducted from your Virtual IBAN balance instantly. 
+                  Your order is now being processed and crypto will be sent shortly.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {!isVirtualIbanPayment && order.status === 'PENDING' && (
         <Card className="border-yellow-200 bg-yellow-50">
           <CardContent className="p-4">
             <div className="flex gap-3">
@@ -132,9 +161,11 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
             <div className="flex gap-3">
               <Clock className="w-5 h-5 text-blue-600 flex-shrink-0" />
               <div>
-                <h3 className="font-semibold text-blue-900">Payment Received</h3>
+                <h3 className="font-semibold text-blue-900">
+                  {isVirtualIbanPayment ? 'Processing Your Order' : 'Payment Received'}
+                </h3>
                 <p className="text-sm text-blue-800 mt-1">
-                  Your payment has been received and is being processed. Crypto will be sent shortly.
+                  Your {isVirtualIbanPayment ? 'order' : 'payment'} is being processed. Crypto will be sent shortly.
                 </p>
               </div>
             </div>
@@ -225,8 +256,8 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
         </Card>
       </div>
 
-      {/* Payment Instructions (for pending orders) */}
-      {order.status === 'PENDING' && paymentAccount && (
+      {/* Payment Instructions (only for bank transfer - NOT for Virtual IBAN) */}
+      {!isVirtualIbanPayment && order.status === 'PENDING' && paymentAccount && (
         <Card>
           <CardHeader>
             <CardTitle>Payment Instructions</CardTitle>
@@ -276,6 +307,46 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps):
               <Button size="lg" className="w-full" disabled>
                 Upload Payment Proof (Coming Soon)
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Virtual IBAN Payment Summary (instead of payment instructions) */}
+      {isVirtualIbanPayment && payInInfo && (
+        <Card className="border-green-200">
+          <CardHeader>
+            <CardTitle className="text-green-900">Payment Summary</CardTitle>
+            <CardDescription>
+              Paid instantly from your Virtual IBAN Balance
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <span className="text-sm text-muted-foreground">Payment Method:</span>
+                <p className="font-medium">Virtual IBAN Balance</p>
+              </div>
+              <div>
+                <span className="text-sm text-muted-foreground">Amount Paid:</span>
+                <p className="font-medium text-green-700">{formatFiatCurrency(payInInfo.amount, order.fiatCurrencyCode)}</p>
+              </div>
+              <div>
+                <span className="text-sm text-muted-foreground">Payment Status:</span>
+                <p className="font-medium text-green-700">✓ Completed</p>
+              </div>
+              <div>
+                <span className="text-sm text-muted-foreground">Payment Date:</span>
+                <p className="font-medium">{formatDateTime(payInInfo.paymentDate || payInInfo.createdAt)}</p>
+              </div>
+            </div>
+
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <p className="text-sm text-green-800">
+                <CheckCircle className="w-4 h-4 inline mr-1" />
+                Your payment was processed instantly from your Virtual IBAN balance. 
+                You will receive your cryptocurrency once the admin processes your order.
+              </p>
             </div>
           </CardContent>
         </Card>

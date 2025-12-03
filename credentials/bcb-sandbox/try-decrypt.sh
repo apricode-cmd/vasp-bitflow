@@ -1,0 +1,42 @@
+#!/bin/bash
+echo "╔═══════════════════════════════════════════════════════════════════╗"
+echo "║     🔓 ИНТЕРАКТИВНАЯ РАСШИФРОВКА BCB CREDENTIALS                 ║"
+echo "╚═══════════════════════════════════════════════════════════════════╝"
+echo ""
+echo "📋 GPG попросит вас ввести passphrase"
+echo "💡 Если не знаете passphrase - проверьте:"
+echo "   • Email от BCB Support"
+echo "   • Где сохраняли при генерации ключа"
+echo "   • Попробуйте вспомнить или сбросить ключ"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+gpg --decrypt "Sandbox_credentials.api (4).gpg" 2>/dev/null
+
+if [ $? -eq 0 ]; then
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "✅ РАСШИФРОВКА УСПЕШНА!"
+    echo ""
+    echo "📋 Скопируйте эти данные и введите в админ-панель:"
+    echo "   http://localhost:3000/admin/integrations"
+else
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "❌ Расшифровка не удалась"
+    echo ""
+    echo "🔑 ВОЗМОЖНЫЕ РЕШЕНИЯ:"
+    echo ""
+    echo "1️⃣  Найдите passphrase от ключа admin@bitflow.biz"
+    echo "   • Проверьте email от BCB"
+    echo "   • Где сохраняли при создании ключа"
+    echo ""
+    echo "2️⃣  Свяжитесь с BCB Support:"
+    echo "   • 'I cannot decrypt the sandbox credentials file'"
+    echo "   • Попросите выслать passphrase или новый credentials"
+    echo ""
+    echo "3️⃣  Если ключ создавали сами:"
+    echo "   • Вспомните какой passphrase устанавливали"
+    echo "   • Или создайте новый GPG ключ без passphrase"
+fi

@@ -1,0 +1,1941 @@
+{
+    "openapi": "3.0.0",
+    "paths": {
+        "/v2/accounts/{accountId}/virtual": {
+            "post": {
+                "operationId": "VirtualAccountController_createVirtualAccountV2",
+                "summary": "",
+                "description": "Creates new virtual accounts for the given owners (max 1000 owners). \n\t\tRequest body differs for individual vs company owners, and GBP vs EUR virtual accounts.\n\t\tIt is possible to create virtual accounts without owner bank details - see CreateNoBankDetailsVirtualAccount schemas.\n\t\tIt is not possible to make payments out of virtual accounts without owner bank details.\n\t\t**Field requirements:**\n\t\t- **EUR accounts**: All fields must be 1-35 characters and contain only letters, numbers, and the following special characters: / - ? : ( ) . ' + and spaces (no leading spaces).\n\t\t- **GBP accounts**: All fields must be 1-140 characters and cannot contain: | _ [ ] < > ^ ` ~ \\ $ (no leading spaces).\n\t\t",
+                "parameters": [
+                    {
+                        "name": "accountId",
+                        "required": true,
+                        "in": "path",
+                        "description": "The account id for the segregated account",
+                        "schema": {
+                            "example": 123,
+                            "type": "number"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "anyOf": [
+                                        {
+                                            "$ref": "#/components/schemas/CreateEURVirtualAccountForCompany"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/CreateEURVirtualAccountForIndividual"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/CreateGBPVirtualAccountForCompany"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/CreateGBPVirtualAccountForIndividual"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/CreateNoBankDetailsVirtualAccountForCompany"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/CreateNoBankDetailsVirtualAccountForIndividual"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "The virtual account creation request was received successfully"
+                    },
+                    "404": {
+                        "description": "The accountId is unknown",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/VirtualAccountApiErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Virtual Accounts"
+                ],
+                "security": [
+                    {
+                        "bearer": []
+                    }
+                ]
+            }
+        },
+        "/v1/accounts/{accountId}/virtual/{iban}/close": {
+            "post": {
+                "operationId": "VirtualAccountController_closeVirtualAccount",
+                "summary": "",
+                "description": "Closes the virtual account with the given IBAN",
+                "parameters": [
+                    {
+                        "name": "accountId",
+                        "required": true,
+                        "in": "path",
+                        "description": "The account id for the segregated account",
+                        "schema": {
+                            "example": 123,
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "iban",
+                        "required": true,
+                        "in": "path",
+                        "description": "The IBAN of the virtual account",
+                        "schema": {
+                            "example": "GB33BUKB20201555555555",
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "The virtual account closure request was received successfully"
+                    },
+                    "404": {
+                        "description": "The accountId or IBAN is unknown",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/VirtualAccountApiErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Virtual Accounts"
+                ],
+                "security": [
+                    {
+                        "bearer": []
+                    }
+                ]
+            }
+        },
+        "/v1/accounts/{accountId}/virtual/{iban}/payment": {
+            "post": {
+                "operationId": "VirtualAccountController_initiatePayment",
+                "summary": "",
+                "description": "Sends a payment from the virtual account with the given IBAN",
+                "parameters": [
+                    {
+                        "name": "accountId",
+                        "required": true,
+                        "in": "path",
+                        "description": "The account id for the segregated account",
+                        "schema": {
+                            "example": 123,
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "iban",
+                        "required": true,
+                        "in": "path",
+                        "description": "The IBAN of the virtual account",
+                        "schema": {
+                            "example": "GB33BUKB20201555555555",
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VirtualAccountPaymentBody"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The payment was successfully created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/VirtualAccountPaymentResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The accountId or IBAN is unknown",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/VirtualAccountApiErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Virtual Accounts"
+                ],
+                "security": [
+                    {
+                        "bearer": []
+                    }
+                ]
+            }
+        },
+        "/v1/accounts/{accountId}/virtual/all-account-data": {
+            "get": {
+                "operationId": "VirtualAccountController_requestVirtualAccountData",
+                "summary": "",
+                "description": "Gets all virtual accounts for the given segregated account",
+                "parameters": [
+                    {
+                        "name": "accountId",
+                        "required": true,
+                        "in": "path",
+                        "description": "The account id for the segregated account",
+                        "schema": {
+                            "example": 123,
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "pageIndex",
+                        "required": false,
+                        "in": "query",
+                        "description": "The page offset of results to return",
+                        "schema": {
+                            "minimum": 0,
+                            "maximum": 1.7976931348623157e+308,
+                            "default": 0,
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "pageSize",
+                        "required": false,
+                        "in": "query",
+                        "description": "The limit of number of results to return",
+                        "schema": {
+                            "minimum": 1,
+                            "maximum": 1000,
+                            "default": 1000,
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The virtual accounts were retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PagedVirtualAccountDataResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The accountId is unknown",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/VirtualAccountApiErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Virtual Accounts"
+                ],
+                "security": [
+                    {
+                        "bearer": []
+                    }
+                ]
+            }
+        },
+        "/v1/accounts/{accountId}/virtual/{iban}/owner-bank-details": {
+            "put": {
+                "operationId": "VirtualAccountController_updateOwnerBankDetails",
+                "summary": "",
+                "description": "Updates the owner bank details for the virtual account with the given IBAN",
+                "parameters": [
+                    {
+                        "name": "accountId",
+                        "required": true,
+                        "in": "path",
+                        "description": "The account id for the segregated account",
+                        "schema": {
+                            "example": 123,
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "iban",
+                        "required": true,
+                        "in": "path",
+                        "description": "The IBAN of the virtual account",
+                        "schema": {
+                            "example": "GB33BUKB20201555555555",
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "$ref": "#/components/schemas/UpdateEUROwnerBankDetailsRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/UpdateGBPOwnerBankDetailsRequest"
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The owner bank details were updated successfully"
+                    },
+                    "400": {
+                        "description": "The request is invalid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/VirtualAccountApiErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The accountId or iban is unknown",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/VirtualAccountApiErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Virtual Accounts"
+                ],
+                "security": [
+                    {
+                        "bearer": []
+                    }
+                ]
+            }
+        },
+        "/v1/accounts/{accountId}/virtual/{iban}/owner-address": {
+            "put": {
+                "operationId": "VirtualAccountController_updateOwnerAddress",
+                "summary": "",
+                "description": "Updates the owner address for the virtual account with the given IBAN",
+                "parameters": [
+                    {
+                        "name": "accountId",
+                        "required": true,
+                        "in": "path",
+                        "description": "The account id for the segregated account",
+                        "schema": {
+                            "example": 123,
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "iban",
+                        "required": true,
+                        "in": "path",
+                        "description": "The IBAN of the virtual account",
+                        "schema": {
+                            "example": "GB33BUKB20201555555555",
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateOwnerAddressRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The owner address was updated successfully"
+                    },
+                    "400": {
+                        "description": "The request is invalid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/VirtualAccountApiErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The accountId or iban is unknown",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/VirtualAccountApiErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Virtual Accounts"
+                ],
+                "security": [
+                    {
+                        "bearer": []
+                    }
+                ]
+            }
+        },
+        "/v4/balance/{accountId}": {
+            "get": {
+                "operationId": "BalanceController_getBalanceForAccount",
+                "summary": "Get the balance for an account",
+                "parameters": [
+                    {
+                        "name": "accountId",
+                        "required": true,
+                        "in": "path",
+                        "description": "The id of the account",
+                        "schema": {
+                            "example": 12345,
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The balance was retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BalanceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The balance for the account was not found"
+                    }
+                },
+                "tags": [
+                    "Balances"
+                ],
+                "security": [
+                    {
+                        "bearer": []
+                    }
+                ]
+            }
+        },
+        "/v1/accounts/{accountId}/payments/{transactionId}": {
+            "get": {
+                "operationId": "PaymentsController_getPaymentById",
+                "summary": "",
+                "description": "Get the details of a single payment for a given account and transaction id",
+                "parameters": [
+                    {
+                        "name": "accountId",
+                        "required": true,
+                        "in": "path",
+                        "description": "The account id",
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "transactionId",
+                        "required": true,
+                        "in": "path",
+                        "description": "The transaction id of the payment",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The payment was retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetPaymentResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized\""
+                    },
+                    "404": {
+                        "description": "No payment was found for the account with the given transaction id"
+                    }
+                },
+                "tags": [
+                    "Payments"
+                ],
+                "security": [
+                    {
+                        "bearer": []
+                    }
+                ]
+            }
+        },
+        "/v1/accounts/{accountId}/payments": {
+            "get": {
+                "operationId": "PaymentsController_getPaymentsForAccount",
+                "summary": "",
+                "description": "Get the details of the payments for an account",
+                "parameters": [
+                    {
+                        "name": "accountId",
+                        "required": true,
+                        "in": "path",
+                        "description": "The account id",
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "dateFrom",
+                        "required": false,
+                        "in": "query",
+                        "description": "The date to get results from",
+                        "schema": {
+                            "format": "date-time",
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "dateTo",
+                        "required": false,
+                        "in": "query",
+                        "description": "The date to get results to",
+                        "schema": {
+                            "format": "date-time",
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "pageIndex",
+                        "required": false,
+                        "in": "query",
+                        "description": "The page offset of results to return",
+                        "schema": {
+                            "minimum": 0,
+                            "maximum": 1.7976931348623157e+308,
+                            "default": 0,
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "pageSize",
+                        "required": false,
+                        "in": "query",
+                        "description": "The limit of number of results to return",
+                        "schema": {
+                            "minimum": 1,
+                            "maximum": 1000,
+                            "default": 1000,
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The payments were retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PagedGetPaymentResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized\""
+                    },
+                    "404": {
+                        "description": "No payments were found for the account"
+                    }
+                },
+                "tags": [
+                    "Payments"
+                ],
+                "security": [
+                    {
+                        "bearer": []
+                    }
+                ]
+            }
+        },
+        "/v1/accounts/{accountId}/payments/nonce/{nonce}": {
+            "get": {
+                "operationId": "PaymentsController_getPaymentByNonce",
+                "summary": "",
+                "description": "Get the details of a single payment for a given account and nonce",
+                "parameters": [
+                    {
+                        "name": "accountId",
+                        "required": true,
+                        "in": "path",
+                        "description": "The account id",
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "nonce",
+                        "required": true,
+                        "in": "path",
+                        "description": "The unique nonce of the payment",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The payment was retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetPaymentResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized\""
+                    },
+                    "404": {
+                        "description": "No payment was found for the account with the given nonce"
+                    }
+                },
+                "tags": [
+                    "Payments"
+                ],
+                "security": [
+                    {
+                        "bearer": []
+                    }
+                ]
+            }
+        },
+        "/v1/accounts/{accountId}/payments/{e2eId}/verification-of-payee/approve": {
+            "post": {
+                "operationId": "PaymentsController_approveVerificationOfPayee",
+                "summary": "",
+                "description": "Approve a payment where the beneficiary name does not match the name on the account",
+                "parameters": [
+                    {
+                        "name": "e2eId",
+                        "required": true,
+                        "in": "path",
+                        "description": "The end-to-end id of the payment",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "The unverified payment was approved successfully."
+                    },
+                    "401": {
+                        "description": "Unauthorized\""
+                    },
+                    "404": {
+                        "description": "No unverified payment was found for this account with the given end-to-end id."
+                    },
+                    "409": {
+                        "description": "The payment is not unverified."
+                    }
+                },
+                "tags": [
+                    "Payments"
+                ],
+                "security": [
+                    {
+                        "bearer": []
+                    }
+                ]
+            }
+        },
+        "/v1/accounts/{accountId}/payments/{e2eId}/verification-of-payee/cancel": {
+            "post": {
+                "operationId": "PaymentsController_cancelVerificationOfPayee",
+                "summary": "",
+                "description": "Cancel a payment where the beneficiary name does not match the name on the account",
+                "parameters": [
+                    {
+                        "name": "e2eId",
+                        "required": true,
+                        "in": "path",
+                        "description": "The end-to-end id of the payment",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "The unverified payment was cancelled successfully."
+                    },
+                    "401": {
+                        "description": "Unauthorized\""
+                    },
+                    "404": {
+                        "description": "No unverified payment was found for this account with the given end-to-end id."
+                    },
+                    "409": {
+                        "description": "The payment is not unverified."
+                    }
+                },
+                "tags": [
+                    "Payments"
+                ],
+                "security": [
+                    {
+                        "bearer": []
+                    }
+                ]
+            }
+        }
+    },
+    "info": {
+        "title": "Client API Documentation",
+        "description": "This is the api documentation for the BCB client gateway",
+        "version": "1.0.0",
+        "contact": {}
+    },
+    "tags": [],
+    "servers": [],
+    "components": {
+        "securitySchemes": {
+            "bearer": {
+                "scheme": "bearer",
+                "bearerFormat": "JWT",
+                "type": "http"
+            }
+        },
+        "schemas": {
+            "CreateEURVirtualAccountForCompany": {
+                "type": "object",
+                "properties": {
+                    "correlationId": {
+                        "type": "string",
+                        "description": "The correlation ID provided on the account creation request. If you did not provide correlation ID, it will be generated",
+                        "maxLength": 255
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "The name of the virtual account owner. Must be 1-35 characters and contain only letters, numbers, and the following special characters: / - ? : ( ) . ' + and spaces (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-?:().'+, ]{1,35}$",
+                        "example": "EUR Test Company",
+                        "minLength": 1,
+                        "maxLength": 35
+                    },
+                    "addressLine1": {
+                        "type": "string",
+                        "description": "The first line of the address of the virtual account owner. Must be 1-35 characters and contain only letters, numbers, and the following special characters: / - ? : ( ) . , ' + and spaces (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-?:().'+, ]{1,35}$",
+                        "example": "Friedrichstrasse",
+                        "minLength": 1,
+                        "maxLength": 35
+                    },
+                    "addressLine2": {
+                        "type": "string",
+                        "description": "The second line of the address of the virtual account owner. Must be 1-35 characters and contain only letters, numbers, and the following special characters: / - ? : ( ) . , ' + and spaces (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-?:().'+, ]{1,35}$",
+                        "example": "100",
+                        "minLength": 1,
+                        "maxLength": 35
+                    },
+                    "addressLine3": {
+                        "type": "string",
+                        "description": "The third line of the address of the virtual account owner. Must be 1-35 characters and contain only letters, numbers, and the following special characters: / - ? : ( ) . , ' + and spaces (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-?:().'+, ]{1,35}$",
+                        "minLength": 1,
+                        "maxLength": 35
+                    },
+                    "city": {
+                        "type": "string",
+                        "description": "The postal city or town of the virtual account owner. Must be 1-35 characters and contain only letters, numbers, and the following special characters: / - ? : ( ) . , ' + and spaces (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-?:().'+, ]{1,35}$",
+                        "example": "Berlin",
+                        "minLength": 1,
+                        "maxLength": 35
+                    },
+                    "region": {
+                        "type": "string",
+                        "description": "The region (e.g. county, state, province, etc.) of the virtual account owner. Must be 1-35 characters and contain only letters, numbers, and the following special characters: / - ? : ( ) . , ' + and spaces (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-?:().'+, ]{1,35}$",
+                        "example": "Berlin",
+                        "minLength": 1,
+                        "maxLength": 35
+                    },
+                    "postcode": {
+                        "type": "string",
+                        "description": "The postal code (e.g. postcode, zip code, etc.) of the virtual account owner. Postcode is required for CHAPS payments. Must be 1-35 characters and contain only letters, numbers, and the following special characters: / - ? : ( ) . , ' + and spaces (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-?:().'+, ]{1,35}$",
+                        "example": "10115",
+                        "minLength": 1,
+                        "maxLength": 35
+                    },
+                    "country": {
+                        "type": "string",
+                        "description": "The 2-letter country code of the virtual account owner's EUR bank account",
+                        "example": "DE",
+                        "minLength": 2,
+                        "maxLength": 2
+                    },
+                    "nationality": {
+                        "type": "string",
+                        "description": "The 2-letter country code for the virtual account owner's nationality",
+                        "example": "DE",
+                        "minLength": 2,
+                        "maxLength": 2
+                    },
+                    "registrationNumber": {
+                        "type": "string",
+                        "description": "The registration number of the virtual account owner - only applicable to a corporation. Must be 1-35 characters and contain only letters, numbers, and the following special characters: / - ? : ( ) . , ' + and spaces (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-?:().'+, ]{1,35}$",
+                        "example": "AB123456",
+                        "minLength": 1,
+                        "maxLength": 35
+                    },
+                    "isIndividual": {
+                        "type": "boolean",
+                        "description": "Whether the virtual account owner is an individual as opposed to a corporation",
+                        "example": false
+                    },
+                    "iban": {
+                        "type": "string",
+                        "description": "The IBAN of the virtual account owner's EUR bank account",
+                        "example": "DE53202208000099106929"
+                    },
+                    "bicSwift": {
+                        "type": "string",
+                        "description": "The BIC of the virtual account owner's EUR bank account",
+                        "example": "MHSBDEHBXXX"
+                    }
+                },
+                "required": [
+                    "name",
+                    "addressLine1",
+                    "city",
+                    "country",
+                    "nationality",
+                    "isIndividual",
+                    "iban",
+                    "bicSwift"
+                ]
+            },
+            "CreateEURVirtualAccountForIndividual": {
+                "type": "object",
+                "properties": {
+                    "correlationId": {
+                        "type": "string",
+                        "description": "The correlation ID provided on the account creation request. If you did not provide correlation ID, it will be generated",
+                        "maxLength": 255
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "The name of the virtual account owner. Must be 1-35 characters and contain only letters, numbers, and the following special characters: / - ? : ( ) . ' + and spaces (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-?:().'+, ]{1,35}$",
+                        "example": "EUR Test Individual",
+                        "minLength": 1,
+                        "maxLength": 35
+                    },
+                    "addressLine1": {
+                        "type": "string",
+                        "description": "The first line of the address of the virtual account owner. Must be 1-35 characters and contain only letters, numbers, and the following special characters: / - ? : ( ) . , ' + and spaces (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-?:().'+, ]{1,35}$",
+                        "example": "Friedrichstrasse",
+                        "minLength": 1,
+                        "maxLength": 35
+                    },
+                    "addressLine2": {
+                        "type": "string",
+                        "description": "The second line of the address of the virtual account owner. Must be 1-35 characters and contain only letters, numbers, and the following special characters: / - ? : ( ) . , ' + and spaces (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-?:().'+, ]{1,35}$",
+                        "example": "100",
+                        "minLength": 1,
+                        "maxLength": 35
+                    },
+                    "addressLine3": {
+                        "type": "string",
+                        "description": "The third line of the address of the virtual account owner. Must be 1-35 characters and contain only letters, numbers, and the following special characters: / - ? : ( ) . , ' + and spaces (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-?:().'+, ]{1,35}$",
+                        "minLength": 1,
+                        "maxLength": 35
+                    },
+                    "city": {
+                        "type": "string",
+                        "description": "The postal city or town of the virtual account owner. Must be 1-35 characters and contain only letters, numbers, and the following special characters: / - ? : ( ) . , ' + and spaces (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-?:().'+, ]{1,35}$",
+                        "example": "Berlin",
+                        "minLength": 1,
+                        "maxLength": 35
+                    },
+                    "region": {
+                        "type": "string",
+                        "description": "The region (e.g. county, state, province, etc.) of the virtual account owner. Must be 1-35 characters and contain only letters, numbers, and the following special characters: / - ? : ( ) . , ' + and spaces (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-?:().'+, ]{1,35}$",
+                        "example": "Berlin",
+                        "minLength": 1,
+                        "maxLength": 35
+                    },
+                    "postcode": {
+                        "type": "string",
+                        "description": "The postal code (e.g. postcode, zip code, etc.) of the virtual account owner. Postcode is required for CHAPS payments. Must be 1-35 characters and contain only letters, numbers, and the following special characters: / - ? : ( ) . , ' + and spaces (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-?:().'+, ]{1,35}$",
+                        "example": "10115",
+                        "minLength": 1,
+                        "maxLength": 35
+                    },
+                    "country": {
+                        "type": "string",
+                        "description": "The 2-letter country code of the virtual account owner's EUR bank account",
+                        "example": "DE",
+                        "minLength": 2,
+                        "maxLength": 2
+                    },
+                    "nationality": {
+                        "type": "string",
+                        "description": "The 2-letter country code for the virtual account owner's nationality",
+                        "example": "DE",
+                        "minLength": 2,
+                        "maxLength": 2
+                    },
+                    "dateOfBirth": {
+                        "type": "string",
+                        "description": "The date of birth of the virtual account owner",
+                        "example": "2000-12-31",
+                        "pattern": "[0-9]{4}-[0-9]{2}-[0-9]{2}"
+                    },
+                    "isIndividual": {
+                        "type": "boolean",
+                        "description": "Whether the virtual account owner is an individual as opposed to a corporation",
+                        "example": true
+                    },
+                    "iban": {
+                        "type": "string",
+                        "description": "The IBAN of the virtual account owner's EUR bank account",
+                        "example": "DE53202208000099106929"
+                    },
+                    "bicSwift": {
+                        "type": "string",
+                        "description": "The BIC of the virtual account owner's EUR bank account",
+                        "example": "MHSBDEHBXXX"
+                    }
+                },
+                "required": [
+                    "name",
+                    "addressLine1",
+                    "city",
+                    "country",
+                    "nationality",
+                    "dateOfBirth",
+                    "isIndividual",
+                    "iban",
+                    "bicSwift"
+                ]
+            },
+            "CreateGBPVirtualAccountForCompany": {
+                "type": "object",
+                "properties": {
+                    "correlationId": {
+                        "type": "string",
+                        "description": "The correlation ID provided on the account creation request. If you did not provide correlation ID, it will be generated",
+                        "maxLength": 255
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "The name of the virtual account owner. Must be 1-140 characters and cannot contain: | _ [ ] < > ^ ` ~ \\ $ (no leading spaces).",
+                        "pattern": "^(?! )[^|_\\[\\]<>\\^`~\\\\\\$]{1,140}$",
+                        "example": "GBP Test Company",
+                        "minLength": 1,
+                        "maxLength": 140
+                    },
+                    "addressLine1": {
+                        "type": "string",
+                        "description": "The first line of the address of the virtual account owner. Must be 1-140 characters and cannot contain: | _ [ ] < > ^ ` ~ \\ $ (no leading spaces).",
+                        "pattern": "^(?! )[^|_\\[\\]<>\\^`~\\\\\\$]{1,140}$",
+                        "example": "One London Wall",
+                        "minLength": 1,
+                        "maxLength": 140
+                    },
+                    "addressLine2": {
+                        "type": "string",
+                        "description": "The second line of the address of the virtual account owner. Must be 1-140 characters and cannot contain: | _ [ ] < > ^ ` ~ \\ $ (no leading spaces).",
+                        "pattern": "^(?! )[^|_\\[\\]<>\\^`~\\\\\\$]{1,140}$",
+                        "example": "6th Floor",
+                        "minLength": 1,
+                        "maxLength": 140
+                    },
+                    "addressLine3": {
+                        "type": "string",
+                        "description": "The third line of the address of the virtual account owner. Must be 1-140 characters and cannot contain: | _ [ ] < > ^ ` ~ \\ $ (no leading spaces).",
+                        "pattern": "^(?! )[^|_\\[\\]<>\\^`~\\\\\\$]{1,140}$",
+                        "minLength": 1,
+                        "maxLength": 140
+                    },
+                    "city": {
+                        "type": "string",
+                        "description": "The postal city or town of the virtual account owner. Must be 1-140 characters and cannot contain: | _ [ ] < > ^ ` ~ \\ $ (no leading spaces).",
+                        "pattern": "^(?! )[^|_\\[\\]<>\\^`~\\\\\\$]{1,140}$",
+                        "example": "London",
+                        "minLength": 1,
+                        "maxLength": 140
+                    },
+                    "region": {
+                        "type": "string",
+                        "description": "The region (e.g. county, state, province, etc.) of the virtual account owner. Must be 1-140 characters and cannot contain: | _ [ ] < > ^ ` ~ \\ $ (no leading spaces).",
+                        "pattern": "^(?! )[^|_\\[\\]<>\\^`~\\\\\\$]{1,140}$",
+                        "example": "Greater London",
+                        "minLength": 1,
+                        "maxLength": 140
+                    },
+                    "postcode": {
+                        "type": "string",
+                        "description": "The postal code (e.g. postcode, zip code, etc.) of the virtual account owner. Postcode is required for CHAPS payments. Must be 1-140 characters and cannot contain: | _ [ ] < > ^ ` ~ \\ $ (no leading spaces).",
+                        "pattern": "^(?! )[^|_\\[\\]<>\\^`~\\\\\\$]{1,140}$",
+                        "example": "EC2Y 5EB",
+                        "minLength": 1,
+                        "maxLength": 140
+                    },
+                    "country": {
+                        "type": "string",
+                        "description": "The 2-letter country code of the virtual account owner's bank account",
+                        "example": "GB",
+                        "minLength": 2,
+                        "maxLength": 2
+                    },
+                    "nationality": {
+                        "type": "string",
+                        "description": "The 2-letter country code for the virtual account owner's nationality",
+                        "example": "GB",
+                        "minLength": 2,
+                        "maxLength": 2
+                    },
+                    "registrationNumber": {
+                        "type": "string",
+                        "description": "The registration number of the virtual account owner - only applicable to a corporation. Must be 1-140 characters and cannot contain: | _ [ ] < > ^ ` ~ \\ $ (no leading spaces).",
+                        "pattern": "^(?! )[^|_\\[\\]<>\\^`~\\\\\\$]{1,140}$",
+                        "example": "AB123456",
+                        "minLength": 1,
+                        "maxLength": 140
+                    },
+                    "isIndividual": {
+                        "type": "boolean",
+                        "description": "Whether the virtual account owner is an individual as opposed to a corporation",
+                        "example": false
+                    },
+                    "iban": {
+                        "type": "string",
+                        "description": "The IBAN of the virtual account owner's bank account",
+                        "example": "GB33BUKB20201555555555"
+                    },
+                    "bicSwift": {
+                        "type": "string",
+                        "description": "The BIC of the virtual account owner's bank account",
+                        "example": "BARCGB22XXX"
+                    },
+                    "accountNumber": {
+                        "type": "string",
+                        "description": "The 8-digit account number of the virtual account owner's bank account - mandatory for GBP accounts",
+                        "example": "55555555"
+                    },
+                    "sortCode": {
+                        "type": "string",
+                        "description": "The 6-digit sort code of the virtual account owner's bank account - mandatory for GBP accounts",
+                        "example": "202015"
+                    }
+                },
+                "required": [
+                    "name",
+                    "addressLine1",
+                    "city",
+                    "country",
+                    "nationality",
+                    "isIndividual",
+                    "accountNumber",
+                    "sortCode"
+                ]
+            },
+            "CreateGBPVirtualAccountForIndividual": {
+                "type": "object",
+                "properties": {
+                    "correlationId": {
+                        "type": "string",
+                        "description": "The correlation ID provided on the account creation request. If you did not provide correlation ID, it will be generated",
+                        "maxLength": 255
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "The name of the virtual account owner. Must be 1-140 characters and cannot contain: | _ [ ] < > ^ ` ~ \\ $ (no leading spaces).",
+                        "pattern": "^(?! )[^|_\\[\\]<>\\^`~\\\\\\$]{1,140}$",
+                        "example": "GBP Test Individual",
+                        "minLength": 1,
+                        "maxLength": 140
+                    },
+                    "addressLine1": {
+                        "type": "string",
+                        "description": "The first line of the address of the virtual account owner. Must be 1-140 characters and cannot contain: | _ [ ] < > ^ ` ~ \\ $ (no leading spaces).",
+                        "pattern": "^(?! )[^|_\\[\\]<>\\^`~\\\\\\$]{1,140}$",
+                        "example": "One London Wall",
+                        "minLength": 1,
+                        "maxLength": 140
+                    },
+                    "addressLine2": {
+                        "type": "string",
+                        "description": "The second line of the address of the virtual account owner. Must be 1-140 characters and cannot contain: | _ [ ] < > ^ ` ~ \\ $ (no leading spaces).",
+                        "pattern": "^(?! )[^|_\\[\\]<>\\^`~\\\\\\$]{1,140}$",
+                        "example": "6th Floor",
+                        "minLength": 1,
+                        "maxLength": 140
+                    },
+                    "addressLine3": {
+                        "type": "string",
+                        "description": "The third line of the address of the virtual account owner. Must be 1-140 characters and cannot contain: | _ [ ] < > ^ ` ~ \\ $ (no leading spaces).",
+                        "pattern": "^(?! )[^|_\\[\\]<>\\^`~\\\\\\$]{1,140}$",
+                        "minLength": 1,
+                        "maxLength": 140
+                    },
+                    "city": {
+                        "type": "string",
+                        "description": "The postal city or town of the virtual account owner. Must be 1-140 characters and cannot contain: | _ [ ] < > ^ ` ~ \\ $ (no leading spaces).",
+                        "pattern": "^(?! )[^|_\\[\\]<>\\^`~\\\\\\$]{1,140}$",
+                        "example": "London",
+                        "minLength": 1,
+                        "maxLength": 140
+                    },
+                    "region": {
+                        "type": "string",
+                        "description": "The region (e.g. county, state, province, etc.) of the virtual account owner. Must be 1-140 characters and cannot contain: | _ [ ] < > ^ ` ~ \\ $ (no leading spaces).",
+                        "pattern": "^(?! )[^|_\\[\\]<>\\^`~\\\\\\$]{1,140}$",
+                        "example": "Greater London",
+                        "minLength": 1,
+                        "maxLength": 140
+                    },
+                    "postcode": {
+                        "type": "string",
+                        "description": "The postal code (e.g. postcode, zip code, etc.) of the virtual account owner. Postcode is required for CHAPS payments. Must be 1-140 characters and cannot contain: | _ [ ] < > ^ ` ~ \\ $ (no leading spaces).",
+                        "pattern": "^(?! )[^|_\\[\\]<>\\^`~\\\\\\$]{1,140}$",
+                        "example": "EC2Y 5EB",
+                        "minLength": 1,
+                        "maxLength": 140
+                    },
+                    "country": {
+                        "type": "string",
+                        "description": "The 2-letter country code of the virtual account owner's bank account",
+                        "example": "GB",
+                        "minLength": 2,
+                        "maxLength": 2
+                    },
+                    "nationality": {
+                        "type": "string",
+                        "description": "The 2-letter country code for the virtual account owner's nationality",
+                        "example": "GB",
+                        "minLength": 2,
+                        "maxLength": 2
+                    },
+                    "dateOfBirth": {
+                        "type": "string",
+                        "description": "The date of birth of the virtual account owner - only applicable to an individual",
+                        "example": "2000-12-31",
+                        "pattern": "[0-9]{4}-[0-9]{2}-[0-9]{2}"
+                    },
+                    "isIndividual": {
+                        "type": "boolean",
+                        "description": "Whether the virtual account owner is an individual as opposed to a corporation",
+                        "example": true
+                    },
+                    "iban": {
+                        "type": "string",
+                        "description": "The IBAN of the virtual account owner's bank account",
+                        "example": "GB33BUKB20201555555555"
+                    },
+                    "bicSwift": {
+                        "type": "string",
+                        "description": "The BIC of the virtual account owner's bank account",
+                        "example": "BARCGB22XXX"
+                    },
+                    "accountNumber": {
+                        "type": "string",
+                        "description": "The 8-digit account number of the virtual account owner's bank account - mandatory for GBP accounts",
+                        "example": "55555555"
+                    },
+                    "sortCode": {
+                        "type": "string",
+                        "description": "The 6-digit sort code of the virtual account owner's bank account - mandatory for GBP accounts",
+                        "example": "202015"
+                    }
+                },
+                "required": [
+                    "name",
+                    "addressLine1",
+                    "city",
+                    "country",
+                    "nationality",
+                    "dateOfBirth",
+                    "isIndividual",
+                    "accountNumber",
+                    "sortCode"
+                ]
+            },
+            "CreateNoBankDetailsVirtualAccountForCompany": {
+                "type": "object",
+                "properties": {
+                    "correlationId": {
+                        "type": "string",
+                        "description": "The correlation ID provided on the account creation request. If you did not provide correlation ID, it will be generated",
+                        "maxLength": 255
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "The name of the virtual account owner. Must contain at least two words separated by a space. Only English alphabet letters, numbers, '/-?:().'+' and spaces are allowed (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-\\?:().'\\+ ]+$",
+                        "example": "GBP Test Company",
+                        "maxLength": 255
+                    },
+                    "addressLine1": {
+                        "type": "string",
+                        "description": "The first line of the address of the virtual account owner. Only English alphabet letters, numbers, '/-?:().'+' ',' and spaces are allowed (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-\\?:().'\\+, ]+$",
+                        "example": "One London Wall",
+                        "maxLength": 1023
+                    },
+                    "addressLine2": {
+                        "type": "string",
+                        "description": "The second line of the address of the virtual account owner. Only English alphabet letters, numbers, '/-?:().'+' ',' and spaces are allowed (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-\\?:().'\\+, ]+$",
+                        "example": "6th Floor",
+                        "maxLength": 1023
+                    },
+                    "addressLine3": {
+                        "type": "string",
+                        "description": "The third line of the address of the virtual account owner. Only English alphabet letters, numbers, '/-?:().'+' ',' and spaces are allowed (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-\\?:().'\\+, ]+$",
+                        "maxLength": 1023
+                    },
+                    "city": {
+                        "type": "string",
+                        "description": "The postal city or town of the virtual account owner. Only English alphabet letters, numbers, '/-?:().'+' and spaces are allowed (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-\\?:().'\\+ ]+$",
+                        "example": "London",
+                        "maxLength": 255
+                    },
+                    "region": {
+                        "type": "string",
+                        "description": "The region (e.g. county, state, province, etc.) of the virtual account owner. Only English alphabet letters, numbers, '/-?:().'+' and spaces are allowed (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-\\?:().'\\+ ]+$",
+                        "example": "Greater London",
+                        "maxLength": 255
+                    },
+                    "postcode": {
+                        "type": "string",
+                        "description": "The postal code (e.g. postcode, zip code, etc.) of the virtual account owner. Postcode is required for CHAPS payments. Only English alphabet letters, numbers, '/-?:().'+' and spaces are allowed (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-\\?:().'\\+ ]+$",
+                        "example": "EC2Y 5EB",
+                        "maxLength": 255
+                    },
+                    "country": {
+                        "type": "string",
+                        "description": "The 2-letter country code of the virtual account owner's bank account",
+                        "example": "GB",
+                        "minLength": 2,
+                        "maxLength": 2
+                    },
+                    "nationality": {
+                        "type": "string",
+                        "description": "The 2-letter country code for the virtual account owner's nationality",
+                        "example": "GB",
+                        "minLength": 2,
+                        "maxLength": 2
+                    },
+                    "registrationNumber": {
+                        "type": "string",
+                        "description": "The registration number of the virtual account owner - only applicable to a corporation. Only English alphabet letters, numbers, '/-?:().'+' and spaces are allowed (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-\\?:().'\\+ ]+$",
+                        "example": "AB123456",
+                        "maxLength": 100
+                    },
+                    "isIndividual": {
+                        "type": "boolean",
+                        "description": "Whether the virtual account owner is an individual as opposed to a corporation",
+                        "example": false
+                    }
+                },
+                "required": [
+                    "name",
+                    "addressLine1",
+                    "city",
+                    "country",
+                    "nationality",
+                    "isIndividual"
+                ]
+            },
+            "CreateNoBankDetailsVirtualAccountForIndividual": {
+                "type": "object",
+                "properties": {
+                    "correlationId": {
+                        "type": "string",
+                        "description": "The correlation ID provided on the account creation request. If you did not provide correlation ID, it will be generated",
+                        "maxLength": 255
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "The name of the virtual account owner. Must contain at least two words separated by a space. Only English alphabet letters, numbers, '/-?:().'+' and spaces are allowed (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-\\?:().'\\+ ]+$",
+                        "example": "GBP Test Individual",
+                        "maxLength": 255
+                    },
+                    "addressLine1": {
+                        "type": "string",
+                        "description": "The first line of the address of the virtual account owner. Only English alphabet letters, numbers, '/-?:().'+' ',' and spaces are allowed (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-\\?:().'\\+, ]+$",
+                        "example": "One London Wall",
+                        "maxLength": 1023
+                    },
+                    "addressLine2": {
+                        "type": "string",
+                        "description": "The second line of the address of the virtual account owner. Only English alphabet letters, numbers, '/-?:().'+' ',' and spaces are allowed (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-\\?:().'\\+, ]+$",
+                        "example": "6th Floor",
+                        "maxLength": 1023
+                    },
+                    "addressLine3": {
+                        "type": "string",
+                        "description": "The third line of the address of the virtual account owner. Only English alphabet letters, numbers, '/-?:().'+' ',' and spaces are allowed (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-\\?:().'\\+, ]+$",
+                        "maxLength": 1023
+                    },
+                    "city": {
+                        "type": "string",
+                        "description": "The postal city or town of the virtual account owner. Only English alphabet letters, numbers, '/-?:().'+' and spaces are allowed (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-\\?:().'\\+ ]+$",
+                        "example": "London",
+                        "maxLength": 255
+                    },
+                    "region": {
+                        "type": "string",
+                        "description": "The region (e.g. county, state, province, etc.) of the virtual account owner. Only English alphabet letters, numbers, '/-?:().'+' and spaces are allowed (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-\\?:().'\\+ ]+$",
+                        "example": "Greater London",
+                        "maxLength": 255
+                    },
+                    "postcode": {
+                        "type": "string",
+                        "description": "The postal code (e.g. postcode, zip code, etc.) of the virtual account owner. Postcode is required for CHAPS payments. Only English alphabet letters, numbers, '/-?:().'+' and spaces are allowed (no leading spaces).",
+                        "pattern": "^(?! )[a-zA-Z0-9\\/\\-\\?:().'\\+ ]+$",
+                        "example": "EC2Y 5EB",
+                        "maxLength": 255
+                    },
+                    "country": {
+                        "type": "string",
+                        "description": "The 2-letter country code of the virtual account owner's bank account",
+                        "example": "GB",
+                        "minLength": 2,
+                        "maxLength": 2
+                    },
+                    "nationality": {
+                        "type": "string",
+                        "description": "The 2-letter country code for the virtual account owner's nationality",
+                        "example": "GB",
+                        "minLength": 2,
+                        "maxLength": 2
+                    },
+                    "dateOfBirth": {
+                        "type": "string",
+                        "description": "The date of birth of the virtual account owner - only applicable to an individual",
+                        "example": "2000-12-31",
+                        "pattern": "[0-9]{4}-[0-9]{2}-[0-9]{2}"
+                    },
+                    "isIndividual": {
+                        "type": "boolean",
+                        "description": "Whether the virtual account owner is an individual as opposed to a corporation",
+                        "example": true
+                    }
+                },
+                "required": [
+                    "name",
+                    "addressLine1",
+                    "city",
+                    "country",
+                    "nationality",
+                    "dateOfBirth",
+                    "isIndividual"
+                ]
+            },
+            "VirtualAccountApiErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "description": "Information about the error",
+                        "example": "Virtual Account request failed",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "message"
+                ]
+            },
+            "VirtualAccountPaymentBody": {
+                "type": "object",
+                "properties": {
+                    "currency": {
+                        "type": "string",
+                        "description": "The currency code for the payment",
+                        "minLength": 3,
+                        "maxLength": 4,
+                        "example": "GBP"
+                    },
+                    "amount": {
+                        "type": "string",
+                        "description": "The amount of the payment",
+                        "example": "1.12"
+                    },
+                    "reference": {
+                        "type": "string",
+                        "description": "The reference for the payment",
+                        "minLength": 1,
+                        "maxLength": 255,
+                        "example": "payment-ref"
+                    },
+                    "nonce": {
+                        "type": "string",
+                        "description": "A unique nonce to guard against duplicate payments",
+                        "minimum": 1,
+                        "example": "1234567890123456"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "The reason for the payment",
+                        "minLength": 1,
+                        "maxLength": 255,
+                        "example": "Internal transfer"
+                    }
+                },
+                "required": [
+                    "currency",
+                    "amount",
+                    "reference",
+                    "nonce",
+                    "reason"
+                ]
+            },
+            "VirtualAccountPaymentResponse": {
+                "type": "object",
+                "properties": {
+                    "transactionId": {
+                        "type": "string"
+                    },
+                    "end2EndId": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "transactionId",
+                    "end2EndId"
+                ]
+            },
+            "GBPVirtualAccountDetails": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "The ID of the virtual account",
+                        "example": "71c33ef0-4af9-4814-b81e-d5f4dfa96dec"
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "The status of the virtual account",
+                        "example": "ACTIVE"
+                    },
+                    "iban": {
+                        "type": "string",
+                        "description": "The IBAN of the virtual account",
+                        "example": "GB33BUKB20201555555555"
+                    },
+                    "accountNumber": {
+                        "type": "string",
+                        "description": "The account number of the virtual account",
+                        "example": "55555555"
+                    },
+                    "sortCode": {
+                        "type": "string",
+                        "description": "The sort code of the virtual account",
+                        "example": "202015"
+                    },
+                    "bic": {
+                        "type": "string",
+                        "description": "The bic of the virtual account owner",
+                        "example": "MONZGB2LXXX"
+                    }
+                },
+                "required": [
+                    "id",
+                    "status",
+                    "iban",
+                    "sortCode",
+                    "bic"
+                ]
+            },
+            "PendingVirtualAccountDetails": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "The ID of the virtual account",
+                        "example": "71c33ef0-4af9-4814-b81e-d5f4dfa96dec"
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "The status of the virtual account",
+                        "example": "PENDING"
+                    }
+                },
+                "required": [
+                    "id",
+                    "status"
+                ]
+            },
+            "GBPVirtualAccountOwnerDetails": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The name of the virtual account owner"
+                    },
+                    "iban": {
+                        "type": "string",
+                        "description": "The IBAN of the virtual account owner",
+                        "example": "GB33BUKB20201555555555"
+                    },
+                    "accountNumber": {
+                        "type": "string",
+                        "description": "The account number of the virtual account owner",
+                        "example": "55555555"
+                    },
+                    "sortCode": {
+                        "type": "string",
+                        "description": "The sort code of the virtual account owner",
+                        "example": "202015"
+                    },
+                    "bic": {
+                        "type": "string",
+                        "description": "The bic of the virtual account owner",
+                        "example": "MONZGB2LXXX"
+                    }
+                },
+                "required": [
+                    "name",
+                    "iban"
+                ]
+            },
+            "NoBankDetailsVirtualAccountOwnerDetails": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The name of the virtual account owner"
+                    }
+                },
+                "required": [
+                    "name"
+                ]
+            },
+            "GBPRequestVirtualAccountDataResponse": {
+                "type": "object",
+                "properties": {
+                    "correlationId": {
+                        "type": "string",
+                        "description": "The correlation ID provided on the account creation request. If you did not provide correlation ID, it will be generated"
+                    },
+                    "virtualAccountDetails": {
+                        "description": "The details of the virtual account",
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/GBPVirtualAccountDetails"
+                            },
+                            {
+                                "$ref": "#/components/schemas/PendingVirtualAccountDetails"
+                            }
+                        ]
+                    },
+                    "ownerDetails": {
+                        "description": "The details of the virtual account owner",
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/GBPVirtualAccountOwnerDetails"
+                            },
+                            {
+                                "$ref": "#/components/schemas/NoBankDetailsVirtualAccountOwnerDetails"
+                            }
+                        ]
+                    }
+                },
+                "required": [
+                    "correlationId",
+                    "virtualAccountDetails",
+                    "ownerDetails"
+                ]
+            },
+            "IbanVirtualAccountOwnerDetails": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The name of the virtual account owner"
+                    },
+                    "iban": {
+                        "type": "string",
+                        "description": "The IBAN of the virtual account owner",
+                        "example": "DK5000400440116243"
+                    },
+                    "bic": {
+                        "type": "string",
+                        "description": "The bic of the virtual account owner",
+                        "example": "SXPYDKKK"
+                    }
+                },
+                "required": [
+                    "name",
+                    "iban"
+                ]
+            },
+            "IbanVirtualAccountDetails": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "The ID of the virtual account",
+                        "example": "71c33ef0-4af9-4814-b81e-d5f4dfa96dec"
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "The status of the virtual account",
+                        "example": "ACTIVE"
+                    },
+                    "iban": {
+                        "type": "string",
+                        "description": "The IBAN of the virtual account",
+                        "example": "DK5000400440116243"
+                    },
+                    "accountNumber": {
+                        "type": "string",
+                        "description": "The account number of the virtual account",
+                        "example": "0440116243"
+                    },
+                    "bic": {
+                        "type": "string",
+                        "description": "The bic of the virtual account",
+                        "example": "SXPYDKKK"
+                    }
+                },
+                "required": [
+                    "id",
+                    "status",
+                    "iban"
+                ]
+            },
+            "IbanRequestVirtualAccountDataResponse": {
+                "type": "object",
+                "properties": {
+                    "correlationId": {
+                        "type": "string",
+                        "description": "The correlation ID provided on the account creation request. If you did not provide correlation ID, it will be generated"
+                    },
+                    "virtualAccountDetails": {
+                        "description": "The details of the virtual account",
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/IbanVirtualAccountDetails"
+                            },
+                            {
+                                "$ref": "#/components/schemas/PendingVirtualAccountDetails"
+                            }
+                        ]
+                    },
+                    "ownerDetails": {
+                        "description": "The details of the virtual account owner",
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/IbanVirtualAccountOwnerDetails"
+                            },
+                            {
+                                "$ref": "#/components/schemas/NoBankDetailsVirtualAccountOwnerDetails"
+                            }
+                        ]
+                    }
+                },
+                "required": [
+                    "correlationId",
+                    "virtualAccountDetails",
+                    "ownerDetails"
+                ]
+            },
+            "PagedVirtualAccountDataResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "number",
+                        "description": "Count of virtual accounts",
+                        "example": 2
+                    },
+                    "results": {
+                        "type": "array",
+                        "description": "Virtual account data",
+                        "items": {
+                            "oneOf": [
+                                {
+                                    "$ref": "#/components/schemas/GBPRequestVirtualAccountDataResponse"
+                                },
+                                {
+                                    "$ref": "#/components/schemas/IbanRequestVirtualAccountDataResponse"
+                                }
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "count",
+                    "results"
+                ]
+            },
+            "UpdateEUROwnerBankDetailsRequest": {
+                "type": "object",
+                "properties": {
+                    "iban": {
+                        "type": "string",
+                        "description": "The IBAN of the virtual account owner's bank account - mandatory for EUR accounts",
+                        "example": "GB33BUKB20201555555555"
+                    },
+                    "bicSwift": {
+                        "type": "string",
+                        "description": "The BIC of the virtual account owner's bank account - mandatory for EUR accounts",
+                        "example": "BARCGB22XXX"
+                    }
+                },
+                "required": [
+                    "iban",
+                    "bicSwift"
+                ]
+            },
+            "UpdateGBPOwnerBankDetailsRequest": {
+                "type": "object",
+                "properties": {
+                    "iban": {
+                        "type": "string",
+                        "description": "The IBAN of the virtual account owner's bank account - optional for GBP accounts",
+                        "example": "GB33BUKB20201555555555"
+                    },
+                    "accountNumber": {
+                        "type": "string",
+                        "description": "The 8-digit account number of the virtual account owner's bank account - mandatory for GBP accounts",
+                        "example": "12345678"
+                    },
+                    "sortCode": {
+                        "type": "string",
+                        "description": "The 6-digit sort code of the virtual account owner's bank account - mandatory for GBP accounts",
+                        "example": "000000"
+                    },
+                    "bicSwift": {
+                        "type": "string",
+                        "description": "The BIC of the virtual account owner's bank account - optional for GBP accounts",
+                        "example": "BARCGB22XXX"
+                    }
+                },
+                "required": [
+                    "accountNumber",
+                    "sortCode"
+                ]
+            },
+            "UpdateOwnerAddressRequest": {
+                "type": "object",
+                "properties": {
+                    "addressLine1": {
+                        "type": "string",
+                        "description": "The first line of the address of the virtual account owner",
+                        "example": "One London Wall",
+                        "maxLength": 1023
+                    },
+                    "addressLine2": {
+                        "type": "string",
+                        "description": "The second line of the address of the virtual account owner",
+                        "example": "6th Floor",
+                        "maxLength": 1023
+                    },
+                    "addressLine3": {
+                        "type": "string",
+                        "description": "The third line of the address of the virtual account owner",
+                        "maxLength": 1023
+                    },
+                    "city": {
+                        "type": "string",
+                        "description": "The postal city or town of the virtual account owner",
+                        "example": "London",
+                        "maxLength": 255
+                    },
+                    "region": {
+                        "type": "string",
+                        "description": "The region (e.g. county, state, province, etc.) of the virtual account owner",
+                        "example": "Greater London",
+                        "maxLength": 255
+                    },
+                    "postcode": {
+                        "type": "string",
+                        "description": "The postal code (e.g. postcode, zip code, etc.) of the virtual account owner. Postcode is required for CHAPS payments",
+                        "example": "EC2Y 5EB",
+                        "maxLength": 255
+                    },
+                    "country": {
+                        "type": "string",
+                        "description": "The 2-letter country code of the virtual account owner's bank account",
+                        "example": "GB",
+                        "minLength": 2,
+                        "maxLength": 2
+                    }
+                },
+                "required": [
+                    "addressLine1",
+                    "city",
+                    "country"
+                ]
+            },
+            "BalanceResponse": {
+                "type": "object",
+                "properties": {
+                    "accountId": {
+                        "type": "number",
+                        "description": "The id of the account"
+                    },
+                    "settled": {
+                        "type": "string",
+                        "description": "The settled balance of the account. This is formatted with a '.' decimal separator and without thousand separators",
+                        "example": "1234.12"
+                    },
+                    "available": {
+                        "type": "string",
+                        "description": "The balance available with which to make payments from the account. This is formatted with a '.' decimal separator and without thousand separators",
+                        "example": "1234.12"
+                    }
+                },
+                "required": [
+                    "accountId",
+                    "settled",
+                    "available"
+                ]
+            },
+            "GetPaymentResponse": {
+                "type": "object",
+                "properties": {
+                    "transactionId": {
+                        "type": "string",
+                        "description": "The transaction id of the payment"
+                    },
+                    "endToEndId": {
+                        "type": "string",
+                        "description": "The end to end id of the payment"
+                    },
+                    "nonce": {
+                        "type": "string",
+                        "description": "The nonce provided when initiating the payment as a technical dupe check and external reference id"
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "The current status of the payment",
+                        "enum": [
+                            "Received",
+                            "Initiated",
+                            "Cancelled",
+                            "Pending",
+                            "Processing",
+                            "Rejected",
+                            "Settled"
+                        ]
+                    },
+                    "currency": {
+                        "type": "string",
+                        "description": "The instructed currency of the payment"
+                    },
+                    "amount": {
+                        "type": "string",
+                        "description": "The instructed amount of the payment"
+                    },
+                    "rejectReason": {
+                        "type": "string",
+                        "description": "The reject reason for the payment. Only populated if the payment has been rejected, otherwise undefined"
+                    }
+                },
+                "required": [
+                    "transactionId",
+                    "endToEndId",
+                    "nonce",
+                    "status",
+                    "currency",
+                    "amount"
+                ]
+            },
+            "PagedGetPaymentResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "number",
+                        "description": "The total number of results in the filtered, un-paged dataset"
+                    },
+                    "results": {
+                        "description": "The paged result set",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "count",
+                    "results"
+                ]
+            }
+        }
+    }
+}

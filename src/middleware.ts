@@ -62,7 +62,9 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/api/admin/') ||  // Admin API (auth checked in each route)
     path.startsWith('/api/setup/') ||  // Setup API (public for initial setup)
     path.startsWith('/api/health') ||  // Health check endpoint (public)
-    path.startsWith('/api/version')  // Version info endpoint (public)
+    path.startsWith('/api/version') ||  // Version info endpoint (public)
+    path.startsWith('/api/webhooks') ||  // Webhook endpoints (authenticated by signature)
+    path.startsWith('/api/cron')  // Cron endpoints (authenticated by CRON_SECRET)
   ) {
     // Log NextAuth requests
     if (path.startsWith('/api/auth')) {

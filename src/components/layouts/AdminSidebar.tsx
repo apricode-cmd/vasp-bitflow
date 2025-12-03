@@ -17,7 +17,7 @@ import {
   Wallet, Globe, Key, User, FileText, Scale,
   ChevronDown, ChevronRight, Search,
   ArrowDownCircle, ArrowUpCircle, BookOpen, Plug,
-  Bell, Mail, MessageSquare, Send, Workflow
+  Bell, Mail, MessageSquare, Send, Workflow, Landmark
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -113,6 +113,14 @@ const navigation = [
         icon: Wallet,
         description: 'Customer wallets',
         requiredPermission: 'users:read'
+      },
+      { 
+        name: 'Virtual IBAN', 
+        href: '/admin/virtual-iban', 
+        icon: Landmark,
+        description: 'Bank accounts & reconciliation',
+        badge: 'unreconciled',
+        requiredPermission: 'finance:read'
       },
     ],
     defaultOpen: true,
@@ -282,6 +290,7 @@ export function AdminSidebar(): JSX.Element {
     pendingPayIn: number;
     pendingPayOut: number;
     unreadNotifications: number;
+    unreconciledViban: number;
   } | null>(null);
 
   const isSuperAdmin = session?.role === 'SUPER_ADMIN' || session?.roleCode === 'SUPER_ADMIN';
@@ -314,13 +323,15 @@ export function AdminSidebar(): JSX.Element {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [statsResponse, notificationsResponse] = await Promise.all([
+        const [statsResponse, notificationsResponse, vibanResponse] = await Promise.all([
           fetch('/api/admin/stats?quick=true'),
-          fetch('/api/admin/notifications?limit=1') // Just get count
+          fetch('/api/admin/notifications?limit=1'), // Just get count
+          fetch('/api/admin/virtual-iban/statistics')
         ]);
         
         const statsData = await statsResponse.json();
         const notificationsData = await notificationsResponse.json();
+        const vibanData = await vibanResponse.json();
         
         if (statsData.success) {
           setStats({
@@ -328,7 +339,8 @@ export function AdminSidebar(): JSX.Element {
             pendingKyc: statsData.data.kyc?.pending || 0,
             pendingPayIn: statsData.data.payIn?.pending || 0,
             pendingPayOut: statsData.data.payOut?.pending || 0,
-            unreadNotifications: notificationsData.unreadCount || 0
+            unreadNotifications: notificationsData.unreadCount || 0,
+            unreconciledViban: vibanData.success ? (vibanData.data.unreconciledTransactions || 0) : 0
           });
         }
       } catch (error) {
@@ -363,9 +375,10 @@ export function AdminSidebar(): JSX.Element {
     if (!stats) return null;
     if (itemName === 'Orders') return stats.pendingOrders;
     if (itemName === 'KYC Reviews') return stats.pendingKyc;
-    if (itemName === 'Pay In') return stats.pendingPayIn;
-    if (itemName === 'Pay Out') return stats.pendingPayOut;
-    if (itemName === 'Notifications') return stats.unreadNotifications;
+    if (itemName === 'Pay-In') return stats.pendingPayIn;
+    if (itemName === 'Pay-Out') return stats.pendingPayOut;
+    if (itemName === 'Virtual IBAN') return stats.unreconciledViban;
+    if (itemName === 'Admin Alerts') return stats.unreadNotifications;
     return null;
   };
 

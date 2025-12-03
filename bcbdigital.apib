@@ -1,0 +1,2006 @@
+FORMAT: 1A
+HOST: https://api.bcb.group/
+
+# BCB Services
+
+The BCB Group REST API provides direct access account management: balances, transactions, etc.
+
+# Description of Server Responses
+<!-- 200 `OK` - the request was successful (some API calls may return 201 instead). -->
+<!-- 201 `Created` - the request was successful and a resource was created. -->
+<!-- 204 `No Content` - the request was successful but there is no representation to return (i.e. the response is empty). -->
+| Status Code | Description                                                                                  |
+|-------------|---------------------------------------------------------------------------------------------|
+| 200 `OK`    | The request was successful.                                                                  |
+| 400 `Bad Request` | The request could not be understood or was missing required parameters.                    |
+| 401 `Unauthorized` | Authentication failed (e.g. invalid token, expired token) or user doesn't have permissions for requested operation. |
+| 403 `Forbidden`    | Access denied.                                                                            |
+| 404 `Not Found`    | Resource was not found.                                                                    |
+| 405 `Method Not Allowed` | Requested method is not supported for resource.                                        |
+
+
+## Authentication
+All API calls require authentication. For a successful authentication you need to provide your Access Token (`Bearer access_token`).
+Each request must contain the following Headers: `Bearer access_token`
+
+You can ask for an access token using your client id + client secret (URL: https://auth.bcb.group/oauth/token).
+
+e.g.
+```
+curl --request POST \                                 
+     --url https://auth.bcb.group/oauth/token \       
+     --header 'content-type: application/json' \          
+     --data '{"client_id":"MY-CLIENT-ID","client_secret":"MY-CLIENT-SECRET"}'
+
+```
+
+
+# Group Services
+
+## Accounts [/v3/accounts{?counterparty_id,limit,pageToken,id}]
+
+The `/accounts` end-points are multi-purpose for bank accounts, custody accounts and cryptocurrency wallets.
+
+> **NOTE:** Some additional fields to those listed below can be returned and these should be disregarded.
+
+<br><b>DEFINTIONS</b>
+
+| Field                | Description                                                                  |
+|----------------------|------------------------------------------------------------------------------|
+| `id`                 | Numeric internal account ID                                                  |
+| `counterparty_id`    | Numeric internal counterparty ID                                             |
+| `aid`                | Alpha-numeric account ID                                                     |
+| `cid`                | Alpha-numeric counterparty ID                                                |
+| `account_type`       | Can be Wallet, Bank or Custodial                                             |
+| `ccy`                | Asset ticker, or left hand side of trading symbol                            |
+| `host_name`          | Bank Name for bank accounts, Custodian Name for custody accounts, Wallet Name for wallet accounts |
+| `host_hub`           | Branch Code for bank accounts, optional for custody and wallets               |
+| `host_location`      | Bank Address for bank accounts, optional for custody and wallets              |
+| `node_name`          | Account holder's legal name                                                  |
+| `node_address`       | Account Number for bank accounts, wallet address for wallets, optional for custody |
+| `node_location`      | Account holder's residential address for bank accounts, optional memo field for custody and wallets |
+| `node_country`       | Account holder's residential address country code (2-letter ISO country code), optional memo field for custody and wallets |
+| `iban`               | IBAN for bank accounts                                                       |
+| `account_label`      | Display name for account                                                     |
+| `description`        | Free-text description of account                                             |
+| `bcb_controlled`     | Flag is 1 if BCB can operate the account, 0 otherwise                        |
+| `settlement_reference` | Optional settlement reference for payments                                 |
+| `created_at`         | Timestamp of account record creation (YYYY-MM-DDTHH:MM:SS.000Z)               |
+| `updated_at`         | Timestamp of account record update (YYYY-MM-DDTHH:MM:SS.000Z)                |
+| `blinc_id`           | Only applicable to BLINC accounts - account id within BLINC network          |
+| `partner_id`         | Internal numeric ID of white-label partner                                   |
+| `email`              | Email address of client                                                      |
+| `reporting_ccy`      | Home currency of client                                                      |
+| `pid`                | Alpha-numeric ID of white-label partner                                      |
+| `partner_name`       | White-label partner name                                                     |
+
+
+
+### List Accounts [GET]
+List all bank accounts, custody accounts and wallet accounts. End-clients can list their own accounts. White-label partners can list all their own clients' accounts.
+
++ Request (application/json)
+
+    + Headers
+    
+            Authorization: Bearer access_token (access_token generated by BCB Auth)
+    
++ Parameters
+
+    + counterparty_id (optional, number) - YOUR COUNTERPARTY ID
+    + limit (optional, number) - Limit result set for server-side paging
+    + pageToken (optional, number) - Offset result set when paging
+    + id (optional, number) - Return single result with matching account id
+
++ Response 200 (application/json)
+
+    +   Body
+    
+            [
+                {
+                    "id": 378,
+                    "counterparty_id": 483,
+                    "aid": "A01-CX00000101",
+                    "cid": "CX00000101",
+                    "account_type": "Wallet",
+                    "ccy": "BTC",
+                    "host_name": "BCB Group",
+                    "host_hub": "",
+                    "host_location": "",
+                    "node_name": "BCB Payments Ltd",
+                    "node_address": "3LxDswEWKC3mJewRYs44xr3qNBqXMwhszo",
+                    "node_location": "",
+                    "node_country": "",
+                    "node_subaddress": "",
+                    "iban": "",
+                    "account_label": "LNS 5 BTC hszo",
+                    "description": "BCB Payments Ltd, 3LxDswEWKC3mJewRYs44xr3qNBqXMwhszo, BTC",
+                    "bcb_controlled": 1,
+                    "settlement_reference": "",
+                    "created_at": "2018-12-28T14:42:44.000Z",
+                    "updated_at": "2019-01-24T21:26:27.000Z",
+                    "partner_id": 4,
+                    "email": "otc@bcbgroup.io",
+                    "reporting_ccy": "GBP",
+                    "pid": "P01061701",
+                    "partner_name": "BCB Direct"
+                },
+                {
+                    "id": 383,
+                    "counterparty_id": 483,
+                    "aid": "A02-CX00000101",
+                    "cid": "CX00000101",
+                    "account_type": "Bank",
+                    "ccy": "CHF",
+                    "host_name": "Credit Suisse",
+                    "host_hub": "Zurich",
+                    "host_location": "Lake View, Zurich, CH 2001, Switzerland",
+                    "node_name": "Best Swiss OTC LLC",
+                    "node_address": "6013354000",
+                    "node_location": "",
+                    "node_country": "CH",
+                    "node_subaddress": "",
+                    "iban": "CH04NWBK53616776013354",
+                    "account_label": "Best Swiss CHF Main Account",
+                    "description": "Best Swiss, Credit Suisse CH04NWBK53616776013354, CHF",
+                    "bcb_controlled": 0,
+                    "settlement_reference": "",
+                    "created_at": "2018-12-28T14:42:44.000Z",
+                    "updated_at": "2018-12-28T14:42:44.000Z",
+                    "partner_id": 4,
+                    "email": "otc@bestswiss.io",
+                    "reporting_ccy": "CHF",
+                    "pid": "P01061701",
+                    "partner_name": "Best Swiss OTC"
+                },
+                {
+                    "id": 410,
+                    "counterparty_id": 483,
+                    "aid": "A03-CX00000101",
+                    "cid": "CX00000101",
+                    "account_type": "Custodial",
+                    "ccy": "XRP",
+                    "host_name": "Vo1t",
+                    "host_hub": "",
+                    "host_location": "Bunker 4a",
+                    "node_name": "John Smith Automotive Ltd",
+                    "node_address": "rpuiAsQSN2PLrFhm2nDvgjv4aeFFHrspKF",
+                    "node_location": "",
+                    "node_country": "",
+                    "node_subaddress": "XRP",
+                    "iban": "",
+                    "account_label": "JSA Ltd XRP",
+                    "description": "Vo1t, Bunker 4a, rpuiAsQSN2PLrFhm2nDvgjv4aeFFHrspKF, XRP",
+                    "bcb_controlled": 1,
+                    "settlement_reference": "",
+                    "created_at": "2018-12-28T14:42:44.000Z",
+                    "updated_at": "2018-12-28T14:42:44.000Z",
+                    "partner_id": 4,
+                    "email": "js@automotive.com",
+                    "reporting_ccy": "USD",
+                    "pid": "P01061701",
+                    "partner_name": "BCB Direct"
+                }
+            ]
+
+
+## Account Balance [/v3/balances/:account_id{?dateTo}]
+
+Get balance for a specific account within user permissions
+
+<br><b>DEFINTIONS</b>
+
+| Field              | Description                                                   |
+|--------------------|---------------------------------------------------------------|
+| `counterparty_id`  | Internal numeric counterparty id                              |
+| `cid`              | Alpha-numeric counterparty id                                 |
+| `pid`              | Alpha-numeric white-label partner id                          |
+| `partner_id`       | Internal numeric white-label partner id                       |
+| `partner_name`     | White-label partner name                                      |
+| `account_name`     | Account holder name                                           |
+| `ticker`           | Asset identifier (e.g. 'BTC', 'USD')                          |
+| `balance`          | Latest balance                                                |
+| `email`            | Account holder email address                                  |
+| `aid`              | Alpha-numeric account id                                      |
+| `account_type`     | Account type (Bank, Custodial, Wallet)                        |
+| `description`      | Free-text description of account                              |
+| `bcb_controlled`   | Flag is 1 if BCB can operate the account, 0 otherwise         |
+| `reporting_ccy`    | Home currency of client                                       |
+| `asset_name`       | Common name for the asset identified by the ticker            |
+| `display_name`     | More descriptive name of the asset                            |
+| `image_url_trans`  | Image URL of asset for display purposes                       |
+| `decimals_price`   | Number of decimals to display in the price                    |
+| `decimals_quantity`| Number of decimals to display in the quantity                 |
+
+
+
+### Get Account Balance [GET]
+
+List Account Balance.
+
++ Request (application/json)
+
+    + Headers
+    
+            Authorization: Bearer access_token (access_token generated by BCB Auth)
+        
++ Parameters
+
+    + dateTo (optional, date) - Use this param to query for end of day balance
+    
+
++ Response 200 (application/json)
+
+    +   Body
+    
+            [{
+                "counterparty_id": 655,
+                "counterparty_name": "European Trade Exchange",
+                "counterparty_country": "United Kingdom",
+                "account_id": 539,
+                "cid": "C000000597",
+                "pid": "P01061702",
+                "partner_id": 13,
+                "account_label": "BLINC GBP",
+                "partner_name": "BCB Payments",
+                "account_name": "European Trade Exchange Ltd",
+                "node_address": "00000221",
+                "node_location": null,
+                "ticker": "GBP",
+                "balance": 0,
+                "email": "st@blinc.com",
+                "aid": "A00-C000002874",
+                "account_type": "Bank",
+                "payment_type": null,
+                "description": "",
+                "bcb_controlled": 1,
+                "is_observable": 1,
+                "host_name": "BCB Payments",
+                "reporting_ccy": "GBP",
+                "iban": "GB09CLRB040325320221",
+                "bic": "CLRBGB22351",
+                "host_location": "Level 39, One Canada Square, Canary Wharf, E14 5AB",
+                "host_hub": "04-08-11",
+                "host_country": "GB",
+                "host_country_name": "United Kingdom",
+                "asset_name": "British Pounds",
+                "display_name": "British Pounds (GBP)",
+                "image_url_trans": "https://bcb.red0.ch/ccicons/transparent/gbp.png",
+                "decimals_price": 5,
+                "decimals_quantity": 2
+            }]
+            
+
+## Transactions [/v3/accounts/:account_id/transactions{?dateFrom,dateTo,limit,pageToken}]
+
+List all transactions for a specific account within user permissions
+
+<br><b>DEFINTIONS</b>
+
+| Field         | Description                                                                |
+|---------------|----------------------------------------------------------------------------|
+| `tx_id`       | Transaction ID (unique code)                                               |
+| `account_id`  | Internal numeric account id                                                |
+| `value_date`  | Date of transaction                                                        |
+| `credit`      | 1 if true, 0 for debit                                                     |
+| `details`     | Sender or receiver account information depending on payment direction      |
+| `ticker`      | Asset identifier (e.g. 'BTC', 'USD')                                       |
+| `amount`      | Amount sent                                                                |
+| `approved`    | Flag is 1 if approved                                                      |
+| `notes`       | Free-text notes                                                            |
+| `source_name` | Transaction source                                                         |
+
+
+
+### Get Account Transactions [GET]
+List Account Transactions.
+
++ Request (application/json)
+
+    + Headers
+    
+            Authorization: Bearer access_token (access_token generated by BCB Auth)
+        
++ Parameters
+
+    + dateFrom (optional, date)
+    + dateTo (optional, date)
+    + limit (optional, number) - Limit result set for server-side paging
+    + pageToken (optional, number) - Offset result set when paging
+    
++ Response 200 (application/json)
+
+    +   Body
+    
+            [
+                {
+                    "tx_id": "7b73263d-65dc-11e9-b39c-42010a8400a9",
+                    "account_id": 539,
+                    "blinc_id": null,
+                    "network": "FPS",
+                    "value_date": "2019-04-23T14:28:26.000Z",
+                    "credit": 0,
+                    "details": {
+                        "bic": null,
+                        "iban": "GB41CLRB04054100000033",
+                        "blinc_id": null,
+                        "reference": "BCB Pay 53135 GBP",
+                        "sort_code": "040541",
+                        "account_name": "BCB Payments Ltd",
+                        "account_number": "00000033",
+                        "counterparty_reference": "BCB Pay 53135 GBP",
+                        "endToEndIdentifier": "fcb60b45a4b94371b7cf2321ec318117", 
+                        "nonce": 1598455372829
+                    },
+                    "ticker": "GBP",
+                    "amount": 5858.94,
+                    "approved": 1,
+                    "notes": null,
+                    "source_name": "clearbank"
+                },
+                {
+                    "tx_id": "38aa62fa-653e-11e9-b39c-42010a8400a9",
+                    "account_id": 539,
+                    "blinc_id": null,
+                    "network": "FPS",
+                    "value_date": "2019-04-22T19:35:37.000Z",
+                    "credit": 1,
+                    "details": {
+                        "bic": null,
+                        "iban": "GB41CLRB04054100000033",
+                        "blinc_id": null,
+                        "reference": "BCB Pay 53135 GBP",
+                        "sort_code": "040541",
+                        "account_name": "BCB Payments Ltd",
+                        "account_number": "00000033",
+                        "counterparty_reference": "BCB Pay 53135 GBP",
+                        "endToEndIdentifier": "fcb60b45a4b94371b7cf2321ec318117", 
+                        "nonce": 1623419032251
+                    },
+                    "ticker": "GBP",
+                    "amount": 8280,
+                    "approved": 1,
+                    "notes": null,
+                    "source_name": "clearbank"
+                }
+            ]
+
+## Transaction Detail [/v3/accounts/:account_id/transactions/:tx_id]
+
+List details of a transaction within user permissions
+
+<br><b>DEFINTIONS</b>
+
+| Field         | Description                                                      |
+|---------------|------------------------------------------------------------------|
+| `tx_id`       | Transaction ID (unique code)                                     |
+| `account_id`  | Internal numeric account id                                      |
+| `blinc_id`    | BLINC account id for BLINC accounts only                         |
+| `network`     | Payment scheme (e.g. FPS, CHAPS, SWIFT, BLINC)                   |
+| `value_date`  | Date of transaction                                              |
+| `credit`      | Flag is 1 if the funds were received, 0 if paid out              |
+| `details`     | Bank Account details                                             |
+| `ticker`      | Asset identifier (e.g. 'BTC', 'USD')                             |
+| `amount`      | Amount (always positive, direction indicated by `credit` flag)   |
+| `approved`    | Flag is 1 if settled, 0 if pending settlement (for outgoing payments only)  |
+| `notes`       | Free-text notes                                                  |
+| `source_name` | transaction source                                               |
+
+
+
+### Get Transaction Details [GET]
+List Account Transaction Details.
+
++ Request (application/json)
+
+    + Headers
+    
+            Authorization: Bearer access_token (access_token generated by BCB Auth)
+    
++ Response 200 (application/json)
+
+    +   Body
+    
+                {
+                    "tx_id": "7b73263d-65dc-11e9-b39c-42010a8400a9",
+                    "account_id": 539,
+                    "blinc_id": null,
+                    "network": "FPS",
+                    "value_date": "2019-04-23T14:28:26.000Z",
+                    "credit": 0,
+                    "details": {
+                        "bic": null,
+                        "iban": "GB41CLRB04054100000033",
+                        "blinc_id": null,
+                        "reference": "BCB Pay 53135 GBP",
+                        "sort_code": "040541",
+                        "account_name": "BCB Payments Ltd",
+                        "account_number": "00000033",
+                        "counterparty_reference": "BCB Pay 53135 GBP",
+                        "endToEndIdentifier": "fcb60b45a4b94371b7cf2321ec318117", 
+                        "nonce": 1598455372829
+                    },
+                    "ticker": "GBP",
+                    "amount": 5858.94,
+                    "approved": 1,
+                    "notes": null,
+                    "source_name": "clearbank"
+                },
+
+## List Beneficiaries [/v3/beneficiaries{?limit,pageToken}]
+
+Beneficiaries POST version 3 has been deprecated, support is ending on 21st April 2024, please migrate to version 4. <br><br>
+>**NOTE**: CHAPS (GBP over £1,000,000) payments will stop being supported on beneficiaries created on version 3 from 21 January 2024 and must be submitted through version 4.<br><br>
+
+The `/beneficiaries end-point` is largely a mirror of the accounts end-point with similar definitions. You can use /beneficiaries endpoint to query beneficiary data or use /accounts endpoint in order to create a beneficiary account.<br><br>
+
+<br><b>DEFINTIONS</b>
+
+| Field                | Description                                                                                  |
+|----------------------|----------------------------------------------------------------------------------------------|
+| `id`                 | Numeric internal beneficiary ID                                                              |
+| `counterparty_id`    | Numeric internal counterparty ID                                                             |
+| `aid`                | Alpha-numeric beneficiary ID                                                                 |
+| `cid`                | Alpha-numeric counterparty ID                                                                |
+| `account_type`       | Can be Wallet, Bank or Custodial                                                             |
+| `ccy`                | Asset ticker, or left hand side of trading symbol                                            |
+| `host_name`          | Bank Name for bank accounts, Custodian Name for custody accounts, Wallet Name for wallet accounts |
+| `host_hub`           | Branch Code for bank accounts, optional for custody and wallets                               |
+| `host_location`      | Bank Address for bank accounts, optional for custody and wallets                             |
+| `node_name`          | Account holder's legal name                                                                  |
+| `node_address`       | Account Number for bank accounts, wallet address for wallets, optional for custody           |
+| `node_location`      | Account holder's residential address for bank accounts, optional memo field for custody and wallets |
+| `node_country`       | Account holder's residential address country code (2-letter ISO country code), optional memo field for custody and wallets |
+| `iban`               | IBAN for bank accounts                                                                       |
+| `account_label`      | Display name for beneficiary                                                                 |
+| `description`        | Free-text description of beneficiary                                                         |
+| `settlement_reference` | Optional settlement reference for payments                                                  |
+| `created_at`         | Timestamp of account record creation (YYYY-MM-DDTHH:MM:SS.000Z)                               |
+| `updated_at`         | Timestamp of account record update (YYYY-MM-DDTHH:MM:SS.000Z)                                 |
+| `partner_id`         | Internal numeric ID of white-label partner                                                   |
+| `email`              | Email address of beneficiary                                                                 |
+| `pid`                | Alpha-numeric ID of white-label partner                                                      |
+| `partner_name`       | White-label partner name                                                                     |
+
+
+- Convention for addresses: 'Street 1, Street 2, Town Postal Code/Zip Code'.
+- Country: 2-letter ISO country code
+
+
+### List Beneficiaries [GET]
+List all beneficiary bank accounts, custody accounts and wallet accounts. End-clients can list their own beneficiaries. White-label partners can list all their own clients' beneficiaries.
+
++ Request (application/json)
+
+    + Headers
+    
+            Authorization: Bearer access_token (access_token generated by BCB Auth)
+    
++ Parameters
+
+    + limit (optional, number) - Limit result set for server-side paging
+    + pageToken (optional, number) - Offset result set when paging
+
++ Response 200 (application/json)
+
+    +   Body
+    
+            [
+                {
+                    "id": 378,
+                    "counterparty_id": 483,
+                    "aid": "A01-CX00000101",
+                    "cid": "CX00000101",
+                    "account_type": "Wallet",
+                    "ccy": "BTC",
+                    "host_name": "BCB Group",
+                    "host_hub": "",
+                    "host_location": "",
+                    "node_name": "BCB Payments Ltd",
+                    "node_address": "3LxDswEWKC3mJewRYs44xr3qNBqXMwhszo",
+                    "node_location": "",
+                    "node_country": "",
+                    "node_subaddress": "",
+                    "iban": "",
+                    "account_label": "LNS 5 BTC hszo",
+                    "description": "BCB Payments Ltd, 3LxDswEWKC3mJewRYs44xr3qNBqXMwhszo, BTC",
+                    "settlement_reference": "",
+                    "created_at": "2018-12-28T14:42:44.000Z",
+                    "updated_at": "2019-01-24T21:26:27.000Z",
+                    "partner_id": 4,
+                    "email": "otc@bcbgroup.io",
+                    "pid": "P01061701",
+                    "partner_name": "BCB Direct"
+                },
+                ...
+            ]
+            
+
+## Create Beneficiary [/v4/accounts]
+
+The version 4 endpoint, POST `v4/accounts/`, is now available.
+To create a new beneficiary you must create an account with flag is_beneficiary=1.
+
+The key difference is the addition of beneficiary address fields as detailed below. 
+<br><br>
+Version 3 (Deprecated):
+```
+node_location (Mandatory when address required)
+node_country (Mandatory when address required)
+```
+<br>
+
+Version 4:
+```
+node_location_line_1 (Mandatory when address required)
+node_location_line_2
+node_location_line_3
+node_location_city (Mandatory when address required)
+node_location_region
+node_location_postcode (Only mandatory for CHAPS payments)
+node_country (Mandatory when address required)
+```
+<br>
+
+The `/beneficiaries end-point` is largely a mirror of the accounts end-point with similar definitions. You can use /beneficiaries endpoint to query beneficiary data or use /accounts endpoint in order to create a beneficiary account.<br><br>
+
+<br><b>DEFINTIONS</b>
+
+| Field                   | Description                                                                                  |
+|-------------------------|----------------------------------------------------------------------------------------------|
+| `id`                    | Numeric internal beneficiary ID                                                              |
+| `counterparty_id`       | Numeric internal counterparty ID                                                             |
+| `aid`                   | Alpha-numeric beneficiary ID                                                                 |
+| `cid`                   | Alpha-numeric counterparty ID                                                                |
+| `account_type`          | Can be Wallet, Bank or Custodial                                                             |
+| `ccy`                   | Asset ticker, or left hand side of trading symbol                                            |
+| `host_name`             | Bank Name for bank accounts, Custodian Name for custody accounts, Wallet Name for wallet accounts |
+| `host_hub`              | Branch Code for bank accounts, optional for custody and wallets                               |
+| `host_location`         | Bank Address for bank accounts, optional for custody and wallets                             |
+| `node_name`             | Account holder's legal name                                                                  |
+| `node_address`          | Account Number for bank accounts, wallet address for wallets, optional for custody           |
+| `node_location_line_1`  | Account holder's residential address line 1 for bank accounts, optional memo field for custody and wallets |
+| `node_location_line_2`  | Account holder's residential address line 2 for bank accounts, optional memo field for custody and wallets |
+| `node_location_line_3`  | Account holder's residential address line 3 for bank accounts, optional memo field for custody and wallets |
+| `node_location_city`    | Account holder's residential address city for bank accounts, optional memo field for custody and wallets |
+| `node_location_region`  | Account holder's residential address region for bank accounts, optional memo field for custody and wallets |
+| `node_location_postcode`| Account holder's residential address postcode for bank accounts, optional memo field for custody and wallets |
+| `node_country`          | Account holder's residential address country code (2-letter ISO country code), optional memo field for custody and wallets |
+| `iban`                  | IBAN for bank accounts                                                                       |
+| `account_label`         | Display name for beneficiary                                                                 |
+| `settlement_reference`  | Optional settlement reference for payments                                                   |
+| `created_at`            | Timestamp of account record creation (YYYY-MM-DDTHH:MM:SS.000Z)                               |
+| `updated_at`            | Timestamp of account record update (YYYY-MM-DDTHH:MM:SS.000Z)                                 |
+| `partner_id`            | Internal numeric ID of white-label partner                                                   |
+| `email`                 | Email address of beneficiary                                                                 |
+| `pid`                   | Alpha-numeric ID of white-label partner                                                      |
+| `partner_name`          | White-label partner name                                                                     |
+
+
+- Convention for addresses: 'Street 1, Street 2, Town Postal Code/Zip Code'.
+- Country: 2-letter ISO country code
+
+
+### Create Beneficiary [POST]
+To create a new beneficiary you must create an account with flag is_beneficiary=1.
+
+E.g. - Payload: 
+(https://api.bcb.group/v3/accounts [POST])
+
+```
+CCY: GBP
+Country: GB
+Scenario: Account Number + Sort Code
+Account Type: Bank
+{ 
+    counterparty_id: 'YOUR_COUNTERPARTY_ID' (NOT CID) (MANDATORY), 
+    cid: 'YOUR CID' (MANDATORY),
+    name: 'NAME' (MANDATORY),
+    account_type: 'Bank' (MANDATORY),
+    ccy: 'GBP' (MANDATORY - CCY ISO CODE - 3 letters),
+    host_name: 'BANK NAME' (OPTIONAL),
+    host_hub: 'SORT CODE' (MANDATORY),
+    host_location: 'BANK ADDRESS' (OPTIONAL),
+    host_country: 'GB' (MANDATORY - COUNTRY ISO CODE - 2 letters),
+    node_name: 'ACCOUNT NAME' (MANDATORY),
+    node_address: 'ACCOUNT NUMBER' (MANDATORY),
+    node_location_line_1: 'Beneficiary Address Line 1' (MANDATORY for CHAPS Payments),
+    node_location_line_2: 'Beneficiary Address Line 2' (OPTIONAL),
+    node_location_line_3: 'Beneficiary Address Line 3' (OPTIONAL),
+    node_location_city: 'Beneficiary Address City' (MANDATORY for CHAPS Payments),
+    node_location_region: 'Beneficiary Address Region' (OPTIONAL),
+    node_location_postcode: 'Beneficiary Address Postcode' (MANDATORY for CHAPS Payments),
+    node_country: 'CC' (OPTIONAL - COUNTRY ISO CODE - 2 letters),
+    node_type: 'individual' (MANDATORY - individual or corporate),
+    iban: 'IBAN'(OPTIONAL),
+    bic: 'BIC'(OPTIONAL),
+    account_label: 'NAME - CCY' (OPTIONAL),
+    payment_type: 'FPS' (OPTIONAL),
+    email: 'BENEFICIARY EMAIL' (OPTIONAL),
+    bcb_controlled: 1 (MANDATORY - ALWAYS 1),
+    settlement_reference: ''(OPTIONAL),
+    is_beneficiary: 1 (MANDATORY - ALWAYS 1)
+}
+```
+```
+CCY: Any CCY excluding GBP & USD
+Country: GB
+Account Type: Bank
+{ 
+    counterparty_id: 'YOUR_COUNTERPARTY_ID' (NOT CID) (MANDATORY), 
+    cid: 'YOUR CID' (MANDATORY),
+    name: 'NAME' (MANDATORY),
+    account_type: 'Bank' (MANDATORY),
+    ccy: 'EUR' (MANDATORY - CCY ISO CODE - 3 letters),
+    host_name: 'BANK NAME' (OPTIONAL),
+    host_hub: 'NULL' (DO NOT FILL),
+    host_location: 'BANK ADDRESS' (OPTIONAL),
+    host_country: 'GB' (MANDATORY - COUNTRY ISO CODE - 2 letters),
+    node_name: 'ACCOUNT NAME' (MANDATORY),
+    node_address: 'ACCOUNT NUMBER' (OPTIONAL),
+    node_location_line_1: 'Beneficiary Address Line 1' (MANDATORY),
+    node_location_line_2: 'Beneficiary Address Line 2' (OPTIONAL),
+    node_location_line_3: 'Beneficiary Address Line 3' (OPTIONAL),
+    node_location_city: 'Beneficiary Address City' (MANDATORY),
+    node_location_region: 'Beneficiary Address Region' (OPTIONAL),
+    node_location_postcode: 'Beneficiary Address Postcode' (OPTIONAL),
+    node_country: 'CC' (MANDATORY - COUNTRY ISO CODE - 2 letters),
+    node_type: 'individual' (MANDATORY - individual or corporate),
+    iban: 'IBAN'(MANDATORY),
+    bic: 'BIC'(MANDATORY),
+    account_label: 'NAME - CCY' (OPTIONAL),
+    payment_type: 'FPS' (OPTIONAL),
+    email: 'BENEFICIARY EMAIL' (OPTIONAL),
+    bcb_controlled: 1 (MANDATORY - ALWAYS 1),
+    settlement_reference: ''(OPTIONAL),
+    is_beneficiary: 1 (MANDATORY - ALWAYS 1)
+}
+```
+```
+CCY: Any CCY excluding USD
+Country: Any IBAN Country excluding GB
+Account Type: Bank
+{ 
+    counterparty_id: 'YOUR_COUNTERPARTY_ID' (NOT CID) (MANDATORY), 
+    cid: 'YOUR CID' (MANDATORY),
+    name: 'NAME' (MANDATORY),
+    account_type: 'Bank' (MANDATORY),
+    ccy: 'EUR' (MANDATORY - CCY ISO CODE - 3 letters),
+    host_name: 'BANK NAME' (OPTIONAL),
+    host_hub: 'NULL' (DO NOT FILL),
+    host_location: 'BANK ADDRESS' (OPTIONAL),
+    host_country: 'DE' (MANDATORY - COUNTRY ISO CODE - 2 letters),
+    node_name: 'ACCOUNT NAME' (MANDATORY),
+    node_address: 'NULL' (DO NOT FILL),
+    node_location_line_1: 'Beneficiary Address Line 1' (MANDATORY),
+    node_location_line_2: 'Beneficiary Address Line 2' (OPTIONAL),
+    node_location_line_3: 'Beneficiary Address Line 3' (OPTIONAL),
+    node_location_city: 'Beneficiary Address City' (MANDATORY),
+    node_location_region: 'Beneficiary Address Region' (OPTIONAL),
+    node_location_postcode: 'Beneficiary Address Postcode' (OPTIONAL),
+    node_country: 'CC' (MANDATORY - COUNTRY ISO CODE - 2 letters),
+    node_type: 'individual' (MANDATORY - individual or corporate),
+    iban: 'IBAN'(MANDATORY),
+    bic: 'BIC'(MANDATORY),
+    account_label: 'NAME - CCY' (OPTIONAL),
+    payment_type: 'FPS' (OPTIONAL),
+    email: 'BENEFICIARY EMAIL' (OPTIONAL),
+    bcb_controlled: 1 (MANDATORY - ALWAYS 1),
+    settlement_reference: ''(OPTIONAL),
+    is_beneficiary: 1 (MANDATORY - ALWAYS 1)
+}
+```
+```
+CCY: Any CCY excluding USD
+Country: Any non-IBAN country excluding AU & NZ & CA & US
+Account Type: Bank
+{ 
+    counterparty_id: 'YOUR_COUNTERPARTY_ID' (NOT CID) (MANDATORY), 
+    cid: 'YOUR CID' (MANDATORY),
+    name: 'NAME' (MANDATORY),
+    account_type: 'Bank' (MANDATORY),
+    ccy: 'HKD' (MANDATORY - CCY ISO CODE - 3 letters),
+    host_name: 'BANK NAME' (OPTIONAL),
+    host_hub: 'NATIONAL CLEARING CODE' (OPTIONAL),
+    host_location: 'BANK ADDRESS' (OPTIONAL),
+    host_country: 'SG' (MANDATORY - COUNTRY ISO CODE - 2 letters),
+    node_name: 'ACCOUNT NAME' (MANDATORY),
+    node_address: 'ACCOUNT NUMBER' (MANDATORY),
+    node_location_line_1: 'Beneficiary Address Line 1' (MANDATORY),
+    node_location_line_2: 'Beneficiary Address Line 2' (OPTIONAL),
+    node_location_line_3: 'Beneficiary Address Line 3' (OPTIONAL),
+    node_location_city: 'Beneficiary Address City' (MANDATORY),
+    node_location_region: 'Beneficiary Address Region' (OPTIONAL),
+    node_location_postcode: 'Beneficiary Address Postcode' (OPTIONAL),
+    node_country: 'CC' (MANDATORY - COUNTRY ISO CODE - 2 letters),
+    node_type: 'individual' (MANDATORY - individual or corporate),
+    iban: 'NULL'(DO NOT FILL),
+    bic: 'BIC'(MANDATORY),
+    account_label: 'NAME - CCY' (OPTIONAL),
+    payment_type: 'FPS' (OPTIONAL),
+    email: 'BENEFICIARY EMAIL' (OPTIONAL),
+    bcb_controlled: 1 (MANDATORY - ALWAYS 1),
+    settlement_reference: ''(OPTIONAL),
+    is_beneficiary: 1 (MANDATORY - ALWAYS 1)
+}
+```
+```
+CCY: Any CCY excluding USD
+Country: CA
+Account Type: Bank
+{ 
+    counterparty_id: 'YOUR_COUNTERPARTY_ID' (NOT CID) (MANDATORY), 
+    cid: 'YOUR CID' (MANDATORY),
+    name: 'NAME' (MANDATORY),
+    account_type: 'Bank' (MANDATORY),
+    ccy: 'CAD' (MANDATORY - CCY ISO CODE - 3 letters),
+    host_name: 'BANK NAME' (OPTIONAL),
+    host_hub: 'CANADIAN ROUTING NUMBER' (OPTIONAL),
+    host_location: 'BANK ADDRESS' (OPTIONAL),
+    host_country: 'CA' (MANDATORY - COUNTRY ISO CODE - 2 letters),
+    node_name: 'ACCOUNT NAME' (MANDATORY),
+    node_address: 'ACCOUNT NUMBER' (MANDATORY),
+    node_location_line_1: 'Beneficiary Address Line 1' (MANDATORY),
+    node_location_line_2: 'Beneficiary Address Line 2' (OPTIONAL),
+    node_location_line_3: 'Beneficiary Address Line 3' (OPTIONAL),
+    node_location_city: 'Beneficiary Address City' (MANDATORY),
+    node_location_region: 'Beneficiary Address Region' (OPTIONAL),
+    node_location_postcode: 'Beneficiary Address Postcode' (OPTIONAL),
+    node_country: 'CC' (MANDATORY - COUNTRY ISO CODE - 2 letters),
+    node_type: 'individual' (MANDATORY - individual or corporate),
+    iban: 'NULL'(DO NOT FILL),
+    bic: 'BIC'(MANDATORY),
+    account_label: 'NAME - CCY' (OPTIONAL),
+    payment_type: 'FPS' (OPTIONAL),
+    email: 'BENEFICIARY EMAIL' (OPTIONAL),
+    bcb_controlled: 1 (MANDATORY - ALWAYS 1),
+    settlement_reference: ''(OPTIONAL),
+    is_beneficiary: 1 (MANDATORY - ALWAYS 1)
+}
+```
+```
+CCY: USD
+Country: US
+Account Type: Bank
+{ 
+    counterparty_id: 'YOUR_COUNTERPARTY_ID' (NOT CID) (MANDATORY), 
+    cid: 'YOUR CID' (MANDATORY),
+    name: 'NAME' (MANDATORY),
+    account_type: 'Bank' (MANDATORY),
+    ccy: 'USD' (MANDATORY - CCY ISO CODE - 3 letters),
+    host_name: 'BANK NAME' (OPTIONAL),
+    host_hub: 'FEDWIRE ROUTING NUMBER' (MANDATORY),
+    host_location: 'BANK ADDRESS' (OPTIONAL),
+    host_country: 'US' (MANDATORY - COUNTRY ISO CODE - 2 letters),
+    node_name: 'ACCOUNT NAME' (MANDATORY),
+    node_address: 'ACCOUNT NUMBER' (MANDATORY),
+    node_location_line_1: 'Beneficiary Address Line 1' (MANDATORY),
+    node_location_line_2: 'Beneficiary Address Line 2' (OPTIONAL),
+    node_location_line_3: 'Beneficiary Address Line 3' (OPTIONAL),
+    node_location_city: 'Beneficiary Address City' (MANDATORY),
+    node_location_region: 'Beneficiary Address Region' (OPTIONAL),
+    node_location_postcode: 'Beneficiary Address Postcode' (OPTIONAL),
+    node_country: 'CC' (MANDATORY - COUNTRY ISO CODE - 2 letters),
+    node_type: 'individual' (MANDATORY - individual or corporate),
+    iban: 'NULL'(DO NOT FILL),
+    bic: 'NULL'(DO NOT FILL),
+    account_label: 'NAME - CCY' (OPTIONAL),
+    payment_type: 'FPS' (OPTIONAL),
+    email: 'BENEFICIARY EMAIL' (OPTIONAL),
+    bcb_controlled: 1 (MANDATORY - ALWAYS 1),
+    settlement_reference: ''(OPTIONAL),
+    is_beneficiary: 1 (MANDATORY - ALWAYS 1)
+}
+```
+```
+CCY: USD
+Country: Any non-IBAN country
+Account Type: Bank
+{ 
+    counterparty_id: 'YOUR_COUNTERPARTY_ID' (NOT CID) (MANDATORY), 
+    cid: 'YOUR CID' (MANDATORY),
+    name: 'NAME' (MANDATORY),
+    account_type: 'Bank' (MANDATORY),
+    ccy: 'USD' (MANDATORY - CCY ISO CODE - 3 letters),
+    host_name: 'BANK NAME' (MANDATORY),
+    host_hub: 'NATIONAL CLEARING CODE' (OPTIONAL),
+    host_location: 'BANK ADDRESS' (MANDATORY),
+    host_country: 'SG' (MANDATORY - COUNTRY ISO CODE - 2 letters),
+    node_name: 'ACCOUNT NAME' (MANDATORY),
+    node_address: 'ACCOUNT NUMBER' (MANDATORY),
+    node_location_line_1: 'Beneficiary Address Line 1' (MANDATORY),
+    node_location_line_2: 'Beneficiary Address Line 2' (OPTIONAL),
+    node_location_line_3: 'Beneficiary Address Line 3' (OPTIONAL),
+    node_location_city: 'Beneficiary Address City' (MANDATORY),
+    node_location_region: 'Beneficiary Address Region' (OPTIONAL),
+    node_location_postcode: 'Beneficiary Address Postcode' (OPTIONAL),
+    node_country: 'CC' (MANDATORY - COUNTRY ISO CODE - 2 letters),
+    node_type: 'individual' (MANDATORY - individual or corporate),
+    iban: 'NULL'(DO NOT FILL),
+    bic: 'BIC'(MANDATORY),
+    account_label: 'NAME - CCY' (OPTIONAL),
+    payment_type: 'FPS' (OPTIONAL),
+    email: 'BENEFICIARY EMAIL' (OPTIONAL),
+    bcb_controlled: 1 (MANDATORY - ALWAYS 1),
+    settlement_reference: ''(OPTIONAL),
+    is_beneficiary: 1 (MANDATORY - ALWAYS 1)
+}
+```
+```
+CCY: USD
+Country: Any IBAN country (Including GB)
+Account Type: Bank
+{ 
+    counterparty_id: 'YOUR_COUNTERPARTY_ID' (NOT CID) (MANDATORY), 
+    cid: 'YOUR CID' (MANDATORY),
+    name: 'NAME' (MANDATORY),
+    account_type: 'Bank' (MANDATORY),
+    ccy: 'USD' (MANDATORY - CCY ISO CODE - 3 letters),
+    host_name: 'BANK NAME' (MANDATORY),
+    host_hub: 'NULL' (DO NOT FILL),
+    host_location: 'BANK ADDRESS' (MANDATORY),
+    host_country: 'SG' (MANDATORY - COUNTRY ISO CODE - 2 letters),
+    node_name: 'ACCOUNT NAME' (MANDATORY),
+    node_address: 'NULL' (DO NOT FILL),
+    node_location_line_1: 'Beneficiary Address Line 1' (MANDATORY),
+    node_location_line_2: 'Beneficiary Address Line 2' (OPTIONAL),
+    node_location_line_3: 'Beneficiary Address Line 3' (OPTIONAL),
+    node_location_city: 'Beneficiary Address City' (MANDATORY),
+    node_location_region: 'Beneficiary Address Region' (OPTIONAL),
+    node_location_postcode: 'Beneficiary Address Postcode' (OPTIONAL),
+    node_country: 'CC' (MANDATORY - COUNTRY ISO CODE - 2 letters),
+    node_type: 'individual' (MANDATORY - individual or corporate),
+    iban: 'IBAN'(MANDATORY),
+    bic: 'BIC'(MANDATORY),
+    account_label: 'NAME - CCY' (OPTIONAL),
+    payment_type: 'FPS' (OPTIONAL),
+    email: 'BENEFICIARY EMAIL' (OPTIONAL),
+    bcb_controlled: 1 (MANDATORY - ALWAYS 1),
+    settlement_reference: ''(OPTIONAL),
+    is_beneficiary: 1 (MANDATORY - ALWAYS 1)
+}
+```
+```
+CCY: Any CCY excluding USD
+Country: AU & NZ
+Account Type: Bank
+{ 
+    counterparty_id: 'YOUR_COUNTERPARTY_ID' (NOT CID) (MANDATORY), 
+    cid: 'YOUR CID' (MANDATORY),
+    name: 'NAME' (MANDATORY),
+    account_type: 'Bank' (MANDATORY),
+    ccy: 'AUD' (MANDATORY - CCY ISO CODE - 3 letters),
+    host_name: 'BANK NAME' (OPTIONAL),
+    host_hub: 'BSB NUMBER' (OPTIONAL),
+    host_location: 'BANK ADDRESS' (OPTIONAL),
+    host_country: 'AU' (MANDATORY - COUNTRY ISO CODE - 2 letters),
+    node_name: 'ACCOUNT NAME' (MANDATORY),
+    node_address: 'ACCOUNT NUMBER' (MANDATORY),
+    node_location_line_1: 'Beneficiary Address Line 1' (MANDATORY),
+    node_location_line_2: 'Beneficiary Address Line 2' (OPTIONAL),
+    node_location_line_3: 'Beneficiary Address Line 3' (OPTIONAL),
+    node_location_city: 'Beneficiary Address City' (MANDATORY),
+    node_location_region: 'Beneficiary Address Region' (OPTIONAL),
+    node_location_postcode: 'Beneficiary Address Postcode' (OPTIONAL),
+    node_country: 'CC' (MANDATORY - COUNTRY ISO CODE - 2 letters),
+    node_type: 'individual' (MANDATORY - individual or corporate),
+    iban: 'NULL'(DO NOT FILL),
+    bic: 'BIC'(MANDATORY),
+    account_label: 'NAME - CCY' (OPTIONAL),
+    payment_type: 'FPS' (OPTIONAL),
+    email: 'BENEFICIARY EMAIL' (OPTIONAL),
+    bcb_controlled: 1 (MANDATORY - ALWAYS 1),
+    settlement_reference: ''(OPTIONAL),
+    is_beneficiary: 1 (MANDATORY - ALWAYS 1)
+}
+```
+```
+Account Type: Wallet
+{ 
+    counterparty_id: 'YOUR_COUNTERPARTY_ID' (NOT CID) (MANDATORY), 
+    cid: 'YOUR CID' (MANDATORY),
+    name: 'NAME' (MANDATORY),
+    account_type: 'Wallet' (MANDATORY),
+    ccy: 'BTC' (MANDATORY),
+    host_name: 'NULL' (DO NOT FILL),
+    host_hub: 'NULL' (DO NOT FILL),
+    host_location: 'NULL' (DO NOT FILL),
+    host_country: 'NULL' (DO NOT FILL),
+    node_name: 'ACCOUNT NAME' (MANDATORY),
+    node_address: 'WALLET ADDRESS' (MANDATORY),
+    node_location_line_1: 'Beneficiary Address Line 1' (MANDATORY),
+    node_location_line_2: 'Beneficiary Address Line 2' (OPTIONAL),
+    node_location_line_3: 'Beneficiary Address Line 3' (OPTIONAL),
+    node_location_city: 'Beneficiary Address City' (MANDATORY),
+    node_location_region: 'Beneficiary Address Region' (OPTIONAL),
+    node_location_postcode: 'Beneficiary Address Postcode' (OPTIONAL),
+    node_country: 'CC' (MANDATORY - COUNTRY ISO CODE - 2 letters),
+    node_type: 'individual' (MANDATORY - individual or corporate),
+    iban: 'NULL' (DO NOT FILL),
+    bic: 'NULL' (DO NOT FILL),
+    account_label: 'NAME - CCY' (OPTIONAL),
+    payment_type: 'NULL' (DO NOT FILL),
+    email: 'BENEFICIARY EMAIL' (OPTIONAL),
+    bcb_controlled: 1 (MANDATORY - ALWAYS 1),
+    settlement_reference: ''(OPTIONAL),
+    is_beneficiary: 1 (MANDATORY - ALWAYS 1)
+}
+```
++ Request (application/json)
+
+    + Headers
+    
+            Authorization: Bearer access_token (access_token generated by BCB Auth)
+            
+    + Body 
+    
+            { 
+                counterparty_id: YOUR_COUNTERPARTY_ID (NOT CID), 
+                cid: 'YOUR CID',
+                name: 'NAME',
+                account_type: 'Bank',
+                ccy: 'EUR',
+                host_name: 'BANK NAME',
+                host_hub: 'SORT CODE',
+                host_location: 'BANK ADDRESS',
+                host_country: 'CC',
+                node_name: 'ACCOUNT NAME',
+                node_address: 'ACCOUNT NUMBER OR WALLET ADDRESS',
+                node_location_line_1: 'Beneficiary Address Line 1',
+                node_location_line_2: 'Beneficiary Address Line 2',
+                node_location_line_3: 'Beneficiary Address Line 3',
+                node_location_city: 'Beneficiary Address City',
+                node_location_region: 'Beneficiary Address Region',
+                node_location_postcode: 'Beneficiary Address Postcode',
+                node_country: 'CC',
+                node_type: 'individual',
+                iban: 'IBAN',
+                bic: 'BIC',
+                account_label: 'NAME - CCY',
+                payment_type: 'FPS',
+                email: 'BENEFICIARY EMAIL',
+                bcb_controlled: 1,
+                settlement_reference: '',
+                is_beneficiary: 1
+            }
+
++ Response 200 (application/json)
+
+    +   Body
+    
+            {
+            
+            }
+
+
+
+
+## BLINC Beneficiaries [/v3/accounts/{accountid}/blinc-beneficiaries{?ccy}]
+
+Returns an array of BLINC accounts of all BLINC members to which you are currently connected to.
+
+All BLINC accounts connected to your entity are returned regardless which one of your BLINC accounts’ account_id was requested.
+
+The following data is returned:
+
+`id` Numeric internal account id
+
+`blinc_id` Numeric BLINC account id
+
+`name` Name of the BLINC account holder
+
+`ccy` Currency of the BLINC account
+
+Sample requests:
+
+GET https://api.bcb.group/v3/accounts/9999/blinc-beneficiaries
+
+GET https://api.bcb.group/v3/accounts/9999/blinc-beneficiaries?ccy=GBP
+
+### List BLINC Beneficiaries [GET]
+
++ Request (application/json)
+
+    + Headers
+    
+            Authorization: Bearer access_token (access_token generated by BCB Auth)
+    
++ Parameters
+
+    + accountid (number) - BLINC account_id of counterparty requesting connected BLINC members list
+    + ccy (optional, ISO 4217 format) - restricts the response to only those BLINC accounts with a matching currency (like: EUR, GBP, CHF).
+
++ Response 200 (application/json)
+
+    +   Body
+    
+            [
+                {
+                    "id": 9996,
+                    "blinc_id": "800999999999",
+                    "ccy": "GBP",
+                    "name": "BLINC Member"
+                },
+                ...
+            ]
+
+## BLINC Members [/v3/blinc-accounts/{blincid}]
+
+Returns a single BLINC account based on the BLINC member BLINC id
+
+Sample request:
+
+GET https://api.bcb.group/v3/blinc-accounts/800999999999
+
+### Retrieve BLINC account information by BLINC id [GET]
+
++ Request (application/json)
+
+    + Headers
+    
+            Authorization: Bearer access_token (access_token generated by BCB Auth)
+  
++ Parameters
+
+    + blincid (number) - blinc_id of another BLINC member 
+
++ Response 200 (application/json)
+
+    +   Body
+    
+            [
+                {
+                    "id": 9996,
+                    "blinc_id": "800999999999",
+                    "ccy": "GBP",
+                    "name": "BLINC Member"
+                },
+                ...
+            ]
+            
+
+## Payments [/v4/payments/authorise]
+
+The version 5 endpoint, POST `v5/payments/authorise`, is now available.
+
+The key difference is the addition of beneficiary address fields as detailed below. 
+
+Version 5:
+```
+beneficiary_address_line_1 (Mandatory when address required)
+beneficiary_address_line_2
+beneficiary_address_line_3
+beneficiary_city (Mandatory when address required)
+beneficiary_region
+beneficiary_postcode (Only mandatory for CHAPS payments)
+beneficiary_country (Mandatory when address required)
+reason(Mandatory field for all payments)
+beneficiary_lei_code(Mandatory for CHAPS)
+```
+
+<br><b>Purpose Codes</b>
+
+| Purpose Code | Classification | Suggested User Group | Name | Description |
+|--------------|----------------|----------------------|------|-------------|
+| BKFE | Bank Debt | Wholesale / Fi-Fi | Bank Loan Fee | Bank loan fees. Cash activity related to specific bank loan fees, including (a) agent/assignment fees; (b) amendment fees; (c) commitment fees; (d) consent fees; (e) cost of carry fees; (f) delayed compensation fees; (g) facility fees; (h) fronting fees; (i) funding fees; (j) letter of credit assignment fees. |
+| BKIP | Bank Debt | Wholesale / Fi-Fi | Loan Accrued interest Payment | Accrued interest payments. Specific to bank loans. |
+| BKPP | Bank Debt | Wholesale / Fi-Fi | Bank Loan Principal Pay-down | Principal pay-downs. Specific to bank loans. |
+| CBLK | Card Settlement | Wholesale / Fi-Fi | Card Bank Clearing | A service that is settling money for a bulk of card transactions, while referring to a specific transaction file or other information like terminal ID, card acceptor ID, or other transaction details. |
+| INTC | Cash Management | Commercial | Intra Company Payment | Transaction is an intra-company payment, i.e., a payment between two companies belonging to the same group. |
+| INTP | Cash Management | Consumer / Goods & Services | Intra Party Payment | Transaction is a payment between two accounts belonging to the same party (intra-party payment), where the party is a natural person (identified by a private ID, not organization ID). |
+| DEEPT | Cash Management | Finance | Deposit | Transaction is related to a payment of deposit. |
+| ACCTCASH | Cash Management | Wholesale / Fi-Fi | Account Management | Transaction moves funds between two accounts of the same account holder at the same bank. |
+| COLL | Cash Management | Wholesale / Fi-Fi | Collection Payment | Transaction is a collection of funds initiated via a credit transfer or direct debit. |
+| CSDB | Cash Management | Wholesale / Fi-Fi | Cash Disbursement Cash Management | Transaction is related to cash disbursement. |
+| LIMA | Cash Management | Wholesale / Fi-Fi | Liquidity Management | Bank-initiated account transfer to support zero target balance management, pooling, or sweeping. |
+| NETT | Cash Management | Wholesale / Fi-Fi | Netting | Transaction is related to a netting operation. |
+| EXTD | Collateral | Wholesale / Fi-Fi | Exchange Trading Derivative | Cash collateral related to trading of exchange-traded derivatives in general (Opposite to Over-the-Counter (OTC)). |
+| OTCD | Collateral | Wholesale / Fi-Fi | OTC Derivatives | Cash collateral related to Over-the-counter (OTC) Derivatives in general, for example contracts which are traded and privately negotiated. |
+| REPO | Collateral | Wholesale / Fi-Fi | Repurchase Agreement | Cash collateral related to a repurchase agreement transaction. |
+| SBSC | Collateral | Wholesale / Fi-Fi | Securities Buy Sel Sell Buy Back | Cash collateral related to a Securities Buy Sell Sell Buy Back. |
+| SLEB | Collateral | Wholesale / Fi-Fi | Securities Lending and Borrowing | Cash collateral related to Securities lending and borrowing. |
+| ARGT | Commercial | Commercial | Agricultural Transfer | Transaction is related to the agricultural domain. |
+| AREN | Commercial | Commercial | Accounts Receivables Entry | Transaction is related to a payment associated with an Account Receivable Entry. |
+| BEXP | Commercial | Commercial | Business Expenses | Transaction is related to a payment of business expenses. |
+| BOCE | Commercial | Commercial | Back Office Conversion Entry | Transaction is related to a payment associated with a Back Office Conversion Entry. |
+| COMC | Commercial | Commercial | Commercial Payment | Transaction is related to a payment of commercial credit or debit (formerly Commercial Credit). |
+| LICF | Commercial | Commercial | License Fee | Transaction is payment of a license fee. |
+| CPYR | Commercial | Commercial | Copyright | Transaction is payment of copyright. |
+| SERV | Commercial | Commercial | Service Charges | Transaction is related to service charges charged by a service provider. |
+| SUPP | Commercial | Commercial | Supplier Payment | Transaction is related to a payment to a supplier. |
+| TRAD | Commercial | Commercial | Commercial | Transaction is related to a trade services operation. |
+| SUBS | Commercial | Consumer / Goods & Services | Subscriptions | Transaction is related to a payment of information or entertainment services either in printed or electronic form. |
+| GDSV | Commercial | Consumer / Goods & Services | Purchase Sale of Goods and Services | Transaction is related to the purchase and sale of goods and services. |
+| GSCB | Commercial | Consumer / Goods & Services | Purchase Sale of Goods and Services with Cash Back | Transaction is related to the purchase and sale of goods and services with cash back. |
+| ROYA | Commercial | Consumer / Goods & Services | Royalties | Transaction is the payment of royalties. |
+| COMT | Consumer | Commercial | Consumer Third Party Consolidated Payment | Transaction is a payment used by a third party who can collect funds to pay on behalf of consumers, i.e., credit counselling or bill payment companies. |
+| CHAR | Consumer | Consumer / Goods & Services | Charity Payment | Transaction is a payment for charity reasons. |
+| ECPR | E-Commerce | Consumer / Goods & Services | E-Payment Return | Commerce payment return. |
+| EPAY | E-Commerce | Consumer / Goods & Services | E-Payment | Transaction is related to e-Payment. |
+| COMP | Finance | Commercial | Compensation Payment | Transaction is related to the payment of a compensation relating to interest loss/value date adjustment and can include fees. |
+| DBTC | Finance | Commercial | Debit Collection Payment | Collection of funds initiated via a debit transfer. |
+| CLPR | Finance | Finance | Car Loan Principal Repayment | Transaction is a payment of car loan principal payment. |
+| INTE | Finance | Finance | Interest | Transaction is payment of interest. |
+| LOAN | Finance | Finance | Loan | Transaction is related to transfer of loan to borrower. |
+| LOAR | Finance | Finance | Loan Repayment | Transaction is related to repayment of loan to lender. |
+| RELG | Finance | Finance | Rental Lease | Transaction is for general rental/lease. |
+| TRFD | Finance | Finance | Trust Fund | Transaction is related to a payment of a trust fund. |
+| PENO | Finance | Government | Payment Based on Enforcement Order | Payment based on enforcement orders except those arising from judicial alimony decrees. |
+| INPC | Finance | Insurance | Insurance Premium | Transaction is a payment of car insurance premium. |
+| INPR | Finance | Insurance | Insurance Premium Refund | Transaction is related to an insurance premium refund. |
+| INSC | Finance | Insurance | Payment of Insurance Claim | Transaction is related to the payment of an insurance claim. |
+| INSU | Finance | Insurance | Insurance Premium | Transaction is payment of an insurance premium. |
+| LBRI | Finance | Insurance | Labour Insurance | Transaction is a payment of labour insurance. |
+| LIFI | Finance | Insurance | Life Insurance | Transaction is a payment of life insurance. |
+| PPTI | Finance | Insurance | Property insurance | Transaction is a payment of property insurance. |
+| HLRP | Finance | Property | Property Loan | Transaction is related to a payment of a property loan. |
+| HLST | Finance | Property | Property Loan Settlement | Transaction is related to the settlement of a property loan. |
+| PLDS | Finance | Property | Property Disbursement | Payment of funds from a lender as part of the issuance of a property loan. |
+| PDEP | Finance | Property | Property Deposit | Payment of the deposit required towards purchase of a property. |
+| PCOM | Finance | Property | Property Completion | Final payment to complete the purchase of a property. |
+| PLRF | Finance | Property | Property Loan Refinancing | The transfer or extension of a property financing arrangement to a new deal or loan provider, without change of ownership of property. |
+| FORW | Finance | Foreign Exchange | Forward Foreign Exchange | FX trades with a value date in the future. |
+| FXNT | Finance | Foreign Exchange | Foreign Exchange Related Netting | FX netting if cash is moved by separate wire instead of within the closing FX instruction. |
+| IVPT | General | Commercial | Invoice Payment | Transaction is the payment for invoices. |
+| REBT | General | Commercial | Rebate | Transaction is the payment of a rebate. |
+| REFU | General | Commercial | Refund | Transaction is the payment of a refund. |
+| CDBL | General | Consumer / Goods & Services | Credit Card Bill | Transaction is related to a payment of credit card bill. |
+| CPKC | General | Consumer / Goods & Services | Carpark Charges | Transaction is related to carpark charges. |
+| EDUC | General | Consumer / Goods & Services | Education | Transaction is related to a payment of study/tuition fees. |
+| FEES | General | Consumer / Goods & Services | Payment of fees/charges | Payment of fees/charges. |
+| GAMB | General | Consumer / Goods & Services | Gambling | Payments towards a purchase or winnings received from gambling, betting or other wagering activities. |
+| LOTT | General | Consumer / Goods & Services | Lottery | Payments towards a purchase or winnings received from lottery activities. |
+| GIFT | General | Consumer / Goods & Services | Gift | Payment with no commercial or statutory purpose. |
+| INSM | General | Consumer / Goods & Services | Instalment | Transaction is related to a payment of an instalment. |
+| REOD | General | Finance | Account Overdraft Repayment | Transaction is for account overdraft repayment. |
+| FAND | General | Finance | Financial Aid In Case Of Natural Disasters | Financial aid by State authorities for abolition of consequences of natural disasters. |
+| GOVT | General | Government | Government Payment | Transaction is a payment to or from a government department. |
+| TCSC | General | Government | Town Council Service Charges | Transaction is related to a payment associated with charges levied by a town council. |
+| BDLM | General | Property | Building Maintenance | Transaction is related to a payment associated with building maintenance. |
+| RENT | General | Property | Rent | Transaction is the payment of rent. |
+| BNET | General | Wholesale / Fi-Fi | Bond Forward Netting | Bond Forward pair-off cash net movement. |
+| CORT | General | Wholesale / Fi-Fi | Trade Settlement Payment | Transaction is related to settlement of a trade, e.g. a foreign exchange deal or a securities transaction. |
+| CMDT | Investment | Investments | Commodity Transfer | Transaction is payment of commodities. |
+| DERI | Investment | Investments | Derivatives | Transaction is related to a derivatives transaction. |
+| DIVD | Investment | Investments | Dividends | Transaction is payment of dividends. |
+| FREX | Investment | Investments | Foreign Exchange | Transaction is related to a foreign exchange operation. |
+| HEDG | Investment | Investments | Hedging | Transaction is related to a hedging operation. |
+| INVS | Investment | Investments | Investments & Securities | Transaction is for the payment of mutual funds, investment products, and shares. |
+| SAVG | Investment | Investments | Savings | Transfer to savings/retirement account. |
+| SECU | Investment | Investments | Securities | Transaction is the payment of securities. |
+| TREA | Investment | Wholesale / Fi-Fi | Treasury Management | Transaction is related to treasury operations. |
+| FNET | Listed Derivatives | Wholesale / Fi-Fi | Futures Netting Payment | Cash associated with a netting of futures payments. |
+| FUTR | Listed Derivatives | Wholesale / Fi-Fi | Futures | Cash related to futures trading activity. |
+| HLTI | Medical | Insurance | Health Insurance | Transaction is a payment of health insurance. |
+| DNTS | Medical | Medical | Dental Services | Transaction is a payment for dental services. |
+| LTCF | Medical | Medical | Long Term Care Facility | Transaction is a payment for long-term care facility services. |
+| MDCS | Medical | Medical | Medical Services | Transaction is a payment for medical care services. |
+| VIEW | Medical | Medical | Vision Care Services | Transaction is a payment for vision care services. |
+| SWFP | OTC Derivatives | Wholesale / Fi-Fi | Swap contract final payment | Final payments for a swap contract. |
+| SWPP | OTC Derivatives | Wholesale / Fi-Fi | Swap contract partial payment | Partial payment for a swap contract. |
+| SWRS | OTC Derivatives | Wholesale / Fi-Fi | Swap contract reset payment | Reset payment for a swap contract. |
+| SWUF | OTC Derivatives | Wholesale / Fi-Fi | Swap contract upfront payment | Upfront payment for a swap contract. |
+| BECH | Salary & Benefits | Benefit Payments | Child Benefit | Transaction is related to a payment made to assist parent/guardian to maintain child. |
+| BENE | Salary & Benefits | Benefit Payments | Unemployment Disability Benefit | Transaction is related to a payment to a person who is unemployed/disabled. |
+| SSBE | Salary & Benefits | Benefit Payments | Social Security Benefit | Transaction is a social security benefit, i.e. payment made by a government to support individuals. |
+| PEFC | Salary & Benefits | Pensions | Pension Fund Contributions | Transaction is contribution to pension fund. |
+| PENS | Salary & Benefits | Pensions | Pension Payments | Transaction is the payment of pension. |
+| ADCS | Salary & Benefits | Salaries & Income | Advisory Donation Copyright Service | Payments for donation, sponsorship, advisory, intellectual and other copyright service. |
+| ALMY | Salary & Benefits | Salaries & Income | Alimony Payment | Transaction is the payment of alimony. |
+| BONU | Salary & Benefits | Salaries & Income | Bonus Payment | Transaction is related to payment of a bonus. |
+| COMM | Salary & Benefits | Salaries & Income | Commission Payment | Transaction is payment of commission. |
+| HREC | Salary & Benefits | Salaries & Income | Housing Related Contributions | Transaction is a contribution by an employer to the housing expenditures (purchase, construction, renovation) of the employees within a tax-free fringe benefit system. |
+| SALA | Salary & Benefits | Salaries & Income | Salary Payment | Transaction is the payment of salaries. |
+| LREB | Securities Lending | Wholesale / Fi-Fi | Lending rebate payments | Securities lending rebate payments. |
+| LREV | Securities Lending | Wholesale / Fi-Fi | Lending revenue Payments | Revenue payments made by the lending agent to the client. |
+| RSTX | Tax | Tax | Estate Tax | Transaction is related to a payment of estate tax. |
+| HSTX | Tax | Tax | Housing Tax | Transaction is related to a payment of housing tax. |
+| INTX | Tax | Tax | Income Tax | Transaction is related to a payment of income tax. |
+| PTXP | Tax | Tax | Property Tax | Transaction is related to a payment of property tax. |
+| RDTX | Tax | Tax | Road Tax | Transaction is related to a payment of road tax. |
+| TAXS | Tax | Tax | Tax Payment | Transaction is the payment of taxes. |
+| VATX | Tax | Tax | Value Added Tax Payment | Transaction is the payment of value added tax. |
+| WHLD | Tax | Tax | Withholding | Transaction is related to a payment of withholding tax. |
+| TAXR | Tax | Tax | Tax Refund | Transaction is the refund of a tax payment or obligation. |
+| CBTV | Utilities | Utilities | Cable Tax Bill | Transaction is related to a payment of cable TV bill. |
+| ELEC | Utilities | Utilities | Electricity Bill | Transaction is related to a payment of electricity bill. |
+| GASB | Utilities | Utilities | Gas Bill | Transaction is related to a payment of gas bill. |
+| PHON | Utilities | Utilities | Telephone bill | Transaction is related to a payment of telephone bill. |
+| UTLB | Utilities | Utilities | Utilities | Transaction is for the payment to a common utility provider that provides gas, water, and/or electricity. |
+| WATR | Utilities | Utilities | Water Bill | Transaction is related to a payment of water bill. |
+
+Version 4:
+```
+beneficiary_address_line_1 (Mandatory when address required)
+beneficiary_address_line_2
+beneficiary_address_line_3
+beneficiary_city (Mandatory when address required)
+beneficiary_region
+beneficiary_postcode (Only mandatory for CHAPS payments)
+beneficiary_country (Mandatory when address required)
+```
+
+Check `Register Webhook` for more details.
+
+Generic payload (if a beneficiary was previously created) is:
+
+```
+"counterparty_id": YOUR_COUNTERPARTY_ID, (Mandatory)
+"sender_account_id": YOUR_ACCOUNT_ID, (Mandatory)
+"beneficiary_account_id": BENEFICIARY_ACCOUNT_ID, (Conditional - see the explanation below)
+"ccy": "GBP", (Mandatory - ISO4217 currency code)
+"amount": "888.11", (Mandatory)
+"reference": "Buy goods 0801", (Mandatory - remittance information for the beneficiary)
+"reason": "Payment for goods or services", (Mandatory)
+"notes": "URGENT", (Optional - this information is not relayed on the payment)
+"preferred_scheme": "AUTO | BLINC | INTERNAL", (Mandatory)
+"nonce": "933829795" (Optional)
+```
+
+Payment Schemes:
+
+```
+AUTO > for external payments
+BLINC > for payments inside BLINC network, must use BLINC accounts
+INTERNAL > for payments between BCB accounts of the same counterparty
+```
+
+Nonce:
+<br><br>
+Using the nonce field ensures that payment requests can only be processed once. If you provide this, it must be unique per payment per account. If the nonce for a payment request is not unique for the account then it will be rejected.
+<br><br>
+You don't need to create a beneficiary in order to create a payment, you can use extra fields if `beneficiary_account_id` field not in use:
+<br><br>
+
+```
+beneficiary_name
+beneficiary_address_line_1
+beneficiary_address_line_2
+beneficiary_address_line_3
+beneficiary_city
+beneficiary_region
+beneficiary_postcode
+beneficiary_country
+beneficiary_account_number
+beneficiary_routing_number
+beneficiary_wire_routing?
+beneficiary_institution
+beneficiary_branch
+beneficiary_bic
+beneficiary_iban
+beneficiary_sort_code
+beneficiary_bank_name
+beneficiary_bank_address
+beneficiary_swift_code
+```
+
+Different payment models by currency:
+```
+USD:
+beneficiary_name
+beneficiary_address_line_1
+beneficiary_address_line_2?
+beneficiary_address_line_3?
+beneficiary_city
+beneficiary_region?
+beneficiary_postcode?
+beneficiary_country
+beneficiary_account_number
+beneficiary_routing_number
+beneficiary_wire_routing?
+beneficiary_bank_name
+beneficiary_bank_address
+beneficiary_bank_country
+
+CAD:
+beneficiary_name 
+beneficiary_address_line_1
+beneficiary_address_line_2?
+beneficiary_address_line_3?
+beneficiary_city
+beneficiary_region?
+beneficiary_postcode?
+beneficiary_country
+beneficiary_account_number 
+beneficiary_institution?
+beneficiary_branch?
+beneficiary_bic
+
+EUR, CHF:
+beneficiary_name
+beneficiary_address_line_1
+beneficiary_address_line_2?
+beneficiary_address_line_3?
+beneficiary_city
+beneficiary_region?
+beneficiary_postcode?
+beneficiary_country
+beneficiary_bic
+beneficiary_iban? (For IBAN countries)
+beneficiary_account_number? (Bank account number for non-IBAN countries)
+
+AED, AUD, CZK, DKK, HKD, HUF, ILS, ISK, JPY, MXN, NOK, NZD, PLN, RON, RUB, SAR, SEK, SGD, TRY, ZAR:
+beneficiary_name
+beneficiary_address_line_1
+beneficiary_address_line_2?
+beneficiary_address_line_3?
+beneficiary_city
+beneficiary_region?
+beneficiary_postcode?
+beneficiary_country
+beneficiary_bic
+beneficiary_account_number (IBAN or bank account number for non-IBAN countries)
+
+GBP - FPS:
+beneficiary_name
+beneficiary_account_number
+beneficiary_sort_code
+
+GBP - CHAPS:
+beneficiary_name
+beneficiary_address_line_1
+beneficiary_address_line_2?
+beneficiary_address_line_3?
+beneficiary_city
+beneficiary_region?
+beneficiary_postcode
+beneficiary_country
+beneficiary_account_number
+beneficiary_sort_code
+
+GBP - SWIFT:
+beneficiary_name
+beneficiary_address_line_1
+beneficiary_address_line_2?
+beneficiary_address_line_3?
+beneficiary_city
+beneficiary_region?
+beneficiary_postcode?
+beneficiary_country
+beneficiary_account_number (IBAN or bank account number for non-IBAN countries)
+beneficiary_sort_code (sort code if available, otherwise please populate with bank BIC)
+beneficiary_swift_code (beneficiary BIC)
+
+AUD - BECS / NPP: 
+beneficiary_account_number
+beneficiary_national_clearing_code
+beneficiary_name
+beneficiary_address_line_1
+beneficiary_address_line_2?
+beneficiary_address_line_3?
+beneficiary_city
+beneficiary_region?
+beneficiary_postcode?
+beneficiary_country
+beneficiary_bank_country
+
+```
+
+- ?: Optional fields
+- Country: 2-letter ISO country code
+
+### Request Payment [POST]
+
++ Request (application/json)
+
+    + Headers 
+
+            Authorization: Bearer access_token (access_token generated by BCB Auth)
+    
+    + Body
+    
+            {
+                "counterparty_id": YOUR_COUNTERPARTY_ID,
+                "sender_account_id": YOUR_ACCOUNT_ID,
+                "beneficiary_account_id": BENEFICIARY_ACCOUNT_ID,
+                "ccy": "GBP",
+                "amount": "888.11",
+                "reference": "Buy goods 0801",
+                "reason": "Payment for goods or services",
+                "notes": "URGENT",
+                "preferred_scheme": "AUTO" (LEGACY: ALWAYS AUTO, WILL BE DEPRECATED),
+                "nonce": "933829795" (OPTIONAL)
+            }
+            
+            or
+            
+            {
+                "counterparty_id": YOUR_COUNTERPARTY_ID,
+                "sender_account_id": YOUR_ACCOUNT_ID,
+                "beneficiary_name": "BENEFICIARY NAME",
+                "beneficiary_account_number": "ACCOUNT NUMBER",
+                "beneficiary_sort_code": "SORT CODE",
+                "ccy": "GBP",
+                "amount": "888.11",
+                "reference": "Invoice 0801",
+                "reason": "Payment for goods or services",
+                "notes": "Urgent please",
+                "preferred_scheme": "AUTO" (LEGACY: ALWAYS AUTO, WILL BE DEPRECATED),
+                "nonce": "933829795" (OPTIONAL)
+            }
+
++ Response 200 (application/json)
+
+    +   Body
+    
+            [
+            {
+                "endToEndIdentification": "PaymentEndToEndIdentification",
+                "transactionId": "PaymentTransactionId",
+                "nonce": "PaymentNonce",
+                "response": "Accepted"
+            }
+            ]
+            
+
+## Payment Status Webhooks [/v3/payments/register-webhook]
+
+Step 1 - Ask for an access token
+Your app authenticates with the BCB Authorization Server using its Client ID and Client Secret (/oauth/token endpoint), BCB Authorization Server validates the Client ID and Client Secret and responds with an Access Token.
+
+Step 2 - Register a webhook
+In order to track the status of your payment, you'll need to register a webhook.
+
+* BCB Payments Engine will trigger this url with current payment status.
+
+```
+IMPORTANT: YOU MUST REGISTER A WEBHOOK IN ORDER TO TRACK PAYMENT STATUS.
+```
+
+Step 3 - Make a payment, below you can see an example of payment:
+
+Payload:
+```
+{                                            
+    "counterparty_id": MY-COUNTERPARTY-ID (Number),        
+    "sender_account_id": ACCOUNT-ID (Number),  
+    "beneficiary_name": "BENEFICIARY NAME" (String), 
+    "beneficiary_account_number": "TEST" (String), 
+    "beneficiary_sort_code": "TEST" (String),            
+    "ccy": "GBP" (String),                            
+    "amount": "AMOUNT" (String),                    
+    "reference": "MY REFERENCE" (String),             
+    "reason": "REASON" (String),                       
+    "notes": "SOME NOTES" (String),           
+    "preferred_scheme": "FPS" (String), 
+    "nonce": "933829795"                      
+}
+```
+
+Response:
+```
+[
+    {
+        "endToEndIdentification": "ID", (String)
+        "transactionId": "ID", (String)
+        "nonce": "933829795", 
+        "response": "Accepted" (String)
+    }
+]
+If the payment is held for verification of payee (EUR only), this information is also provided via webhook:
+[
+    {                                     
+        "endToEndIdentification": "ID" (String),  
+        "transactionId": "ID", (String),
+        "nonce": "933829795"  (If provided in your request, otherwise equal to endToEndIdentification),
+        "response": "vopheld",
+        "data": {
+            "matchStatus": "close_match", (Only if response is vopheld) (close_match or no_match or impossible_match)
+            "matchedName": "Jane Smith" (String) (if matchStatus is close_match)
+        }
+    }
+]
+```
+
+You can call /account/:account_id/transactions to get details of your operational account.
+And remember that you can use beneficiary_account_id instead of  beneficiary_name, beneficiary_account_number and beneficiary_sort_code and our engine will query account details in our system.
+
+Now our webhook engine will trigger your url endpoint with payment status:
+
+Response:
+```
+[
+    {                                     
+        "endToEndIdentification": "ID" (String),  
+        "transactionId": "ID", (String),
+        "nonce": "933829795"  (If provided in your request, otherwise equal to endToEndIdentification),
+        "response": "Complete" (Accepted, Processing, final statuses: Complete OR Rejected)
+    }
+]
+```
+
+That's all! You have created your first payment. 
+
+### Register Webhook [POST]
+
++ Request (application/json)
+
+    + Headers 
+
+            Authorization: Bearer access_token (access_token generated by BCB Auth)
+    
+    + Body
+
+            {
+                "counterparty_id": YOUR_COUNTERPARTY_ID,
+                "event":"TransactionStatus",
+                "url": "URL"
+            }
+
++ Response 200 (application/json)
+
+    +   Body
+    
+            {
+                "event": "TransactionStatus",
+                "status: "OK"
+            }
+
+## Deposits [/v3/payments/reverse-deposit]
+
+To return an unwanted deposit back to the sender, you can call the 'Reverse Deposit' endpoint with the endToEndId of the deposit. This will create a new payment back to the sender.
+
+The deposit's endToEndId can be found in two places: using the 'Get Account Transactions' endpoint, or on the deposit notification.
+
+In order to verify that the deposit has been successfully reversed, you can monitor the outgoing payment's status using payment status-webhooks, the UI, or after the payment has settled, via the 'Get Account Transactions' endpoint. 
+
+Payload: (https://api.bcb.group/v3/payments/reverse-deposit [POST]):
+
+<code> 
+{ 
+    endToEndId: DEPOSIT_END_TO_END_ID
+}
+</code>
+
+### Reverse Deposit [POST]
+
++ Request (application/json)
+        
+    + Headers
+    
+            Authorization: Bearer access_token (access_token generated by BCB Auth)
+    
+    + Body
+
+            {
+                "endToEndId": "DepositEndToEndIdentification"
+            }
+
++ Response 200 (application/json)
+
+    + Headers
+    
+    
+    + Body
+
+            [
+            {
+                "paymentEndToEndId": "PaymentEndToEndIdentification",
+                "paymentTransactionId": "PaymentTransactionId"
+            }
+            ]
+
+# Group Verification of Payee
+
+Verification of Payee, is a European security measure that checks if the account name provided by a payer matches the account holder's name at the receiving bank before a payment is sent. This service helps prevent fraud and misdirected payments by ensuring funds go to the intended recipient, especially for instant, irrevocable payments, and is mandatory for `SEPA` and `SEPA Instant` (EUR) payments.
+
+Verification of Payee has the following states:
+
+| Status    | Description |
+| -------- | ------- |
+| match  | The beneficiary name exactly matches the name registered to the provided IBAN and BIC. Payments will proceed with out any further action required.    |
+| close_match | The beneficiary name is a close, but not exact, match. For example, "Francois Dupont" might be a close_match to "François Dupont". The API will also return a suggestion with the correct name. You can choose to proceed with the payment, but it may be at a higher risk of failure.     |
+| no_match    | The beneficiary name does not match the details registered to the account. You can choose to proceed with the payment at your own risk or cancel it.    |
+| impossible_match | This means the check could not be completed. You can choose to proceed with the payment at your own risk or cancel it. |
+
+> **Important**: For API to receive Verification of Payee (VOP) statuses for a payment you will need to be subscribed to [Payment Status Webhooks](#webhooks) or access the [Client Console](https://console.bcb.group) where the payment will be flagged for `Approval` or `Cancellation` 
+
+**Webhook Notifications**
+
+After sending the [payment authorization request](#payments), if the verification of payee status is anything other than **match** a payment status webhook notificaiton will be sent with one of the following: 
+
+
+**close_match**: 
+
+This means the name is similar but not an exact match. You will have to choose whether to proceed or cancel the payment. The webhook will include the suggested `matchedName`.
+
+Response:
+```
+[
+    {
+        "endToEndIdentification": "a85407ff36164b0d8c5f1281673920da",
+        "transactionId": "0f25ce815fbc4ae38a15b773b6080fd8",
+        "nonce": "933829795",
+        "response": "vopheld",
+        "data": {
+            "matchStatus": "close_match",
+            "matchedName": "Jane Smith"
+        }
+    }
+]
+```
+
+**no_match**: 
+
+The beneficiary name does not match the registered details. The payment will not be processed and must be cancelled.
+
+Response:
+```
+[
+    {
+        "endToEndIdentification": "a85407ff36164b0d8c5f1281673920da",
+        "transactionId": "0f25ce815fbc4ae38a15b773b6080fd8",
+        "nonce": "933829795",
+        "response": "vopheld",
+        "data": {
+            "matchStatus": "no_match"
+        }
+    }
+]
+```
+
+**impossible_match**: 
+
+This means the check could not be completed. You can choose to proceed with the payment at your own risk or cancel it.
+
+Response:
+```
+[
+    {
+        "endToEndIdentification": "a85407ff36164b0d8c5f1281673920da",
+        "transactionId": "0f25ce815fbc4ae38a15b773b6080fd8",
+        "nonce": "933829795",
+        "response": "vopheld",
+        "data": {
+            "matchStatus": "impossible_match"
+        }
+    }
+]
+```
+
+## Approve or Cancel the Payment
+
+Based on the VOP result, you must take an action to either `approve` or `cancel` the payment. This is done using the unique `end2end_id` provided in the authorization response.
+
+### Approve a Payment
+
+To approve a payment and process the transaction, send a POST request to the following [endpoint](https://client-api.uat.bcb.group/v1/accounts/{accountId}/payments/{end2end_id}/verification-of-payee/approve)
+
++ Request (application/json)
+
+    + Headers 
+
+            Authorization: Bearer access_token (access_token generated by BCB Auth)
+            
+    + Parameters
+    
+        + accountId (string)
+        + end2endId (string)
+
++ Response 202 (application/json)
+
+        The unverified payment was approved successfully.
+
++ Response 401 (application/json)
+
+        Unauthorized
+
++ Response 404 (application/json)
+
+        No unverified payment was found for this account with the given end-to-end id.
+
++ Response 409 (application/json)
+
+        The payment is not unverified.
+
+
+### Cancel a Payment
+
+To cancel a payment and stop the transaction, send a POST request to the following [endpoint](https://client-api.uat.bcb.group/v1/accounts/{accountId}/payments/{end2end_id}/verification-of-payee/cancel)
+
++ Request (application/json)
+
+    + Headers 
+
+            Authorization: Bearer access_token (access_token generated by BCB Auth)
+    
+    + Parameters
+    
+        + accountId (string)
+        + end2endId (string)
+
++ Response 202 (application/json)
+
+        The unverified payment was cancelled successfully.
+
++ Response 401 (application/json)
+
+        Unauthorized
+
++ Response 404 (application/json)
+
+        No unverified payment was found for this account with the given end-to-end id.
+
++ Response 409 (application/json)
+
+        The payment is not unverified.
+
+
+# Group Virtual Accounts 
+
+GBP & EUR virtual accounts can be created against an existing segregated account that has been set up to support them.
+
+Our virtual account offering provides endpoints enabling creation, closure and listing of virtual accounts, as well as transactions between the virtual account and its linked owner account.
+
+As part of the migration of our API documentation, the description of virtual account endpoints can be found here: [Client API documentation](https://client-api.bcb.group/docs).
+
+
+## Virtual Account Notifications
+
+For virtual accounts, our notifications service produces webhooks each time a payment reaches Complete status or new deposit is received. 
+
+Notification service also produces webhooks each time a virtual account is created or closed (or if there was a failure on account creation or closure).
+
+In order to set these up - please contact us via usual communication channels.
+
+There can be a dedicated URL per segregated account.
+
+**Sample deposit notification body:**
+
+```
+{
+  "subject": "TRANSACTION:GBP:1234567812345678",
+  "timestamp": "YYYY-MM-DDTHH:MM:SS.000Z",
+  "account_id": 1234,
+  "transactions": [
+    {
+      "id": "transaction id here",
+      "timestamp": "transaction timestamp here",
+      "amount_instructed": 9.99,
+      "amount_actual": 9.99,
+      "currency": "GBP",
+      "credit": true,
+      "reference": "sender's reference",
+      "bank_name": "",
+      "bank_country": "",
+      "account_name": "sender's name",
+      "account_number": "sender's account number available",
+      "account_address": "sender's address if available",
+      "sort_code": "sender's UK sort code if applicable",
+      "iban": "sender's IBAN if available",
+      "wire_routing_number": "sender's wire routing number if available",
+      "notes_external": "",
+      "virtual_account_iban": "IBAN of virtual account to which deposit was made to",
+      "from": "sender's name",
+      "to": "beneficiary name"
+    }
+  ]
+}
+```
+
+**Sample payment notification body:**
+
+```
+{
+  "subject": "TRANSACTION:GBP:1234567812345678",
+  "timestamp": "YYYY-MM-DDTHH:MM:SS.000Z",
+  "account_id": 1234,
+  "transactions": [
+    {
+      "id": "transaction id here",
+      "timestamp": "transaction timestamp here",
+      "amount_instructed": 9.99,
+      "amount_actual": 9.99,
+      "currency": "GBP",
+      "credit": false,
+      "reference": "sender's reference",
+      "bank_name": "",
+      "bank_country": "",
+      "account_name": "beneficiary name",
+      "account_number": "beneficiary account number if available",
+      "account_address": "",
+      "sort_code": "beneficiary's UK sort code if applicable",
+      "iban": "beneficiary's IBAN if available",
+      "wire_routing_number": "sender's wire routing number if available",
+      "notes_external": "",
+      "virtual_account_iban": "IBAN of virtual account from which payment was made",
+      "from": "sender's name",
+      "to": "beneficiary name"
+    }
+  ]
+}
+```
+
+**Sample account creation notification body:**
+
+```
+{
+  "virtual_account_identifier": "41edd094-7c15-48a6-b576-0d33f1a66acc",
+  "segregated_account_id": 123456,
+  "request_details": {
+    "owner_name": "owner's name",
+    "is_individual": true,
+    "owner_address": "owner's address", (deprecated 21st of April 2024)
+    "owner_address_line_1": "owner's 1st line address", (live on 21st of April 2024)
+    "owner_address_line_2": "owner's 2nd line address", (live on 21st of April 2024)
+    "owner_address_line_3": "owner's 3rd line address", (live on 21st of April 2024)
+    "owner_city": "owner's city", (live on 21st of April 2024)
+    "owner_region": "owner's region", (live on 21st of April 2024)
+    "owner_postcode": "owner's postcode", (live on 21st of April 2024)
+    "owner_country": "GB",
+    "owner_nationality": "GB",
+    "owner_date_of_birth": "owner's date of birth if available",
+    "owner_registration_number": "owner's registration number if available",
+    "owner_account_number": "owner's account number",
+    "owner_sort_code": "owner's sort code",
+    "owner_iban": "owner's IBAN",
+    "owner_bic_swift": "owner's BIC if available"
+  },
+  "account_details": {
+    "iban": "virtual account IBAN",
+    "bban": "virtual account BBAN",
+    "account_number": "virtual account number",
+    "sort_code": "virtual account sort code"
+  }
+}
+```
+
+**Sample account creation failure notification body:**
+
+```
+{
+  "accounts": [
+    {
+      "failure_reason": {
+        "message": "failure reason"
+      },
+      "request_details": {
+        "owner_name": "owner's name",
+        "is_individual": true,
+        "owner_address": "owner's address", (deprecated 21st of April 2024)
+        "owner_address_line_1": "owner's 1st line address", (live on 21st of April 2024)
+        "owner_address_line_2": "owner's 2nd line address", (live on 21st of April 2024)
+        "owner_address_line_3": "owner's 3rd line address", (live on 21st of April 2024)
+        "owner_city": "owner's city", (live on 21st of April 2024)
+        "owner_region": "owner's region", (live on 21st of April 2024)
+        "owner_postcode": "owner's postcode", (live on 21st of April 2024)
+        "owner_country": "GB",
+        "owner_nationality": "GB",
+        "owner_date_of_birth": "owner's date of birth if available",
+        "owner_registration_number": "owner's registration number if available",
+        "owner_account_number": "owner's account number",
+        "owner_sort_code": "owner's sort code",
+        "owner_iban": "owner's IBAN",
+        "owner_bic_swift": "owner's BIC if available"
+      }
+    }
+  ],
+  "segregated_account_id": 123456
+}
+```
+
+**Sample account closure notification body:**
+
+```
+{
+  "segregated_account_id": 123456,
+  "status": "CLOSED",
+  "details": {
+    "account_details": {
+      "account_number": "virtual account number",
+      "sort_code": "virtual account sort code",
+      "iban": "virtual account IBAN"
+    },
+    "request_details": {
+      "owner_name": "owner's name",
+      "is_individual": true,
+      "owner_address": "owner's address", (deprecated 21st of April 2024)
+      "owner_address_line_1": "owner's 1st line address", (live on 21st of April 2024)
+      "owner_address_line_2": "owner's 2nd line address", (live on 21st of April 2024)
+      "owner_address_line_3": "owner's 3rd line address", (live on 21st of April 2024)
+      "owner_city": "owner's city", (live on 21st of April 2024)
+      "owner_region": "owner's region", (live on 21st of April 2024)
+      "owner_postcode": "owner's postcode", (live on 21st of April 2024)
+      "owner_country": "GB",
+      "owner_nationality": "GB",
+      "owner_date_of_birth": "owner's date of birth if available",
+      "owner_registration_number": "owner's registration number if available",
+      "owner_account_number": "owner's account number",
+      "owner_sort_code": "owner's sort code",
+      "owner_iban": "owner's IBAN",
+      "owner_bic_swift": "owner's BIC if available"
+    }
+  }
+}
+```
+
+**Sample account closure failure notification body:**
+```
+{
+  "segregated_account_id": 123456,
+  "status": "CLOSURE_FAILED",
+  "failure_reason": "failure reason",
+  "details": {
+    "account_details": {
+      "account_number": "virtual account number",
+      "sort_code": "virtual account sort code",
+      "iban": "virtual account IBAN"
+    }
+  }
+}
+```
+# Group Notifications
+
+Our notifications service produces webhooks each time a payment reaches Complete status or new deposit is received.
+In order to set these up - please contact us via usual communication channels.
+
+There can be a dedicated URL per account.
+
+```
+Headers: X-BCB-SIGNATURE - this can be verified - please get in touch for additional information
+```
+
+```
+"headers":{
+    "Content-Type": "application/json",
+    "X-BCB-SIGNATURE": "<BCB-SIGNATURE>"
+}
+```
+
+**Sample deposit notification body:**
+```
+{
+    "subject": "TRANSACTION:GBP:1234567812345678",
+    "timestamp": "YYYY-MM-DDTHH:MM:SS.000Z",
+    "account_id": 1234,
+    "transactions": [
+        {
+            "id": "transaction id here",
+            "timestamp": "transaction timestamp here",
+            "amount_instructed": 9.99,
+            "amount_actual": 9.99,
+            "currency": "GBP",
+            "credit": true,
+            "reference": "sender's reference",
+            "bank_name": "",
+            "bank_country": "",
+            "account_name": "senders name",
+            "account_number": "sender's account number available",
+            "account_address": "sender's address if available",
+            "sort_code": "sender's UK sort code if applicable",
+            "iban": "sender's IBAN if available",
+            "notes_external": "",
+            "from": "sender's name"
+        }
+    ]
+}
+```
+
+**Sample payment notification body:**
+```
+{
+    "subject": "TRANSACTION:GBP:1234567812345678",
+    "timestamp": "YYYY-MM-DDTHH:MM:SS.000Z",
+    "account_id": 1234,
+    "transactions": [
+        {
+            "id": "transaction id here",
+            "timestamp": "transaction timestamp here",
+            "amount_instructed": 9.99,
+            "amount_actual": 9.99,
+            "currency": "GBP",
+            "credit": false,
+            "reference": "sender's reference",
+            "bank_name": "",
+            "bank_country": "",
+            "account_name": "beneficiary name",
+            "account_number": "beneficiary account number if available",
+            "account_address": ""
+            "sort_code": "beneficiary's UK sort code if applicable",
+            "iban": "beneficiary's IBAN if available",
+            "notes_external": "",
+            "to": "beneficiary name"
+        }
+    ]
+}
+```

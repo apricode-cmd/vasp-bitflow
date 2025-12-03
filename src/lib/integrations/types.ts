@@ -17,6 +17,7 @@ export enum IntegrationCategory {
   EMAIL = 'EMAIL',               // Email/notification services
   PAYMENT = 'PAYMENT',           // Payment gateways (future)
   BLOCKCHAIN = 'BLOCKCHAIN',     // Blockchain data & transaction providers
+  VIRTUAL_IBAN = 'VIRTUAL_IBAN', // Virtual IBAN providers (BCB Group, Currency Cloud, etc.)
   ANALYTICS = 'ANALYTICS',       // Analytics services (future)
   STORAGE = 'STORAGE'            // File storage services (future)
 }

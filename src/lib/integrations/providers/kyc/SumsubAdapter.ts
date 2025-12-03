@@ -765,7 +765,7 @@ export class SumsubAdapter implements IKycProvider {
       // Collect rejection reasons
       const rejectLabels = data.reviewResult?.rejectLabels || [];
       const rejectionReason = rejectLabels.length > 0 ? rejectLabels.join(', ') : undefined;
-      
+
       // Extract resubmission fields
       const reviewRejectType = data.reviewResult?.reviewRejectType || null;
       const canResubmit = reviewRejectType === 'RETRY';

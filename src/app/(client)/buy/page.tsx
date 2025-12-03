@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { ClientOrderWidget } from '@/components/features/ClientOrderWidget';
 import { KycAlert } from '@/components/features/KycAlert';
 import { CurrencyDisplay } from '@/components/features/CurrencyIcon';
+import { VirtualIbanCard } from '@/components/features/VirtualIbanCard';
 import { 
   ShoppingCart, Shield, Lock, Zap, TrendingUp, CheckCircle2, Coins
 } from 'lucide-react';
@@ -145,6 +146,11 @@ export default function BuyPage(): React.ReactElement {
 
         {/* Sidebar Info */}
         <div className="space-y-4">
+          {/* Virtual IBAN Card */}
+          {(!kycStatus?.kycRequired || kycStatus?.isApproved) && (
+            <VirtualIbanCard compact />
+          )}
+
           {/* Features */}
           <Card className="bg-card/50 backdrop-blur-sm border-primary/10">
             <CardContent className="p-5">
