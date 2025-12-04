@@ -75,6 +75,7 @@ export function TransactionsTab({
     setSelectedTransaction(null);
     onRefresh(); // Refresh transactions list
   };
+
   if (transactions.length === 0) {
     return (
       <Card>
@@ -93,6 +94,7 @@ export function TransactionsTab({
   };
 
   return (
+    <>
     <Card>
       <CardContent className="p-0">
         <Table>
