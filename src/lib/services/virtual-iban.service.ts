@@ -534,7 +534,8 @@ class VirtualIbanService {
       throw new Error('Account not found');
     }
 
-    const provider = await this.getProvider();
+    // Get provider that owns this account
+    const provider = await this.getProviderForAccount(account);
 
     // Fetch from provider
     const providerTransactions = await provider.getTransactions(

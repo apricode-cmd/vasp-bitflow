@@ -2458,17 +2458,31 @@ model VirtualIbanAuditLog {
 
 enum VirtualIbanAuditType {
   ACCOUNT_CREATED // New Virtual IBAN account created
+  ACCOUNT_UPDATED // Account metadata updated (status, BIC, etc.)
+  ACCOUNT_SUSPENDED // Account suspended
+  ACCOUNT_REACTIVATED // Account reactivated
   ACCOUNT_CLOSED // Virtual IBAN account closed
-  BALANCE_CREDIT // Balance increased (top-up)
-  BALANCE_DEBIT // Balance decreased (withdrawal/purchase)
+  BALANCE_CREDITED // Balance increased (top-up)
+  BALANCE_DEBITED // Balance decreased (withdrawal/purchase)
+  BALANCE_CREDIT // Alias for BALANCE_CREDITED
+  BALANCE_DEBIT // Alias for BALANCE_DEBITED
   BALANCE_SYNC // Balance synchronized with provider
   BALANCE_MISMATCH // Balance discrepancy detected
+  TRANSACTION_PROCESSED // Transaction processed successfully
+  TOPUP_REQUEST_CREATED // Top-up request created
+  TOPUP_REQUEST_COMPLETED // Top-up request completed
+  TOPUP_REQUEST_CANCELLED // Top-up request cancelled
   WEBHOOK_RECEIVED // Webhook notification received
   WEBHOOK_MISSED // Missed webhook recovered by polling
   POLLING_DETECTED // Transaction detected via polling
   MANUAL_ADJUSTMENT // Manual balance adjustment by admin
-  RECONCILIATION // Reconciliation performed
+  MANUAL_SYNC_PAYMENTS // Manual payment sync triggered by admin
+  MANUAL_VALIDATE_BALANCE // Manual balance validation triggered by admin
+  RECONCILIATION_SUCCESS // Reconciliation completed successfully
+  RECONCILIATION_FAILURE // Reconciliation failed
+  RECONCILIATION // General reconciliation event
   VOP_REVIEW // VOP (Verification of Payee) review
+  SYSTEM_ALERT // System-generated alert
 }
 
 enum AuditSeverity {
