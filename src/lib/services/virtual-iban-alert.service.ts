@@ -34,7 +34,7 @@ export class VirtualIbanAlertService {
     console.error(`🚨 Virtual IBAN ${severity} ALERT:`, title, message);
 
     // 1. Log to audit
-    await virtualIbanAuditService.createLog({
+    await virtualIbanAuditService.log({
       accountId,
       type: VirtualIbanAuditType.SYSTEM_ALERT,
       severity,
