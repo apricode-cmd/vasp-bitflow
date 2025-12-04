@@ -43,6 +43,7 @@ export async function validateVirtualIbanBalance() {
 }
 
 async function validateVirtualIbanBalanceInternal() {
+  try {
     // 1. Get BCB adapter and config
     const bcbAdapter = await integrationFactory.getVirtualIbanProvider();
     
@@ -159,7 +160,7 @@ async function validateVirtualIbanBalanceInternal() {
       data: {
         segregatedAccountId,
         bcbTotalBalance: bcbTotal,
-        bcbBalanceSnapshot: bcbBalances,
+        bcbBalanceSnapshot: balanceData,
         localTotalBalance: localTotal,
         activeAccountsCount: activeAccounts,
         accountBreakdown,
