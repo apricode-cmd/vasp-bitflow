@@ -82,10 +82,10 @@ async function validateVirtualIbanBalanceInternal() {
     const localSum = await prisma.virtualIbanAccount.aggregate({
       where: {
         status: 'ACTIVE',
-        // Only for this segregated account
+        // metadata.segregatedAccountId is stored as number in JSONB
         metadata: {
           path: ['segregatedAccountId'],
-          equals: segregatedAccountId,
+          equals: parseInt(segregatedAccountId, 10), // Convert to number
         },
       },
       _sum: { balance: true },
@@ -104,7 +104,7 @@ async function validateVirtualIbanBalanceInternal() {
         status: 'ACTIVE',
         metadata: {
           path: ['segregatedAccountId'],
-          equals: segregatedAccountId,
+          equals: parseInt(segregatedAccountId, 10), // Convert to number
         },
       },
       select: {
