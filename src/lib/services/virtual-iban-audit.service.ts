@@ -43,17 +43,22 @@ class VirtualIbanAuditService {
         },
       });
 
-      // For CRITICAL events, also send alert
-      if (params.severity === 'CRITICAL') {
-        await this.sendCriticalAlert(params);
-      }
-
       console.log('[Audit]', {
         type: params.type,
         severity: params.severity,
         action: params.action,
         accountId: params.accountId,
       });
+
+      // For CRITICAL events, also log to console (alerting is done separately by VirtualIbanAlertService)
+      if (params.severity === 'CRITICAL') {
+        console.error('🚨 CRITICAL AUDIT EVENT:', {
+          type: params.type,
+          action: params.action,
+          reason: params.reason,
+          metadata: params.metadata,
+        });
+      }
     } catch (error) {
       // Don't throw - audit logging should never break main flow
       console.error('[Audit] Failed to log:', error);
@@ -355,94 +360,6 @@ class VirtualIbanAuditService {
         end: endDate,
       },
     };
-  }
-
-  /**
-   * Send critical alert to admins
-   */
-  private async sendCriticalAlert(params: CreateAuditLogParams): Promise<void> {
-    console.error('🚨 CRITICAL ALERT:', {
-      type: params.type,
-      action: params.action,
-      reason: params.reason,
-      metadata: params.metadata,
-      accountId: params.accountId,
-      userId: params.userId,
-      diff: params.diff,
-    });
-
-    // TODO: Implement actual alerting
-    // Options:
-    // 1. Email via Resend
-    // 2. Slack webhook
-    // 3. PagerDuty for on-call
-    // 4. SMS for critical issues
-    
-    // Example email alert:
-    /*
-    await emailService.sendAlert({
-      to: process.env.ADMIN_ALERT_EMAIL || 'admin@apricode.agency',
-      subject: `[CRITICAL] Virtual IBAN: ${params.action}`,
-      body: `
-        CRITICAL EVENT DETECTED
-        
-        Type: ${params.type}
-        Action: ${params.action}
-        Severity: ${params.severity}
-        
-        Reason: ${params.reason}
-        
-        Details:
-        ${JSON.stringify(params.metadata, null, 2)}
-        
-        Account ID: ${params.accountId || 'N/A'}
-        User ID: ${params.userId || 'N/A'}
-        Admin ID: ${params.adminId || 'N/A'}
-        
-        Difference: ${params.diff ? `€${params.diff.toFixed(2)}` : 'N/A'}
-        
-        Timestamp: ${new Date().toISOString()}
-        
-        Please investigate immediately!
-      `,
-    });
-    */
-
-    // Example Slack webhook:
-    /*
-    await fetch(process.env.SLACK_WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: `🚨 CRITICAL: ${params.action}`,
-        blocks: [
-          {
-            type: 'header',
-            text: {
-              type: 'plain_text',
-              text: '🚨 Critical Virtual IBAN Alert',
-            },
-          },
-          {
-            type: 'section',
-            fields: [
-              { type: 'mrkdwn', text: `*Type:*\n${params.type}` },
-              { type: 'mrkdwn', text: `*Severity:*\n${params.severity}` },
-              { type: 'mrkdwn', text: `*Action:*\n${params.action}` },
-              { type: 'mrkdwn', text: `*Account:*\n${params.accountId || 'N/A'}` },
-            ],
-          },
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: `*Reason:*\n${params.reason}`,
-            },
-          },
-        ],
-      }),
-    });
-    */
   }
 }
 

@@ -39,7 +39,7 @@ export class VirtualIbanAlertService {
       type: VirtualIbanAuditType.SYSTEM_ALERT,
       severity,
       action: `ALERT_${severity}`,
-      description: `${title}: ${message}`,
+      reason: `${title}: ${message}`,
       metadata,
     });
 
