@@ -338,6 +338,11 @@ class VirtualIbanReconciliationService {
 
   /**
    * Process all unreconciled transactions
+   * 
+   * Only processes transactions that are:
+   * - Not linked to Order, PayIn, or TopUpRequest
+   * - CREDIT type
+   * - COMPLETED status
    */
   async reconcileAll(): Promise<{
     total: number;
@@ -351,6 +356,7 @@ class VirtualIbanReconciliationService {
       where: {
         orderId: null,
         payInId: null,
+        topUpRequestId: null, // ← Exclude TopUp transactions
         type: 'CREDIT',
         status: 'COMPLETED',
       },

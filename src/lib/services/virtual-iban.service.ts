@@ -744,12 +744,21 @@ class VirtualIbanService {
 
   /**
    * Get unreconciled transactions (admin)
+   * 
+   * Returns CREDIT transactions that are:
+   * - Not linked to an Order (orderId = null)
+   * - Not linked to a PayIn (payInId = null)  
+   * - Not linked to a TopUpRequest (topUpRequestId = null)
+   * - Completed
+   * 
+   * These are "orphan" payments that need manual investigation
    */
   async getUnreconciledTransactions(): Promise<VirtualIbanTransaction[]> {
     return prisma.virtualIbanTransaction.findMany({
       where: {
         orderId: null,
         payInId: null,
+        topUpRequestId: null, // ← Exclude TopUp transactions
         type: 'CREDIT',
         status: 'COMPLETED',
       },
