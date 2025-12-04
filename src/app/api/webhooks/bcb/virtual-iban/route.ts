@@ -13,6 +13,7 @@ import { virtualIbanService } from '@/lib/services/virtual-iban.service';
 import { virtualIbanReconciliationService } from '@/lib/services/virtual-iban-reconciliation.service';
 import { topUpRequestService } from '@/lib/services/topup-request.service';
 import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
+import { virtualIbanAuditService } from '@/lib/services/virtual-iban-audit.service';
 
 export async function POST(req: NextRequest) {
   console.log('[BCB Webhook] Received payment notification');
@@ -59,6 +60,14 @@ export async function POST(req: NextRequest) {
       reference: transaction.reference,
       vopStatus: transaction.vopStatus,
     });
+    
+    // Log audit
+    await virtualIbanAuditService.logWebhookProcessed(
+      transaction.providerTransactionId,
+      transaction.virtualIbanId,
+      transaction.amount,
+      true
+    ).catch(err => console.error('[Audit] Failed to log webhook:', err));
 
     // =========================================
     // STEP 0: Check for VOP (Verification of Payee)

@@ -44,6 +44,7 @@ model User {
   userWallets               UserWallet[]
   virtualIbanAccounts       VirtualIbanAccount[] // Virtual IBAN accounts
   topUpRequests             TopUpRequest[] // Top-up requests for Virtual IBAN
+  virtualIbanAuditLogs      VirtualIbanAuditLog[] // Audit logs for Virtual IBAN operations
 
   @@index([email])
   @@index([role])
@@ -1440,6 +1441,11 @@ model Admin {
   workflowsCreated  Workflow[]              @relation("WorkflowCreator")
   workflowsUpdated  Workflow[]              @relation("WorkflowUpdater")
 
+  // Virtual IBAN relations
+  virtualIbanAuditLogs             VirtualIbanAuditLog[]             @relation("AdminVirtualIbanAuditLogs")
+  virtualIbanBalanceSnapshots      VirtualIbanBalanceSnapshot[]      @relation("AdminBalanceSnapshots")
+  virtualIbanReconciliationReports VirtualIbanReconciliationReport[] @relation("AdminReconciliationReports")
+
   @@unique([ssoProvider, ssoSubject])
   @@index([workEmail])
   @@index([orgId])
@@ -2283,6 +2289,7 @@ model VirtualIbanAccount {
   // Relations
   transactions  VirtualIbanTransaction[]
   topUpRequests TopUpRequest[]
+  auditLogs     VirtualIbanAuditLog[]    @relation("AccountAuditLogs") // Audit trail for this account
 
   @@index([userId])
   @@index([providerId])
@@ -2314,13 +2321,13 @@ model VirtualIbanTransaction {
 
   // Status
   status VirtualIbanTransactionStatus @default(PENDING)
-  
+
   // Verification of Payee (VOP) for EUR payments
-  vopStatus        VopStatus? // VOP check result
-  vopMatchedName   String?    // Suggested name from VOP (if close_match)
-  vopReviewedBy    String?    // Admin who reviewed VOP (if manual review)
-  vopReviewedAt    DateTime?  // When VOP was reviewed
-  vopApproved      Boolean?   // Admin decision (true = approved, false = cancelled)
+  vopStatus      VopStatus? // VOP check result
+  vopMatchedName String? // Suggested name from VOP (if close_match)
+  vopReviewedBy  String? // Admin who reviewed VOP (if manual review)
+  vopReviewedAt  DateTime? // When VOP was reviewed
+  vopApproved    Boolean? // Admin decision (true = approved, false = cancelled)
 
   // Timestamps
   processedAt DateTime?
@@ -2404,4 +2411,163 @@ model TopUpRequest {
   @@index([expiresAt])
   @@index([createdAt])
   @@map("top_up_requests")
+}
+
+// ============================================
+// VIRTUAL IBAN AUDIT LOG
+// ============================================
+
+model VirtualIbanAuditLog {
+  id String @id @default(cuid())
+
+  // === CONTEXT ===
+  accountId String? // VirtualIbanAccount ID (optional)
+  userId    String? // User ID (optional)
+  adminId   String? // Admin ID who performed action (optional)
+
+  // === EVENT DETAILS ===
+  type     VirtualIbanAuditType
+  severity AuditSeverity
+  action   String // e.g., "BALANCE_SYNC", "WEBHOOK_PROCESSED", "MANUAL_ADJUSTMENT"
+
+  // === DATA ===
+  oldValue Json? // Previous state
+  newValue Json? // New state
+  metadata Json? // Additional context
+
+  // === RECONCILIATION ===
+  diff   Float? // For balance mismatches
+  reason String? // Human-readable reason
+
+  // === TIMESTAMPS ===
+  createdAt DateTime @default(now())
+
+  // === RELATIONS ===
+  account VirtualIbanAccount? @relation("AccountAuditLogs", fields: [accountId], references: [id], onDelete: SetNull)
+  user    User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  admin   Admin?              @relation("AdminVirtualIbanAuditLogs", fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@index([accountId])
+  @@index([userId])
+  @@index([adminId])
+  @@index([type])
+  @@index([severity])
+  @@index([createdAt])
+  @@map("virtual_iban_audit_logs")
+}
+
+enum VirtualIbanAuditType {
+  ACCOUNT_CREATED // New Virtual IBAN account created
+  ACCOUNT_CLOSED // Virtual IBAN account closed
+  BALANCE_CREDIT // Balance increased (top-up)
+  BALANCE_DEBIT // Balance decreased (withdrawal/purchase)
+  BALANCE_SYNC // Balance synchronized with provider
+  BALANCE_MISMATCH // Balance discrepancy detected
+  WEBHOOK_RECEIVED // Webhook notification received
+  WEBHOOK_MISSED // Missed webhook recovered by polling
+  POLLING_DETECTED // Transaction detected via polling
+  MANUAL_ADJUSTMENT // Manual balance adjustment by admin
+  RECONCILIATION // Reconciliation performed
+  VOP_REVIEW // VOP (Verification of Payee) review
+}
+
+enum AuditSeverity {
+  INFO // Informational event
+  WARNING // Warning event
+  ERROR // Error event
+  CRITICAL // Critical event requiring immediate attention
+}
+
+// ============================================
+// VIRTUAL IBAN BALANCE SNAPSHOT
+// ============================================
+
+model VirtualIbanBalanceSnapshot {
+  id String @id @default(cuid())
+
+  // === SNAPSHOT TIME ===
+  snapshotDate DateTime @default(now())
+
+  // === BCB DATA ===
+  segregatedAccountId String // e.g., "94092443"
+  bcbTotalBalance     Float // Total balance from BCB API
+  bcbBalanceSnapshot  Json // Full BCB API response
+
+  // === OUR DATA ===
+  localTotalBalance   Float // Sum of all local Virtual IBAN balances
+  activeAccountsCount Int // Number of active Virtual IBAN accounts
+  accountBreakdown    Json // Array of {accountId, iban, balance, userId}
+
+  // === VALIDATION ===
+  isValid    Boolean // bcbTotal === localTotal (with tolerance)
+  difference Float? // Absolute difference if mismatch
+
+  // === RECONCILIATION ===
+  reconciliationNeeded Boolean   @default(false)
+  reconciledAt         DateTime?
+  reconciledBy         String?
+  reconciledByAdmin    Admin?    @relation("AdminBalanceSnapshots", fields: [reconciledBy], references: [id], onDelete: SetNull)
+
+  // === TIMESTAMPS ===
+  createdAt DateTime @default(now())
+
+  @@index([snapshotDate])
+  @@index([segregatedAccountId])
+  @@index([reconciliationNeeded])
+  @@index([createdAt])
+  @@map("virtual_iban_balance_snapshots")
+}
+
+// ============================================
+// VIRTUAL IBAN RECONCILIATION REPORT
+// ============================================
+
+model VirtualIbanReconciliationReport {
+  id String @id @default(cuid())
+
+  // === PERIOD ===
+  startDate DateTime
+  endDate   DateTime
+
+  // === SUMMARY ===
+  totalTransactions Int // Total number of transactions in period
+  totalCredits      Float // Total credits (incoming payments)
+  totalDebits       Float // Total debits (purchases/withdrawals)
+  netChange         Float // Net change (credits - debits)
+
+  // === BALANCE CHECK ===
+  startingBalance         Float // Balance at start of period
+  endingBalance           Float // Balance at end of period
+  calculatedEndingBalance Float // starting + netChange
+  bcbEndingBalance        Float // Balance from BCB API
+
+  // === VALIDATION ===
+  isBalanced     Boolean // All checks passed
+  discrepancies  Json? // Array of issues found
+  discrepancyLog String? // Human-readable log
+
+  // === STATUS ===
+  status     ReconciliationStatus
+  resolvedAt DateTime?
+  resolvedBy String?
+  admin      Admin?               @relation("AdminReconciliationReports", fields: [resolvedBy], references: [id], onDelete: SetNull)
+
+  // === TIMESTAMPS ===
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([startDate])
+  @@index([endDate])
+  @@index([status])
+  @@index([createdAt])
+  @@map("virtual_iban_reconciliation_reports")
+}
+
+enum ReconciliationStatus {
+  PENDING // Report created, waiting for review
+  IN_PROGRESS // Being reviewed
+  BALANCED // Everything matches, no issues
+  DISCREPANCY_FOUND // Issues found, requires action
+  RESOLVED // Discrepancies resolved
+  FAILED // Reconciliation failed
 }

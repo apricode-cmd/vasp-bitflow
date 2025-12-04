@@ -11,6 +11,7 @@
 
 import { prisma } from '@/lib/prisma';
 import type { VirtualIbanAccount, VirtualIbanTransaction } from '@prisma/client';
+import { virtualIbanAuditService } from './virtual-iban-audit.service';
 
 export class VirtualIbanBalanceService {
   /**
@@ -85,6 +86,17 @@ export class VirtualIbanBalanceService {
 
       return { account: updatedAccount, transaction };
     });
+    
+    // Log audit (after transaction committed)
+    await virtualIbanAuditService.logBalanceChange(
+      result.account.id,
+      result.account.balance + amount, // old balance
+      result.account.balance, // new balance
+      `ORDER_PAYMENT: ${orderId}`,
+      result.account.userId
+    ).catch(err => console.error('[Audit] Failed to log balance deduction:', err));
+    
+    return result;
   }
 
   /**
@@ -160,6 +172,17 @@ export class VirtualIbanBalanceService {
 
       return { account: updatedAccount, transaction };
     });
+    
+    // Log audit (after transaction committed)
+    await virtualIbanAuditService.logBalanceChange(
+      result.account.id,
+      result.account.balance - amount, // old balance
+      result.account.balance, // new balance
+      `TOP_UP: ${providerTransactionId}`,
+      result.account.userId
+    ).catch(err => console.error('[Audit] Failed to log balance addition:', err));
+    
+    return result;
   }
 
   /**
