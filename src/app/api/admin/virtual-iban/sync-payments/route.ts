@@ -23,14 +23,14 @@ export async function POST(req: NextRequest) {
     console.log(`[Admin] Manual sync triggered by: ${session.email}`);
 
     // Run sync
-    const result = await syncVirtualIbanPayments();
+    const syncResult = await syncVirtualIbanPayments();
 
     return NextResponse.json({
-      success: result.success,
-      message: result.missed > 0 
-        ? `Found and processed ${result.missed} missed payment(s)`
+      success: syncResult.success,
+      message: syncResult.missed > 0 
+        ? `Found and processed ${syncResult.missed} missed payment(s)`
         : 'No missed payments found',
-      ...result,
+      ...syncResult,
       triggeredBy: session.email,
       timestamp: new Date().toISOString(),
     });

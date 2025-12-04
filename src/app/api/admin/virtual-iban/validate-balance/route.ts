@@ -23,14 +23,14 @@ export async function POST(req: NextRequest) {
     console.log(`[Admin] Manual validation triggered by: ${session.email}`);
 
     // Run validation
-    const result = await validateVirtualIbanBalance();
+    const validationResult = await validateVirtualIbanBalance();
 
     return NextResponse.json({
-      success: result.success,
-      message: result.isValid 
+      success: validationResult.success,
+      message: validationResult.isValid 
         ? 'Balance validation passed - all accounts balanced'
-        : `Balance mismatch detected: €${result.difference?.toFixed(2)} difference`,
-      ...result,
+        : `Balance mismatch detected: €${validationResult.difference?.toFixed(2)} difference`,
+      ...validationResult,
       triggeredBy: session.email,
       timestamp: new Date().toISOString(),
     });
