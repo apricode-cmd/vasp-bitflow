@@ -25,6 +25,7 @@ import type {
   VirtualIbanTransactionType,
   VirtualIbanTransactionStatus,
 } from '@prisma/client';
+import { virtualIbanAuditService } from './virtual-iban-audit.service';
 
 // ==========================================
 // SERVICE CLASS
