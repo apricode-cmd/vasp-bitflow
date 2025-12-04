@@ -960,11 +960,11 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
     const details = virtualAccount.virtualAccountDetails;
     const owner = virtualAccount.ownerDetails;
     
-    // Map status
-    let status: 'active' | 'pending' | 'suspended' | 'closed' = 'pending';
-    if (details.status === 'ACTIVE') status = 'active';
-    else if (details.status === 'CLOSED') status = 'closed';
-    else if (details.status === 'PENDING') status = 'pending';
+    // Map status to Prisma enum (UPPERCASE)
+    let status: 'ACTIVE' | 'PENDING' | 'SUSPENDED' | 'CLOSED' | 'FAILED' = 'PENDING';
+    if (details.status === 'ACTIVE') status = 'ACTIVE';
+    else if (details.status === 'CLOSED') status = 'CLOSED';
+    else if (details.status === 'PENDING') status = 'PENDING';
     
     // Extract country from IBAN (country where the account is physically located)
     // BCB assigns IBANs from their pool, so IBAN country may differ from user's country
