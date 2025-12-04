@@ -353,6 +353,40 @@ export function ManualReconcileDialog({
           </div>
         )}
 
+        {/* Warning for amount mismatch */}
+        {selectedOrderId && (() => {
+          const selectedOrder = filteredOrders.find(o => o.id === selectedOrderId);
+          if (!selectedOrder) return null;
+          
+          const amountMatch = getAmountMatch(selectedOrder);
+          const diff = Math.abs(selectedOrder.totalFiat - transaction.amount);
+          
+          if (amountMatch === 'mismatch' && diff > 100) {
+            return (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-2">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-semibold text-yellow-800">Large Amount Mismatch</p>
+                    <p className="text-sm text-yellow-700">
+                      Transaction: <span className="font-medium">{formatCurrency(transaction.amount, transaction.currency)}</span>
+                      {' vs '}
+                      Order: <span className="font-medium">{formatCurrency(selectedOrder.totalFiat, selectedOrder.currency)}</span>
+                      {' (difference: '}
+                      <span className="font-medium">{formatCurrency(diff, transaction.currency)}</span>)
+                    </p>
+                    <p className="text-sm text-yellow-700">
+                      Please verify this is the correct order before reconciling.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+          
+          return null;
+        })()}
+
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={reconciling}>
             Cancel

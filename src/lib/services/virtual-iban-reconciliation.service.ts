@@ -172,6 +172,15 @@ class VirtualIbanReconciliationService {
       method,
     });
 
+    // Check if order already has a PayIn
+    const existingPayIn = await prisma.payIn.findUnique({
+      where: { orderId: order.id },
+    });
+
+    if (existingPayIn) {
+      throw new Error(`Order ${order.id} already has a PayIn (${existingPayIn.id}). Cannot reconcile twice.`);
+    }
+
     // Check for amount mismatch
     const amountMismatch = Math.abs(order.totalFiat - transaction.amount) > 0.01;
 
@@ -181,6 +190,15 @@ class VirtualIbanReconciliationService {
         received: transaction.amount,
         difference: transaction.amount - order.totalFiat,
       });
+      
+      // For manual reconciliation with large mismatch, throw error
+      if (method === 'manual' && Math.abs(transaction.amount - order.totalFiat) > 100) {
+        throw new Error(
+          `Large amount mismatch: Transaction €${transaction.amount.toFixed(2)} vs Order €${order.totalFiat.toFixed(2)}. ` +
+          `Difference: €${Math.abs(transaction.amount - order.totalFiat).toFixed(2)}. ` +
+          `Please verify this is the correct order.`
+        );
+      }
     }
 
     // Create PayIn record
