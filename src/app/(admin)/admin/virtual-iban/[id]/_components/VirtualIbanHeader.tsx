@@ -98,143 +98,180 @@ export function VirtualIbanHeader({
   const config = statusConfig[account.status] || { variant: 'default' as const, label: account.status };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Back button */}
       <Link href="/admin/virtual-iban">
-        <Button variant="ghost" size="sm">
+        <Button variant="ghost" size="sm" className="hover:bg-accent">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Virtual IBANs
         </Button>
       </Link>
 
-      {/* Header content */}
-      <div className="flex items-start justify-between">
-        {/* Left: Info */}
-        <div className="flex items-start gap-6">
-          <div className="h-24 w-24 rounded-lg border-4 border-background shadow-lg bg-primary/10 flex items-center justify-center">
-            <Landmark className="h-12 w-12 text-primary" />
-          </div>
-
-          <div className="space-y-2">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">{account.bankName}</h1>
-              <p className="text-lg text-muted-foreground">{account.accountHolder}</p>
+      {/* Main Header Card */}
+      <div className="bg-gradient-to-br from-primary/5 via-primary/3 to-background border rounded-xl p-6 shadow-sm">
+        <div className="flex items-start justify-between gap-6">
+          {/* Left: Bank Info & User */}
+          <div className="flex items-start gap-6 flex-1 min-w-0">
+            {/* Bank Icon */}
+            <div className="h-20 w-20 rounded-xl border-2 border-primary/20 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center flex-shrink-0">
+              <Landmark className="h-10 w-10 text-primary" />
             </div>
 
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <span className="text-lg">{getCountryFlag(account.country)}</span>
-                {getCountryName(account.country)}
-              </span>
-              <span>•</span>
-              <span>{account.currency}</span>
-              <span>•</span>
-              <span>Created {formatDateTime(account.createdAt)}</span>
-            </div>
-
-            {/* IBAN & BIC */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">IBAN:</span>
-                <code className="text-sm bg-muted px-2 py-1 rounded font-mono">
-                  {account.iban}
-                </code>
-                <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={copyIban}>
-                  <Copy className="h-3 w-3" />
-                </Button>
+            {/* Info */}
+            <div className="space-y-3 flex-1 min-w-0">
+              {/* Bank Name + Status */}
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-2xl font-bold tracking-tight truncate">
+                    {account.bankName}
+                  </h1>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {account.accountHolder}
+                  </p>
+                </div>
+                
+                {/* Status Badge (prominent) */}
+                <Badge 
+                  variant={config.variant} 
+                  className="text-sm font-semibold px-3 py-1 flex-shrink-0"
+                >
+                  {config.label}
+                </Badge>
               </div>
-              {account.bic && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">BIC:</span>
-                  <code className="text-sm bg-muted px-2 py-1 rounded font-mono">
-                    {account.bic}
+
+              {/* Meta Info */}
+              <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <span className="text-base">{getCountryFlag(account.country)}</span>
+                  {getCountryName(account.country)}
+                </span>
+                <span className="text-muted-foreground/40">•</span>
+                <span className="font-mono font-semibold">{account.currency}</span>
+                <span className="text-muted-foreground/40">•</span>
+                <Badge variant="secondary" className="text-xs">
+                  <Building2 className="h-3 w-3 mr-1" />
+                  {account.providerId}
+                </Badge>
+              </div>
+
+              {/* IBAN & BIC in Card */}
+              <div className="bg-background/60 backdrop-blur border rounded-lg p-3 space-y-2">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-medium text-muted-foreground w-12">IBAN</span>
+                  <code className="text-sm font-mono bg-muted/50 px-3 py-1.5 rounded flex-1 tracking-wide">
+                    {account.iban}
                   </code>
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={copyBic}>
-                    <Copy className="h-3 w-3" />
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary" 
+                    onClick={copyIban}
+                  >
+                    <Copy className="h-4 w-4" />
                   </Button>
                 </div>
-              )}
-            </div>
+                {account.bic && (
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-medium text-muted-foreground w-12">BIC</span>
+                    <code className="text-sm font-mono bg-muted/50 px-3 py-1.5 rounded flex-1 tracking-wide">
+                      {account.bic}
+                    </code>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary" 
+                      onClick={copyBic}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
 
-            {/* Status Badges */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant={config.variant} className="text-xs">
-                {config.label}
-              </Badge>
-
-              <Badge variant="secondary" className="text-xs">
-                <Building2 className="h-3 w-3 mr-1" />
-                {account.providerId}
-              </Badge>
-
-              <Badge variant="outline" className="text-xs">
-                {formatCurrency(account.balance, account.currency)}
-              </Badge>
+              {/* Balance + Created */}
+              <div className="flex items-center gap-4 pt-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Balance:</span>
+                  <span className="text-lg font-bold">
+                    {formatCurrency(account.balance, account.currency)}
+                  </span>
+                </div>
+                <span className="text-muted-foreground/40">•</span>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span>Created {formatDateTime(account.createdAt)}</span>
+                </div>
+              </div>
             </div>
           </div>
+
+          {/* Right: Actions Button */}
+          <div className="flex-shrink-0">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="default" size="lg" className="shadow-md hover:shadow-lg transition-shadow">
+                  <MoreVertical className="h-5 w-5 mr-2" />
+                  Actions
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="text-sm font-semibold">Account Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                
+                <DropdownMenuItem onClick={onSync} className="cursor-pointer">
+                  <RefreshCw className="h-4 w-4 mr-3" />
+                  Sync Account Details
+                </DropdownMenuItem>
+
+                <DropdownMenuItem onClick={copyIban} className="cursor-pointer">
+                  <Copy className="h-4 w-4 mr-3" />
+                  Copy IBAN
+                </DropdownMenuItem>
+
+                {account.bic && (
+                  <DropdownMenuItem onClick={copyBic} className="cursor-pointer">
+                    <Copy className="h-4 w-4 mr-3" />
+                    Copy BIC
+                  </DropdownMenuItem>
+                )}
+
+                <DropdownMenuSeparator />
+
+                {account.status === 'ACTIVE' && (
+                  <DropdownMenuItem onClick={onSuspend} className="text-orange-600 dark:text-orange-400 cursor-pointer">
+                    <Ban className="h-4 w-4 mr-3" />
+                    Suspend Account
+                  </DropdownMenuItem>
+                )}
+
+                {account.status === 'SUSPENDED' && (
+                  <DropdownMenuItem onClick={onReactivate} className="text-green-600 dark:text-green-400 cursor-pointer">
+                    <CheckCircle className="h-4 w-4 mr-3" />
+                    Reactivate Account
+                  </DropdownMenuItem>
+                )}
+
+                {account.status !== 'CLOSED' && account.status !== 'FAILED' && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setCloseDialogOpen(true)} className="text-destructive cursor-pointer">
+                      <XCircle className="h-4 w-4 mr-3" />
+                      Close Account
+                    </DropdownMenuItem>
+                  </>
+                )}
+
+                <DropdownMenuSeparator />
+                
+                <DropdownMenuItem asChild className="cursor-pointer">
+                  <Link href={`/admin/users/${account.user.email}`} className="flex items-center">
+                    <Building2 className="h-4 w-4 mr-3" />
+                    View User Profile
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
-
-        {/* Right: Actions */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline">
-              <MoreVertical className="h-4 w-4 mr-2" />
-              Actions
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuLabel>Account Actions</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            
-            <DropdownMenuItem onClick={onSync}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Sync Account
-            </DropdownMenuItem>
-
-            <DropdownMenuItem onClick={copyIban}>
-              <Copy className="h-4 w-4 mr-2" />
-              Copy IBAN
-            </DropdownMenuItem>
-
-            {account.bic && (
-              <DropdownMenuItem onClick={copyBic}>
-                <Copy className="h-4 w-4 mr-2" />
-                Copy BIC
-              </DropdownMenuItem>
-            )}
-
-            <DropdownMenuSeparator />
-
-            {account.status === 'ACTIVE' && (
-              <DropdownMenuItem onClick={onSuspend} className="text-destructive">
-                <Ban className="h-4 w-4 mr-2" />
-                Suspend Account
-              </DropdownMenuItem>
-            )}
-
-            {account.status === 'SUSPENDED' && (
-              <DropdownMenuItem onClick={onReactivate}>
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Reactivate Account
-              </DropdownMenuItem>
-            )}
-
-            <DropdownMenuSeparator />
-
-            {account.status !== 'CLOSED' && (
-              <DropdownMenuItem onClick={() => setCloseDialogOpen(true)} className="text-destructive">
-                <XCircle className="h-4 w-4 mr-2" />
-                Close Account
-              </DropdownMenuItem>
-            )}
-
-            <DropdownMenuItem asChild>
-              <Link href={`/admin/users/${account.user.id}`}>
-                View User Profile
-              </Link>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
 
       {/* Close Account Dialog */}
