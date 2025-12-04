@@ -791,6 +791,7 @@ class VirtualIbanService {
       where: {
         orderId: null,
         payInId: null,
+        topUpRequest: null, // ← Exclude TopUp transactions
         type: 'CREDIT',
         status: 'COMPLETED',
       },
