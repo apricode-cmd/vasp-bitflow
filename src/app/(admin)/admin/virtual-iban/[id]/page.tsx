@@ -6,12 +6,16 @@
  * - Quick Stats (balance, transactions, etc.)
  * - Tabs: Overview, Transactions, Top-Up Requests
  * 
+ * URL params:
+ * - ?reconcile=<transactionId> - автоматически открыть диалог сверки
+ * 
  * Переиспользует паттерн из users/[id]/page.tsx
  */
 
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { VirtualIbanHeader } from './_components/VirtualIbanHeader';
@@ -28,14 +32,25 @@ interface PageProps {
 }
 
 export default function VirtualIbanDetailsPage({ params }: PageProps): JSX.Element {
+  const searchParams = useSearchParams();
+  const reconcileTransactionId = searchParams.get('reconcile');
+  
   const [account, setAccount] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [topUpRequests, setTopUpRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     fetchAccountDetails();
   }, [params.id]);
+
+  // Auto-switch to transactions tab if reconcile param is present
+  useEffect(() => {
+    if (reconcileTransactionId && !loading) {
+      setActiveTab('transactions');
+    }
+  }, [reconcileTransactionId, loading]);
 
   const fetchAccountDetails = async (): Promise<void> => {
     try {
@@ -188,7 +203,7 @@ export default function VirtualIbanDetailsPage({ params }: PageProps): JSX.Eleme
       <VirtualIbanQuickStats stats={stats} />
 
       {/* Tabs */}
-      <Tabs defaultValue="overview" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="transactions">
@@ -209,6 +224,7 @@ export default function VirtualIbanDetailsPage({ params }: PageProps): JSX.Eleme
             accountCurrency={account.currency}
             userId={account.userId}
             onRefresh={fetchAccountDetails}
+            autoReconcileTransactionId={reconcileTransactionId}
           />
         </TabsContent>
 

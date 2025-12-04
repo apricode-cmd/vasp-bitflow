@@ -187,7 +187,7 @@ export default function UnreconciledTransactionsPage(): JSX.Element {
                       {formatDateTime(tx.processedAt || tx.createdAt)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Link href={`/admin/virtual-iban/${tx.virtualIban.id}`}>
+                      <Link href={`/admin/virtual-iban/${tx.virtualIban.id}?reconcile=${tx.id}`}>
                         <Button variant="outline" size="sm">
                           Manual Reconcile
                         </Button>

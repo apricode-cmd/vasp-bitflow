@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -54,6 +54,7 @@ interface TransactionsTabProps {
   accountCurrency: string;
   userId: string; // User ID for manual reconciliation
   onRefresh: () => void; // Callback to refresh data after reconciliation
+  autoReconcileTransactionId?: string | null; // Auto-open reconcile dialog for this transaction
 }
 
 export function TransactionsTab({ 
@@ -61,9 +62,20 @@ export function TransactionsTab({
   accountCurrency,
   userId,
   onRefresh,
+  autoReconcileTransactionId,
 }: TransactionsTabProps): JSX.Element {
   const [reconcileDialogOpen, setReconcileDialogOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+
+  // Auto-open reconcile dialog if transaction ID is provided in URL
+  useEffect(() => {
+    if (autoReconcileTransactionId && transactions.length > 0) {
+      const transaction = transactions.find(tx => tx.id === autoReconcileTransactionId);
+      if (transaction && transaction.type === 'CREDIT' && transaction.status === 'COMPLETED' && !transaction.orderId) {
+        handleOpenReconcileDialog(transaction);
+      }
+    }
+  }, [autoReconcileTransactionId, transactions]);
 
   const handleOpenReconcileDialog = (tx: Transaction): void => {
     setSelectedTransaction(tx);
