@@ -118,31 +118,6 @@ export function OverviewTab({ account }: OverviewTabProps): JSX.Element {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
-            {/* IBAN & BIC */}
-            <div className="space-y-3">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground mb-1.5">IBAN</p>
-                  <code className="text-sm bg-muted/60 px-3 py-2 rounded-md font-mono block break-all">
-                    {account.iban}
-                  </code>
-                </div>
-              </div>
-              
-              {account.bic && (
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-muted-foreground mb-1.5">BIC/SWIFT</p>
-                    <code className="text-sm bg-muted/60 px-3 py-2 rounded-md font-mono block">
-                      {account.bic}
-                    </code>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <Separator />
-
             {/* Bank & Holder */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -172,22 +147,6 @@ export function OverviewTab({ account }: OverviewTabProps): JSX.Element {
                   {getCountryName(account.country)}
                 </p>
               </div>
-            </div>
-
-            <Separator />
-
-            {/* Balance (Prominent) */}
-            <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-lg p-5 border border-primary/20">
-              <p className="text-xs font-medium text-muted-foreground mb-2">Current Balance</p>
-              <p className="text-3xl font-bold text-primary tracking-tight">
-                {formatCurrency(account.balance, account.currency)}
-              </p>
-              {account.lastBalanceUpdate && (
-                <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1.5">
-                  <Clock className="h-3 w-3" />
-                  Last updated {formatDateTime(account.lastBalanceUpdate)}
-                </p>
-              )}
             </div>
           </CardContent>
         </Card>
