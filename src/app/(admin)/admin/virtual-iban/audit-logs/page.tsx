@@ -56,16 +56,20 @@ async function getAuditLogs(params: {
         },
         user: {
           select: {
-            firstName: true,
-            lastName: true,
             email: true,
+            profile: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
           },
         },
         admin: {
           select: {
+            email: true,
             firstName: true,
             lastName: true,
-            email: true,
           },
         },
       },
@@ -286,7 +290,7 @@ export default async function AuditLogsPage({ searchParams }: AuditLogsPageProps
                       {log.user && (
                         <div>
                           <p className="font-medium">
-                            {log.user.firstName} {log.user.lastName}
+                            {log.user.profile?.firstName} {log.user.profile?.lastName}
                           </p>
                           <p className="text-xs text-muted-foreground">{log.user.email}</p>
                         </div>
