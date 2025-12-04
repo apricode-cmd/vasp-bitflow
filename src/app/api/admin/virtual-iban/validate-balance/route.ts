@@ -8,23 +8,19 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { validateVirtualIbanBalance } from '@/lib/cron/validate-virtual-iban-balance';
 
 export async function POST(req: NextRequest) {
   try {
     // Check admin authentication
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const result = await requireAdminRole('ADMIN');
+    if (result instanceof NextResponse) {
+      return result;
     }
+    const { session } = result;
 
-    console.log(`[Admin] Manual validation triggered by: ${session.user.email}`);
+    console.log(`[Admin] Manual validation triggered by: ${session.email}`);
 
     // Run validation
     const result = await validateVirtualIbanBalance();
@@ -35,7 +31,7 @@ export async function POST(req: NextRequest) {
         ? 'Balance validation passed - all accounts balanced'
         : `Balance mismatch detected: €${result.difference?.toFixed(2)} difference`,
       ...result,
-      triggeredBy: session.user.email,
+      triggeredBy: session.email,
       timestamp: new Date().toISOString(),
     });
 
