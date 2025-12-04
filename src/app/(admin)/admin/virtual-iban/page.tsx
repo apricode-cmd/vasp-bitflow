@@ -33,7 +33,7 @@ import { toast } from 'sonner';
 import { 
   MoreHorizontal, Eye, Ban, CheckCircle, RefreshCw, 
   Building2, Users, TrendingUp, Clock, Download,
-  Landmark, Copy
+  Landmark, Copy, Database, Shield
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -87,6 +87,8 @@ export default function VirtualIbanPage(): JSX.Element {
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [validating, setValidating] = useState(false);
   
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -212,6 +214,72 @@ export default function VirtualIbanPage(): JSX.Element {
   const copyIban = (iban: string): void => {
     navigator.clipboard.writeText(iban);
     toast.success('IBAN copied to clipboard');
+  };
+  
+  const handleManualSync = async (): Promise<void> => {
+    setSyncing(true);
+    const toastId = toast.loading('Checking for missed payments...');
+    
+    try {
+      const response = await fetch('/api/admin/virtual-iban/sync-payments', {
+        method: 'POST',
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        if (data.missed > 0) {
+          toast.success(
+            `Found and processed ${data.missed} missed payment(s)`,
+            { id: toastId }
+          );
+          fetchAccounts();
+          fetchStats();
+        } else {
+          toast.success('No missed payments found - all up to date!', { id: toastId });
+        }
+      } else {
+        toast.error(data.error || 'Sync failed', { id: toastId });
+      }
+    } catch (error) {
+      console.error('Manual sync error:', error);
+      toast.error('Failed to sync payments', { id: toastId });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleManualValidation = async (): Promise<void> => {
+    setValidating(true);
+    const toastId = toast.loading('Validating balances...');
+    
+    try {
+      const response = await fetch('/api/admin/virtual-iban/validate-balance', {
+        method: 'POST',
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        if (data.isValid) {
+          toast.success(
+            `Balance validation passed!\nBCB: €${data.bcbTotal.toFixed(2)}, Local: €${data.localTotal.toFixed(2)}`,
+            { id: toastId }
+          );
+        } else {
+          toast.error(
+            `Balance mismatch detected!\nBCB: €${data.bcbTotal.toFixed(2)}, Local: €${data.localTotal.toFixed(2)}\nDifference: €${data.difference.toFixed(2)}`,
+            { id: toastId, duration: 10000 }
+          );
+        }
+        fetchStats();
+      } else {
+        toast.error(data.error || 'Validation failed', { id: toastId });
+      }
+    } catch (error) {
+      console.error('Manual validation error:', error);
+      toast.error('Failed to validate balances', { id: toastId });
+    } finally {
+      setValidating(false);
+    }
   };
 
   // Table columns
@@ -390,6 +458,22 @@ export default function VirtualIbanPage(): JSX.Element {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button 
+            onClick={handleManualSync} 
+            variant="outline" 
+            disabled={syncing}
+          >
+            <Database className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing...' : 'Sync Payments'}
+          </Button>
+          <Button 
+            onClick={handleManualValidation} 
+            variant="outline" 
+            disabled={validating}
+          >
+            <Shield className={`h-4 w-4 mr-2 ${validating ? 'animate-pulse' : ''}`} />
+            {validating ? 'Validating...' : 'Validate Balance'}
+          </Button>
           <Button onClick={() => fetchAccounts()} variant="outline" disabled={refreshing}>
             <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh

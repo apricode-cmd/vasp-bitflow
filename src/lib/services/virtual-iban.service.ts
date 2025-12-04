@@ -388,16 +388,17 @@ class VirtualIbanService {
     // Get provider that owns this account
     const provider = await this.getProviderForAccount(account);
 
-    // Get fresh data from provider
+    // Get fresh account details from provider (status, IBAN, BIC, etc.)
+    // For BCB: use providerAccountId which is the Virtual IBAN UUID
     const providerAccount = await provider.getAccountDetails(account.providerAccountId);
-    const balance = await provider.getBalance(account.providerAccountId);
 
-    // Update in DB
+    // Update in DB (but NOT balance - balance is only updated via webhooks/polling)
     return prisma.virtualIbanAccount.update({
       where: { id: accountId },
       data: {
-        balance: balance.balance,
-        lastBalanceUpdate: new Date(),
+        status: providerAccount.status,
+        bic: providerAccount.bic || account.bic,
+        bankName: providerAccount.bankName || account.bankName,
         metadata: providerAccount.metadata,
         updatedAt: new Date(),
       },
