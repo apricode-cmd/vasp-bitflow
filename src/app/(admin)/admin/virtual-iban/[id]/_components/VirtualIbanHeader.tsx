@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { formatDateTime, formatCurrency } from '@/lib/formatters';
 import { getCountryFlag, getCountryName } from '@/lib/utils/country-utils';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
@@ -71,20 +72,30 @@ export function VirtualIbanHeader({
   onReactivate 
 }: VirtualIbanHeaderProps): JSX.Element {
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
+  const [copiedField, setCopiedField] = useState<'iban' | 'bic' | null>(null);
 
   const fullName = account.user.profile 
     ? `${account.user.profile.firstName} ${account.user.profile.lastName}` 
     : 'Unknown User';
 
+  // Format IBAN with spaces for better readability (e.g., DK96 8990 0025 3329 304)
+  const formatIban = (iban: string): string => {
+    return iban.replace(/(.{4})/g, '$1 ').trim();
+  };
+
   const copyIban = () => {
     navigator.clipboard.writeText(account.iban);
+    setCopiedField('iban');
     toast.success('IBAN copied to clipboard');
+    setTimeout(() => setCopiedField(null), 2000);
   };
 
   const copyBic = () => {
     if (account.bic) {
       navigator.clipboard.writeText(account.bic);
+      setCopiedField('bic');
       toast.success('BIC copied to clipboard');
+      setTimeout(() => setCopiedField(null), 2000);
     }
   };
 
@@ -152,39 +163,102 @@ export function VirtualIbanHeader({
                 </Badge>
               </div>
 
-              {/* IBAN & BIC - Prominent Display */}
-              <div className="bg-background/80 backdrop-blur border rounded-lg divide-y">
+              {/* IBAN & BIC - Premium Banking Card Style */}
+              <div className="bg-gradient-to-br from-slate-900 to-slate-800 dark:from-slate-800 dark:to-slate-900 rounded-xl shadow-lg overflow-hidden border border-slate-700/50">
                 {/* IBAN Row */}
-                <div className="flex items-center gap-3 p-3 hover:bg-accent/30 transition-colors group">
-                  <span className="text-xs font-semibold text-muted-foreground w-10 uppercase">IBAN</span>
-                  <code className="text-sm font-mono font-semibold bg-muted/50 px-3 py-1.5 rounded flex-1 tracking-wide">
-                    {account.iban}
-                  </code>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-8 w-8 p-0 opacity-70 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary transition-all" 
-                    onClick={copyIban}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
+                <div className="relative group">
+                  <div className="flex items-center gap-4 p-4 transition-all hover:bg-white/5">
+                    {/* Label */}
+                    <div className="flex items-center gap-2 w-16 flex-shrink-0">
+                      <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <Landmark className="h-4 w-4 text-primary" />
+                      </div>
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">IBAN</span>
+                    </div>
+                    
+                    {/* IBAN Value */}
+                    <div className="flex-1 min-w-0">
+                      <code className="text-base font-semibold text-white tracking-[0.15em] block">
+                        {formatIban(account.iban)}
+                      </code>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        International Bank Account Number
+                      </p>
+                    </div>
+                    
+                    {/* Copy Button */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={copyIban}
+                      className={cn(
+                        "h-9 px-3 text-white hover:bg-white/10 hover:text-primary transition-all",
+                        copiedField === 'iban' && "bg-green-500/20 text-green-400"
+                      )}
+                    >
+                      {copiedField === 'iban' ? (
+                        <>
+                          <CheckCircle className="h-4 w-4 mr-1.5" />
+                          <span className="text-xs font-medium">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4 mr-1.5" />
+                          <span className="text-xs font-medium">Copy</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  
+                  {/* Separator */}
+                  <div className="h-px bg-gradient-to-r from-transparent via-slate-600/50 to-transparent" />
                 </div>
                 
                 {/* BIC Row */}
                 {account.bic && (
-                  <div className="flex items-center gap-3 p-3 hover:bg-accent/30 transition-colors group">
-                    <span className="text-xs font-semibold text-muted-foreground w-10 uppercase">BIC</span>
-                    <code className="text-sm font-mono font-semibold bg-muted/50 px-3 py-1.5 rounded flex-1 tracking-wide">
-                      {account.bic}
-                    </code>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-8 w-8 p-0 opacity-70 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary transition-all" 
-                      onClick={copyBic}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
+                  <div className="relative group">
+                    <div className="flex items-center gap-4 p-4 transition-all hover:bg-white/5">
+                      {/* Label */}
+                      <div className="flex items-center gap-2 w-16 flex-shrink-0">
+                        <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                          <Building2 className="h-4 w-4 text-blue-400" />
+                        </div>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">BIC</span>
+                      </div>
+                      
+                      {/* BIC Value */}
+                      <div className="flex-1 min-w-0">
+                        <code className="text-base font-semibold text-white tracking-[0.2em] block">
+                          {account.bic}
+                        </code>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Bank Identifier Code (SWIFT)
+                        </p>
+                      </div>
+                      
+                      {/* Copy Button */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={copyBic}
+                        className={cn(
+                          "h-9 px-3 text-white hover:bg-white/10 hover:text-blue-400 transition-all",
+                          copiedField === 'bic' && "bg-green-500/20 text-green-400"
+                        )}
+                      >
+                        {copiedField === 'bic' ? (
+                          <>
+                            <CheckCircle className="h-4 w-4 mr-1.5" />
+                            <span className="text-xs font-medium">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-4 w-4 mr-1.5" />
+                            <span className="text-xs font-medium">Copy</span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
