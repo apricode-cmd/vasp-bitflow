@@ -42,7 +42,7 @@ export function CloseAccountDialog({
   const [loading, setLoading] = useState(false);
 
   const handleClose = async (): Promise<void> => {
-    if (!isAdmin && !reason.trim()) {
+    if (!reason.trim()) {
       toast.error('Please provide a reason for closing the account');
       return;
     }
@@ -152,7 +152,7 @@ export function CloseAccountDialog({
           {/* Reason */}
           <div className="space-y-2">
             <Label htmlFor="reason">
-              Reason for closure {!isAdmin && <span className="text-destructive">*</span>}
+              Reason for closure <span className="text-destructive">*</span>
             </Label>
             <Textarea
               id="reason"
@@ -160,7 +160,7 @@ export function CloseAccountDialog({
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               rows={4}
-              required={!isAdmin}
+              required
             />
           </div>
 
@@ -188,7 +188,7 @@ export function CloseAccountDialog({
           <Button
             variant="destructive"
             onClick={handleClose}
-            disabled={loading || (!isAdmin && hasBalance) || (!isAdmin && !reason.trim())}
+            disabled={loading || (!isAdmin && hasBalance) || !reason.trim()}
           >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {loading ? 'Closing...' : 'Close Account'}

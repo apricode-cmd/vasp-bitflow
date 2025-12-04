@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminAuth } from '@/lib/auth-utils';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { virtualIbanService } from '@/lib/services/virtual-iban.service';
 import { z } from 'zod';
 
@@ -18,11 +18,11 @@ export async function POST(
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   try {
-    const { error, session } = await requireAdminAuth();
-    if (error) return error;
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const authResult = await requireAdminRole('ADMIN');
+    if (authResult instanceof NextResponse) {
+      return authResult;
     }
+    const { session } = authResult;
 
     const adminId = session.user.id;
     const accountId = params.id;
@@ -67,11 +67,11 @@ export async function POST(
     }
 
     // Close the account
-    const result = await virtualIbanService.closeAccount(accountId, reason, adminId);
+    const closeResult = await virtualIbanService.closeAccount(accountId, reason, adminId);
 
-    if (!result.success) {
+    if (!closeResult.success) {
       return NextResponse.json(
-        { error: result.error || 'Failed to close account' },
+        { error: closeResult.error || 'Failed to close account' },
         { status: 500 }
       );
     }
