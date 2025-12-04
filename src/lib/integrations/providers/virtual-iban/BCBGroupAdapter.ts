@@ -147,6 +147,38 @@ interface BCBVirtualAccountData {
   ownerDetails: BCBVirtualAccountOwnerDetails;
 }
 
+// ==========================================
+// CLIENT API PAYMENT TYPES
+// ==========================================
+
+interface BCBPayment {
+  transactionId: string;
+  virtualAccountId: string; // UUID of the Virtual IBAN
+  amount: number;
+  currency: string;
+  credit: boolean; // true = incoming, false = outgoing
+  valueDate: string;
+  details: {
+    reference?: string;
+    endToEndId?: string;
+    iban?: string;
+    bic?: string;
+    accountName?: string;
+    accountNumber?: string;
+    sortCode?: string;
+  };
+  status: 'COMPLETED' | 'PENDING' | 'FAILED';
+  createdAt: string;
+}
+
+interface PagedPaymentResponse {
+  data: BCBPayment[];
+  pageIndex: number;
+  pageSize: number;
+  totalPages: number;
+  totalRecords: number;
+}
+
 interface BCBVirtualAccountListResponse {
   count: number;
   results: BCBVirtualAccountData[];
@@ -808,18 +840,34 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
     startDate?: Date,
     endDate?: Date
   ): Promise<VirtualIbanTransaction[]> {
-    let endpoint = `/v3/accounts/${accountId}/transactions?limit=100`;
+    // For Virtual IBAN transactions, we need to use the Client API
+    // accountId here is actually the Virtual IBAN UUID (providerAccountId)
+    // We need to get payments from the segregated account and filter by Virtual IBAN
     
+    // Build query parameters
+    const params = new URLSearchParams();
     if (startDate) {
-      endpoint += `&dateFrom=${startDate.toISOString().split('T')[0]}`;
+      params.append('dateFrom', startDate.toISOString());
     }
     if (endDate) {
-      endpoint += `&dateTo=${endDate.toISOString().split('T')[0]}`;
+      params.append('dateTo', endDate.toISOString());
     }
-
-    const transactions = await this.request<BCBTransaction[]>('GET', endpoint);
-
-    return transactions.map(tx => this.mapBcbTransactionToVirtualIban(tx));
+    params.append('pageSize', '1000'); // Max allowed by API
+    
+    const endpoint = `/v1/accounts/${this.segregatedAccountId}/payments?${params.toString()}`;
+    
+    // Use Client API
+    const response = await this.clientApiRequest<PagedPaymentResponse>('GET', endpoint);
+    
+    if (!response || !response.data) {
+      return [];
+    }
+    
+    // Filter payments by Virtual IBAN (accountId is the Virtual IBAN UUID)
+    // and map to our VirtualIbanTransaction format
+    return response.data
+      .filter(payment => payment.virtualAccountId === accountId)
+      .map(payment => this.mapClientApiPaymentToVirtualIban(payment));
   }
 
   async getBalance(accountId: string): Promise<VirtualIbanBalance> {
@@ -1015,6 +1063,32 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
         notes: tx.notes,
         sourceName: tx.source_name,
         endToEndId: tx.details?.endToEndIdentifier,
+      },
+    };
+  }
+
+  /**
+   * Map BCB Client API Payment to VirtualIbanTransaction
+   */
+  private mapClientApiPaymentToVirtualIban(payment: BCBPayment): VirtualIbanTransaction {
+    return {
+      transactionId: payment.transactionId,
+      accountId: payment.virtualAccountId,
+      type: payment.credit ? 'credit' : 'debit',
+      amount: payment.amount,
+      currency: payment.currency,
+      senderName: payment.details?.accountName,
+      senderIban: payment.details?.iban,
+      senderBic: payment.details?.bic,
+      reference: payment.details?.reference,
+      status: payment.status === 'COMPLETED' ? 'completed' : 
+              payment.status === 'PENDING' ? 'pending' : 'failed',
+      processedAt: new Date(payment.valueDate),
+      metadata: {
+        endToEndId: payment.details?.endToEndId,
+        accountNumber: payment.details?.accountNumber,
+        sortCode: payment.details?.sortCode,
+        createdAt: payment.createdAt,
       },
     };
   }
