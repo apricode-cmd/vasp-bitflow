@@ -33,7 +33,7 @@ import { toast } from 'sonner';
 import { 
   MoreHorizontal, Eye, Ban, CheckCircle, RefreshCw, 
   Building2, Users, TrendingUp, Clock, Download,
-  Landmark, Copy, Database, Shield
+  Landmark, Copy, Database, Shield, FileText, Activity
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -458,6 +458,18 @@ export default function VirtualIbanPage(): JSX.Element {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/admin/virtual-iban/audit-logs">
+            <Button variant="outline" size="sm">
+              <Activity className="h-4 w-4 mr-2" />
+              Audit Logs
+            </Button>
+          </Link>
+          <Link href="/admin/virtual-iban/reconciliation">
+            <Button variant="outline" size="sm">
+              <FileText className="h-4 w-4 mr-2" />
+              Reconciliation
+            </Button>
+          </Link>
           <Button 
             onClick={handleManualSync} 
             variant="outline" 
