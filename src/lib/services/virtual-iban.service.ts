@@ -392,17 +392,44 @@ class VirtualIbanService {
     // For BCB: use providerAccountId which is the Virtual IBAN UUID
     const providerAccount = await provider.getAccountDetails(account.providerAccountId);
 
+    // Normalize status to uppercase for Prisma enum
+    let normalizedStatus: 'ACTIVE' | 'PENDING' | 'SUSPENDED' | 'CLOSED' | 'FAILED' = 'PENDING';
+    if (providerAccount.status) {
+      const statusUpper = providerAccount.status.toUpperCase();
+      if (['ACTIVE', 'PENDING', 'SUSPENDED', 'CLOSED', 'FAILED'].includes(statusUpper)) {
+        normalizedStatus = statusUpper as 'ACTIVE' | 'PENDING' | 'SUSPENDED' | 'CLOSED' | 'FAILED';
+      }
+    }
+
     // Update in DB (but NOT balance - balance is only updated via webhooks/polling)
-    return prisma.virtualIbanAccount.update({
+    const updatedAccount = await prisma.virtualIbanAccount.update({
       where: { id: accountId },
       data: {
-        status: providerAccount.status,
+        status: normalizedStatus,
         bic: providerAccount.bic || account.bic,
         bankName: providerAccount.bankName || account.bankName,
         metadata: providerAccount.metadata,
         updatedAt: new Date(),
       },
     });
+
+    // Audit log for account metadata update
+    await virtualIbanAuditService.log({
+      type: 'ACCOUNT_UPDATED',
+      severity: 'INFO',
+      action: 'SYNC_ACCOUNT_DETAILS',
+      accountId,
+      metadata: {
+        statusChanged: account.status !== normalizedStatus,
+        oldStatus: account.status,
+        newStatus: normalizedStatus,
+        bicUpdated: providerAccount.bic !== account.bic,
+        timestamp: new Date(),
+      },
+      reason: 'Manual sync via admin panel',
+    });
+
+    return updatedAccount;
   }
 
   /**
