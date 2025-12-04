@@ -30,6 +30,7 @@ import {
   Landmark,
   Building2,
   XCircle,
+  User,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -107,99 +108,85 @@ export function VirtualIbanHeader({
         </Button>
       </Link>
 
-      {/* Main Header Card */}
-      <div className="bg-gradient-to-br from-primary/5 via-primary/3 to-background border rounded-xl p-6 shadow-sm">
-        <div className="flex items-start justify-between gap-6">
-          {/* Left: Bank Info & User */}
-          <div className="flex items-start gap-6 flex-1 min-w-0">
+      {/* Main Header Card - Clean & Focused */}
+      <div className="bg-gradient-to-br from-primary/5 via-primary/3 to-background border rounded-xl shadow-sm overflow-hidden">
+        <div className="flex items-start justify-between gap-6 p-6">
+          {/* Left: Bank Identity */}
+          <div className="flex items-start gap-5 flex-1 min-w-0">
             {/* Bank Icon */}
-            <div className="h-20 w-20 rounded-xl border-2 border-primary/20 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center flex-shrink-0">
-              <Landmark className="h-10 w-10 text-primary" />
+            <div className="h-16 w-16 rounded-xl border-2 border-primary/20 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center flex-shrink-0">
+              <Landmark className="h-8 w-8 text-primary" />
             </div>
 
-            {/* Info */}
-            <div className="space-y-3 flex-1 min-w-0">
-              {/* Bank Name + Status */}
+            {/* Bank Info */}
+            <div className="flex-1 min-w-0 space-y-3">
+              {/* Bank Name + Status Badge */}
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <h1 className="text-2xl font-bold tracking-tight truncate">
                     {account.bankName}
                   </h1>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="text-base text-muted-foreground mt-0.5 truncate">
                     {account.accountHolder}
                   </p>
                 </div>
                 
-                {/* Status Badge (prominent) */}
+                {/* Status Badge */}
                 <Badge 
                   variant={config.variant} 
-                  className="text-sm font-semibold px-3 py-1 flex-shrink-0"
+                  className="text-sm font-semibold px-4 py-1.5 flex-shrink-0 shadow-sm"
                 >
                   {config.label}
                 </Badge>
               </div>
 
-              {/* Meta Info */}
-              <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
-                <span className="flex items-center gap-1.5 font-medium">
-                  <span className="text-base">{getCountryFlag(account.country)}</span>
+              {/* Location Info */}
+              <div className="flex items-center gap-3 text-sm">
+                <span className="flex items-center gap-1.5 font-medium text-foreground">
+                  <span className="text-xl">{getCountryFlag(account.country)}</span>
                   {getCountryName(account.country)}
                 </span>
-                <span className="text-muted-foreground/40">•</span>
-                <span className="font-mono font-semibold">{account.currency}</span>
-                <span className="text-muted-foreground/40">•</span>
-                <Badge variant="secondary" className="text-xs">
-                  <Building2 className="h-3 w-3 mr-1" />
-                  {account.providerId}
+                <span className="text-muted-foreground/50">•</span>
+                <Badge variant="outline" className="font-mono font-semibold">
+                  {account.currency}
                 </Badge>
               </div>
 
-              {/* IBAN & BIC in Card */}
-              <div className="bg-background/60 backdrop-blur border rounded-lg p-3 space-y-2">
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-medium text-muted-foreground w-12">IBAN</span>
-                  <code className="text-sm font-mono bg-muted/50 px-3 py-1.5 rounded flex-1 tracking-wide">
+              {/* IBAN & BIC - Prominent Display */}
+              <div className="bg-background/80 backdrop-blur border rounded-lg divide-y">
+                {/* IBAN Row */}
+                <div className="flex items-center gap-3 p-3 hover:bg-accent/30 transition-colors group">
+                  <span className="text-xs font-semibold text-muted-foreground w-10 uppercase">IBAN</span>
+                  <code className="text-sm font-mono font-semibold bg-muted/50 px-3 py-1.5 rounded flex-1 tracking-wide">
                     {account.iban}
                   </code>
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary" 
+                    className="h-8 w-8 p-0 opacity-70 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary transition-all" 
                     onClick={copyIban}
                   >
                     <Copy className="h-4 w-4" />
                   </Button>
                 </div>
+                
+                {/* BIC Row */}
                 {account.bic && (
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-medium text-muted-foreground w-12">BIC</span>
-                    <code className="text-sm font-mono bg-muted/50 px-3 py-1.5 rounded flex-1 tracking-wide">
+                  <div className="flex items-center gap-3 p-3 hover:bg-accent/30 transition-colors group">
+                    <span className="text-xs font-semibold text-muted-foreground w-10 uppercase">BIC</span>
+                    <code className="text-sm font-mono font-semibold bg-muted/50 px-3 py-1.5 rounded flex-1 tracking-wide">
                       {account.bic}
                     </code>
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary" 
+                      className="h-8 w-8 p-0 opacity-70 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary transition-all" 
                       onClick={copyBic}
                     >
                       <Copy className="h-4 w-4" />
                     </Button>
                   </div>
                 )}
-              </div>
-
-              {/* Balance + Created */}
-              <div className="flex items-center gap-4 pt-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Balance:</span>
-                  <span className="text-lg font-bold">
-                    {formatCurrency(account.balance, account.currency)}
-                  </span>
-                </div>
-                <span className="text-muted-foreground/40">•</span>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <span>Created {formatDateTime(account.createdAt)}</span>
-                </div>
               </div>
             </div>
           </div>
@@ -208,7 +195,7 @@ export function VirtualIbanHeader({
           <div className="flex-shrink-0">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="default" size="lg" className="shadow-md hover:shadow-lg transition-shadow">
+                <Button variant="default" size="lg" className="shadow-md hover:shadow-lg transition-all">
                   <MoreVertical className="h-5 w-5 mr-2" />
                   Actions
                 </Button>
@@ -264,7 +251,7 @@ export function VirtualIbanHeader({
                 
                 <DropdownMenuItem asChild className="cursor-pointer">
                   <Link href={`/admin/users/${account.user.email}`} className="flex items-center">
-                    <Building2 className="h-4 w-4 mr-3" />
+                    <User className="h-4 w-4 mr-3" />
                     View User Profile
                   </Link>
                 </DropdownMenuItem>
