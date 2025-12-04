@@ -1,11 +1,11 @@
 {
   "crons": [
     {
-      "path": "/api/cron/process-notifications",
-      "schedule": "0 */5 * * *"
+      "path": "/api/cron/sync-virtual-iban-payments",
+      "schedule": "*/5 * * * *"
     },
     {
-      "path": "/api/cron/cleanup-sessions",
+      "path": "/api/cron/validate-virtual-iban-balance",
       "schedule": "0 * * * *"
     }
   ]
