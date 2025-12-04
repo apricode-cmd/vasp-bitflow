@@ -18,9 +18,7 @@ import {
   Mail, 
   MapPin, 
   Calendar, 
-  Clock, 
-  Landmark,
-  CreditCard,
+  Clock,
   AlertCircle,
   CheckCircle2,
   XCircle,
@@ -105,52 +103,8 @@ export function OverviewTab({ account }: OverviewTabProps): JSX.Element {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Left Column: Account & User (2/3 width) */}
-      <div className="lg:col-span-2 space-y-6">
-        {/* Account Information */}
-        <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Landmark className="h-5 w-5 text-primary" />
-              </div>
-              Account Details
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            {/* Bank & Holder */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1.5">Bank Name</p>
-                <p className="font-semibold text-base">{account.bankName}</p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1.5">Account Holder</p>
-                <p className="font-semibold text-base">{account.accountHolder}</p>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Currency & Country */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1.5">Currency</p>
-                <Badge variant="outline" className="font-mono font-semibold text-sm">
-                  {account.currency}
-                </Badge>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1.5">Bank Country</p>
-                <p className="font-medium text-base">
-                  <span className="text-xl mr-2">{getCountryFlag(account.country)}</span>
-                  {getCountryName(account.country)}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
+      {/* Left Column: User Information (2/3 width) */}
+      <div className="lg:col-span-2">
         {/* User Information */}
         <Card>
           <CardHeader className="pb-4">
