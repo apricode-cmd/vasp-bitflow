@@ -356,7 +356,7 @@ class VirtualIbanReconciliationService {
       where: {
         orderId: null,
         payInId: null,
-        topUpRequestId: null, // ← Exclude TopUp transactions
+        topUpRequest: null, // ← Relation, not topUpRequestId
         type: 'CREDIT',
         status: 'COMPLETED',
       },

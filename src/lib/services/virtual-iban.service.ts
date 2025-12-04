@@ -748,7 +748,7 @@ class VirtualIbanService {
    * Returns CREDIT transactions that are:
    * - Not linked to an Order (orderId = null)
    * - Not linked to a PayIn (payInId = null)  
-   * - Not linked to a TopUpRequest (topUpRequestId = null)
+   * - Not linked to a TopUpRequest (topUpRequest = null)
    * - Completed
    * 
    * These are "orphan" payments that need manual investigation
@@ -758,7 +758,7 @@ class VirtualIbanService {
       where: {
         orderId: null,
         payInId: null,
-        topUpRequestId: null, // ← Exclude TopUp transactions
+        topUpRequest: null, // ← Relation, not topUpRequestId
         type: 'CREDIT',
         status: 'COMPLETED',
       },
