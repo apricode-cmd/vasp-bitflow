@@ -35,7 +35,7 @@ async function getReconciliationReports(params: {
   const [reports, total] = await Promise.all([
     prisma.virtualIbanReconciliationReport.findMany({
       where,
-      orderBy: { reportDate: 'desc' },
+      orderBy: { createdAt: 'desc' },
       take: limit,
       skip: (page - 1) * limit,
     }),
