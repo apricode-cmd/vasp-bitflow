@@ -54,7 +54,7 @@ export default async function WalletsPage(): Promise<React.ReactElement> {
   }, {} as Record<string, typeof userWallets>);
 
   return (
-    <div className="space-y-6 animate-in max-w-5xl mx-auto">
+    <div className="space-y-6 animate-in">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

@@ -227,24 +227,43 @@ class IntegrationFactory {
     
     // Decrypt API key if it exists
     let decryptedApiKey: string | undefined;
+    let decryptedCredentials: Record<string, any> = {};
+    
     if (integration.apiKey) {
       try {
-        decryptedApiKey = decrypt(integration.apiKey);
+        const decrypted = decrypt(integration.apiKey);
+        
+        // Try to parse as JSON (for BCB and similar integrations)
+        try {
+          decryptedCredentials = JSON.parse(decrypted);
+          console.log(`🔓 Decrypted JSON credentials for ${integration.service}:`, {
+            ...Object.fromEntries(
+              Object.entries(decryptedCredentials).map(([k, v]) => 
+                [k, k.toLowerCase().includes('secret') ? '***' : v]
+              )
+            )
+          });
+        } catch {
+          // Simple string API key
+          decryptedApiKey = decrypted;
+        }
       } catch (error) {
         console.error(`Failed to decrypt API key for ${integration.service}:`, error);
       }
     }
     
-    // ✅ Build config with explicit webhookSecret mapping
+    // ✅ Build config with decrypted credentials merged
     const config: BaseIntegrationConfig = {
       ...Object.fromEntries(
         Object.entries(integrationConfig).filter(([key]) => key !== 'apiKey')
       ),
+      ...decryptedCredentials, // ✅ Merge decrypted credentials (clientId, clientSecret, etc.)
       apiKey: decryptedApiKey || undefined,
       apiEndpoint: integration.apiEndpoint || undefined,
-      webhookSecret: integrationConfig.webhookSecret || undefined, // ✅ Explicit
+      webhookSecret: integrationConfig.webhookSecret || undefined,
       metadata: {
         ...integrationConfig,
+        ...decryptedCredentials,
         // Don't include masked apiKey in metadata
         apiKey: undefined
       }

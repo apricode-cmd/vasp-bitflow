@@ -97,7 +97,7 @@ export default function PaymentDetailsPage(): JSX.Element {
 
   if (loading) {
     return (
-      <div className="container max-w-6xl py-8 space-y-6">
+      <div className="py-8 space-y-6">
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-64 w-full" />
       </div>
@@ -106,7 +106,7 @@ export default function PaymentDetailsPage(): JSX.Element {
 
   if (!selectedAccount) {
     return (
-      <div className="container max-w-6xl py-8">
+      <div className="py-8">
         <Card>
           <CardContent className="py-12 text-center">
             <Landmark className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
@@ -121,7 +121,7 @@ export default function PaymentDetailsPage(): JSX.Element {
   }
 
   return (
-    <div className="container max-w-6xl py-8 space-y-6">
+    <div className="py-8 space-y-6">
       {/* Page Header */}
       <div>
         <h1 className="text-3xl font-bold flex items-center gap-2">

@@ -116,7 +116,8 @@ class TopUpRequestService {
       throw new Error('Virtual IBAN account not found or not active');
     }
 
-    // 2. Check for existing pending request (optional: allow multiple)
+    // 2. Check for existing pending request
+    // For better UX: inform user about existing request before creating new one
     const existingPending = await prisma.topUpRequest.findFirst({
       where: {
         userId,
@@ -124,15 +125,16 @@ class TopUpRequestService {
         status: 'PENDING',
         expiresAt: { gt: new Date() }, // Not expired
       },
+      orderBy: { createdAt: 'desc' },
     });
 
     if (existingPending) {
-      // Return existing pending request instead of creating new one
+      // Throw error with existing request details so UI can handle it
       console.log('[TopUpRequest] User already has pending request:', existingPending.reference);
-      return {
-        ...existingPending,
-        virtualIban,
-      };
+      const error = new Error('EXISTING_PENDING_REQUEST') as any;
+      error.code = 'EXISTING_PENDING_REQUEST';
+      error.existingRequest = existingPending;
+      throw error;
     }
 
     // 3. Generate unique reference

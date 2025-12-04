@@ -36,20 +36,43 @@ export async function GET(): Promise<NextResponse> {
       orderBy: { updatedAt: 'desc' }
     });
 
+    // Get integration settings (contains configs for some integrations)
+    const dbSettings = await prisma.integrationSetting.findMany();
+
     // Merge registry data with database data
     const integrations = registeredProviders.map(provider => {
       const dbConfig = dbIntegrations.find(db => db.service === provider.providerId);
+      const dbSetting = dbSettings.find(s => s.service === provider.providerId);
 
       // Mask API key for display
       let maskedApiKey = null;
+      let decryptedCredentials: Record<string, any> = {};
+      
       if (dbConfig?.apiKey) {
         try {
           const decrypted = decrypt(dbConfig.apiKey);
-          maskedApiKey = maskApiKey(decrypted);
+          
+          // Try to parse as JSON (for BCB and similar integrations)
+          try {
+            decryptedCredentials = JSON.parse(decrypted);
+            // For JSON credentials, don't mask - we'll show individual fields
+          } catch {
+            // Simple string API key - mask it
+            maskedApiKey = maskApiKey(decrypted);
+          }
         } catch (error) {
           console.error('Failed to decrypt API key:', error);
         }
       }
+
+      // Merge config from both tables
+      let mergedConfig = dbConfig?.config || {};
+      if (dbSetting?.config) {
+        mergedConfig = { ...mergedConfig, ...(dbSetting.config as object) };
+      }
+      
+      // Add decrypted credentials to config (for form display)
+      mergedConfig = { ...mergedConfig, ...decryptedCredentials };
 
       return {
         service: provider.providerId,
@@ -57,12 +80,12 @@ export async function GET(): Promise<NextResponse> {
         displayName: provider.displayName,
         description: provider.description,
         icon: provider.icon,
-        isEnabled: dbConfig?.isEnabled ?? false,
-        status: dbConfig?.status ?? 'inactive',
+        isEnabled: dbConfig?.isEnabled ?? dbSetting?.isEnabled ?? false,
+        status: dbConfig?.status ?? dbSetting?.status ?? 'inactive',
         apiKey: maskedApiKey,
         apiEndpoint: dbConfig?.apiEndpoint,
-        lastTested: dbConfig?.lastTested,
-        config: dbConfig?.config,
+        lastTested: dbConfig?.lastTested ?? dbSetting?.lastTested,
+        config: mergedConfig,
         rates: dbConfig?.rates
       };
     });

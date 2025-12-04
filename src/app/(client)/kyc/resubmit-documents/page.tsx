@@ -360,7 +360,7 @@ export default function ResubmitDocumentsPage() {
   // Loading state
   if (loading || sessionStatus === 'loading') {
     return (
-      <div className="container mx-auto p-6 max-w-4xl space-y-6">
+      <div className="p-6 space-y-6">
         <Skeleton className="h-12 w-3/4" />
         <Card>
           <CardHeader>
@@ -380,7 +380,7 @@ export default function ResubmitDocumentsPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl space-y-6">
+    <div className="p-6 space-y-6">
       {/* Header */}
       <div className="space-y-2">
         <Button

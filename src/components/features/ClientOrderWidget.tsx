@@ -484,11 +484,9 @@ export function ClientOrderWidget() {
     description: fiat.symbol
   })) || [];
 
-  // Base payment options (without VIRTUAL_IBAN - added dynamically later)
-  const basePaymentOptions = config?.paymentMethods
+  // Payment options from database (filtered by direction)
+  const paymentOptions = config?.paymentMethods
     .filter(method => {
-      // Filter out VIRTUAL_IBAN from config (we'll add it conditionally)
-      if (method.code === 'VIRTUAL_IBAN') return false;
       // Only show IN or BOTH methods for buying
       const direction = ['IN', 'BOTH'];
       return method.direction && direction.includes(method.direction);
@@ -871,26 +869,7 @@ export function ClientOrderWidget() {
           <div className="space-y-2">
             <Label>Payment Method *</Label>
             <Combobox
-              options={(() => {
-                // Dynamically add VIRTUAL_IBAN if balance is sufficient
-                const methods = [...basePaymentOptions];
-                const totalFiatNum = calculation?.totalFiat || 0;
-                
-                if (
-                  hasVirtualIban && 
-                  virtualIbanBalance !== null && 
-                  virtualIbanBalance >= totalFiatNum && 
-                  totalFiatNum > 0
-                ) {
-                  methods.unshift({
-                    value: 'VIRTUAL_IBAN',
-                    label: '💳 Pay from Balance',
-                    description: `€${virtualIbanBalance.toFixed(2)} available - Instant payment`
-                  });
-                }
-                
-                return methods;
-              })()}
+              options={paymentOptions}
               value={selectedPaymentMethod}
               onValueChange={(value) => {
                 setSelectedPaymentMethod(value);

@@ -76,7 +76,7 @@ export default function BuyPage(): React.ReactElement {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto space-y-6 animate-in">
+      <div className="space-y-6 animate-in">
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-96 w-full" />
       </div>
@@ -84,7 +84,7 @@ export default function BuyPage(): React.ReactElement {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-5 animate-in">
+    <div className="space-y-5 animate-in">
       {/* Compact Header */}
       <div className="flex items-center justify-between">
         <div>

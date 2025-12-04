@@ -227,6 +227,15 @@ export class VirtualIbanBalanceService {
             paymentReference: true,
           },
         },
+        topUpRequest: {
+          select: {
+            id: true,
+            reference: true,
+            invoiceNumber: true,
+            amount: true,
+            status: true,
+          },
+        },
       },
     });
   }

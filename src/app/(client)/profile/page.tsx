@@ -179,7 +179,7 @@ export default function ProfilePage(): React.ReactElement {
   const userInitials = `${user.profile?.firstName?.charAt(0) || ''}${user.profile?.lastName?.charAt(0) || ''}`.toUpperCase();
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-in">
+    <div className="space-y-6 animate-in">
       {/* Header with Avatar */}
       <div className="flex items-center gap-6">
         <Avatar className="h-24 w-24 border-4 border-primary/20">

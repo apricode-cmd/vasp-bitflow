@@ -82,6 +82,20 @@ export async function POST(
     console.error('[API] TopUp request creation failed:', error);
     
     const message = error instanceof Error ? error.message : 'Unknown error';
+    const errorCode = (error as any)?.code;
+    
+    // Handle existing pending request
+    if (errorCode === 'EXISTING_PENDING_REQUEST') {
+      return NextResponse.json(
+        { 
+          error: 'You already have a pending top-up request',
+          code: 'EXISTING_PENDING_REQUEST',
+          existingRequest: (error as any).existingRequest,
+          message: 'Please complete or cancel your existing request before creating a new one.'
+        },
+        { status: 409 } // Conflict
+      );
+    }
     
     // Handle specific errors
     if (message.includes('not found') || message.includes('not active')) {

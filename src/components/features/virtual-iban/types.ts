@@ -24,12 +24,47 @@ export interface VirtualIbanTransaction {
   status: string;
   amount: number;
   currencyCode: string;
+  currency?: string;
   reference?: string;
   senderName?: string;
   senderAccount?: string;
+  senderIban?: string;
   description?: string;
   processedAt: string;
   orderId?: string;
+  order?: {
+    id: string;
+    status: string;
+    paymentReference?: string;
+  } | null;
+  topUpRequest?: {
+    id: string;
+    reference: string;
+    invoiceNumber?: string | null;
+    amount: number;
+    status: string;
+  } | null;
+}
+
+export type TopUpRequestStatus = 'PENDING' | 'COMPLETED' | 'EXPIRED' | 'CANCELLED';
+
+export interface TopUpRequest {
+  id: string;
+  reference: string;
+  invoiceNumber: string | null;
+  amount: number;
+  currency: string;
+  status: TopUpRequestStatus;
+  expiresAt: string;
+  completedAt: string | null;
+  cancelledAt: string | null;
+  createdAt: string;
+  transaction?: {
+    id: string;
+    amount: number;
+    status: string;
+    processedAt: string | null;
+  } | null;
 }
 
 export interface UserData {

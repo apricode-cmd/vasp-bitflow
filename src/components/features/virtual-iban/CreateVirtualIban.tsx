@@ -47,15 +47,24 @@ export function CreateVirtualIban({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-in">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-          <Landmark className="h-6 w-6 text-primary" />
-        </div>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Virtual IBAN Account</h1>
-          <p className="text-muted-foreground">Get your personal bank account for instant crypto purchases</p>
+    <div className="space-y-8 animate-in">
+      {/* Hero Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-background border border-primary/20 p-8 md:p-12">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+        
+        <div className="relative flex flex-col md:flex-row items-center gap-6">
+          <div className="h-20 w-20 rounded-2xl bg-primary/10 backdrop-blur-sm flex items-center justify-center flex-shrink-0 shadow-lg">
+            <Landmark className="h-10 w-10 text-primary" />
+          </div>
+          <div className="flex-1 text-center md:text-left">
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-3">
+              Virtual IBAN Account
+            </h1>
+            <p className="text-lg text-muted-foreground max-w-2xl">
+              Get your personal EUR bank account for instant crypto purchases
+            </p>
+          </div>
         </div>
       </div>
 
@@ -65,141 +74,210 @@ export function CreateVirtualIban({
           <AlertTriangle className="h-4 w-4 text-amber-600" />
           <AlertDescription className="text-amber-800 dark:text-amber-200">
             <span className="font-semibold">Previous attempt failed</span> — There was an issue creating your account. 
-            Please try again.
+            Please try again or contact support if the problem persists.
           </AlertDescription>
         </Alert>
       )}
 
       {/* KYC Verified Badge */}
       <Alert className="border-green-500 bg-green-50 dark:bg-green-950/20">
-        <ShieldCheck className="h-4 w-4 text-green-600" />
-        <AlertDescription className="text-green-800 dark:text-green-200">
-          <span className="font-semibold">✓ Identity Verified</span> — You are eligible to open a Virtual IBAN account.
+        <ShieldCheck className="h-5 w-5 text-green-600" />
+        <AlertDescription className="text-green-800 dark:text-green-200 flex items-center gap-2">
+          <span className="font-semibold text-base">✓ Identity Verified</span>
+          <span className="text-sm opacity-90">— You are eligible to open a Virtual IBAN account</span>
         </AlertDescription>
       </Alert>
 
-      {/* Benefits Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Why Get a Virtual IBAN?</CardTitle>
-          <CardDescription>Fast, secure, and convenient</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                <ArrowUpCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <h3 className="font-semibold">Instant Top-up</h3>
-              <p className="text-sm text-muted-foreground">
+      {/* Benefits Grid */}
+      <div className="grid md:grid-cols-3 gap-6">
+        {/* Instant Top-up */}
+        <Card className="group hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/50">
+          <CardContent className="p-6 space-y-4">
+            <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+              <ArrowUpCircle className="h-7 w-7 text-white" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold mb-2">Instant Top-up</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
                 Transfer money from any EU bank account. Automatic reconciliation via webhooks.
               </p>
             </div>
+          </CardContent>
+        </Card>
 
-            <div className="space-y-2">
-              <div className="h-10 w-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
-              </div>
-              <h3 className="font-semibold">Instant Purchases</h3>
-              <p className="text-sm text-muted-foreground">
+        {/* Instant Purchases */}
+        <Card className="group hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/50">
+          <CardContent className="p-6 space-y-4">
+            <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+              <CheckCircle2 className="h-7 w-7 text-white" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold mb-2">Instant Purchases</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
                 Buy crypto instantly using your balance. No waiting for bank transfers to clear.
               </p>
             </div>
+          </CardContent>
+        </Card>
 
-            <div className="space-y-2">
-              <div className="h-10 w-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                <Building2 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-              </div>
-              <h3 className="font-semibold">Secure Banking</h3>
-              <p className="text-sm text-muted-foreground">
+        {/* Secure Banking */}
+        <Card className="group hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/50">
+          <CardContent className="p-6 space-y-4">
+            <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+              <Building2 className="h-7 w-7 text-white" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold mb-2">Secure Banking</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
                 Powered by BCB Group - regulated banking infrastructure.
               </p>
             </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* How it works */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl">How it works:</CardTitle>
+          <CardDescription>Simple 4-step process to start using Virtual IBAN</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-2 gap-6">
+            {[
+              {
+                step: '1',
+                title: 'Review your verified data and confirm account creation',
+                color: 'from-blue-500 to-blue-600',
+              },
+              {
+                step: '2',
+                title: 'Receive your personal Virtual IBAN (instant)',
+                color: 'from-green-500 to-green-600',
+              },
+              {
+                step: '3',
+                title: 'Top up balance via bank transfer from your regular bank',
+                color: 'from-purple-500 to-purple-600',
+              },
+              {
+                step: '4',
+                title: 'Use balance to buy crypto instantly - no waiting!',
+                color: 'from-orange-500 to-orange-600',
+              },
+            ].map((item) => (
+              <div key={item.step} className="flex items-start gap-4 p-4 rounded-lg border bg-card hover:shadow-md transition-shadow">
+                <div className={`flex-shrink-0 h-10 w-10 rounded-lg bg-gradient-to-br ${item.color} text-white flex items-center justify-center text-lg font-bold shadow-md`}>
+                  {item.step}
+                </div>
+                <p className="text-sm leading-relaxed pt-1">{item.title}</p>
+              </div>
+            ))}
           </div>
 
-          <Separator />
-
-          {/* How it works */}
-          <div className="space-y-3">
-            <h3 className="font-semibold">How it works:</h3>
-            <ol className="space-y-2 text-sm text-muted-foreground">
-              <li className="flex items-start gap-2">
-                <span className="flex-shrink-0 h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">1</span>
-                <span>Review your verified data and confirm account creation</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="flex-shrink-0 h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">2</span>
-                <span>Receive your personal Virtual IBAN (instant)</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="flex-shrink-0 h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">3</span>
-                <span>Top up balance via bank transfer from your regular bank</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="flex-shrink-0 h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">4</span>
-                <span>Use balance to buy crypto instantly - no waiting!</span>
-              </li>
-            </ol>
-          </div>
-
-          <Separator />
+          <Separator className="my-6" />
 
           {/* Create Button */}
-          <div className="flex items-center justify-center pt-4">
+          <div className="flex flex-col items-center gap-4 pt-2">
             <Button
               onClick={() => setShowConfirmDialog(true)}
               disabled={creating}
               size="lg"
-              className="w-full md:w-auto px-8"
+              className="w-full md:w-auto px-12 h-14 text-lg shadow-lg hover:shadow-xl transition-all"
             >
               {creating ? (
                 <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
                   Creating Virtual IBAN...
                 </>
               ) : (
                 <>
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Plus className="h-5 w-5 mr-2" />
                   Get My Virtual IBAN
                 </>
               )}
             </Button>
-          </div>
 
-          <p className="text-xs text-center text-muted-foreground">
-            Free to create • No monthly fees • Instant activation
-          </p>
+            <div className="flex items-center gap-6 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                Free to create
+              </span>
+              <span className="flex items-center gap-1">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                No monthly fees
+              </span>
+              <span className="flex items-center gap-1">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                Instant activation
+              </span>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
       {/* FAQ */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Frequently Asked Questions</CardTitle>
+          <CardTitle className="text-2xl">Frequently Asked Questions</CardTitle>
+          <CardDescription>Everything you need to know about Virtual IBAN</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <h4 className="font-semibold text-sm">Is it safe?</h4>
-            <p className="text-sm text-muted-foreground">
-              Yes! Virtual IBAN is provided by BCB Group, a regulated payment institution. 
-              Your funds are segregated and protected.
-            </p>
-          </div>
-          <Separator />
-          <div className="space-y-2">
-            <h4 className="font-semibold text-sm">Are there any fees?</h4>
-            <p className="text-sm text-muted-foreground">
-              No! Creating and maintaining Virtual IBAN is completely free. 
-              Using your balance for purchases has 0% fees.
-            </p>
-          </div>
-          <Separator />
-          <div className="space-y-2">
-            <h4 className="font-semibold text-sm">How long does top-up take?</h4>
-            <p className="text-sm text-muted-foreground">
-              SEPA transfers typically arrive within 1 business day. 
-              Your balance will update automatically when payment is received.
-            </p>
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
+            <div className="p-4 rounded-lg bg-muted/50 border hover:bg-muted transition-colors">
+              <h4 className="font-semibold text-base mb-2 flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-primary" />
+                Is it safe?
+              </h4>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Yes! Virtual IBAN is provided by <strong>BCB Group</strong>, a regulated payment institution. 
+                Your funds are segregated and protected under European banking regulations.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-lg bg-muted/50 border hover:bg-muted transition-colors">
+              <h4 className="font-semibold text-base mb-2 flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-primary" />
+                Are there any fees?
+              </h4>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                <strong>No!</strong> Creating and maintaining Virtual IBAN is completely free. 
+                Using your balance for purchases has 0% fees. Only standard SEPA transfer fees from your bank apply.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-lg bg-muted/50 border hover:bg-muted transition-colors">
+              <h4 className="font-semibold text-base mb-2 flex items-center gap-2">
+                <ArrowUpCircle className="h-5 w-5 text-primary" />
+                How long does top-up take?
+              </h4>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                SEPA transfers typically arrive within <strong>1 business day</strong>. 
+                Your balance will update automatically when payment is received via webhook.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-lg bg-muted/50 border hover:bg-muted transition-colors">
+              <h4 className="font-semibold text-base mb-2 flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-primary" />
+                Can I use it from any EU country?
+              </h4>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Yes! Virtual IBAN accepts SEPA transfers from any bank in the EU/EEA. 
+                The account is denominated in <strong>EUR</strong>.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-lg bg-muted/50 border hover:bg-muted transition-colors">
+              <h4 className="font-semibold text-base mb-2 flex items-center gap-2">
+                <Landmark className="h-5 w-5 text-primary" />
+                What can I do with the balance?
+              </h4>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Use your balance to <strong>buy cryptocurrency instantly</strong> without waiting for bank transfers. 
+                You can also withdraw funds back to your personal bank account.
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>

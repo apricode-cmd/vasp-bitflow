@@ -12,7 +12,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
-import type { VirtualIbanAccount, VirtualIbanTransaction, EligibilityData } from './types';
+import type { VirtualIbanAccount, VirtualIbanTransaction, EligibilityData, TopUpRequest } from './types';
 
 // Polling interval: 30 seconds for balance updates
 const BALANCE_POLL_INTERVAL = 30 * 1000;
@@ -24,6 +24,7 @@ interface UseVirtualIbanReturn {
   refreshing: boolean;
   account: VirtualIbanAccount | null;
   transactions: VirtualIbanTransaction[];
+  topUpRequests: TopUpRequest[];
   eligibility: EligibilityData | null;
   
   // Actions
@@ -39,6 +40,7 @@ export function useVirtualIban(): UseVirtualIbanReturn {
   const [refreshing, setRefreshing] = useState(false);
   const [account, setAccount] = useState<VirtualIbanAccount | null>(null);
   const [transactions, setTransactions] = useState<VirtualIbanTransaction[]>([]);
+  const [topUpRequests, setTopUpRequests] = useState<TopUpRequest[]>([]);
   const [eligibility, setEligibility] = useState<EligibilityData | null>(null);
 
   // useRef for tracking balance changes
@@ -55,15 +57,26 @@ export function useVirtualIban(): UseVirtualIbanReturn {
         if (data.existingAccount) {
           setAccount(data.existingAccount);
           
-          // Fetch transactions
+          // Fetch transactions and top-up requests in parallel
           try {
-            const txResponse = await fetch(`/api/client/virtual-iban/${data.existingAccount.id}/transactions`);
-            const txData = await txResponse.json();
+            const [txResponse, topUpResponse] = await Promise.all([
+              fetch(`/api/client/virtual-iban/${data.existingAccount.id}/transactions`),
+              fetch(`/api/client/virtual-iban/${data.existingAccount.id}/topup`),
+            ]);
+            
+            const [txData, topUpData] = await Promise.all([
+              txResponse.json(),
+              topUpResponse.json(),
+            ]);
+            
             if (txData.success) {
               setTransactions(txData.data || []);
             }
+            if (topUpData.success) {
+              setTopUpRequests(topUpData.data || []);
+            }
           } catch {
-            console.error('Failed to fetch transactions');
+            console.error('Failed to fetch transactions/top-up requests');
           }
         }
       }
@@ -147,12 +160,23 @@ export function useVirtualIban(): UseVirtualIbanReturn {
         setAccount(newAccount);
         setEligibility(data);
 
-        // Refresh transactions
+        // Refresh transactions and top-up requests
         try {
-          const txResponse = await fetch(`/api/client/virtual-iban/${newAccount.id}/transactions`);
-          const txData = await txResponse.json();
+          const [txResponse, topUpResponse] = await Promise.all([
+            fetch(`/api/client/virtual-iban/${newAccount.id}/transactions`),
+            fetch(`/api/client/virtual-iban/${newAccount.id}/topup`),
+          ]);
+          
+          const [txData, topUpData] = await Promise.all([
+            txResponse.json(),
+            topUpResponse.json(),
+          ]);
+          
           if (txData.success) {
             setTransactions(txData.data || []);
+          }
+          if (topUpData.success) {
+            setTopUpRequests(topUpData.data || []);
           }
         } catch {
           // Silent fail for transactions
@@ -200,6 +224,7 @@ export function useVirtualIban(): UseVirtualIbanReturn {
     refreshing,
     account,
     transactions,
+    topUpRequests,
     eligibility,
     checkEligibility,
     createAccount,

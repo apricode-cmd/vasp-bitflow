@@ -1,7 +1,10 @@
 /**
- * Script to add VIRTUAL_IBAN payment method to database
+ * Add Virtual IBAN Balance Payment Method
  * 
- * Run with: npx ts-node scripts/add-virtual-iban-payment-method.ts
+ * Создает метод оплаты для использования баланса Virtual IBAN
+ * 
+ * Usage:
+ * npx tsx scripts/add-virtual-iban-payment-method.ts
  */
 
 import { PrismaClient } from '@prisma/client';
@@ -9,17 +12,17 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🔄 Adding VIRTUAL_IBAN payment method...\n');
+  console.log('🔄 Adding Virtual IBAN Balance payment method...\n');
 
   try {
     const paymentMethod = await prisma.paymentMethod.upsert({
       where: {
-        code: 'VIRTUAL_IBAN',
+        code: 'virtual_iban_balance',
       },
       update: {
         name: 'Virtual IBAN Balance',
-        description: 'Pay instantly using your Virtual IBAN balance',
-        type: 'VIRTUAL_IBAN',
+        description: 'Pay instantly using your Virtual IBAN account balance',
+        type: 'balance',
         direction: 'IN',
         providerType: 'PSP',
         automationLevel: 'FULLY_AUTO',
@@ -29,18 +32,24 @@ async function main() {
         maxAmount: 999999.00,
         feeFixed: 0.00,
         feePercent: 0.00,
-        processingTime: 'instant',
-        instructions: 'Your Virtual IBAN balance will be deducted immediately after order confirmation.',
+        processingTime: 'Instant',
+        instructions: 'Your Virtual IBAN balance will be used for this purchase. The payment is instant and has no fees.',
+        iconUrl: null,
         priority: 1,
+        config: {
+          type: 'virtual_iban_balance',
+          instantPayment: true,
+          noFees: true,
+        },
         isActive: true,
         isAvailableForClients: true,
         updatedAt: new Date(),
       },
       create: {
-        code: 'VIRTUAL_IBAN',
+        code: 'virtual_iban_balance',
         name: 'Virtual IBAN Balance',
-        description: 'Pay instantly using your Virtual IBAN balance',
-        type: 'VIRTUAL_IBAN',
+        description: 'Pay instantly using your Virtual IBAN account balance',
+        type: 'balance',
         direction: 'IN',
         providerType: 'PSP',
         automationLevel: 'FULLY_AUTO',
@@ -50,32 +59,49 @@ async function main() {
         maxAmount: 999999.00,
         feeFixed: 0.00,
         feePercent: 0.00,
-        processingTime: 'instant',
-        instructions: 'Your Virtual IBAN balance will be deducted immediately after order confirmation.',
+        processingTime: 'Instant',
+        instructions: 'Your Virtual IBAN balance will be used for this purchase. The payment is instant and has no fees.',
+        iconUrl: null,
         priority: 1,
+        config: {
+          type: 'virtual_iban_balance',
+          instantPayment: true,
+          noFees: true,
+        },
         isActive: true,
         isAvailableForClients: true,
       },
     });
 
-    console.log('✅ VIRTUAL_IBAN payment method added successfully!');
-    console.log('\nDetails:');
-    console.log(`  Code: ${paymentMethod.code}`);
-    console.log(`  Name: ${paymentMethod.name}`);
-    console.log(`  Type: ${paymentMethod.type}`);
-    console.log(`  Currency: ${paymentMethod.currency}`);
-    console.log(`  Processing: ${paymentMethod.processingTime}`);
-    console.log(`  Fee: ${paymentMethod.feePercent}%`);
-    console.log(`  Min: €${paymentMethod.minAmount}`);
-    console.log(`  Max: €${paymentMethod.maxAmount}`);
-    console.log('');
+    console.log('✅ Virtual IBAN Balance payment method created/updated:');
+    console.log('   Code:', paymentMethod.code);
+    console.log('   Name:', paymentMethod.name);
+    console.log('   Type:', paymentMethod.type);
+    console.log('   Currency:', paymentMethod.currency);
+    console.log('   Direction:', paymentMethod.direction);
+    console.log('   Provider Type:', paymentMethod.providerType);
+    console.log('   Automation Level:', paymentMethod.automationLevel);
+    console.log('   Fee:', `${paymentMethod.feeFixed}€ + ${paymentMethod.feePercent}%`);
+    console.log('   Active:', paymentMethod.isActive);
+    console.log('   Available for Clients:', paymentMethod.isAvailableForClients);
+
+    console.log('\n💡 Payment method features:');
+    console.log('   ✓ Instant payment (no waiting)');
+    console.log('   ✓ Zero fees');
+    console.log('   ✓ Fully automated');
+    console.log('   ✓ EUR only');
+
   } catch (error) {
-    console.error('❌ Failed to add VIRTUAL_IBAN payment method:', error);
+    console.error('❌ Error:', error);
     process.exit(1);
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
-main();
-
+main()
+  .catch((error) => {
+    console.error('Fatal error:', error);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

@@ -653,7 +653,7 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
             status: details.status,
           });
           
-          return this.mapClientApiAccountToVirtualIban(virtualAccount, request.userId);
+          return this.mapClientApiAccountToVirtualIban(virtualAccount, request.userId, request.country);
         }
         
         console.log('[BCB] Account found but not ready yet:', {
@@ -673,7 +673,7 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
         status: finalAccount.virtualAccountDetails?.status,
       });
       
-      return this.mapClientApiAccountToVirtualIban(finalAccount, request.userId);
+      return this.mapClientApiAccountToVirtualIban(finalAccount, request.userId, request.country);
     }
 
     // Fallback - return pending status with correlation ID for later sync
@@ -730,7 +730,7 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
    * Sync pending account - fetch latest status from BCB
    * Called for accounts that were created but IBAN wasn't ready yet
    */
-  async syncPendingAccount(correlationId: string, userId: string): Promise<VirtualIbanAccount | null> {
+  async syncPendingAccount(correlationId: string, userId: string, country?: string): Promise<VirtualIbanAccount | null> {
     console.log('[BCB] Syncing pending account:', correlationId);
 
     // Ensure we have segregated account ID
@@ -753,7 +753,7 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
         status: details.status,
       });
       
-      return this.mapClientApiAccountToVirtualIban(virtualAccount, userId);
+      return this.mapClientApiAccountToVirtualIban(virtualAccount, userId, country);
     }
 
     console.log('[BCB] Account still pending:', {
@@ -954,7 +954,8 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
    */
   private mapClientApiAccountToVirtualIban(
     virtualAccount: BCBVirtualAccountData,
-    userId: string
+    userId: string,
+    country?: string
   ): VirtualIbanAccount {
     const details = virtualAccount.virtualAccountDetails;
     const owner = virtualAccount.ownerDetails;
@@ -965,6 +966,17 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
     else if (details.status === 'CLOSED') status = 'closed';
     else if (details.status === 'PENDING') status = 'pending';
     
+    // Extract country from IBAN (country where the account is physically located)
+    // BCB assigns IBANs from their pool, so IBAN country may differ from user's country
+    let accountCountry = '';
+    if (details.iban) {
+      // IBAN first 2 letters are country code (e.g., DK for Denmark)
+      accountCountry = details.iban.substring(0, 2);
+    } else if (country) {
+      // Fallback to provided country if IBAN not yet available
+      accountCountry = country;
+    }
+    
     return {
       accountId: details.id,
       userId,
@@ -973,7 +985,7 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
       bankName: 'BCB Partner Bank',
       accountHolder: owner.name,
       currency: 'EUR', // Client API is for EUR accounts
-      country: '', // Not returned by Client API
+      country: accountCountry,
       status,
       balance: undefined,
       createdAt: new Date(),

@@ -168,10 +168,18 @@ export async function GET(req: NextRequest) {
 
     // Check existing Virtual IBAN (exclude FAILED and CLOSED accounts)
     const existingAccounts = await virtualIbanService.getUserAccounts(userId);
-    const activeAccount = existingAccounts.find(acc => 
+    let activeAccount = existingAccounts.find(acc => 
       acc.status !== 'FAILED' && acc.status !== 'CLOSED'
     );
     const hasFailedAccount = existingAccounts.some(acc => acc.status === 'FAILED');
+    
+    // Update lastBalanceUpdate for active account (to show refresh time)
+    if (activeAccount) {
+      activeAccount = await prisma.virtualIbanAccount.update({
+        where: { id: activeAccount.id },
+        data: { lastBalanceUpdate: new Date() },
+      });
+    }
     
     // Build eligibility response
     const kycApproved = user.kycSession?.status === 'APPROVED';

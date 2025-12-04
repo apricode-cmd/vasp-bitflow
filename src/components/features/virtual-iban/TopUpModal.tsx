@@ -51,6 +51,12 @@ interface TopUpRequest {
   expiresAt: string;
 }
 
+interface ExistingRequestError {
+  code: 'EXISTING_PENDING_REQUEST';
+  existingRequest: TopUpRequest;
+  message: string;
+}
+
 interface TopUpModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -80,6 +86,8 @@ export function TopUpModal({ open, onOpenChange, account }: TopUpModalProps): JS
   const handleCreateRequest = async (): Promise<void> => {
     setLoading(true);
     try {
+      console.log('[TopUpModal] Creating request with amount:', parsedAmount);
+      
       const response = await fetch(`/api/client/virtual-iban/${account.id}/topup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -92,6 +100,7 @@ export function TopUpModal({ open, onOpenChange, account }: TopUpModalProps): JS
         throw new Error(data.error || 'Failed to create top-up request');
       }
 
+      console.log('[TopUpModal] Request created:', data.data);
       setTopUpRequest(data.data);
       setStep('confirm');
       toast.success('Top-up request created!');
@@ -198,27 +207,43 @@ export function TopUpModal({ open, onOpenChange, account }: TopUpModalProps): JS
                     type="number"
                     placeholder="0.00"
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      console.log('[TopUpModal] Input changed:', newValue);
+                      setAmount(newValue);
+                    }}
                     className="pl-8 text-2xl h-14 font-mono"
                     min={10}
                     max={100000}
                     step={0.01}
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Minimum: €10 • Maximum: €100,000
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    Minimum: €10 • Maximum: €100,000
+                  </p>
+                  {parsedAmount > 0 && (
+                    <p className="text-sm font-medium text-primary">
+                      You will deposit: {formatCurrency(parsedAmount)}
+                    </p>
+                  )}
+                </div>
               </div>
 
               {/* Quick amounts */}
               <div className="flex flex-wrap gap-2">
+                <p className="w-full text-xs text-muted-foreground mb-1">Quick amounts:</p>
                 {[100, 500, 1000, 5000].map((preset) => (
                   <Button
                     key={preset}
+                    type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => setAmount(preset.toString())}
-                    className={amount === preset.toString() ? 'border-primary' : ''}
+                    onClick={() => {
+                      console.log('[TopUpModal] Quick amount clicked:', preset);
+                      setAmount(preset.toString());
+                    }}
+                    className={amount === preset.toString() ? 'border-primary bg-primary/10' : ''}
                   >
                     €{preset.toLocaleString()}
                   </Button>
@@ -234,6 +259,18 @@ export function TopUpModal({ open, onOpenChange, account }: TopUpModalProps): JS
                   </span>
                 </AlertDescription>
               </Alert>
+              
+              {/* Preview after deposit */}
+              {parsedAmount > 0 && (
+                <Alert className="border-green-300 bg-green-50 dark:bg-green-950">
+                  <AlertDescription className="flex justify-between items-center">
+                    <span className="text-green-700 dark:text-green-400">Balance after deposit:</span>
+                    <span className="font-bold text-lg text-green-700 dark:text-green-400">
+                      {formatCurrency((account.balance || 0) + parsedAmount)}
+                    </span>
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
 
             <DialogFooter>

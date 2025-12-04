@@ -26,6 +26,7 @@ export default function VirtualIbanPage(): JSX.Element {
     refreshing,
     account,
     transactions,
+    topUpRequests,
     eligibility,
     createAccount,
     refresh,
@@ -34,7 +35,7 @@ export default function VirtualIbanPage(): JSX.Element {
   // Loading state
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto space-y-6 animate-in">
+      <div className="space-y-6 animate-in">
         <Skeleton className="h-12 w-64" />
         <Skeleton className="h-64 w-full" />
         <Skeleton className="h-96 w-full" />
@@ -64,6 +65,7 @@ export default function VirtualIbanPage(): JSX.Element {
     <VirtualIbanDetails
       account={account}
       transactions={transactions}
+      topUpRequests={topUpRequests}
       refreshing={refreshing}
       onRefresh={refresh}
     />

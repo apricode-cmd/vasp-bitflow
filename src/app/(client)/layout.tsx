@@ -23,7 +23,7 @@ export default function ClientLayout({
       </div>
 
       <ClientHeader />
-      <main className="flex-1 container mx-auto px-4 py-8 max-w-7xl">
+      <main className="flex-1 container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-7xl">
         {children}
       </main>
       <ClientFooter />
