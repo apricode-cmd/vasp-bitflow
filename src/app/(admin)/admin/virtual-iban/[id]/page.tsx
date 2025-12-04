@@ -206,7 +206,9 @@ export default function VirtualIbanDetailsPage({ params }: PageProps): JSX.Eleme
         <TabsContent value="transactions">
           <TransactionsTab 
             transactions={transactions} 
-            accountCurrency={account.currency} 
+            accountCurrency={account.currency}
+            userId={account.userId}
+            onRefresh={fetchAccountDetails}
           />
         </TabsContent>
 

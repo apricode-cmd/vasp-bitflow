@@ -6,6 +6,7 @@
 
 'use client';
 
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,6 +21,7 @@ import {
 import { formatDateTime, formatCurrency } from '@/lib/formatters';
 import { ArrowDownToLine, ArrowUpFromLine, Link2, ExternalLink, Wallet } from 'lucide-react';
 import Link from 'next/link';
+import { ManualReconcileDialog } from './ManualReconcileDialog';
 
 interface Transaction {
   id: string;
@@ -50,12 +52,29 @@ interface Transaction {
 interface TransactionsTabProps {
   transactions: Transaction[];
   accountCurrency: string;
+  userId: string; // User ID for manual reconciliation
+  onRefresh: () => void; // Callback to refresh data after reconciliation
 }
 
 export function TransactionsTab({ 
   transactions, 
-  accountCurrency 
+  accountCurrency,
+  userId,
+  onRefresh,
 }: TransactionsTabProps): JSX.Element {
+  const [reconcileDialogOpen, setReconcileDialogOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+
+  const handleOpenReconcileDialog = (tx: Transaction): void => {
+    setSelectedTransaction(tx);
+    setReconcileDialogOpen(true);
+  };
+
+  const handleReconciled = (): void => {
+    setReconcileDialogOpen(false);
+    setSelectedTransaction(null);
+    onRefresh(); // Refresh transactions list
+  };
   if (transactions.length === 0) {
     return (
       <Card>
@@ -157,13 +176,24 @@ export function TransactionsTab({
                     {formatDateTime(tx.processedAt || tx.createdAt)}
                   </TableCell>
                   <TableCell className="text-right">
-                    {tx.orderId && (
-                      <Link href={`/admin/orders/${tx.orderId}`}>
-                        <Button variant="ghost" size="sm">
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                    )}
+                    {isReconciled ? (
+                      tx.orderId && (
+                        <Link href={`/admin/orders/${tx.orderId}`}>
+                          <Button variant="ghost" size="sm">
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                      )
+                    ) : tx.type === 'CREDIT' && tx.status === 'COMPLETED' && !isTopUp ? (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleOpenReconcileDialog(tx)}
+                      >
+                        <Link2 className="h-4 w-4 mr-1" />
+                        Reconcile
+                      </Button>
+                    ) : null}
                   </TableCell>
                 </TableRow>
               );
@@ -172,6 +202,21 @@ export function TransactionsTab({
         </Table>
       </CardContent>
     </Card>
+
+    {/* Manual Reconcile Dialog */}
+    {selectedTransaction && (
+      <ManualReconcileDialog
+        isOpen={reconcileDialogOpen}
+        onClose={() => {
+          setReconcileDialogOpen(false);
+          setSelectedTransaction(null);
+        }}
+        transaction={selectedTransaction}
+        userId={userId}
+        onReconciled={handleReconciled}
+      />
+    )}
+  </>
   );
 }
 
