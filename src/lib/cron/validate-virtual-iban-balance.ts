@@ -9,6 +9,7 @@
 
 import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
 import { virtualIbanAuditService } from '@/lib/services/virtual-iban-audit.service';
+import { virtualIbanAlertService } from '@/lib/services/virtual-iban-alert.service';
 import { prisma } from '@/lib/prisma';
 
 export async function validateVirtualIbanBalance() {
@@ -155,7 +156,14 @@ export async function validateVirtualIbanBalance() {
         accountBreakdown
       );
 
-      // TODO: Send emergency alert to admins
+      // Send emergency alert to admins
+      await virtualIbanAlertService.alertBalanceMismatch({
+        segregatedAccountId,
+        bcbBalance: bcbTotal,
+        localBalance: localTotal,
+        difference: bcbTotal - localTotal,
+      });
+
       console.error('⚠️  ALERT: Manual reconciliation required!');
       console.error('Account breakdown:', accountBreakdown);
 
@@ -185,6 +193,13 @@ export async function validateVirtualIbanBalance() {
 
   } catch (error) {
     console.error('[Cron] ❌ Balance validation failed:', error);
+
+    // Send alert for cron failure
+    await virtualIbanAlertService.alertReconciliationFailed({
+      segregatedAccountId: 'unknown',
+      reason: 'Balance validation cron failed',
+      error: error instanceof Error ? error.message : String(error),
+    });
 
     // Log critical error
     await virtualIbanAuditService.log({

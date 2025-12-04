@@ -458,6 +458,32 @@ export default function VirtualIbanPage(): JSX.Element {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Actions Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Shield className="h-4 w-4 mr-2" />
+                Actions
+                <MoreHorizontal className="h-4 w-4 ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={handleManualSync} disabled={syncing}>
+                <Database className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? 'Syncing Payments...' : 'Sync Payments'}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleManualValidation} disabled={validating}>
+                <Shield className={`h-4 w-4 mr-2 ${validating ? 'animate-pulse' : ''}`} />
+                {validating ? 'Validating...' : 'Validate Balance'}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => fetchAccounts()} disabled={refreshing}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh Data
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Quick Links */}
           <Link href="/admin/virtual-iban/audit-logs">
             <Button variant="outline" size="sm">
               <Activity className="h-4 w-4 mr-2" />
@@ -470,30 +496,15 @@ export default function VirtualIbanPage(): JSX.Element {
               Reconciliation
             </Button>
           </Link>
-          <Button 
-            onClick={handleManualSync} 
-            variant="outline" 
-            disabled={syncing}
-          >
-            <Database className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? 'Syncing...' : 'Sync Payments'}
-          </Button>
-          <Button 
-            onClick={handleManualValidation} 
-            variant="outline" 
-            disabled={validating}
-          >
-            <Shield className={`h-4 w-4 mr-2 ${validating ? 'animate-pulse' : ''}`} />
-            {validating ? 'Validating...' : 'Validate Balance'}
-          </Button>
-          <Button onClick={() => fetchAccounts()} variant="outline" disabled={refreshing}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
           <Link href="/admin/virtual-iban/unreconciled">
-            <Button variant="outline">
+            <Button variant="outline" size="sm">
               <Clock className="h-4 w-4 mr-2" />
-              Unreconciled ({stats?.unreconciledTransactions || 0})
+              Unreconciled
+              {stats && stats.unreconciledTransactions > 0 && (
+                <Badge variant="destructive" className="ml-2 px-1.5 py-0 h-5 text-xs">
+                  {stats.unreconciledTransactions}
+                </Badge>
+              )}
             </Button>
           </Link>
         </div>
