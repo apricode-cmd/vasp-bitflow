@@ -15,7 +15,34 @@ import { prisma } from '@/lib/prisma';
 export async function validateVirtualIbanBalance() {
   console.log('[Cron] 🔍 Validating Virtual IBAN balance...');
 
+  // Timeout after 30 seconds
+  const timeout = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Validation timeout after 30 seconds')), 30000);
+  });
+
   try {
+    return await Promise.race([
+      validateVirtualIbanBalanceInternal(),
+      timeout
+    ]);
+  } catch (error) {
+    console.error('[Cron] ❌ Balance validation failed:', error);
+
+    // Send alert for cron failure
+    await virtualIbanAlertService.alertReconciliationFailed({
+      segregatedAccountId: 'unknown',
+      reason: 'Balance validation cron failed',
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function validateVirtualIbanBalanceInternal() {
     // 1. Get BCB adapter and config
     const bcbAdapter = await integrationFactory.getVirtualIbanProvider();
     
@@ -37,17 +64,18 @@ export async function validateVirtualIbanBalance() {
     console.log(`[Cron] Segregated Account ID: ${segregatedAccountId}`);
 
     // 2. Get BCB total balance (segregated account)
-    const bcbBalances = await bcbAdapter.request<any[]>(
-      'GET',
-      `/v3/balances/${segregatedAccountId}`
-    );
+    console.log(`[Cron] Fetching balance from BCB for account: ${segregatedAccountId}`);
+    
+    // Use getBalance method instead of direct request
+    const balanceData = await bcbAdapter.getBalance(segregatedAccountId);
+    
+    console.log(`[Cron] BCB balance response:`, balanceData);
 
-    const bcbTotal = bcbBalances[0]?.balance || 0;
-    const bcbCurrency = bcbBalances[0]?.ticker || 'EUR';
-    const bcbIban = bcbBalances[0]?.iban || 'N/A';
+    const bcbTotal = balanceData.balance;
+    const bcbCurrency = balanceData.currency;
 
     console.log(`[Cron] BCB Total Balance: €${bcbTotal.toFixed(2)}`);
-    console.log(`[Cron] BCB IBAN: ${bcbIban}`);
+    console.log(`[Cron] Currency: ${bcbCurrency}`);
 
     // 3. Sum all local balances (active Virtual IBANs)
     const localSum = await prisma.virtualIbanAccount.aggregate({
@@ -192,27 +220,7 @@ export async function validateVirtualIbanBalance() {
     };
 
   } catch (error) {
-    console.error('[Cron] ❌ Balance validation failed:', error);
-
-    // Send alert for cron failure
-    await virtualIbanAlertService.alertReconciliationFailed({
-      segregatedAccountId: 'unknown',
-      reason: 'Balance validation cron failed',
-      error: error instanceof Error ? error.message : String(error),
-    });
-
-    // Log critical error
-    await virtualIbanAuditService.log({
-      type: 'BALANCE_SYNC',
-      severity: 'CRITICAL',
-      action: 'VALIDATION_CRON_FAILED',
-      metadata: {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        timestamp: new Date(),
-      },
-      reason: 'Balance validation cron failed',
-    });
+    console.error('[Cron] ❌ Balance validation internal error:', error);
 
     return {
       success: false,
