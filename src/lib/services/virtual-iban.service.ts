@@ -11,6 +11,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import { VirtualIbanAccount } from '@prisma/client';
 import { virtualIbanRouter } from '@/lib/integrations/VirtualIbanRouter';
 import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
 import { IVirtualIbanProvider, VirtualIbanCreateRequest } from '@/lib/integrations/categories/IVirtualIbanProvider';
@@ -168,50 +169,66 @@ class VirtualIbanService {
       providerAccount = await provider.createAccount(createRequest);
     } catch (error) {
       console.error('[VirtualIBAN] Provider failed to create account:', error);
-      
-      // Save failed attempt to DB for debugging
-      await prisma.virtualIbanAccount.create({
-        data: {
-          userId,
-          providerId,
-          providerAccountId: 'failed',
-          iban: 'PENDING',
-          bankName: 'Pending',
-          accountHolder: `${user.profile.firstName} ${user.profile.lastName}`,
-          currency,
-          country: user.profile.country,
-          status: 'FAILED',
-          metadata: {
-            error: error instanceof Error ? error.message : 'Unknown error',
-            attemptedProvider: providerId,
-          },
-        },
-      });
-
       throw new Error(`Failed to create Virtual IBAN: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 
     // Map provider status to DB status
     const dbStatus = providerAccount.status === 'pending' ? 'PENDING' : 'ACTIVE';
 
-    // Save to database
-    const dbAccount = await prisma.virtualIbanAccount.create({
-      data: {
+    // Use upsert to handle retry scenarios (if account with same correlationId exists)
+    const metadata = providerAccount.metadata as Record<string, any> || {};
+    const correlationId = metadata.bcbCorrelationId || providerAccount.accountId;
+    
+    // Try to find existing pending account by metadata
+    const existingPending = await prisma.virtualIbanAccount.findFirst({
+      where: {
         userId,
         providerId,
-        providerAccountId: providerAccount.accountId,
-        iban: providerAccount.iban,
-        bic: providerAccount.bic,
-        bankName: providerAccount.bankName,
-        accountHolder: providerAccount.accountHolder,
-        currency: providerAccount.currency,
-        country: providerAccount.country,
-        status: dbStatus,
-        balance: providerAccount.balance || 0,
-        lastBalanceUpdate: new Date(),
-        metadata: providerAccount.metadata,
+        currency,
+        status: 'PENDING',
       },
     });
+
+    let dbAccount: VirtualIbanAccount;
+    
+    if (existingPending) {
+      // Update existing pending account
+      console.log('[VirtualIBAN] Updating existing pending account:', existingPending.id);
+      dbAccount = await prisma.virtualIbanAccount.update({
+        where: { id: existingPending.id },
+        data: {
+          providerAccountId: providerAccount.accountId,
+          iban: providerAccount.iban,
+          bic: providerAccount.bic,
+          bankName: providerAccount.bankName,
+          accountHolder: providerAccount.accountHolder,
+          country: providerAccount.country,
+          status: dbStatus,
+          balance: providerAccount.balance || 0,
+          lastBalanceUpdate: new Date(),
+          metadata: providerAccount.metadata,
+        },
+      });
+    } else {
+      // Create new account
+      dbAccount = await prisma.virtualIbanAccount.create({
+        data: {
+          userId,
+          providerId,
+          providerAccountId: providerAccount.accountId,
+          iban: providerAccount.iban,
+          bic: providerAccount.bic,
+          bankName: providerAccount.bankName,
+          accountHolder: providerAccount.accountHolder,
+          currency: providerAccount.currency,
+          country: providerAccount.country,
+          status: dbStatus,
+          balance: providerAccount.balance || 0,
+          lastBalanceUpdate: new Date(),
+          metadata: providerAccount.metadata,
+        },
+      });
+    }
 
     console.log('[VirtualIBAN] Account created successfully:', {
       id: dbAccount.id,

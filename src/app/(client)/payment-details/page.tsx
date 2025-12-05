@@ -7,11 +7,12 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Table,
   TableBody,
@@ -28,7 +29,10 @@ import {
   Landmark, 
   ArrowDownToLine, 
   CheckCircle,
-  Clock
+  Clock,
+  RefreshCw,
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 
 export default function PaymentDetailsPage(): JSX.Element {
@@ -36,6 +40,8 @@ export default function PaymentDetailsPage(): JSX.Element {
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     fetchAccounts();
@@ -44,8 +50,37 @@ export default function PaymentDetailsPage(): JSX.Element {
   useEffect(() => {
     if (selectedAccount) {
       fetchTransactions(selectedAccount.id);
+      
+      // Start polling if account is PENDING
+      if (selectedAccount.status === 'PENDING') {
+        startPolling();
+      } else {
+        stopPolling();
+      }
     }
+    
+    return () => {
+      stopPolling();
+    };
   }, [selectedAccount]);
+
+  const startPolling = () => {
+    // Poll every 5 seconds
+    if (pollingIntervalRef.current) return; // Already polling
+    
+    console.log('[PaymentDetails] Starting auto-poll for PENDING account');
+    pollingIntervalRef.current = setInterval(() => {
+      fetchAccounts(); // Silent refresh
+    }, 5000);
+  };
+
+  const stopPolling = () => {
+    if (pollingIntervalRef.current) {
+      console.log('[PaymentDetails] Stopping auto-poll');
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+  };
 
   const fetchAccounts = async (): Promise<void> => {
     try {
@@ -54,13 +89,38 @@ export default function PaymentDetailsPage(): JSX.Element {
 
       if (data.success && data.data.length > 0) {
         setAccounts(data.data);
-        setSelectedAccount(data.data[0]); // Select first account
+        
+        // Update selected account if it exists
+        if (selectedAccount) {
+          const updated = data.data.find((acc: any) => acc.id === selectedAccount.id);
+          if (updated) {
+            setSelectedAccount(updated);
+            
+            // Stop polling if account became ACTIVE
+            if (updated.status !== 'PENDING' && selectedAccount.status === 'PENDING') {
+              stopPolling();
+              toast.success('Your IBAN is now ready!');
+            }
+          }
+        } else {
+          setSelectedAccount(data.data[0]); // Select first account
+        }
       }
     } catch (error) {
       console.error('Fetch accounts error:', error);
       toast.error('Failed to load payment details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRefresh = async (): Promise<void> => {
+    setRefreshing(true);
+    try {
+      await fetchAccounts();
+      toast.success('Payment details refreshed');
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -123,15 +183,46 @@ export default function PaymentDetailsPage(): JSX.Element {
   return (
     <div className="py-8 space-y-6">
       {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Landmark className="h-8 w-8" />
-          Payment Details
-        </h1>
-        <p className="text-muted-foreground">
-          Your personal bank account for payments
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Landmark className="h-8 w-8" />
+            Payment Details
+          </h1>
+          <p className="text-muted-foreground">
+            Your personal bank account for payments
+          </p>
+        </div>
+        
+        {/* Refresh Button */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
+          disabled={refreshing}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
+
+      {/* PENDING Alert */}
+      {selectedAccount.status === 'PENDING' && (
+        <Alert className="border-orange-200 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/20">
+          <div className="flex items-start gap-3">
+            <Loader2 className="h-5 w-5 text-orange-600 dark:text-orange-400 animate-spin flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h4 className="font-semibold text-orange-900 dark:text-orange-100 mb-1">
+                Your account is being created
+              </h4>
+              <AlertDescription className="text-orange-800 dark:text-orange-200">
+                We're setting up your personal IBAN. This usually takes 1-2 minutes.
+                You'll be notified once it's ready. This page will update automatically.
+              </AlertDescription>
+            </div>
+          </div>
+        </Alert>
+      )}
 
       {/* IBAN Card */}
       <Card className="border-primary/20 shadow-lg">
@@ -149,15 +240,30 @@ export default function PaymentDetailsPage(): JSX.Element {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium text-muted-foreground">IBAN</label>
-              <Button variant="ghost" size="sm" onClick={copyIban}>
-                <Copy className="h-4 w-4 mr-2" />
-                Copy
-              </Button>
+              {selectedAccount.status !== 'PENDING' && (
+                <Button variant="ghost" size="sm" onClick={copyIban}>
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy
+                </Button>
+              )}
             </div>
-            <div className="flex items-center gap-2 p-4 bg-muted rounded-lg">
-              <code className="text-lg font-mono font-semibold flex-1">
-                {selectedAccount.iban}
-              </code>
+            <div className={`flex items-center gap-2 p-4 rounded-lg ${
+              selectedAccount.status === 'PENDING' 
+                ? 'bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900' 
+                : 'bg-muted'
+            }`}>
+              {selectedAccount.status === 'PENDING' ? (
+                <div className="flex items-center gap-2 flex-1">
+                  <Loader2 className="h-4 w-4 text-orange-600 dark:text-orange-400 animate-spin" />
+                  <span className="text-lg font-medium text-orange-900 dark:text-orange-100">
+                    Creating your IBAN...
+                  </span>
+                </div>
+              ) : (
+                <code className="text-lg font-mono font-semibold flex-1">
+                  {selectedAccount.iban}
+                </code>
+              )}
             </div>
           </div>
 
