@@ -12,18 +12,28 @@ import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { syncVirtualIbanPayments } from '@/lib/cron/sync-virtual-iban-payments';
 
 export async function POST(req: NextRequest) {
+  console.log('[Admin Sync API] Request received');
+  
   try {
     // Check admin authentication
     const result = await requireAdminRole('ADMIN');
     if (result instanceof NextResponse) {
+      console.log('[Admin Sync API] Auth failed');
       return result;
     }
     const { session } = result;
 
-    console.log(`[Admin] Manual sync triggered by: ${session.email}`);
+    console.log(`[Admin Sync API] Manual sync triggered by: ${session.email}`);
 
-    // Run sync
-    const syncResult = await syncVirtualIbanPayments();
+    // Run sync with timeout (2 minutes max)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Sync operation timeout after 2 minutes')), 120000);
+    });
+
+    const syncResult = await Promise.race([
+      syncVirtualIbanPayments(),
+      timeoutPromise
+    ]) as any;
 
     return NextResponse.json({
       success: syncResult.success,

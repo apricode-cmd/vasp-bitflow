@@ -188,6 +188,33 @@ interface BCBVirtualAccountListResponse {
 // ADAPTER IMPLEMENTATION
 // ==========================================
 
+/**
+ * Fetch with timeout to prevent hanging requests
+ */
+async function fetchWithTimeout(
+  url: string, 
+  options: RequestInit = {}, 
+  timeoutMs: number = 30000
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error(`Request timeout after ${timeoutMs}ms: ${url}`);
+    }
+    throw error;
+  }
+}
+
 export class BCBGroupAdapter implements IVirtualIbanProvider {
   readonly providerId = 'BCB_GROUP_VIRTUAL_IBAN';
   readonly category = IntegrationCategory.VIRTUAL_IBAN as const;
@@ -282,7 +309,7 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
 
     console.log('[BCB] Authenticating via OAuth...');
 
-    const response = await fetch(this.authUrl, {
+    const response = await fetchWithTimeout(this.authUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -291,7 +318,7 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
         audience: this.baseUrl,
         grant_type: 'client_credentials',
       }),
-    });
+    }, 15000); // 15s timeout for auth
 
     if (!response.ok) {
       const error = await response.text();
@@ -415,11 +442,11 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
 
     console.log(`[BCB] ${method} ${endpoint}`);
 
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
-    });
+    }, 30000); // 30s timeout
 
     // Re-authenticate on 401
     if (response.status === 401) {
@@ -428,14 +455,14 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
       await this.authenticate();
       
       // Retry request
-      const retryResponse = await fetch(url, {
+      const retryResponse = await fetchWithTimeout(url, {
         method,
         headers: {
           ...headers,
           'Authorization': `Bearer ${this.token}`,
         },
         body: body ? JSON.stringify(body) : undefined,
-      });
+      }, 30000); // 30s timeout
 
       if (!retryResponse.ok) {
         const error = await retryResponse.text();
@@ -479,11 +506,11 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
 
     console.log(`[BCB Client API] ${method} ${url}`);
 
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
-    });
+    }, 30000); // 30s timeout
 
     // Re-authenticate on 401
     if (response.status === 401) {
@@ -492,14 +519,14 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
       await this.authenticate();
       
       // Retry request
-      const retryResponse = await fetch(url, {
+      const retryResponse = await fetchWithTimeout(url, {
         method,
         headers: {
           ...headers,
           'Authorization': `Bearer ${this.token}`,
         },
         body: body ? JSON.stringify(body) : undefined,
-      });
+      }, 30000); // 30s timeout
 
       if (!retryResponse.ok) {
         const error = await retryResponse.text();
@@ -1008,11 +1035,15 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
     const details = virtualAccount.virtualAccountDetails;
     const owner = virtualAccount.ownerDetails;
     
-    // Map status to Prisma enum (UPPERCASE)
-    let status: 'ACTIVE' | 'PENDING' | 'SUSPENDED' | 'CLOSED' | 'FAILED' = 'PENDING';
-    if (details.status === 'ACTIVE') status = 'ACTIVE';
-    else if (details.status === 'CLOSED') status = 'CLOSED';
-    else if (details.status === 'PENDING') status = 'PENDING';
+    // Map BCB status to provider interface (lowercase, no 'pending')
+    // If IBAN is not ready yet, we still return 'active' but with iban='PENDING'
+    // The service layer will handle this by checking iban field
+    let status: 'active' | 'suspended' | 'closed' = 'active';
+    if (details.status === 'CLOSED') {
+      status = 'closed';
+    }
+    // Note: BCB 'PENDING' status maps to 'active' because the account exists,
+    // just IBAN allocation is pending. We use iban='PENDING' to signal this.
     
     // Extract country from IBAN (country where the account is physically located)
     // BCB assigns IBANs from their pool, so IBAN country may differ from user's country

@@ -220,11 +220,28 @@ export default function VirtualIbanPage(): JSX.Element {
     setSyncing(true);
     const toastId = toast.loading('Checking for missed payments...');
     
+    console.log('[Sync Payments] Starting manual sync...');
+    
     try {
+      // Create fetch with 2 minute timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes
+
       const response = await fetch('/api/admin/virtual-iban/sync-payments', {
         method: 'POST',
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
+      
+      console.log('[Sync Payments] Response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
       const data = await response.json();
+      console.log('[Sync Payments] Response data:', data);
 
       if (data.success) {
         if (data.missed > 0) {
@@ -240,11 +257,17 @@ export default function VirtualIbanPage(): JSX.Element {
       } else {
         toast.error(data.error || 'Sync failed', { id: toastId });
       }
-    } catch (error) {
-      console.error('Manual sync error:', error);
-      toast.error('Failed to sync payments', { id: toastId });
+    } catch (error: any) {
+      console.error('[Sync Payments] Error:', error);
+      
+      if (error.name === 'AbortError') {
+        toast.error('Sync timeout - operation took too long (>2 min)', { id: toastId });
+      } else {
+        toast.error(error.message || 'Failed to sync payments', { id: toastId });
+      }
     } finally {
       setSyncing(false);
+      console.log('[Sync Payments] Completed');
     }
   };
 

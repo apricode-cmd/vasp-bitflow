@@ -3,12 +3,15 @@ export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/admin/users/[id]/orders
- * 
- * Fetch all orders for a specific user
+ *
+ * Fetch orders for a specific user (with optional status filter).
+ * Used by:
+ * - Admin Users → Orders tab
+ * - Virtual IBAN manual reconciliation dialog
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminAuth } from '@/lib/middleware/admin-auth';
+import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { prisma } from '@/lib/prisma';
 
 interface RouteContext {
@@ -18,28 +21,35 @@ interface RouteContext {
 }
 
 export async function GET(
-  request: NextRequest,
+  req: NextRequest,
   { params }: RouteContext
 ): Promise<NextResponse> {
-  const authResult = await requireAdminAuth();
-  if (authResult instanceof NextResponse) {
-    return authResult;
-  }
-
   try {
+    // Authorization
+    const auth = await requireAdminRole('ADMIN');
+    if (auth instanceof NextResponse) {
+      return auth;
+    }
+
     const { id: userId } = params;
+    const { searchParams } = new URL(req.url);
+    const status = searchParams.get('status');
+
+    const where: { userId: string; status?: string } = { userId };
+    if (status) {
+      where.status = status;
+    }
 
     const orders = await prisma.order.findMany({
-      where: {
-        userId,
-      },
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 50, // limit to recent orders
       select: {
         id: true,
-        paymentReference: true,
-        cryptoAmount: true,
-        totalFiat: true,
         status: true,
-        createdAt: true,
+        totalFiat: true,
+        cryptoAmount: true,
+        currencyCode: true, // Crypto currency code
         currency: {
           select: {
             code: true,
@@ -51,22 +61,22 @@ export async function GET(
             code: true,
           },
         },
-      },
-      orderBy: {
-        createdAt: 'desc',
+        paymentReference: true,
+        createdAt: true,
       },
     });
 
     return NextResponse.json({
       success: true,
       data: orders,
+      count: orders.length,
     });
   } catch (error) {
-    console.error('❌ Failed to fetch user orders:', error);
+    console.error('[API] Get user orders failed:', error);
     return NextResponse.json(
       {
-        success: false,
         error: 'Failed to fetch orders',
+        details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     );

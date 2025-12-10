@@ -173,7 +173,15 @@ class VirtualIbanService {
     }
 
     // Map provider status to DB status
-    const dbStatus = providerAccount.status === 'pending' ? 'PENDING' : 'ACTIVE';
+    // Provider interface uses lowercase ('active', 'closed'), but with iban='PENDING' for pending accounts
+    // DB uses uppercase ENUM ('ACTIVE', 'PENDING', 'CLOSED')
+    let dbStatus: 'ACTIVE' | 'PENDING' | 'CLOSED' = 'ACTIVE';
+    if (providerAccount.status === 'closed') {
+      dbStatus = 'CLOSED';
+    } else if (providerAccount.iban === 'PENDING') {
+      // Account exists but IBAN not allocated yet
+      dbStatus = 'PENDING';
+    }
 
     // Use upsert to handle retry scenarios (if account with same correlationId exists)
     const metadata = providerAccount.metadata as Record<string, any> || {};
@@ -250,9 +258,9 @@ class VirtualIbanService {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Auto-sync any PENDING accounts
+    // Auto-sync any accounts with PENDING IBAN (regardless of status)
     for (const account of accounts) {
-      if (account.status === 'PENDING' && account.iban === 'PENDING') {
+      if (account.iban === 'PENDING') {
         try {
           await this.syncPendingAccount(account.id);
         } catch (error) {
@@ -281,14 +289,14 @@ class VirtualIbanService {
       return null;
     }
 
-    // Only sync PENDING accounts
-    if (account.status !== 'PENDING') {
+    // Only sync accounts with PENDING IBAN
+    if (account.iban !== 'PENDING') {
       return account;
     }
 
-    // Get correlation ID from metadata
+    // Get correlation ID from metadata (support both field names)
     const metadata = account.metadata as Record<string, any> || {};
-    const correlationId = metadata.bcbCorrelationId;
+    const correlationId = metadata.correlationId || metadata.bcbCorrelationId;
 
     if (!correlationId) {
       console.warn('[VirtualIBAN] No correlation ID for pending account:', accountId);
@@ -345,8 +353,7 @@ class VirtualIbanService {
   async syncAllPendingAccounts(): Promise<{ synced: number; failed: number }> {
     const pendingAccounts = await prisma.virtualIbanAccount.findMany({
       where: {
-        status: 'PENDING',
-        iban: 'PENDING',
+        iban: 'PENDING', // Sync any account with pending IBAN, regardless of status
       },
     });
 

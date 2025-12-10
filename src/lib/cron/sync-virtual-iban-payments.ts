@@ -57,26 +57,35 @@ export async function syncVirtualIbanPayments() {
       throw new Error('segregatedAccountId not found in config');
     }
 
-    // 2. Look back 10 minutes (overlap for reliability)
-    const dateFrom = new Date(Date.now() - 10 * 60 * 1000);
+    // 2. Look back 30 DAYS for testing to find ANY payments (normally 10 minutes for cron)
+    const daysBack = 30; // TODO: Change to 10 minutes for production cron
+    const dateFrom = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
     const dateFromISO = dateFrom.toISOString();
 
-    console.log(`[Cron] Checking payments since: ${dateFromISO}`);
+    console.log(`[Cron] Checking payments since: ${dateFromISO} (${daysBack} days ago)`);
     console.log(`[Cron] Segregated Account ID: ${segregatedAccountId}`);
 
-    // 3. Get payments from BCB Client API
-    const response = await bcbAdapter.clientApiRequest<{
-      count: number;
-      results: string[]; // Array of transactionIds
-    }>(
+    // 3. IMPORTANT: Use Services API /v3/transactions NOT Client API /v1/payments
+    // Payments API = outgoing only, Transactions API = all (incoming + outgoing)
+    console.log('[Cron] Fetching transactions from Services API...');
+    
+    const dateFromDate = dateFrom.toISOString().split('T')[0]; // YYYY-MM-DD
+    const transactionsResponse = await (bcbAdapter as any).request(
       'GET',
-      `/v1/accounts/${segregatedAccountId}/payments?dateFrom=${dateFromISO}&pageSize=100`
+      `/v3/accounts/${segregatedAccountId}/transactions?dateFrom=${dateFromDate}&limit=100`
     );
 
-    console.log(`[Cron] Found ${response.count} payments in BCB`);
+    console.log('[Cron] RAW BCB TRANSACTIONS API RESPONSE:');
+    console.log(JSON.stringify(transactionsResponse, null, 2));
+    console.log(`[Cron] Response type: ${typeof transactionsResponse}`);
+    console.log(`[Cron] Found ${transactionsResponse?.length || 0} transactions`);
+    
+    // Filter only CREDIT transactions (incoming payments)
+    const creditTransactions = (transactionsResponse || []).filter((tx: any) => tx.credit === 1);
+    console.log(`[Cron] Found ${creditTransactions.length} credit (incoming) transactions`);
 
-    if (response.count === 0) {
-      console.log('[Cron] ✅ No payments to process');
+    if (creditTransactions.length === 0) {
+      console.log('[Cron] ✅ No incoming payments to process');
       return {
         success: true,
         total: 0,
@@ -92,8 +101,9 @@ export async function syncVirtualIbanPayments() {
     let missedCount = 0;
     let errorCount = 0;
 
-    // 4. Process each payment
-    for (const transactionId of response.results) {
+    // 4. Process each credit transaction
+    for (const transaction of creditTransactions) {
+      const transactionId = transaction.tx_id;
       try {
         // 4.1 Check if already in database (idempotency)
         const exists = await prisma.virtualIbanTransaction.findUnique({
@@ -102,104 +112,89 @@ export async function syncVirtualIbanPayments() {
 
         if (exists) {
           skippedCount++;
+          console.log(`[Cron] Transaction ${transactionId} already processed, skipping`);
           continue; // Already processed
         }
 
-        // 4.2 Get payment details from Client API
-        const payment = await bcbAdapter.clientApiRequest<BCBPaymentDetails>(
-          'GET',
-          `/v1/accounts/${segregatedAccountId}/payments/transaction/${transactionId}`
-        );
-
-        // 4.3 Only process Settled payments
-        if (payment.status !== 'Settled') {
-          console.log(`[Cron] Payment ${transactionId} status: ${payment.status}, skipping`);
-          continue;
-        }
-
-        console.log(`[Cron] 🎯 Missed payment detected: ${transactionId}, amount: ${payment.amount} ${payment.currency}`);
-        missedCount++;
-
-        // 4.4 PROBLEM: Client API doesn't return recipient IBAN!
-        // Solution: Cross-reference with Services API transactions
-        
-        const dateFromDate = dateFrom.toISOString().split('T')[0]; // YYYY-MM-DD
-        const transactions = await bcbAdapter.request<BCBTransaction[]>(
-          'GET',
-          `/v3/accounts/${segregatedAccountId}/transactions?limit=100&dateFrom=${dateFromDate}`
-        );
-
-        console.log(`[Cron] Cross-referencing with ${transactions.length} transactions from Services API`);
-
-        // 4.5 Find matching transaction by amount and currency
-        const matchingTx = transactions.find(
-          (tx) => {
-            const amountMatch = Math.abs(parseFloat(tx.amount) - parseFloat(payment.amount)) < 0.01;
-            const currencyMatch = tx.ticker === payment.currency;
-            const isCredit = tx.credit === 1;
-            const hasIban = !!tx.iban || !!tx.details?.iban;
-            
-            return amountMatch && currencyMatch && isCredit && hasIban;
-          }
-        );
-
-        if (!matchingTx) {
-          console.warn(`[Cron] ⚠️  Cannot find matching transaction for ${transactionId}`);
-          
-          // Log as error in audit
-          await virtualIbanAuditService.log({
-            type: 'WEBHOOK_MISSED',
-            severity: 'ERROR',
-            action: 'POLLING_FAILED',
-            metadata: {
-              transactionId,
-              payment,
-              reason: 'Cannot determine recipient IBAN via cross-reference',
-              timestamp: new Date(),
-            },
-            reason: 'Polling detected missed payment but cannot determine Virtual IBAN',
-          });
-          
-          errorCount++;
-          continue;
-        }
-
-        const recipientIban = matchingTx.iban || matchingTx.details?.iban;
+        // 4.2 Extract recipient IBAN from transaction
+        // For Virtual IBAN incoming payments, the recipient IBAN is in details.virtual.iban
+        // transaction.iban contains the SENDER's IBAN
+        const recipientIban = transaction.details?.virtual?.iban || transaction.details?.iban || transaction.iban;
         
         if (!recipientIban) {
-          console.warn(`[Cron] ⚠️  No IBAN found in matching transaction`);
+          console.warn(`[Cron] ⚠️  No IBAN found in transaction ${transactionId}`);
+          console.log('[Cron] Transaction details:', JSON.stringify(transaction, null, 2));
           errorCount++;
           continue;
         }
 
-        console.log(`[Cron] ✅ Found recipient IBAN: ${recipientIban}`);
+        console.log(`[Cron] 🎯 New incoming payment detected!`);
+        console.log(`[Cron]   Transaction ID: ${transactionId}`);
+        console.log(`[Cron]   Amount: ${transaction.amount} ${transaction.ticker}`);
+        console.log(`[Cron]   Recipient IBAN: ${recipientIban}`);
+        console.log(`[Cron]   Reference: ${transaction.details?.reference || 'N/A'}`);
+        console.log(`[Cron]   Sender: ${transaction.details?.account_name || 'N/A'}`);
+        
+        missedCount++;
 
-        // 4.6 Process as webhook (reuse existing logic)
+        // 4.3 Process as webhook (reuse existing logic)
         const webhookPayload = {
-          tx_id: payment.transactionId,
-          account_id: parseInt(segregatedAccountId),
-          amount: parseFloat(payment.amount),
-          currency: payment.currency,
-          ticker: payment.currency,
+          tx_id: transaction.tx_id,
+          account_id: transaction.account_id,
+          amount: parseFloat(transaction.amount),
+          currency: transaction.ticker,
+          ticker: transaction.ticker,
           credit: 1,
           iban: recipientIban,
           details: {
             iban: recipientIban,
-            reference: matchingTx.details?.reference || payment.nonce,
-            sender_name: matchingTx.details?.sender_name,
-            sender_iban: matchingTx.details?.sender_iban,
+            reference: transaction.details?.reference,
+            sender_name: transaction.details?.account_name,
+            sender_iban: transaction.details?.iban,
+            sort_code: transaction.details?.sort_code,
+            account_number: transaction.details?.account_number,
           },
         };
 
-        const transaction = await virtualIbanService.processIncomingTransaction(webhookPayload);
+        const processedTx = await virtualIbanService.processIncomingTransaction(webhookPayload);
 
-        console.log(`[Cron] ✅ Transaction processed: ${transaction.id}`);
+        console.log(`[Cron] ✅ Transaction processed: ${processedTx.id}`);
 
-        // 4.7 Log successful recovery in audit
+        // 4.4 Try to auto-reconcile with TopUp Request
+        try {
+          const { topUpRequestService } = await import('../services/topup-request.service');
+          
+          const matchedRequest = await topUpRequestService.matchPaymentToRequest(
+            processedTx.virtualIbanId,
+            transaction.details?.reference,
+            parseFloat(transaction.amount)
+          );
+
+          if (matchedRequest) {
+            console.log('[Cron] 🎯 Matched TopUp request:', {
+              requestId: matchedRequest.id,
+              reference: matchedRequest.reference,
+            });
+
+            await topUpRequestService.completeRequest(
+              matchedRequest.id,
+              processedTx.id
+            );
+
+            console.log('[Cron] ✅ TopUp auto-reconciled');
+          } else {
+            console.log('[Cron] No TopUp match found - transaction will be unreconciled');
+          }
+        } catch (topUpError) {
+          console.warn('[Cron] TopUp matching failed:', topUpError);
+          // Continue - transaction will remain unreconciled
+        }
+
+        // 4.5 Log successful recovery in audit
         await virtualIbanAuditService.logPollingDetected(
-          payment.transactionId,
-          transaction.virtualIbanId,
-          parseFloat(payment.amount)
+          transaction.tx_id,
+          processedTx.virtualIbanId,
+          parseFloat(transaction.amount)
         );
 
         processedCount++;
@@ -225,7 +220,7 @@ export async function syncVirtualIbanPayments() {
 
     const result = {
       success: true,
-      total: response.count,
+      total: creditTransactions.length,
       processed: processedCount,
       skipped: skippedCount,
       missed: missedCount,
