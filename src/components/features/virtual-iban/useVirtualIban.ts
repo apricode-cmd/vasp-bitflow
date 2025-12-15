@@ -14,8 +14,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import type { VirtualIbanAccount, VirtualIbanTransaction, EligibilityData, TopUpRequest } from './types';
 
-// Polling interval: 30 seconds for balance updates
-const BALANCE_POLL_INTERVAL = 30 * 1000;
+// Polling intervals
+const BALANCE_POLL_INTERVAL = 30 * 1000; // 30 seconds for balance updates
+const PENDING_POLL_INTERVAL = 5 * 1000;  // 5 seconds for PENDING accounts
 
 interface UseVirtualIbanReturn {
   // State
@@ -197,6 +198,65 @@ export function useVirtualIban(): UseVirtualIbanReturn {
     init();
   }, [checkEligibility]);
 
+  // Auto-polling for PENDING accounts (check every 5 seconds)
+  useEffect(() => {
+    if (!account || account.status !== 'PENDING') return;
+
+    console.log('[VirtualIBAN] Starting PENDING account polling (every 5s)...');
+
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch('/api/client/virtual-iban/create');
+        const data = await response.json();
+
+        if (response.ok && data.success && data.existingAccount) {
+          const newAccount = data.existingAccount;
+          
+          // Check if status changed from PENDING to ACTIVE
+          if (newAccount.status === 'ACTIVE' && account.status === 'PENDING') {
+            toast.success('Virtual IBAN Activated!', {
+              description: `Your IBAN ${newAccount.iban} is now ready to use.`,
+            });
+          }
+          
+          setAccount(newAccount);
+          setEligibility(data);
+
+          // If now active, also fetch transactions
+          if (newAccount.status === 'ACTIVE') {
+            try {
+              const [txResponse, topUpResponse] = await Promise.all([
+                fetch(`/api/client/virtual-iban/${newAccount.id}/transactions`),
+                fetch(`/api/client/virtual-iban/${newAccount.id}/topup`),
+              ]);
+              
+              const [txData, topUpData] = await Promise.all([
+                txResponse.json(),
+                topUpResponse.json(),
+              ]);
+              
+              if (txData.success) {
+                setTransactions(txData.data || []);
+              }
+              if (topUpData.success) {
+                setTopUpRequests(topUpData.data || []);
+              }
+            } catch {
+              // Silent fail
+            }
+          }
+        }
+      } catch {
+        // Silent fail for auto-polling
+      }
+    }, PENDING_POLL_INTERVAL);
+
+    return () => {
+      console.log('[VirtualIBAN] Stopping PENDING account polling');
+      clearInterval(interval);
+    };
+  }, [account]);
+
   // Auto-polling for balance updates (only when account is ACTIVE)
   useEffect(() => {
     if (!account || account.status !== 'ACTIVE') return;
@@ -206,7 +266,7 @@ export function useVirtualIban(): UseVirtualIbanReturn {
       prevBalanceRef.current = account.balance || 0;
     }
 
-    console.log('[VirtualIBAN] Starting balance polling...');
+    console.log('[VirtualIBAN] Starting balance polling (every 30s)...');
 
     const interval = setInterval(() => {
       silentRefresh();
