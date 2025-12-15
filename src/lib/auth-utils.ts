@@ -2,12 +2,21 @@
  * Authentication Utility Functions
  * 
  * Helper functions for authentication, authorization, and password management.
+ * 
+ * This file serves as a central export for both CLIENT and ADMIN auth utilities.
  */
 
 import { NextResponse } from 'next/server';
 import { getClientSession } from '@/auth-client';
 import bcrypt from 'bcryptjs';
 import { Role } from '@prisma/client';
+
+// Re-export ADMIN auth utilities for convenience
+export { 
+  requireAdminAuth, 
+  requireAdminRole, 
+  requireAdminPermission 
+} from '@/lib/middleware/admin-auth';
 
 const SALT_ROUNDS = 10;
 

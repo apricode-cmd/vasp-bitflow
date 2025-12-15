@@ -418,12 +418,32 @@ export function ClientOrderWidget() {
   // Calculate order total
   const calculation = useMemo(() => {
     const crypto = parseFloat(cryptoAmount);
+    const fiat = parseFloat(fiatAmount);
     if (!rates || !crypto || crypto <= 0 || !currentRate || !tradingPair) return null;
 
     // Use fee from TradingPair (convert from percent to decimal)
     const feeDecimal = tradingPair.feePercent / 100;
+    
+    // FIX: If user entered fiat amount, use it directly to avoid rounding errors
+    if (inputMode === 'fiat' && fiat > 0) {
+      // User entered total fiat, calculate backwards
+      const totalFiat = fiat;
+      const fiatBeforeFee = totalFiat / (1 + feeDecimal);
+      const fee = totalFiat - fiatBeforeFee;
+      
+      return {
+        amount: crypto,
+        rate: currentRate,
+        fiatAmount: fiatBeforeFee,
+        fee: fee,
+        feePercentage: feeDecimal,
+        totalFiat: totalFiat // Use exact input, no rounding errors
+      };
+    }
+    
+    // If user entered crypto, calculate normally
     return calculateOrderTotal(crypto, currentRate, feeDecimal);
-  }, [cryptoAmount, currentRate, tradingPair, rates]);
+  }, [cryptoAmount, fiatAmount, currentRate, tradingPair, rates, inputMode]);
 
   // Quick amount buttons - dynamic based on trading pair limits
   const quickAmounts = useMemo(() => {

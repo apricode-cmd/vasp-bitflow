@@ -17,9 +17,9 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
-  AlignTop,
-  AlignMiddle,
-  AlignBottom,
+  AlignVerticalJustifyStart,
+  AlignVerticalJustifyCenter,
+  AlignVerticalJustifyEnd,
   Clipboard,
   Power,
 } from 'lucide-react';
@@ -166,17 +166,17 @@ export function ContextMenu({ onClick, onClose, position, type, data }: ContextM
           onClick={() => handleItemClick('alignRight')}
         />
         <MenuItem
-          icon={AlignTop}
+          icon={AlignVerticalJustifyStart}
           label="Align Top"
           onClick={() => handleItemClick('alignTop')}
         />
         <MenuItem
-          icon={AlignMiddle}
+          icon={AlignVerticalJustifyCenter}
           label="Align Middle"
           onClick={() => handleItemClick('alignMiddle')}
         />
         <MenuItem
-          icon={AlignBottom}
+          icon={AlignVerticalJustifyEnd}
           label="Align Bottom"
           onClick={() => handleItemClick('alignBottom')}
         />

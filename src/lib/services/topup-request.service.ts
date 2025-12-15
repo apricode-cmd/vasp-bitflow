@@ -62,13 +62,14 @@ const REFERENCE_PREFIX = 'TU';
 class TopUpRequestService {
   /**
    * Generate unique reference for payment matching
-   * Format: TU-{IBAN_LAST4}-{RANDOM}
-   * Example: TU-7890-A3X9K2
+   * Format: TU-{RANDOM}
+   * Example: TU-A3X9
+   * Short and easy to type for bank transfers
    */
   private generateReference(iban: string): string {
-    const ibanLast4 = iban.slice(-4);
-    const randomPart = randomBytes(3).toString('hex').toUpperCase().slice(0, 6);
-    return `${REFERENCE_PREFIX}-${ibanLast4}-${randomPart}`;
+    // Generate 4-character random code (16^4 = 65,536 combinations)
+    const randomPart = randomBytes(2).toString('hex').toUpperCase();
+    return `${REFERENCE_PREFIX}-${randomPart}`;
   }
 
   /**
