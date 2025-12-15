@@ -40,9 +40,6 @@ export async function POST(req: NextRequest) {
     // Validate input
     const validatedData = bcbGroupConfigSchema.parse(body);
 
-    // Encrypt client secret
-    const encryptedClientSecret = encrypt(validatedData.clientSecret);
-
     // API URLs based on environment
     const baseUrl = validatedData.sandbox 
       ? 'https://api.uat.bcb.group' 
@@ -52,15 +49,25 @@ export async function POST(req: NextRequest) {
       ? 'https://auth.uat.bcb.group/oauth/token'
       : 'https://auth.bcb.group/oauth/token';
 
-    // Prepare config object
+    // ✅ Prepare credentials to encrypt (all sensitive data)
+    const credentials = {
+      clientId: validatedData.clientId,
+      clientSecret: validatedData.clientSecret,
+      counterpartyId: validatedData.counterpartyId,
+    };
+
+    // ✅ Encrypt credentials as JSON
+    const encryptedCredentials = encrypt(JSON.stringify(credentials));
+
+    // ✅ Prepare config object (includes ALL fields for Admin UI display)
     const config = {
       sandbox: validatedData.sandbox,
       clientId: validatedData.clientId,
-      clientSecret: encryptedClientSecret,
+      clientSecret: validatedData.clientSecret, // ✅ Plain text for UI
       counterpartyId: validatedData.counterpartyId,
       baseUrl,
       authUrl,
-      audience: baseUrl.replace('/api', ''),
+      audience: baseUrl,
     };
 
     // Upsert integration in database
@@ -73,7 +80,7 @@ export async function POST(req: NextRequest) {
         status: 'active',
         apiEndpoint: baseUrl,
         config,
-        apiKey: encryptedClientSecret,
+        apiKey: encryptedCredentials, // ✅ Encrypted JSON with all credentials
         updatedAt: new Date(),
       },
       create: {
@@ -83,7 +90,7 @@ export async function POST(req: NextRequest) {
         status: 'active',
         apiEndpoint: baseUrl,
         config,
-        apiKey: encryptedClientSecret,
+        apiKey: encryptedCredentials, // ✅ Encrypted JSON with all credentials
       },
     });
 

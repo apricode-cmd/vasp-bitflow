@@ -558,7 +558,7 @@ export default function VirtualIbanPage(): JSX.Element {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Providers</SelectItem>
-              <SelectItem value="BCB_GROUP">BCB Group</SelectItem>
+              <SelectItem value="BCB_GROUP_VIRTUAL_IBAN">BCB Group</SelectItem>
             </SelectContent>
           </Select>
 

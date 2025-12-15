@@ -237,31 +237,27 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
     
     console.log('[BCB] Initializing with config:', {
       hasClientId: !!bcbConfig.clientId,
-      hasClientSecret: !!(bcbConfig.clientSecret || bcbConfig.apiKey),
+      hasClientSecret: !!bcbConfig.clientSecret,
       counterpartyId: bcbConfig.counterpartyId,
       sandbox: bcbConfig.sandbox,
     });
 
     // Validate required config
-    if (!bcbConfig.counterpartyId) {
-      throw new Error('BCB Group: Missing required config (counterpartyId)');
-    }
-
+    // Note: IntegrationFactory decrypts apiKey and merges credentials into config
     if (!bcbConfig.clientId) {
       throw new Error('BCB Group: Missing required config (clientId)');
     }
 
-    // Get client secret (from clientSecret or apiKey)
-    const clientSecret = bcbConfig.clientSecret || bcbConfig.apiKey;
-    if (!clientSecret) {
+    if (!bcbConfig.clientSecret) {
       throw new Error('BCB Group: Missing required config (clientSecret)');
     }
 
-    // Store config with resolved clientSecret
-    this.config = {
-      ...bcbConfig,
-      clientSecret,
-    };
+    if (!bcbConfig.counterpartyId) {
+      throw new Error('BCB Group: Missing required config (counterpartyId)');
+    }
+
+    // Store config (credentials are already decrypted by IntegrationFactory)
+    this.config = bcbConfig;
 
     // Set API URLs based on environment
     const isSandbox = bcbConfig.sandbox ?? true;

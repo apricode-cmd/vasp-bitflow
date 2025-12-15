@@ -44,22 +44,18 @@ export async function validateVirtualIbanBalance() {
 
 async function validateVirtualIbanBalanceInternal() {
   try {
-    // 1. Get BCB adapter and config
+    // 1. Get BCB adapter (already initialized with segregatedAccountId)
     const bcbAdapter = await integrationFactory.getVirtualIbanProvider();
     
-    const integration = await prisma.integration.findUnique({
-      where: { service: 'BCB_GROUP' },
-    });
-
-    if (!integration?.config) {
-      throw new Error('BCB integration not configured');
+    if (!bcbAdapter) {
+      throw new Error('BCB provider not available');
     }
 
-    const config = integration.config as any;
-    const segregatedAccountId = config.segregatedAccountId;
+    // Get segregatedAccountId from adapter (fetched during initialization)
+    const segregatedAccountId = (bcbAdapter as any).segregatedAccountId;
 
     if (!segregatedAccountId) {
-      throw new Error('segregatedAccountId not found in config');
+      throw new Error('segregatedAccountId not found - BCB adapter not properly initialized');
     }
 
     console.log(`[Cron] Segregated Account ID: ${segregatedAccountId}`);

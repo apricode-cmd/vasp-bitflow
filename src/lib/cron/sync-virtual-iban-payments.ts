@@ -39,22 +39,18 @@ export async function syncVirtualIbanPayments() {
   console.log('[Cron] 🔄 Syncing Virtual IBAN payments...');
 
   try {
-    // 1. Get BCB adapter and config
+    // 1. Get BCB adapter (already initialized with segregatedAccountId)
     const bcbAdapter = await integrationFactory.getVirtualIbanProvider();
     
-    const integration = await prisma.integration.findUnique({
-      where: { service: 'BCB_GROUP' },
-    });
-
-    if (!integration?.config) {
-      throw new Error('BCB integration not configured');
+    if (!bcbAdapter) {
+      throw new Error('BCB provider not available');
     }
 
-    const config = integration.config as any;
-    const segregatedAccountId = config.segregatedAccountId;
+    // Get segregatedAccountId from adapter (fetched during initialization)
+    const segregatedAccountId = (bcbAdapter as any).segregatedAccountId;
 
     if (!segregatedAccountId) {
-      throw new Error('segregatedAccountId not found in config');
+      throw new Error('segregatedAccountId not found - BCB adapter not properly initialized');
     }
 
     // 2. Look back 30 DAYS for testing to find ANY payments (normally 10 minutes for cron)

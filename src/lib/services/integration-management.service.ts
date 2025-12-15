@@ -217,7 +217,28 @@ export async function updateIntegrationConfig(params: UpdateIntegrationParams) {
       updatedAt: new Date()
     };
 
-    if (updates.apiKey !== undefined) {
+    // ✅ Special handling for BCB_GROUP_VIRTUAL_IBAN (multi-credential integration)
+    if (service === 'BCB_GROUP_VIRTUAL_IBAN' && updates.config) {
+      const config = updates.config as any;
+      
+      // If config has credentials, encrypt them into apiKey
+      if (config.clientId && config.clientSecret && config.counterpartyId) {
+        const credentials = {
+          clientId: config.clientId,
+          clientSecret: config.clientSecret,
+          counterpartyId: config.counterpartyId,
+        };
+        
+        console.log('✅ Encrypting BCB credentials (JSON) into apiKey');
+        updateData.apiKey = encrypt(JSON.stringify(credentials));
+        
+        // If adding/updating API key and integration is enabled, set to active
+        if (integration.isEnabled) {
+          updateData.status = 'active';
+        }
+      }
+    } else if (updates.apiKey !== undefined) {
+      // Standard apiKey handling for other integrations
       // Don't save masked API keys (containing • or *)
       const isMasked = updates.apiKey && (
         updates.apiKey.includes('•') || 
