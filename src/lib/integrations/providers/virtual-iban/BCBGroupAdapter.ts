@@ -667,13 +667,22 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
     console.log('[BCB] Client API - Create virtual account payload:', ownerPayload);
 
     // Client API expects an array of owners
+    let createResponse;
     try {
-      await this.clientApiRequest<void>(
+      createResponse = await this.clientApiRequest<void>(
         'POST', 
         `/v2/accounts/${this.segregatedAccountId}/virtual`,
         [ownerPayload]
       );
+      console.log('[BCB] Create account response:', createResponse);
     } catch (error) {
+      // Log full error details
+      console.error('[BCB] Virtual account creation failed:', error);
+      console.error('[BCB] Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      
       // Provide more specific error messages
       const errorMsg = error instanceof Error ? error.message : String(error);
       
@@ -691,15 +700,17 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
 
     // BCB creates accounts asynchronously - poll until we get the IBAN
     // Typically takes 1-5 seconds in sandbox, up to 30 seconds in production
-    const maxAttempts = 10;
-    const pollInterval = 2000; // 2 seconds between attempts
+    // In production, it can take even longer (up to 60 seconds)
+    const maxAttempts = 20; // Increased from 10 to 20 for production
+    const pollInterval = 3000; // 3 seconds between attempts = 60s total
     
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       await this.sleep(pollInterval);
       
       console.log(`[BCB] Polling for virtual account (attempt ${attempt}/${maxAttempts})...`);
       
-      const virtualAccount = await this.findVirtualAccountByCorrelationId(correlationId);
+      // Search only first 2 pages (200 accounts) - new accounts appear at the top
+      const virtualAccount = await this.findVirtualAccountByCorrelationId(correlationId, 2);
       
       if (virtualAccount) {
         const details = virtualAccount.virtualAccountDetails;
@@ -768,17 +779,47 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
   /**
    * Find virtual account by correlation ID
    */
-  private async findVirtualAccountByCorrelationId(correlationId: string): Promise<BCBVirtualAccountData | null> {
+  private async findVirtualAccountByCorrelationId(correlationId: string, maxPages: number = 3): Promise<BCBVirtualAccountData | null> {
     if (!this.segregatedAccountId) return null;
 
     try {
-      const response = await this.clientApiRequest<BCBVirtualAccountListResponse>(
-        'GET',
-        `/v1/accounts/${this.segregatedAccountId}/virtual/all-account-data?pageSize=100`
-      );
+      // Paginate through accounts to find the correlation ID
+      // maxPages defaults to 3 (300 accounts) for performance
+      // Newer accounts typically appear in first few pages
+      let pageNumber = 1;
+      const pageSize = 100;
+      
+      while (pageNumber <= maxPages) {
+        const response = await this.clientApiRequest<BCBVirtualAccountListResponse>(
+          'GET',
+          `/v1/accounts/${this.segregatedAccountId}/virtual/all-account-data?pageSize=${pageSize}&pageNumber=${pageNumber}`
+        );
 
-      const account = response.results?.find(acc => acc.correlationId === correlationId);
-      return account || null;
+        console.log('[BCB] Virtual accounts response:', {
+          page: pageNumber,
+          count: response.results?.length || 0,
+          maxPages,
+          searchingFor: correlationId
+        });
+
+        const account = response.results?.find(acc => acc.correlationId === correlationId);
+        
+        if (account) {
+          console.log('[BCB] Account found on page', pageNumber);
+          return account;
+        }
+        
+        // No more pages if less than pageSize returned
+        if (!response.results || response.results.length < pageSize) {
+          console.log('[BCB] Reached last page');
+          break;
+        }
+        
+        pageNumber++;
+      }
+      
+      console.log('[BCB] Correlation ID not found in first', maxPages, 'pages');
+      return null;
     } catch (error) {
       console.warn('[BCB] Error fetching virtual accounts:', error);
       return null;
@@ -790,14 +831,22 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
    * Called for accounts that were created but IBAN wasn't ready yet
    */
   async syncPendingAccount(correlationId: string, userId: string, country?: string): Promise<VirtualIbanAccount | null> {
-    console.log('[BCB] Syncing pending account:', correlationId);
+    // Remove 'pending-' prefix if present (added during account creation fallback)
+    const actualCorrelationId = correlationId.startsWith('pending-') 
+      ? correlationId.replace('pending-', '') 
+      : correlationId;
+    
+    console.log('[BCB] Syncing pending account:', {
+      received: correlationId,
+      searching: actualCorrelationId
+    });
 
     // Ensure we have segregated account ID
     if (!this.segregatedAccountId) {
       await this.fetchAccountInfo();
     }
 
-    const virtualAccount = await this.findVirtualAccountByCorrelationId(correlationId);
+    const virtualAccount = await this.findVirtualAccountByCorrelationId(actualCorrelationId);
     
     if (!virtualAccount) {
       console.warn('[BCB] Account not found for correlation ID:', correlationId);

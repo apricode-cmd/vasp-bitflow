@@ -60,6 +60,7 @@ export interface VirtualIbanTransaction {
   currency: string;
   senderName?: string;
   senderIban?: string;
+  senderBic?: string;
   reference?: string;
   status: 'pending' | 'completed' | 'failed';
   processedAt?: Date;
@@ -69,7 +70,7 @@ export interface VirtualIbanTransaction {
 /**
  * Account status
  */
-export type VirtualIbanStatus = 'active' | 'suspended' | 'closed';
+export type VirtualIbanStatus = 'active' | 'pending' | 'suspended' | 'closed';
 
 /**
  * Balance information
