@@ -25,8 +25,8 @@ export interface Order {
   rate: number;
   feePercent: number;
   walletAddress: string;
-  blockchainCode?: string | null;
-  paymentMethodCode?: string | null;
+  blockchainCode?: string;
+  paymentMethodCode?: string;
   createdAt: string;
   updatedAt: string;
   expiresAt: string;
@@ -56,6 +56,8 @@ export interface OrderFilters {
   fiatCurrencyCode?: string;
   hasPayIn?: boolean;
   hasPayOut?: boolean;
+  page?: number;
+  limit?: number;
 }
 
 export interface UseOrdersReturn {
@@ -82,6 +84,10 @@ export function useOrders(filters: OrderFilters = {}): UseOrdersReturn {
 
     try {
       const params = new URLSearchParams();
+
+      // Pagination
+      params.append('page', (filters.page || 1).toString());
+      params.append('limit', (filters.limit || 20).toString());
 
       // Status filter
       if (filters.status && filters.status !== 'all') {
@@ -149,7 +155,9 @@ export function useOrders(filters: OrderFilters = {}): UseOrdersReturn {
     filters.currencyCode,
     filters.fiatCurrencyCode,
     filters.hasPayIn,
-    filters.hasPayOut
+    filters.hasPayOut,
+    filters.page,
+    filters.limit
   ]);
 
   // Fetch on mount and filter changes

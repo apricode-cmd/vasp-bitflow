@@ -34,7 +34,7 @@ interface Order {
   currencyCode: string;
   walletAddress: string;
   blockchainCode?: string;
-  paymentMethodCode?: string;
+  paymentMethodCode?: string | null;
 }
 
 interface OrderTransitionDialogProps {

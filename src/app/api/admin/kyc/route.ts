@@ -14,8 +14,10 @@ import { redis } from '@/lib/services/cache.service';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   // Check admin authorization
-  const { error } = await requireAdminRole('ADMIN');
-  if (error) return error;
+  const authResult = await requireAdminRole('ADMIN');
+  if ('error' in authResult) {
+    return authResult.error as NextResponse;
+  }
 
   try {
     const { searchParams } = new URL(request.url);
@@ -27,6 +29,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const dateFrom = searchParams.get('dateFrom');
     const dateTo = searchParams.get('dateTo');
     const pepStatus = searchParams.get('pepStatus');
+    const riskLevel = searchParams.get('riskLevel');
+    const search = searchParams.get('search');
     
     // Pagination
     const page = parseInt(searchParams.get('page') || '1');
@@ -38,17 +42,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const sortOrder = searchParams.get('sortOrder') || 'desc';
 
     // Generate cache key
-    const cacheKey = `kyc-list:${status || 'all'}:${country || 'all'}:${provider || 'all'}:${pepStatus || 'all'}:${page}:${limit}:${sortBy}:${sortOrder}:${dateFrom || ''}:${dateTo || ''}`;
+    const cacheKey = `kyc-list:${status || 'all'}:${country || 'all'}:${provider || 'all'}:${pepStatus || 'all'}:${riskLevel || 'all'}:${search || ''}:${page}:${limit}:${sortBy}:${sortOrder}:${dateFrom || ''}:${dateTo || ''}`;
     
-    // Try to get from cache
-    try {
-      const cached = await redis.get(cacheKey);
-      if (cached) {
-        console.log(`📦 [Redis] Cache HIT: ${cacheKey}`);
-        return NextResponse.json(JSON.parse(cached));
+    // Try to get from cache (skip cache for search queries - they need to be real-time)
+    if (!search) {
+      try {
+        const cached = await redis.get(cacheKey);
+        if (cached) {
+          console.log(`📦 [Redis] Cache HIT: ${cacheKey}`);
+          return NextResponse.json(JSON.parse(cached));
+        }
+      } catch (cacheError) {
+        console.error('Redis get error:', cacheError);
       }
-    } catch (cacheError) {
-      console.error('Redis get error:', cacheError);
     }
 
     console.log(`📦 [Redis] Cache MISS: ${cacheKey}`);
@@ -60,10 +66,87 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       where.status = status;
     }
 
+    // Search filter (text search across multiple fields)
+    if (search && search.trim()) {
+      const searchTerm = search.trim();
+      where.OR = [
+        // Search in user email
+        {
+          user: {
+            email: {
+              contains: searchTerm,
+              mode: 'insensitive',
+            },
+          },
+        },
+        // Search in user profile (first name, last name)
+        {
+          user: {
+            profile: {
+              OR: [
+                {
+                  firstName: {
+                    contains: searchTerm,
+                    mode: 'insensitive',
+                  },
+                },
+                {
+                  lastName: {
+                    contains: searchTerm,
+                    mode: 'insensitive',
+                  },
+                },
+              ],
+            },
+          },
+        },
+        // Search in verification IDs
+        {
+          verificationId: {
+            contains: searchTerm,
+            mode: 'insensitive',
+          },
+        },
+        {
+          applicantId: {
+            contains: searchTerm,
+            mode: 'insensitive',
+          },
+        },
+        // Search in KYC profile
+        {
+          profile: {
+            OR: [
+              {
+                firstName: {
+                  contains: searchTerm,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                lastName: {
+                  contains: searchTerm,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                idNumber: {
+                  contains: searchTerm,
+                  mode: 'insensitive',
+                },
+              },
+            ],
+          },
+        },
+      ];
+    }
+
     // Filter by country (from user profile)
     if (country) {
       where.user = {
+        ...where.user,
         profile: {
+          ...where.user?.profile,
           country,
         },
       };
@@ -86,9 +169,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     // Filter by PEP status
-    if (pepStatus === 'yes' || pepStatus === 'no') {
+    if (pepStatus === 'true' || pepStatus === 'false') {
       where.profile = {
-        pepStatus: pepStatus === 'yes',
+        ...where.profile,
+        pepStatus: pepStatus === 'true',
+      };
+    }
+
+    // Filter by risk level
+    if (riskLevel) {
+      where.profile = {
+        ...where.profile,
+        riskScore: riskLevel === 'low' 
+          ? { lte: 30 } 
+          : riskLevel === 'medium' 
+            ? { gt: 30, lte: 60 }
+            : { gt: 60 }, // high
       };
     }
 

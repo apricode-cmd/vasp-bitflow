@@ -75,8 +75,10 @@ interface Order {
   currencyCode: string;
   fiatCurrencyCode: string;
   totalFiat: number;
+  walletAddress: string;
+  blockchainCode?: string;
   status: OrderStatus;
-  createdAt: string;
+  createdAt: string | Date;
   paymentMethodCode?: string | null;
   paymentMethod?: {
     code: string;

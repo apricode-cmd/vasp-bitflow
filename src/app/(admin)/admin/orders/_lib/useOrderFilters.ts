@@ -18,6 +18,8 @@ export interface OrderFilters {
   fiatCurrencyCode?: string;
   hasPayIn?: boolean;
   hasPayOut?: boolean;
+  page?: number;
+  limit?: number;
 }
 
 const DEFAULT_FILTERS: OrderFilters = {
@@ -27,7 +29,9 @@ const DEFAULT_FILTERS: OrderFilters = {
   currencyCode: undefined,
   fiatCurrencyCode: undefined,
   hasPayIn: undefined,
-  hasPayOut: undefined
+  hasPayOut: undefined,
+  page: 1,
+  limit: 20
 };
 
 export interface UseOrderFiltersReturn {
@@ -49,10 +53,19 @@ export function useOrderFilters(initialFilters?: Partial<OrderFilters>): UseOrde
     key: K,
     value: OrderFilters[K]
   ) => {
-    setFiltersState(prev => ({
-      ...prev,
-      [key]: value
-    }));
+    setFiltersState(prev => {
+      const newFilters = {
+        ...prev,
+        [key]: value
+      };
+      
+      // Reset to page 1 when any filter changes (except page and limit)
+      if (key !== 'page' && key !== 'limit') {
+        newFilters.page = 1;
+      }
+      
+      return newFilters;
+    });
   }, []);
 
   // Update multiple filters at once

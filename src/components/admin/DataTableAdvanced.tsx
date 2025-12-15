@@ -109,6 +109,13 @@ export interface DataTableAdvancedProps<TData, TValue> {
   
   // Inline editing
   onDataUpdate?: (rowIndex: number, columnId: string, value: string | number) => void;
+  
+  // Server-side pagination
+  serverSide?: boolean;
+  totalRows?: number;
+  currentPage?: number;
+  onPageChange?: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
 }
 
 type DensityMode = 'compact' | 'standard' | 'comfortable';
@@ -135,6 +142,11 @@ export function DataTableAdvanced<TData, TValue>({
   filters,
   defaultDensity = 'standard',
   onDataUpdate,
+  serverSide = false,
+  totalRows,
+  currentPage = 1,
+  onPageChange,
+  onPageSizeChange,
 }: DataTableAdvancedProps<TData, TValue>): React.ReactElement {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -146,9 +158,9 @@ export function DataTableAdvanced<TData, TValue>({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: serverSide ? undefined : getPaginationRowModel(),
+    getSortedRowModel: serverSide ? undefined : getSortedRowModel(),
+    getFilteredRowModel: serverSide ? undefined : getFilteredRowModel(),
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
@@ -161,12 +173,22 @@ export function DataTableAdvanced<TData, TValue>({
       columnFilters,
       columnVisibility,
       rowSelection,
+      ...(serverSide && {
+        pagination: {
+          pageIndex: currentPage - 1,
+          pageSize,
+        },
+      }),
     },
     initialState: {
       pagination: {
         pageSize,
       },
     },
+    manualPagination: serverSide,
+    manualSorting: serverSide,
+    manualFiltering: serverSide,
+    pageCount: serverSide && totalRows ? Math.ceil(totalRows / pageSize) : undefined,
     enableRowSelection,
   });
 
@@ -482,11 +504,11 @@ export function DataTableAdvanced<TData, TValue>({
         <div className="flex-1 text-sm text-muted-foreground">
           {hasSelection ? (
             <span>
-              {selectedRows.length} of {table.getFilteredRowModel().rows.length} row(s) selected
+              {selectedRows.length} of {serverSide ? totalRows : table.getFilteredRowModel().rows.length} row(s) selected
             </span>
           ) : (
             <span>
-              {table.getFilteredRowModel().rows.length} total row(s)
+              {serverSide ? totalRows : table.getFilteredRowModel().rows.length} total row(s)
             </span>
           )}
         </div>
@@ -496,7 +518,12 @@ export function DataTableAdvanced<TData, TValue>({
             <Select
               value={table.getState().pagination.pageSize.toString()}
               onValueChange={(value) => {
-                table.setPageSize(Number(value));
+                const newPageSize = Number(value);
+                if (serverSide) {
+                  onPageSizeChange?.(newPageSize);
+                } else {
+                  table.setPageSize(newPageSize);
+                }
               }}
             >
               <SelectTrigger className="h-8 w-[70px]">
@@ -512,15 +539,21 @@ export function DataTableAdvanced<TData, TValue>({
             </Select>
           </div>
           <div className="flex w-[100px] items-center justify-center text-sm font-medium">
-            Page {table.getState().pagination.pageIndex + 1} of{' '}
+            Page {serverSide ? currentPage : table.getState().pagination.pageIndex + 1} of{' '}
             {table.getPageCount()}
           </div>
           <div className="flex items-center space-x-2">
             <Button
               variant="outline"
               className="hidden h-8 w-8 p-0 lg:flex"
-              onClick={() => table.setPageIndex(0)}
-              disabled={!table.getCanPreviousPage()}
+              onClick={() => {
+                if (serverSide) {
+                  onPageChange?.(1);
+                } else {
+                  table.setPageIndex(0);
+                }
+              }}
+              disabled={serverSide ? currentPage === 1 : !table.getCanPreviousPage()}
             >
               <span className="sr-only">Go to first page</span>
               <ChevronsLeft className="h-4 w-4" />
@@ -528,8 +561,14 @@ export function DataTableAdvanced<TData, TValue>({
             <Button
               variant="outline"
               className="h-8 w-8 p-0"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
+              onClick={() => {
+                if (serverSide) {
+                  onPageChange?.(currentPage - 1);
+                } else {
+                  table.previousPage();
+                }
+              }}
+              disabled={serverSide ? currentPage === 1 : !table.getCanPreviousPage()}
             >
               <span className="sr-only">Go to previous page</span>
               <ChevronLeft className="h-4 w-4" />
@@ -537,8 +576,14 @@ export function DataTableAdvanced<TData, TValue>({
             <Button
               variant="outline"
               className="h-8 w-8 p-0"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
+              onClick={() => {
+                if (serverSide) {
+                  onPageChange?.(currentPage + 1);
+                } else {
+                  table.nextPage();
+                }
+              }}
+              disabled={serverSide ? currentPage >= table.getPageCount() : !table.getCanNextPage()}
             >
               <span className="sr-only">Go to next page</span>
               <ChevronRight className="h-4 w-4" />
@@ -546,8 +591,14 @@ export function DataTableAdvanced<TData, TValue>({
             <Button
               variant="outline"
               className="hidden h-8 w-8 p-0 lg:flex"
-              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-              disabled={!table.getCanNextPage()}
+              onClick={() => {
+                if (serverSide) {
+                  onPageChange?.(table.getPageCount());
+                } else {
+                  table.setPageIndex(table.getPageCount() - 1);
+                }
+              }}
+              disabled={serverSide ? currentPage >= table.getPageCount() : !table.getCanNextPage()}
             >
               <span className="sr-only">Go to last page</span>
               <ChevronsRight className="h-4 w-4" />

@@ -57,7 +57,7 @@ import { Combobox } from '@/components/shared/Combobox';
 import type { ComboboxOption } from '@/components/shared/Combobox';
 import { DynamicKycForm } from '@/components/forms/DynamicKycForm';
 import { KycQuickStats } from './_components/KycQuickStats';
-import { KycFilters, type KycFiltersState } from './_components/KycFilters';
+import { EnterpriseKycSearch, type EnterpriseFilters } from './_components/EnterpriseKycSearch';
 import { formatDateTime } from '@/lib/formatters';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -166,10 +166,13 @@ interface KycSession {
     documentType: string;
     fileUrl: string;
     fileName: string;
+    verificationData?: any;
   }>;
   provider?: {
     name: string;
     code: string;
+    status?: string;
+    service?: string;
   } | null;
 }
 
@@ -180,7 +183,7 @@ export default function AdminKycPage(): JSX.Element {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedSession, setSelectedSession] = useState<KycSession | null>(null);
-  const [filters, setFilters] = useState<KycFiltersState>({});
+  const [filters, setFilters] = useState<EnterpriseFilters>({});
   const [availableCountries, setAvailableCountries] = useState<string[]>([]);
   const [availableProviders, setAvailableProviders] = useState<Array<{ value: string; label: string }>>([]);
   const [statusCounts, setStatusCounts] = useState({ pending: 0, approved: 0, rejected: 0, total: 0 });
@@ -266,11 +269,17 @@ export default function AdminKycPage(): JSX.Element {
       if (filters.pepStatus) {
         url.searchParams.set('pepStatus', filters.pepStatus);
       }
-      if (filters.dateFrom) {
-        url.searchParams.set('dateFrom', filters.dateFrom.toISOString());
+      if (filters.riskLevel) {
+        url.searchParams.set('riskLevel', filters.riskLevel);
       }
-      if (filters.dateTo) {
-        url.searchParams.set('dateTo', filters.dateTo.toISOString());
+      if (filters.dateRange?.from) {
+        url.searchParams.set('dateFrom', filters.dateRange.from.toISOString());
+      }
+      if (filters.dateRange?.to) {
+        url.searchParams.set('dateTo', filters.dateRange.to.toISOString());
+      }
+      if (filters.search) {
+        url.searchParams.set('search', filters.search);
       }
 
       const response = await fetch(url.toString());
@@ -307,6 +316,7 @@ export default function AdminKycPage(): JSX.Element {
               .map((s: any) => s.user?.profile?.country)
               .filter(Boolean)
           )].sort();
+          console.log('[KYC Filters] Available countries:', countries);
           setAvailableCountries(countries as string[]);
         }
       }
@@ -315,14 +325,17 @@ export default function AdminKycPage(): JSX.Element {
       const providersResponse = await fetch('/api/admin/integrations?category=kyc');
       if (providersResponse.ok) {
         const result = await providersResponse.json();
+        console.log('[KYC Filters] Integrations response:', result);
         if (result.success && result.data) {
-          setAvailableProviders(
-            result.data.map((integration: any) => ({
-              value: integration.service,
-              label: integration.name || integration.service.toUpperCase(),
-            }))
-          );
+          const providers = result.data.map((integration: any) => ({
+            value: integration.service,
+            label: integration.name || integration.service.toUpperCase(),
+          }));
+          console.log('[KYC Filters] Available providers:', providers);
+          setAvailableProviders(providers);
         }
+      } else {
+        console.warn('[KYC Filters] Failed to fetch providers:', providersResponse.status);
       }
     } catch (error) {
       console.error('Failed to fetch filter options:', error);
@@ -786,66 +799,60 @@ export default function AdminKycPage(): JSX.Element {
       {/* Quick Stats */}
       <KycQuickStats />
 
-      {/* Advanced Filters */}
-      {/* Unified Filters Row */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        {/* Status Tabs */}
-        <Tabs value={selectedStatus} onValueChange={setSelectedStatus} className="flex-1">
-          <TabsList>
-            <TabsTrigger value="all">
-              All
-              {statusCounts.total > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {statusCounts.total}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="PENDING">
-              Pending
-              {statusCounts.pending > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {statusCounts.pending}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="APPROVED">
-              Approved
-              {statusCounts.approved > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {statusCounts.approved}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="REJECTED">
-              Rejected
-              {statusCounts.rejected > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {statusCounts.rejected}
-                </Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+      {/* Status Tabs */}
+      <Tabs value={selectedStatus} onValueChange={setSelectedStatus}>
+        <TabsList>
+          <TabsTrigger value="all">
+            All
+            {statusCounts.total > 0 && (
+              <Badge variant="secondary" className="ml-2">
+                {statusCounts.total}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="PENDING">
+            Pending
+            {statusCounts.pending > 0 && (
+              <Badge variant="secondary" className="ml-2">
+                {statusCounts.pending}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="APPROVED">
+            Approved
+            {statusCounts.approved > 0 && (
+              <Badge variant="secondary" className="ml-2">
+                {statusCounts.approved}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="REJECTED">
+            Rejected
+            {statusCounts.rejected > 0 && (
+              <Badge variant="secondary" className="ml-2">
+                {statusCounts.rejected}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-        {/* Advanced Filters */}
-        <KycFilters
-          filters={filters}
-          onFiltersChange={setFilters}
-          onReset={() => setFilters({})}
-          availableCountries={availableCountries}
-          availableProviders={availableProviders}
-        />
-      </div>
+      {/* Enterprise Search & Filters */}
+      <EnterpriseKycSearch
+        filters={filters}
+        onFiltersChange={setFilters}
+        availableCountries={availableCountries}
+        availableProviders={availableProviders}
+      />
 
       {/* KYC Sessions Table */}
       <DataTableAdvanced
         columns={columns}
         data={kycSessions}
-        searchPlaceholder="Search by name or email..."
         isLoading={loading}
         onRowClick={(row) => router.push(`/admin/kyc/${row.id}`)}
         pageSize={20}
-        exportFilename="kyc-sessions"
+        exportFileName="kyc-sessions"
         enableRowSelection={true}
         bulkActions={[
           {

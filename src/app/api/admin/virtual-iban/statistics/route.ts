@@ -8,6 +8,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminRole } from '@/lib/middleware/admin-auth';
 import { virtualIbanService } from '@/lib/services/virtual-iban.service';
 
+// Force dynamic rendering (uses headers for auth)
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     // Check admin permission

@@ -30,6 +30,11 @@ interface OrdersTableViewProps {
   fiatCurrencies?: any[];
   cryptocurrencies?: any[];
   networks?: any[];
+  totalOrders: number;
+  currentPage: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
 }
 
 export function OrdersTableView({ 
@@ -39,7 +44,12 @@ export function OrdersTableView({
   paymentMethods = [],
   fiatCurrencies = [],
   cryptocurrencies = [],
-  networks = []
+  networks = [],
+  totalOrders,
+  currentPage,
+  pageSize,
+  onPageChange,
+  onPageSizeChange
 }: OrdersTableViewProps): JSX.Element {
   const router = useRouter();
   
@@ -226,8 +236,13 @@ export function OrdersTableView({
         onExport={handleExport}
         exportFileName={`orders-${new Date().toISOString().split('T')[0]}`}
         onRowClick={handleRowClick}
-        pageSize={20}
+        pageSize={pageSize}
         defaultDensity="standard"
+        serverSide={true}
+        totalRows={totalOrders}
+        currentPage={currentPage}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
       />
 
       {/* Order Transition Dialog */}

@@ -8,6 +8,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth-utils';
 import { virtualIbanService } from '@/lib/services/virtual-iban.service';
 
+// Force dynamic rendering (uses headers for auth)
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     // Check client auth

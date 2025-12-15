@@ -33,7 +33,7 @@ export default function OrdersPage(): JSX.Element {
 
   // Custom hooks
   const { filters, setFilter } = useOrderFilters();
-  const { orders, loading, refetch } = useOrders(filters);
+  const { orders, loading, refetch, total, page, totalPages } = useOrders(filters);
 
   // Reference data for OrderTransitionDialog
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
@@ -150,7 +150,7 @@ export default function OrdersPage(): JSX.Element {
         </Tabs>
 
         <p className="text-sm text-muted-foreground">
-          {orders.length} orders
+          {total} orders (Page {page} of {totalPages})
         </p>
       </div>
 
@@ -164,12 +164,21 @@ export default function OrdersPage(): JSX.Element {
           fiatCurrencies={fiatCurrencies}
           cryptocurrencies={cryptocurrencies}
           networks={networks}
+          totalOrders={total}
+          currentPage={filters.page || 1}
+          pageSize={filters.limit || 20}
+          onPageChange={(newPage) => setFilter('page', newPage)}
+          onPageSizeChange={(newSize) => setFilter('limit', newSize)}
         />
       ) : (
         <OrderKanban
           orders={orders.map(o => ({
             ...o,
-            createdAt: new Date(o.createdAt)
+            createdAt: typeof o.createdAt === 'string' ? new Date(o.createdAt) : o.createdAt,
+            user: {
+              ...o.user,
+              profile: o.user.profile || { firstName: '', lastName: '' }
+            }
           }))}
           onStatusChange={async (orderId, newStatus, transitionData) => {
             // Handle status change via drag & drop

@@ -7,6 +7,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminAuth } from '@/lib/auth-utils';
 import { prisma } from '@/lib/prisma';
 
+// Force dynamic rendering (uses headers for auth)
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest): Promise<NextResponse> {
   try {
     const { error } = await requireAdminAuth();

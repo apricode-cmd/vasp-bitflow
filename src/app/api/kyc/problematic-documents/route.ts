@@ -10,6 +10,9 @@ import { getClientSession } from '@/auth-client';
 import { prisma } from '@/lib/prisma';
 import { integrationFactory } from '@/lib/integrations/IntegrationFactory';
 
+// Force dynamic rendering (uses headers for auth)
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     // Check authentication

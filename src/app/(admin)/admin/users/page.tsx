@@ -97,11 +97,16 @@ export default function UsersPage(): JSX.Element {
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [kycFilter, setKycFilter] = useState<string>('all');
+  
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalUsers, setTotalUsers] = useState(0);
 
   useEffect(() => {
     fetchUsers();
     fetchStats();
-  }, [statusFilter, kycFilter]);
+  }, [statusFilter, kycFilter, currentPage, pageSize]);
 
   const fetchUsers = async (): Promise<void> => {
     setRefreshing(true);
@@ -110,6 +115,10 @@ export default function UsersPage(): JSX.Element {
       
       // Only show CLIENT users (not admins)
       params.append('role', 'CLIENT');
+      
+      // Pagination
+      params.append('page', currentPage.toString());
+      params.append('limit', pageSize.toString());
       
       if (statusFilter === 'active') {
         params.append('isActive', 'true');
@@ -129,6 +138,7 @@ export default function UsersPage(): JSX.Element {
           createdAt: new Date(u.createdAt),
           lastLogin: u.lastLogin ? new Date(u.lastLogin) : null
         })));
+        setTotalUsers(data.pagination.total);
       } else {
         toast.error('Failed to fetch users');
       }
@@ -169,7 +179,6 @@ export default function UsersPage(): JSX.Element {
         toast.success(currentStatus ? 'User deactivated' : 'User activated');
         await fetchUsers();
         await fetchStats();
-        setSheetOpen(false);
       } else {
         toast.error(data.error || 'Failed to update user');
       }
@@ -598,7 +607,7 @@ export default function UsersPage(): JSX.Element {
         searchPlaceholder="Search by name or email..."
         isLoading={loading}
         onRowClick={viewUserDetails}
-        pageSize={20}
+        pageSize={pageSize}
         enableRowSelection={true}
         enableExport={true}
         exportFileName="users"
@@ -623,6 +632,14 @@ export default function UsersPage(): JSX.Element {
             variant: 'outline',
           },
         ]}
+        serverSide={true}
+        totalRows={totalUsers}
+        currentPage={currentPage}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(newSize) => {
+          setPageSize(newSize);
+          setCurrentPage(1); // Reset to page 1 when page size changes
+        }}
         filters={
           <>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
