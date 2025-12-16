@@ -13,6 +13,7 @@ import { IKycProvider, KycUserData } from '@/lib/integrations/categories/IKycPro
 /**
  * Format date for KYC without timezone conversion
  * Prevents the "day before" bug when converting to UTC
+ * ✅ Uses UTC methods as dates are stored in DB as UTC at noon
  */
 function formatDateForKyc(date: Date): string {
   // Validate that date is valid
@@ -21,9 +22,10 @@ function formatDateForKyc(date: Date): string {
     throw new Error('Invalid date provided for KYC');
   }
   
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  // Use UTC methods to extract the date as stored in database
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 

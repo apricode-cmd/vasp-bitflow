@@ -75,7 +75,16 @@ export async function GET(request: NextRequest) {
         email: user.email,
         firstName: user.profile.firstName,
         lastName: user.profile.lastName,
-        dateOfBirth: user.profile.dateOfBirth?.toISOString().split('T')[0] || '',
+        dateOfBirth: user.profile.dateOfBirth 
+          ? (() => {
+              // ✅ FIX: Use UTC date to prevent "1 day less" bug
+              const d = new Date(user.profile.dateOfBirth);
+              const year = d.getUTCFullYear();
+              const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+              const day = String(d.getUTCDate()).padStart(2, '0');
+              return `${year}-${month}-${day}`;
+            })()
+          : '',
         nationality: user.profile.nationality || user.profile.country,
         residenceCountry: user.profile.country,
         phone: user.profile.phoneNumber || '',

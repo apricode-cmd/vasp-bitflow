@@ -70,9 +70,27 @@ export async function GET(): Promise<NextResponse> {
       return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
     }
 
+    // ✅ FIX: Format dateOfBirth as YYYY-MM-DD to prevent timezone issues
+    // When Date is serialized to JSON, it uses toISOString() which causes timezone shift
+    const userData = {
+      ...user,
+      profile: user.profile ? {
+        ...user.profile,
+        dateOfBirth: user.profile.dateOfBirth 
+          ? (() => {
+              const d = new Date(user.profile.dateOfBirth);
+              const year = d.getUTCFullYear();
+              const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+              const day = String(d.getUTCDate()).padStart(2, '0');
+              return `${year}-${month}-${day}`;
+            })()
+          : null
+      } : null
+    };
+
     return NextResponse.json({
       success: true,
-      user
+      user: userData
     });
   } catch (error) {
     console.error('[PROFILE GET] Error:', error);
@@ -115,39 +133,37 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
       nationality: validated.nationality || null,
     };
     
-    // Convert dateOfBirth to Date if provided
-    // Handle both ISO string and YYYY-MM-DD format
+    // ✅ FIX: Parse dateOfBirth without timezone conversion
+    // Store in UTC at noon to prevent "1 day less" bug
     if (validated.dateOfBirth) {
       try {
         console.log('📅 Parsing dateOfBirth:', validated.dateOfBirth);
         
-        // If it's an ISO string (e.g., "1989-09-26T23:00:00.000Z"), parse it
-        if (validated.dateOfBirth.includes('T')) {
+        let year: number, month: number, day: number;
+        
+        // Parse YYYY-MM-DD format (from our fixed forms)
+        if (validated.dateOfBirth.includes('-') && !validated.dateOfBirth.includes('T')) {
+          [year, month, day] = validated.dateOfBirth.split('-').map(Number);
+          console.log('  ✅ YYYY-MM-DD format:', { year, month, day });
+        } 
+        // Fallback: parse ISO string if it comes from old forms
+        else if (validated.dateOfBirth.includes('T')) {
           const dateObj = new Date(validated.dateOfBirth);
-          console.log('  ISO string detected:', validated.dateOfBirth);
-          console.log('  Parsed as Date:', dateObj);
-          
-          // Extract year, month, day in local timezone
-          const year = dateObj.getFullYear();
-          const month = dateObj.getMonth();
-          const day = dateObj.getDate();
-          
-          console.log('  Extracted: year =', year, ', month =', month, ', day =', day);
-          
-          profileData.dateOfBirth = new Date(year, month, day);
-          console.log('  Final Date object:', profileData.dateOfBirth);
+          year = dateObj.getUTCFullYear();
+          month = dateObj.getUTCMonth() + 1;
+          day = dateObj.getUTCDate();
+          console.log('  ⚠️ ISO string detected, extracting UTC:', { year, month, day });
         } else {
-          // If it's YYYY-MM-DD format, parse as local date
-          const [year, month, day] = validated.dateOfBirth.split('-').map(Number);
-          console.log('  YYYY-MM-DD detected:', validated.dateOfBirth);
-          console.log('  Parsed: year =', year, ', month =', month, ', day =', day);
-          
-          profileData.dateOfBirth = new Date(year, month - 1, day); // month is 0-indexed
-          console.log('  Final Date object:', profileData.dateOfBirth);
+          throw new Error('Invalid date format');
         }
+        
+        // ✅ Store in UTC at noon to prevent timezone shift when reading
+        // Example: User enters "1963-03-06" → stored as "1963-03-06T12:00:00.000Z"
+        profileData.dateOfBirth = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+        console.log('  ✅ Saved to DB:', profileData.dateOfBirth.toISOString());
       } catch (error) {
         console.error('❌ Failed to parse dateOfBirth:', validated.dateOfBirth, error);
-        // Skip setting dateOfBirth if parsing fails
+        throw new Error('Invalid date of birth format');
       }
     }
 

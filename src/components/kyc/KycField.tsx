@@ -169,7 +169,17 @@ export function KycField({ field, value, onChange, error, formData = {} }: Props
         return (
           <DatePicker
             date={value ? new Date(value) : undefined}
-            onDateChange={(date) => onChange(date?.toISOString())}
+            onDateChange={(date) => {
+              if (date) {
+                // ✅ FIX: Use local date instead of UTC to prevent "1 day less" bug
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                onChange(`${year}-${month}-${day}`);
+              } else {
+                onChange('');
+              }
+            }}
             maxDate={maxDate}
           />
         );

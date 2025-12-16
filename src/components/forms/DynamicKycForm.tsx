@@ -231,7 +231,17 @@ export function DynamicKycForm({ onSubmit, initialData = {} }: DynamicKycFormPro
             </Label>
             <DatePicker
               date={value ? new Date(value) : undefined}
-              onDateChange={(date) => handleInputChange(field.fieldName, date ? date.toISOString().split('T')[0] : '')}
+              onDateChange={(date) => {
+                if (date) {
+                  // ✅ FIX: Use local date instead of UTC to prevent "1 day less" bug
+                  const year = date.getFullYear();
+                  const month = String(date.getMonth() + 1).padStart(2, '0');
+                  const day = String(date.getDate()).padStart(2, '0');
+                  handleInputChange(field.fieldName, `${year}-${month}-${day}`);
+                } else {
+                  handleInputChange(field.fieldName, '');
+                }
+              }}
               placeholder={`Select ${field.label.toLowerCase()}`}
               fromYear={1900}
               toYear={new Date().getFullYear()}

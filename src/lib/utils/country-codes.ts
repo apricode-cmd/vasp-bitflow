@@ -140,16 +140,35 @@ export function normalizeCountryCodeForProvider(code: string, provider: string):
 }
 
 /**
- * Format date for KYC providers
+ * Format date for KYC providers (API format)
  * Returns: YYYY-MM-DD
+ * ✅ Uses UTC methods to prevent timezone shift (dates stored in DB as UTC at noon)
  */
 export function formatDateForKyc(date: Date | null): string {
   if (!date) return '';
   
   const d = new Date(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
+  // Use UTC methods to extract the date as stored in database
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
   
   return `${year}-${month}-${day}`;
+}
+
+/**
+ * Format date for European display (DD.MM.YYYY)
+ * ✅ Uses UTC methods to prevent timezone shift
+ */
+export function formatDateEuropean(date: Date | string | null): string {
+  if (!date) return '';
+  
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '';
+  
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  
+  return `${day}.${month}.${year}`;
 }
