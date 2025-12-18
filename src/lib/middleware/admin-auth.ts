@@ -238,7 +238,7 @@ export function isErrorResponse(session: any): session is NextResponse {
  */
 export async function getCurrentUserId(): Promise<string | null> {
   // Try Custom JWT (Passkey) first
-  let sessionData = await getAdminSessionData();
+  const sessionData = await getAdminSessionData();
 
   if (!sessionData) {
     // Try NextAuth (Password+TOTP)

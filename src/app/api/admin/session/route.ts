@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   try {
     // Try Custom JWT (Passkey) first
-    let sessionData = await getAdminSessionData();
+    const sessionData = await getAdminSessionData();
     let adminId: string | undefined;
 
     if (sessionData) {

@@ -29,7 +29,7 @@ export default async function AdminLayout({
   
   // For all other /admin/* pages, check authentication
   // Try Custom JWT (Passkey) first
-  let sessionData = await getAdminSessionData();
+  const sessionData = await getAdminSessionData();
 
   if (!sessionData) {
     // Try NextAuth (Password+TOTP)

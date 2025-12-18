@@ -438,7 +438,7 @@ export class KycaidAdapter implements IKycProvider {
       }
 
       // Collect rejection reasons from verifications
-      let rejectionReasons: string[] = [];
+      const rejectionReasons: string[] = [];
       if (data.verifications) {
         Object.entries(data.verifications).forEach(([type, result]: [string, any]) => {
           if (result.verified === false && result.comment) {
@@ -626,7 +626,7 @@ export class KycaidAdapter implements IKycProvider {
     }
 
     // Collect rejection reasons from verifications
-    let rejectionReasons: string[] = [];
+    const rejectionReasons: string[] = [];
     if (verifications) {
       Object.entries(verifications).forEach(([type, result]: [string, any]) => {
         if (result.verified === false && result.comment) {

@@ -695,18 +695,19 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
     console.log('[BCB] Virtual account creation request accepted (202)');
 
     // BCB creates accounts asynchronously - poll until we get the IBAN
-    // Typically takes 1-5 seconds in sandbox, up to 30 seconds in production
-    // In production, it can take even longer (up to 60 seconds)
-    const maxAttempts = 20; // Increased from 10 to 20 for production
-    const pollInterval = 3000; // 3 seconds between attempts = 60s total
+    // BCB states accounts are created "instantly" (typically 1-10 seconds)
+    // We poll with shorter intervals to provide faster response
+    const maxAttempts = 30; // 30 attempts for safety
+    const pollInterval = 2000; // 2 seconds between attempts = 60s total
     
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       await this.sleep(pollInterval);
       
       console.log(`[BCB] Polling for virtual account (attempt ${attempt}/${maxAttempts})...`);
       
-      // Search only first 2 pages (200 accounts) - new accounts appear at the top
-      const virtualAccount = await this.findVirtualAccountByCorrelationId(correlationId, 2);
+      // Search in first page (1000 accounts) - new accounts appear at the top
+      // BCB API supports up to 1000 results per page
+      const virtualAccount = await this.findVirtualAccountByCorrelationId(correlationId, 1);
       
       if (virtualAccount) {
         const details = virtualAccount.virtualAccountDetails;
@@ -774,50 +775,64 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
 
   /**
    * Find virtual account by correlation ID
+   * BCB API supports pageSize up to 1000, and pageIndex (0-based offset)
    */
-  private async findVirtualAccountByCorrelationId(correlationId: string, maxPages: number = 3): Promise<BCBVirtualAccountData | null> {
+  private async findVirtualAccountByCorrelationId(correlationId: string, maxPages: number = 1): Promise<BCBVirtualAccountData | null> {
     if (!this.segregatedAccountId) return null;
 
     try {
-      // Paginate through accounts to find the correlation ID
-      // maxPages defaults to 3 (300 accounts) for performance
-      // Newer accounts typically appear in first few pages
-      let pageNumber = 1;
-      const pageSize = 100;
+      // Use maximum page size (1000) to minimize API calls
+      // Newer accounts typically appear at the top (pageIndex=0)
+      const pageSize = 1000; // Maximum allowed by BCB API
       
-      while (pageNumber <= maxPages) {
-        const response = await this.clientApiRequest<BCBVirtualAccountListResponse>(
-          'GET',
-          `/v1/accounts/${this.segregatedAccountId}/virtual/all-account-data?pageSize=${pageSize}&pageNumber=${pageNumber}`
-        );
-
-        console.log('[BCB] Virtual accounts response:', {
-          page: pageNumber,
-          count: response.results?.length || 0,
-          maxPages,
+      for (let pageIndex = 0; pageIndex < maxPages; pageIndex++) {
+        console.log('[BCB] Fetching virtual accounts:', {
+          pageIndex,
+          pageSize,
+          segregatedAccountId: this.segregatedAccountId,
           searchingFor: correlationId
         });
 
+        const response = await this.clientApiRequest<BCBVirtualAccountListResponse>(
+          'GET',
+          `/v1/accounts/${this.segregatedAccountId}/virtual/all-account-data?pageSize=${pageSize}&pageIndex=${pageIndex}`
+        );
+
+        console.log('[BCB] Virtual accounts response:', {
+          pageIndex,
+          count: response.count || 0,
+          resultsLength: response.results?.length || 0,
+          maxPages,
+        });
+
+        // Find account by correlationId
         const account = response.results?.find(acc => acc.correlationId === correlationId);
         
         if (account) {
-          console.log('[BCB] Account found on page', pageNumber);
+          console.log('[BCB] Account found:', {
+            correlationId: account.correlationId,
+            pageIndex,
+            status: account.virtualAccountDetails?.status,
+            hasIban: !!account.virtualAccountDetails?.iban
+          });
           return account;
         }
         
         // No more pages if less than pageSize returned
         if (!response.results || response.results.length < pageSize) {
-          console.log('[BCB] Reached last page');
+          console.log('[BCB] Reached last page - no more results');
           break;
         }
-        
-        pageNumber++;
       }
       
-      console.log('[BCB] Correlation ID not found in first', maxPages, 'pages');
+      console.log('[BCB] Correlation ID not found:', {
+        correlationId,
+        pagesSearched: maxPages,
+        segregatedAccountId: this.segregatedAccountId
+      });
       return null;
     } catch (error) {
-      console.warn('[BCB] Error fetching virtual accounts:', error);
+      console.error('[BCB] Error fetching virtual accounts:', error);
       return null;
     }
   }
@@ -871,6 +886,7 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
   /**
    * Get all virtual accounts for the segregated account
    * Useful for reconciliation and admin views
+   * Note: BCB API supports max 1000 results per page
    */
   async getAllVirtualAccounts(): Promise<BCBVirtualAccountData[]> {
     if (!this.segregatedAccountId) {
@@ -882,10 +898,16 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
     }
 
     try {
+      // Use max page size (1000) as recommended by BCB API spec
       const response = await this.clientApiRequest<BCBVirtualAccountListResponse>(
         'GET',
-        `/v1/accounts/${this.segregatedAccountId}/virtual/all-account-data?pageSize=1000`
+        `/v1/accounts/${this.segregatedAccountId}/virtual/all-account-data?pageSize=1000&pageIndex=0`
       );
+
+      console.log('[BCB] Fetched all virtual accounts:', {
+        count: response.count || 0,
+        results: response.results?.length || 0
+      });
 
       return response.results || [];
     } catch (error) {

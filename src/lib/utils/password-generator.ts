@@ -38,7 +38,7 @@ export function generatePassword(options: PasswordOptions = {}): string {
 
   // Build character set
   let charset = '';
-  let requiredChars: string[] = [];
+  const requiredChars: string[] = [];
 
   if (uppercase) {
     let chars = UPPERCASE;

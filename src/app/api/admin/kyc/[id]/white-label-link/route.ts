@@ -45,7 +45,7 @@ export async function POST(
     }
 
     // 3. Check if KYC session exists
-    let kycSession = await prisma.kycSession.findUnique({
+    const kycSession = await prisma.kycSession.findUnique({
       where: { userId }
     });
 
