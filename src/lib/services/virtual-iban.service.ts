@@ -122,8 +122,38 @@ class VirtualIbanService {
     });
 
     if (existingAccount) {
-      console.log('[VirtualIBAN] User already has an account:', existingAccount.id);
-      return existingAccount;
+      // ✅ FIX: If account is PENDING for more than 5 minutes, consider it failed
+      // Production BCB creates accounts in ~5 seconds, so 5 minutes is more than enough
+      if (existingAccount.status === 'PENDING') {
+        const accountAge = Date.now() - existingAccount.createdAt.getTime();
+        const fiveMinutes = 5 * 60 * 1000;
+        
+        if (accountAge > fiveMinutes) {
+          console.log('[VirtualIBAN] Found stale PENDING account, marking as FAILED:', {
+            accountId: existingAccount.id,
+            ageMinutes: Math.floor(accountAge / 1000 / 60)
+          });
+          
+          // Mark as FAILED so user can retry
+          await prisma.virtualIbanAccount.update({
+            where: { id: existingAccount.id },
+            data: { 
+              status: 'FAILED',
+              iban: 'FAILED - Account creation timeout'
+            },
+          });
+          
+          // Continue to create new account below
+        } else {
+          // Still fresh, return it
+          console.log('[VirtualIBAN] User has a fresh PENDING account:', existingAccount.id);
+          return existingAccount;
+        }
+      } else {
+        // ACTIVE account
+        console.log('[VirtualIBAN] User already has an ACTIVE account:', existingAccount.id);
+        return existingAccount;
+      }
     }
 
     // Get best provider using router (or specific if requested)

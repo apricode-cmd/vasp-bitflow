@@ -94,9 +94,24 @@ export async function POST(req: NextRequest) {
 
     // Check if user already has a WORKING account (not FAILED or CLOSED)
     const existingAccounts = await virtualIbanService.getUserAccounts(userId);
-    const activeAccount = existingAccounts.find(acc => 
-      acc.status !== 'FAILED' && acc.status !== 'CLOSED'
-    );
+    
+    // ✅ FIX: Consider PENDING accounts older than 5 minutes as FAILED
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const activeAccount = existingAccounts.find(acc => {
+      // Exclude FAILED and CLOSED
+      if (acc.status === 'FAILED' || acc.status === 'CLOSED') return false;
+      
+      // Exclude stale PENDING accounts (older than 5 minutes)
+      if (acc.status === 'PENDING' && acc.createdAt < fiveMinutesAgo) {
+        console.log('[VirtualIBAN API] Ignoring stale PENDING account:', {
+          accountId: acc.id,
+          age: Math.floor((Date.now() - acc.createdAt.getTime()) / 1000 / 60) + ' minutes'
+        });
+        return false;
+      }
+      
+      return true;
+    });
     
     if (activeAccount) {
       return NextResponse.json({
@@ -168,10 +183,25 @@ export async function GET(req: NextRequest) {
 
     // Check existing Virtual IBAN (exclude FAILED and CLOSED accounts)
     const existingAccounts = await virtualIbanService.getUserAccounts(userId);
-    let activeAccount = existingAccounts.find(acc => 
-      acc.status !== 'FAILED' && acc.status !== 'CLOSED'
+    
+    // ✅ FIX: Consider PENDING accounts older than 5 minutes as FAILED
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    let activeAccount = existingAccounts.find(acc => {
+      // Exclude FAILED and CLOSED
+      if (acc.status === 'FAILED' || acc.status === 'CLOSED') return false;
+      
+      // Exclude stale PENDING accounts (older than 5 minutes)
+      if (acc.status === 'PENDING' && acc.createdAt < fiveMinutesAgo) {
+        return false;
+      }
+      
+      return true;
+    });
+    
+    const hasFailedAccount = existingAccounts.some(acc => 
+      acc.status === 'FAILED' || 
+      (acc.status === 'PENDING' && acc.createdAt < fiveMinutesAgo)
     );
-    const hasFailedAccount = existingAccounts.some(acc => acc.status === 'FAILED');
     
     // Update lastBalanceUpdate for active account (to show refresh time)
     if (activeAccount) {
