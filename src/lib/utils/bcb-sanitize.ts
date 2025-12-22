@@ -142,9 +142,14 @@ export function sanitizePostcode(postcode: string | null | undefined): string {
 
 /**
  * Validates if a string contains only BCB-allowed characters
+ * Returns true if string is empty (validation happens elsewhere)
  */
 export function isValidForBCB(input: string, allowComma: boolean = false): boolean {
-  if (!input || input.startsWith(' ')) return false;
+  // Empty string is considered "valid" - validation happens elsewhere
+  if (!input || input.length === 0) return true;
+  
+  // Leading space is not allowed by BCB
+  if (input.startsWith(' ')) return false;
   
   const pattern = allowComma
     ? /^[a-zA-Z0-9\/\-\?:().'+ ,]+$/

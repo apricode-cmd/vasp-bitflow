@@ -38,7 +38,9 @@ export async function POST(req: NextRequest) {
     try {
       const body = await req.json();
       editedData = body.editedData;
-    } catch {
+      console.log('[VirtualIBAN API] Request body:', { hasEditedData: !!editedData, editedData });
+    } catch (e) {
+      console.log('[VirtualIBAN API] No request body or invalid JSON');
       // No body or invalid JSON - that's fine, we'll use profile data
     }
 
@@ -87,16 +89,98 @@ export async function POST(req: NextRequest) {
 
     const { firstName, lastName, country, city, address, postalCode, dateOfBirth, nationality } = user.profile;
 
-    // Required fields check
+    // If user provided edited data, validate and update profile first
+    if (editedData) {
+      console.log('[VirtualIBAN API] User provided edited data:', editedData);
+      
+      // Validate edited data
+      const validationErrors: string[] = [];
+      
+      if (editedData.firstName !== undefined && !editedData.firstName.trim()) {
+        validationErrors.push('firstName cannot be empty');
+      }
+      if (editedData.lastName !== undefined && !editedData.lastName.trim()) {
+        validationErrors.push('lastName cannot be empty');
+      }
+      if (editedData.address !== undefined && !editedData.address.trim()) {
+        validationErrors.push('address cannot be empty');
+      }
+      if (editedData.city !== undefined && !editedData.city.trim()) {
+        validationErrors.push('city cannot be empty');
+      }
+      
+      if (validationErrors.length > 0) {
+        console.error('[VirtualIBAN API] Validation errors for edited data:', validationErrors);
+        console.error('[VirtualIBAN API] Edited data received:', editedData);
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'Invalid edited data',
+            code: 'VALIDATION_ERROR',
+            validationErrors,
+            message: `Validation failed: ${validationErrors.join(', ')}`
+          },
+          { status: 400 }
+        );
+      }
+      
+      // Build update data object - only include fields that were actually edited
+      const updateData: any = {};
+      
+      if (editedData.firstName !== undefined) {
+        updateData.firstName = editedData.firstName.trim();
+      }
+      if (editedData.lastName !== undefined) {
+        updateData.lastName = editedData.lastName.trim();
+      }
+      if (editedData.address !== undefined) {
+        updateData.address = editedData.address.trim();
+      }
+      if (editedData.city !== undefined) {
+        updateData.city = editedData.city.trim();
+      }
+      if (editedData.postalCode !== undefined) {
+        updateData.postalCode = editedData.postalCode.trim() || null; // Allow null for optional field
+      }
+      
+      await prisma.profile.update({
+        where: { userId },
+        data: updateData,
+      });
+      
+      console.log('[VirtualIBAN API] Profile updated with edited data:', updateData);
+      console.log('[VirtualIBAN API] Profile changes saved permanently to database');
+      
+      // Re-fetch user profile to get updated data
+      const updatedUser = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { profile: true },
+      });
+      
+      if (!updatedUser || !updatedUser.profile) {
+        return NextResponse.json(
+          { success: false, error: 'Failed to fetch updated profile' },
+          { status: 500 }
+        );
+      }
+      
+      // Use updated profile data for subsequent checks
+      user.profile = updatedUser.profile;
+    }
+
+    // NOW check for missing required fields (after potential update)
+    const currentProfile = user.profile;
     const missingFields: string[] = [];
-    if (!firstName) missingFields.push('firstName');
-    if (!lastName) missingFields.push('lastName');
-    if (!country) missingFields.push('country');
-    if (!city) missingFields.push('city');
-    if (!address) missingFields.push('address');
-    if (!dateOfBirth) missingFields.push('dateOfBirth');
+    if (!currentProfile.firstName) missingFields.push('firstName');
+    if (!currentProfile.lastName) missingFields.push('lastName');
+    if (!currentProfile.country) missingFields.push('country');
+    if (!currentProfile.city) missingFields.push('city');
+    if (!currentProfile.address) missingFields.push('address');
+    if (!currentProfile.dateOfBirth) missingFields.push('dateOfBirth');
 
     if (missingFields.length > 0) {
+      console.error('[VirtualIBAN API] Missing profile fields (after update):', missingFields);
+      console.error('[VirtualIBAN API] Profile data:', currentProfile);
       return NextResponse.json(
         { 
           success: false, 
@@ -134,24 +218,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // If user provided edited data, temporarily update profile
-    // This allows them to fix non-ASCII characters or incorrect data
-    if (editedData) {
-      console.log('[VirtualIBAN] User provided edited data:', editedData);
-      await prisma.profile.update({
-        where: { userId },
-        data: {
-          ...(editedData.firstName && { firstName: editedData.firstName }),
-          ...(editedData.lastName && { lastName: editedData.lastName }),
-          ...(editedData.address && { address: editedData.address }),
-          ...(editedData.city && { city: editedData.city }),
-          ...(editedData.postalCode && { postalCode: editedData.postalCode }),
-        },
-      });
-      console.log('[VirtualIBAN] Profile updated with edited data');
-    }
-
-    // Create Virtual IBAN account
+    // Create Virtual IBAN account (uses latest profile data from DB)
     const account = await virtualIbanService.createAccountForUser(userId);
 
     return NextResponse.json({

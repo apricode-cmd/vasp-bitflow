@@ -90,15 +90,18 @@ export function useVirtualIban(): UseVirtualIbanReturn {
     setCreating(true);
     
     try {
+      console.log('[useVirtualIban] Creating account with edited data:', editedData);
+      
       const response = await fetch('/api/client/virtual-iban/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: editedData ? JSON.stringify({ editedData }) : undefined,
+        body: JSON.stringify({ editedData: editedData || undefined }),
       });
 
       const data = await response.json();
+      console.log('[useVirtualIban] API response:', { ok: response.ok, status: response.status, data });
 
       if (response.ok && data.success) {
         setAccount(data.data);
@@ -120,7 +123,12 @@ export function useVirtualIban(): UseVirtualIbanReturn {
           });
         } else if (data.code === 'PROFILE_INCOMPLETE' || data.code === 'MISSING_PROFILE_DATA') {
           toast.error('Profile Incomplete', { 
-            description: data.message,
+            description: data.message || `Missing: ${data.missingFields?.join(', ')}`,
+            duration: 6000,
+          });
+        } else if (data.code === 'VALIDATION_ERROR') {
+          toast.error('Validation Error', {
+            description: data.message || `Validation failed: ${data.validationErrors?.join(', ')}`,
             duration: 6000,
           });
         } else if (data.code === 'VIRTUAL_IBAN_CREATION_TIMEOUT') {

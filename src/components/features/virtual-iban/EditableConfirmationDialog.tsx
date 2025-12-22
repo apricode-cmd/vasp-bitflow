@@ -73,6 +73,8 @@ export function EditableConfirmationDialog({
   const [isEditing, setIsEditing] = useState(false);
   const [editedData, setEditedData] = useState<Partial<UserData>>({});
   const [showSanitizationWarning, setShowSanitizationWarning] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [hasChanges, setHasChanges] = useState(false); // Track if user made changes
 
   // Reset edited data when dialog opens or userData changes
   useEffect(() => {
@@ -85,19 +87,108 @@ export function EditableConfirmationDialog({
         postalCode: userData.postalCode,
       });
       
-      // Check if sanitization will occur
+      // Check if sanitization will occur (only for non-empty fields)
       const needsSanitization = 
-        !isValidForBCB(`${userData.firstName} ${userData.lastName}`, false) ||
-        !isValidForBCB(userData.address || '', true) ||
-        !isValidForBCB(userData.city || '', false) ||
-        !isValidForBCB(userData.postalCode || '', false);
+        (userData.firstName && !isValidForBCB(`${userData.firstName} ${userData.lastName}`, false)) ||
+        (userData.address && !isValidForBCB(userData.address, true)) ||
+        (userData.city && !isValidForBCB(userData.city, false)) ||
+        (userData.postalCode && !isValidForBCB(userData.postalCode, false));
       
-      setShowSanitizationWarning(needsSanitization);
+      setShowSanitizationWarning(!!needsSanitization);
+
+      // Check if required fields are missing - auto-enable edit mode
+      const hasEmptyRequiredFields = 
+        !userData.firstName?.trim() ||
+        !userData.lastName?.trim() ||
+        !userData.address?.trim() ||
+        !userData.city?.trim();
+      
+      if (hasEmptyRequiredFields) {
+        setIsEditing(true);
+      }
+      
+      // Reset hasChanges flag when dialog opens
+      setHasChanges(false);
     }
   }, [userData, open]);
 
+  // Reset validation errors when switching between edit/view mode
+  useEffect(() => {
+    if (!isEditing) {
+      setValidationErrors({});
+    }
+  }, [isEditing]);
+
+  /**
+   * Validate form data before submission
+   */
+  const validateData = (data: Partial<UserData>): boolean => {
+    const errors: Record<string, string> = {};
+    
+    // Validate required fields
+    if (!data.firstName?.trim()) {
+      errors.firstName = 'First name is required';
+    }
+    if (!data.lastName?.trim()) {
+      errors.lastName = 'Last name is required';
+    }
+    if (!data.address?.trim()) {
+      errors.address = 'Street address is required';
+    }
+    if (!data.city?.trim()) {
+      errors.city = 'City is required';
+    }
+    
+    // Optional but validate if provided
+    if (data.postalCode && !data.postalCode.trim()) {
+      errors.postalCode = 'Postal code cannot be empty if provided';
+    }
+    
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  /**
+   * Handle Save Changes button (in edit mode)
+   * Validates data and switches back to review mode
+   */
+  const handleSaveChanges = () => {
+    const dataToValidate = {
+      firstName: editedData.firstName || userData?.firstName,
+      lastName: editedData.lastName || userData?.lastName,
+      address: editedData.address || userData?.address,
+      city: editedData.city || userData?.city,
+      postalCode: editedData.postalCode || userData?.postalCode,
+    };
+    
+    if (!validateData(dataToValidate)) {
+      // Validation failed - stay in edit mode
+      return;
+    }
+    
+    // Validation passed - mark as changed and switch to review mode
+    setHasChanges(true);
+    setIsEditing(false);
+  };
+
   const handleConfirm = () => {
-    onConfirm(isEditing ? editedData : undefined);
+    // If editing, validate before submitting
+    if (isEditing) {
+      const dataToValidate = {
+        firstName: editedData.firstName || userData?.firstName,
+        lastName: editedData.lastName || userData?.lastName,
+        address: editedData.address || userData?.address,
+        city: editedData.city || userData?.city,
+        postalCode: editedData.postalCode || userData?.postalCode,
+      };
+      
+      if (!validateData(dataToValidate)) {
+        return; // Don't submit if validation fails
+      }
+    }
+    
+    // Pass editedData if user made changes (either in edit mode or already saved)
+    onConfirm((isEditing || hasChanges) ? editedData : undefined);
   };
 
   const getCurrentData = () => ({
@@ -182,6 +273,19 @@ export function EditableConfirmationDialog({
               </Alert>
             )}
 
+            {/* Warning about missing required fields */}
+            {isEditing && (!userData?.address?.trim() || !userData?.city?.trim()) && (
+              <Alert className="border-orange-500 bg-orange-50 dark:bg-orange-950/20">
+                <AlertTriangle className="h-4 w-4 text-orange-600" />
+                <AlertDescription className="text-orange-900 dark:text-orange-200">
+                  <p className="font-semibold mb-1">Required Information Missing</p>
+                  <p className="text-sm">
+                    Your profile is missing required address information. Please fill in all required fields (*) below to create your Virtual IBAN account.
+                  </p>
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Sanitization Warning */}
             {showSanitizationWarning && !isEditing && (
               <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
@@ -241,10 +345,22 @@ export function EditableConfirmationDialog({
                       <Input
                         id="firstName"
                         value={editedData.firstName || ''}
-                        onChange={(e) => setEditedData({ ...editedData, firstName: e.target.value })}
-                        className="h-12 font-semibold"
+                        onChange={(e) => {
+                          setEditedData({ ...editedData, firstName: e.target.value });
+                          // Clear error on change
+                          if (validationErrors.firstName) {
+                            setValidationErrors({ ...validationErrors, firstName: '' });
+                          }
+                        }}
+                        className={`h-12 font-semibold ${validationErrors.firstName ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                         placeholder="First name"
                       />
+                      {validationErrors.firstName && (
+                        <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          {validationErrors.firstName}
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <div className="group p-4 bg-gradient-to-br from-muted/80 to-muted/40 hover:from-muted hover:to-muted/60 rounded-lg border border-border/50 transition-all h-full">
@@ -264,10 +380,21 @@ export function EditableConfirmationDialog({
                       <Input
                         id="lastName"
                         value={editedData.lastName || ''}
-                        onChange={(e) => setEditedData({ ...editedData, lastName: e.target.value })}
-                        className="h-12 font-semibold"
+                        onChange={(e) => {
+                          setEditedData({ ...editedData, lastName: e.target.value });
+                          if (validationErrors.lastName) {
+                            setValidationErrors({ ...validationErrors, lastName: '' });
+                          }
+                        }}
+                        className={`h-12 font-semibold ${validationErrors.lastName ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                         placeholder="Last name"
                       />
+                      {validationErrors.lastName && (
+                        <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          {validationErrors.lastName}
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <div className="group p-4 bg-gradient-to-br from-muted/80 to-muted/40 hover:from-muted hover:to-muted/60 rounded-lg border border-border/50 transition-all h-full">
@@ -315,11 +442,23 @@ export function EditableConfirmationDialog({
                     <Input
                       id="address"
                       value={editedData.address || ''}
-                      onChange={(e) => setEditedData({ ...editedData, address: e.target.value })}
-                      className="h-12 font-semibold"
+                      onChange={(e) => {
+                        setEditedData({ ...editedData, address: e.target.value });
+                        if (validationErrors.address) {
+                          setValidationErrors({ ...validationErrors, address: '' });
+                        }
+                      }}
+                      className={`h-12 font-semibold ${validationErrors.address ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                       placeholder="Street address"
                     />
-                    <p className="text-xs text-muted-foreground">Enter your full street address</p>
+                    {validationErrors.address ? (
+                      <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        {validationErrors.address}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Enter your full street address</p>
+                    )}
                   </div>
                   
                   <div className="grid grid-cols-2 gap-3">
@@ -330,10 +469,21 @@ export function EditableConfirmationDialog({
                       <Input
                         id="postalCode"
                         value={editedData.postalCode || ''}
-                        onChange={(e) => setEditedData({ ...editedData, postalCode: e.target.value })}
-                        className="h-12 font-semibold"
+                        onChange={(e) => {
+                          setEditedData({ ...editedData, postalCode: e.target.value });
+                          if (validationErrors.postalCode) {
+                            setValidationErrors({ ...validationErrors, postalCode: '' });
+                          }
+                        }}
+                        className={`h-12 font-semibold ${validationErrors.postalCode ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                         placeholder="Postal code"
                       />
+                      {validationErrors.postalCode && (
+                        <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          {validationErrors.postalCode}
+                        </p>
+                      )}
                     </div>
                     
                     <div className="space-y-1.5">
@@ -343,10 +493,21 @@ export function EditableConfirmationDialog({
                       <Input
                         id="city"
                         value={editedData.city || ''}
-                        onChange={(e) => setEditedData({ ...editedData, city: e.target.value })}
-                        className="h-12 font-semibold"
+                        onChange={(e) => {
+                          setEditedData({ ...editedData, city: e.target.value });
+                          if (validationErrors.city) {
+                            setValidationErrors({ ...validationErrors, city: '' });
+                          }
+                        }}
+                        className={`h-12 font-semibold ${validationErrors.city ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                         placeholder="City"
                       />
+                      {validationErrors.city && (
+                        <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          {validationErrors.city}
+                        </p>
+                      )}
                     </div>
                   </div>
                   
@@ -432,6 +593,21 @@ export function EditableConfirmationDialog({
                 {' '}and authorize us to create an account using your verified KYC data.
               </AlertDescription>
             </Alert>
+
+            {/* Validation Errors Summary */}
+            {isEditing && Object.keys(validationErrors).length > 0 && (
+              <Alert className="border-red-500 bg-red-50 dark:bg-red-950/20">
+                <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                <AlertDescription className="text-sm text-red-900 dark:text-red-100">
+                  <p className="font-semibold mb-1">Please fix the following errors:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    {Object.entries(validationErrors).map(([field, error]) => (
+                      error && <li key={field}>{error}</li>
+                    ))}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
         )}
 
@@ -442,6 +618,7 @@ export function EditableConfirmationDialog({
                 variant="outline"
                 onClick={() => {
                   setIsEditing(false);
+                  setHasChanges(false);
                   // Reset to original data
                   if (userData) {
                     setEditedData({
@@ -459,7 +636,7 @@ export function EditableConfirmationDialog({
                 Cancel Edit
               </Button>
               <Button
-                onClick={() => setIsEditing(false)}
+                onClick={handleSaveChanges}
                 disabled={creating}
                 size="lg"
                 className="w-full sm:w-auto"
