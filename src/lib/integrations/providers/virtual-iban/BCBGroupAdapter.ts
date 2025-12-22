@@ -29,6 +29,8 @@ import {
   VirtualIbanWebhookPayload,
 } from '../../categories/IVirtualIbanProvider';
 import { IntegrationCategory, BaseIntegrationConfig, IntegrationTestResult } from '../../types';
+import { sanitizeName, sanitizeAddress, sanitizeCity, sanitizePostcode } from '@/lib/utils/bcb-sanitize';
+import { VirtualIbanCreationTimeoutError } from '@/lib/errors/VirtualIbanCreationTimeoutError';
 
 // ==========================================
 // CONFIGURATION INTERFACE
@@ -648,12 +650,17 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
 
     // Build payload for CreateNoBankDetailsVirtualAccountForIndividual
     // This creates a Virtual IBAN for receiving payments (no withdrawal bank details needed)
+    // 
+    // IMPORTANT: BCB API requires ASCII-only characters (English alphabet + numbers + special chars: /-?:().'+ )
+    // Non-ASCII characters (ø, å, ü, etc.) will cause silent rejection (202 Accepted but account not created)
+    // We sanitize all text fields to ensure compatibility
+    const rawName = `${request.firstName} ${request.lastName}`;
     const ownerPayload = {
       correlationId, // BCB requires UUID format
-      name: `${request.firstName} ${request.lastName}`.substring(0, 255),
-      addressLine1: request.address.street.substring(0, 255),
-      city: request.address.city.substring(0, 255),
-      postcode: request.address.postalCode?.substring(0, 255),
+      name: sanitizeName(rawName).substring(0, 255), // ← Sanitized: Nørregade → Norregade
+      addressLine1: sanitizeAddress(request.address.street).substring(0, 255), // ← Sanitized
+      city: sanitizeCity(request.address.city).substring(0, 255), // ← Sanitized: København → Kobenhavn
+      postcode: sanitizePostcode(request.address.postalCode).substring(0, 255), // ← Sanitized
       country: request.address.country.substring(0, 2).toUpperCase(),
       nationality: (request.nationality || request.address.country).substring(0, 2).toUpperCase(),
       dateOfBirth,
@@ -694,11 +701,13 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
 
     console.log('[BCB] Virtual account creation request accepted (202)');
 
-    // BCB creates accounts asynchronously - poll until we get the IBAN
-    // BCB states accounts are created "instantly" (typically 1-10 seconds)
-    // We poll with shorter intervals to provide faster response
-    const maxAttempts = 30; // 30 attempts for safety
-    const pollInterval = 2000; // 2 seconds between attempts = 60s total
+    // BCB creates accounts asynchronously
+    // Based on production testing:
+    // - Account appears in PENDING status within 1-2 seconds
+    // - Account becomes ACTIVE with IBAN within 4-6 seconds
+    // We poll with 1-second intervals for faster UX
+    const maxAttempts = 15; // 15 attempts
+    const pollInterval = 1000; // 1 second = 15 seconds total timeout
     
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       await this.sleep(pollInterval);
@@ -718,6 +727,7 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
             correlationId: virtualAccount.correlationId,
             iban: details.iban,
             status: details.status,
+            createdInSeconds: attempt * (pollInterval / 1000),
           });
           
           return this.mapClientApiAccountToVirtualIban(virtualAccount, request.userId, request.country);
@@ -726,44 +736,25 @@ export class BCBGroupAdapter implements IVirtualIbanProvider {
         console.log('[BCB] Account found but not ready yet:', {
           status: details?.status,
           hasIban: !!details?.iban,
+          attempt,
         });
       }
     }
 
-    // After max attempts, return what we have (might still be pending)
-    const finalAccount = await this.findVirtualAccountByCorrelationId(correlationId);
+    // ❌ TIMEOUT: Account not created after polling
+    // BCB typically creates accounts in 4-6 seconds, so 15 seconds timeout is sufficient
+    // If we reach here, something went wrong (validation error, BCB issue, etc.)
+    console.error('[BCB] TIMEOUT: Account not found after 15 seconds of polling');
+    console.error('[BCB] This usually means BCB rejected the account creation due to validation errors');
+    console.error('[BCB] correlationId:', correlationId);
+    console.error('[BCB] payload (after sanitization):', ownerPayload);
     
-    if (finalAccount) {
-      console.log('[BCB] Returning account (may still be pending):', {
-        correlationId: finalAccount.correlationId,
-        iban: finalAccount.virtualAccountDetails?.iban || 'PENDING',
-        status: finalAccount.virtualAccountDetails?.status,
-      });
-      
-      return this.mapClientApiAccountToVirtualIban(finalAccount, request.userId, request.country);
-    }
-
-    // Fallback - return pending status with correlation ID for later sync
-    console.log('[BCB] Account not found after polling, returning pending status');
-    
-    return {
-      accountId: `pending-${correlationId}`,
-      userId: request.userId,
-      iban: 'PENDING',
-      bic: undefined,
-      bankName: 'BCB Partner Bank',
-      accountHolder: `${request.firstName} ${request.lastName}`,
-      currency: request.currency,
-      country: request.country,
-      status: 'pending',
-      balance: 0,
-      createdAt: new Date(),
-      metadata: {
-        bcbCorrelationId: correlationId,
-        segregatedAccountId: this.segregatedAccountId,
-        creationPending: true,
-      },
-    };
+    // Do NOT create pending account - throw error instead
+    throw new VirtualIbanCreationTimeoutError(
+      'Virtual IBAN creation timeout: Account was not created by BCB within 15 seconds. ' +
+      'This may indicate data validation issues (non-ASCII characters were automatically sanitized). ' +
+      'Please verify your profile data and try again. If the problem persists, contact support with correlation ID: ' + correlationId
+    );
   }
 
   /**

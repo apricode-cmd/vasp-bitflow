@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth-utils';
 import { virtualIbanService } from '@/lib/services/virtual-iban.service';
 import { prisma } from '@/lib/prisma';
+import { VirtualIbanCreationTimeoutError } from '@/lib/errors/VirtualIbanCreationTimeoutError';
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,6 +25,22 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = session.user.id;
+
+    // Parse request body for edited data (optional)
+    let editedData: Partial<{
+      firstName: string;
+      lastName: string;
+      address: string;
+      city: string;
+      postalCode: string;
+    }> | undefined;
+
+    try {
+      const body = await req.json();
+      editedData = body.editedData;
+    } catch {
+      // No body or invalid JSON - that's fine, we'll use profile data
+    }
 
     // Get user with KYC session and profile
     const user = await prisma.user.findUnique({
@@ -93,25 +110,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if user already has a WORKING account (not FAILED or CLOSED)
+    // Note: PENDING removed - BCB creates instantly or fails with error
     const existingAccounts = await virtualIbanService.getUserAccounts(userId);
-    
-    // ✅ FIX: Consider PENDING accounts older than 5 minutes as FAILED
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-    const activeAccount = existingAccounts.find(acc => {
-      // Exclude FAILED and CLOSED
-      if (acc.status === 'FAILED' || acc.status === 'CLOSED') return false;
-      
-      // Exclude stale PENDING accounts (older than 5 minutes)
-      if (acc.status === 'PENDING' && acc.createdAt < fiveMinutesAgo) {
-        console.log('[VirtualIBAN API] Ignoring stale PENDING account:', {
-          accountId: acc.id,
-          age: Math.floor((Date.now() - acc.createdAt.getTime()) / 1000 / 60) + ' minutes'
-        });
-        return false;
-      }
-      
-      return true;
-    });
+    const activeAccount = existingAccounts.find(acc => 
+      acc.status !== 'FAILED' && acc.status !== 'CLOSED'
+    );
     
     if (activeAccount) {
       return NextResponse.json({
@@ -131,6 +134,23 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // If user provided edited data, temporarily update profile
+    // This allows them to fix non-ASCII characters or incorrect data
+    if (editedData) {
+      console.log('[VirtualIBAN] User provided edited data:', editedData);
+      await prisma.profile.update({
+        where: { userId },
+        data: {
+          ...(editedData.firstName && { firstName: editedData.firstName }),
+          ...(editedData.lastName && { lastName: editedData.lastName }),
+          ...(editedData.address && { address: editedData.address }),
+          ...(editedData.city && { city: editedData.city }),
+          ...(editedData.postalCode && { postalCode: editedData.postalCode }),
+        },
+      });
+      console.log('[VirtualIBAN] Profile updated with edited data');
+    }
+
     // Create Virtual IBAN account
     const account = await virtualIbanService.createAccountForUser(userId);
 
@@ -141,6 +161,20 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error('[API] Create Virtual IBAN failed:', error);
+    
+    // Handle timeout error specifically
+    if (error instanceof VirtualIbanCreationTimeoutError) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Virtual IBAN creation timeout',
+          code: 'VIRTUAL_IBAN_CREATION_TIMEOUT',
+          details: error.message,
+        },
+        { status: 408 } // 408 Request Timeout
+      );
+    }
+    
     return NextResponse.json(
       { 
         success: false, 
@@ -183,25 +217,10 @@ export async function GET(req: NextRequest) {
 
     // Check existing Virtual IBAN (exclude FAILED and CLOSED accounts)
     const existingAccounts = await virtualIbanService.getUserAccounts(userId);
-    
-    // ✅ FIX: Consider PENDING accounts older than 5 minutes as FAILED
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-    let activeAccount = existingAccounts.find(acc => {
-      // Exclude FAILED and CLOSED
-      if (acc.status === 'FAILED' || acc.status === 'CLOSED') return false;
-      
-      // Exclude stale PENDING accounts (older than 5 minutes)
-      if (acc.status === 'PENDING' && acc.createdAt < fiveMinutesAgo) {
-        return false;
-      }
-      
-      return true;
-    });
-    
-    const hasFailedAccount = existingAccounts.some(acc => 
-      acc.status === 'FAILED' || 
-      (acc.status === 'PENDING' && acc.createdAt < fiveMinutesAgo)
+    let activeAccount = existingAccounts.find(acc => 
+      acc.status !== 'FAILED' && acc.status !== 'CLOSED'
     );
+    const hasFailedAccount = existingAccounts.some(acc => acc.status === 'FAILED');
     
     // Update lastBalanceUpdate for active account (to show refresh time)
     if (activeAccount) {

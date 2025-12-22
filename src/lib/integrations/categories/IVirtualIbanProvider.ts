@@ -69,8 +69,10 @@ export interface VirtualIbanTransaction {
 
 /**
  * Account status
+ * Note: 'pending' removed - BCB creates accounts instantly (~5s)
+ * Either account is created (active) or creation fails with error
  */
-export type VirtualIbanStatus = 'active' | 'pending' | 'suspended' | 'closed';
+export type VirtualIbanStatus = 'active' | 'suspended' | 'closed';
 
 /**
  * Balance information

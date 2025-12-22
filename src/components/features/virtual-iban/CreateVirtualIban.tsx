@@ -21,14 +21,14 @@ import {
   ShieldCheck,
   AlertTriangle
 } from 'lucide-react';
-import { ConfirmationDialog } from './ConfirmationDialog';
+import { EditableConfirmationDialog } from './EditableConfirmationDialog';
 import type { UserData } from './types';
 
 interface CreateVirtualIbanProps {
   userData: UserData | null;
   creating: boolean;
   hasFailedAccount?: boolean;
-  onCreateAccount: () => Promise<boolean>;
+  onCreateAccount: (editedData?: Partial<UserData>) => Promise<boolean>;
 }
 
 export function CreateVirtualIban({ 
@@ -39,8 +39,8 @@ export function CreateVirtualIban({
 }: CreateVirtualIbanProps): JSX.Element {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
-  const handleConfirm = async () => {
-    const success = await onCreateAccount();
+  const handleConfirm = async (editedData?: Partial<UserData>) => {
+    const success = await onCreateAccount(editedData);
     if (success) {
       setShowConfirmDialog(false);
     }
@@ -282,8 +282,8 @@ export function CreateVirtualIban({
         </CardContent>
       </Card>
 
-      {/* Confirmation Dialog */}
-      <ConfirmationDialog
+      {/* Editable Confirmation Dialog */}
+      <EditableConfirmationDialog
         open={showConfirmDialog}
         onOpenChange={setShowConfirmDialog}
         userData={userData}

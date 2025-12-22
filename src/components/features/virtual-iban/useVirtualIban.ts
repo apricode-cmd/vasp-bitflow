@@ -16,7 +16,6 @@ import type { VirtualIbanAccount, VirtualIbanTransaction, EligibilityData, TopUp
 
 // Polling intervals
 const BALANCE_POLL_INTERVAL = 30 * 1000; // 30 seconds for balance updates
-const PENDING_POLL_INTERVAL = 5 * 1000;  // 5 seconds for PENDING accounts
 
 interface UseVirtualIbanReturn {
   // State
@@ -87,12 +86,16 @@ export function useVirtualIban(): UseVirtualIbanReturn {
     }
   }, []);
 
-  const createAccount = useCallback(async (): Promise<boolean> => {
+  const createAccount = useCallback(async (editedData?: Partial<UserData>): Promise<boolean> => {
     setCreating(true);
     
     try {
       const response = await fetch('/api/client/virtual-iban/create', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: editedData ? JSON.stringify({ editedData }) : undefined,
       });
 
       const data = await response.json();
@@ -103,23 +106,56 @@ export function useVirtualIban(): UseVirtualIbanReturn {
           description: data.alreadyExists 
             ? 'Your existing IBAN was retrieved.'
             : `Your new IBAN: ${data.data.iban}`,
+          duration: 5000,
         });
         
         await checkEligibility();
         return true;
       } else {
+        // Handle specific error codes
         if (data.code === 'KYC_REQUIRED') {
-          toast.error('KYC Verification Required', { description: data.message });
+          toast.error('KYC Verification Required', { 
+            description: data.message,
+            duration: 6000,
+          });
         } else if (data.code === 'PROFILE_INCOMPLETE' || data.code === 'MISSING_PROFILE_DATA') {
-          toast.error('Profile Incomplete', { description: data.message });
+          toast.error('Profile Incomplete', { 
+            description: data.message,
+            duration: 6000,
+          });
+        } else if (data.code === 'VIRTUAL_IBAN_CREATION_TIMEOUT') {
+          // Specific handling for BCB timeout
+          toast.error('Virtual IBAN Creation Timeout', {
+            description: 'BCB Group did not confirm account creation within 15 seconds. ' +
+                        'This may indicate data validation issues. Please verify your profile data and try again.',
+            duration: 10000,
+          });
         } else {
-          toast.error(data.error || 'Failed to create Virtual IBAN');
+          // Check if error message mentions timeout or validation
+          const errorMsg = data.error || data.details || 'Failed to create Virtual IBAN';
+          const isTimeout = errorMsg.toLowerCase().includes('timeout');
+          const isValidation = errorMsg.toLowerCase().includes('validation') || 
+                              errorMsg.toLowerCase().includes('data') ||
+                              errorMsg.toLowerCase().includes('verify');
+          
+          toast.error(
+            isTimeout ? 'Account Creation Timeout' : 'Creation Failed', 
+            { 
+              description: isValidation || isTimeout 
+                ? 'Please verify your profile data (name, address, country match) and try again. Contact support if the issue persists.'
+                : errorMsg,
+              duration: 8000,
+            }
+          );
         }
         return false;
       }
     } catch (error) {
       console.error('Create account error:', error);
-      toast.error('An error occurred while creating Virtual IBAN');
+      toast.error('Network Error', {
+        description: 'Unable to reach the server. Please check your connection and try again.',
+        duration: 6000,
+      });
       return false;
     } finally {
       setCreating(false);
@@ -197,65 +233,6 @@ export function useVirtualIban(): UseVirtualIbanReturn {
     };
     init();
   }, [checkEligibility]);
-
-  // Auto-polling for PENDING accounts (check every 5 seconds)
-  useEffect(() => {
-    if (!account || account.status !== 'PENDING') return;
-
-    console.log('[VirtualIBAN] Starting PENDING account polling (every 5s)...');
-
-    const interval = setInterval(async () => {
-      try {
-        const response = await fetch('/api/client/virtual-iban/create');
-        const data = await response.json();
-
-        if (response.ok && data.success && data.existingAccount) {
-          const newAccount = data.existingAccount;
-          
-          // Check if status changed from PENDING to ACTIVE
-          if (newAccount.status === 'ACTIVE' && account.status === 'PENDING') {
-            toast.success('Virtual IBAN Activated!', {
-              description: `Your IBAN ${newAccount.iban} is now ready to use.`,
-            });
-          }
-          
-          setAccount(newAccount);
-          setEligibility(data);
-
-          // If now active, also fetch transactions
-          if (newAccount.status === 'ACTIVE') {
-            try {
-              const [txResponse, topUpResponse] = await Promise.all([
-                fetch(`/api/client/virtual-iban/${newAccount.id}/transactions`),
-                fetch(`/api/client/virtual-iban/${newAccount.id}/topup`),
-              ]);
-              
-              const [txData, topUpData] = await Promise.all([
-                txResponse.json(),
-                topUpResponse.json(),
-              ]);
-              
-              if (txData.success) {
-                setTransactions(txData.data || []);
-              }
-              if (topUpData.success) {
-                setTopUpRequests(topUpData.data || []);
-              }
-            } catch {
-              // Silent fail
-            }
-          }
-        }
-      } catch {
-        // Silent fail for auto-polling
-      }
-    }, PENDING_POLL_INTERVAL);
-
-    return () => {
-      console.log('[VirtualIBAN] Stopping PENDING account polling');
-      clearInterval(interval);
-    };
-  }, [account]);
 
   // Auto-polling for balance updates (only when account is ACTIVE)
   useEffect(() => {
