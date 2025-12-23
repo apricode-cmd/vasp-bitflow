@@ -16,8 +16,7 @@ import { z } from 'zod';
 
 const CreateTopUpSchema = z.object({
   amount: z.number()
-    .min(10, 'Minimum top-up amount is €10')
-    .max(100000, 'Maximum top-up amount is €100,000'),
+    .min(10000, 'Minimum top-up amount is €10,000'),
 });
 
 // ==========================================

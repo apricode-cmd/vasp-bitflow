@@ -73,7 +73,7 @@ export function TopUpModal({ open, onOpenChange, account }: TopUpModalProps): JS
   const [downloadingInvoice, setDownloadingInvoice] = useState(false);
 
   const parsedAmount = parseFloat(amount) || 0;
-  const isValidAmount = parsedAmount >= 10 && parsedAmount <= 100000;
+  const isValidAmount = parsedAmount >= 10000;
 
   const handleCopy = (text: string, label: string): void => {
     navigator.clipboard.writeText(text);
@@ -213,14 +213,13 @@ export function TopUpModal({ open, onOpenChange, account }: TopUpModalProps): JS
                       setAmount(newValue);
                     }}
                     className="pl-8 text-2xl h-14 font-mono"
-                    min={10}
-                    max={100000}
+                    min={10000}
                     step={0.01}
                   />
                 </div>
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-muted-foreground">
-                    Minimum: €10 • Maximum: €100,000
+                    Minimum: €10,000
                   </p>
                   {parsedAmount > 0 && (
                     <p className="text-sm font-medium text-primary">
@@ -233,7 +232,7 @@ export function TopUpModal({ open, onOpenChange, account }: TopUpModalProps): JS
               {/* Quick amounts */}
               <div className="flex flex-wrap gap-2">
                 <p className="w-full text-xs text-muted-foreground mb-1">Quick amounts:</p>
-                {[100, 500, 1000, 5000].map((preset) => (
+                {[10000, 25000, 50000, 100000].map((preset) => (
                   <Button
                     key={preset}
                     type="button"

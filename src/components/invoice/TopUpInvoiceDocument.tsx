@@ -368,7 +368,7 @@ export const TopUpInvoiceDocument: React.FC<{ data: TopUpInvoiceData }> = ({ dat
             • SWIFT transfers may take 2-5 business days{'\n'}
             • Your balance will update automatically upon receipt{'\n'}
             • Currency must be {data.currency}{'\n'}
-            • Minimum top-up: €10 | Maximum: €100,000{'\n'}
+            • Minimum top-up: €10,000{'\n'}
             • Transfers from third-party accounts may be rejected
           </Text>
         </View>
