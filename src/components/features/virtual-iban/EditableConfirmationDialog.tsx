@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import type { UserData } from './types';
 import { sanitizeName, sanitizeAddress, sanitizeCity, sanitizePostcode, isValidForBCB } from '@/lib/utils/bcb-sanitize';
+import { needsTransliteration, detectScript } from '@/lib/utils/universal-transliterate';
 
 interface EditableConfirmationDialogProps {
   open: boolean;
@@ -293,10 +294,10 @@ export function EditableConfirmationDialog({
                 <AlertDescription className="text-amber-900 dark:text-amber-200 text-sm">
                   <p className="font-semibold mb-2">Special Characters Detected</p>
                   <p className="mb-2">
-                    BCB requires ASCII-only characters. Special characters (ø, å, ü, é, etc.) will be automatically converted:
+                    BCB requires ASCII-only characters. Non-Latin characters (Greek, Cyrillic, diacritics) will be automatically converted:
                   </p>
                   <div className="space-y-1 text-xs bg-amber-100 dark:bg-amber-900/30 p-3 rounded-lg font-mono">
-                    {!isValidForBCB(fullName, false) && (
+                    {(needsTransliteration(fullName) || !isValidForBCB(fullName, false)) && (
                       <div className="flex items-center gap-2">
                         <span className="text-amber-700 dark:text-amber-400">Name:</span>
                         <span className="text-amber-600 dark:text-amber-300">{fullName}</span>
@@ -304,7 +305,7 @@ export function EditableConfirmationDialog({
                         <span className="text-green-700 dark:text-green-400 font-semibold">{sanitizeName(fullName)}</span>
                       </div>
                     )}
-                    {!isValidForBCB(currentData.address, true) && (
+                    {(needsTransliteration(currentData.address) || !isValidForBCB(currentData.address, true)) && (
                       <div className="flex items-center gap-2">
                         <span className="text-amber-700 dark:text-amber-400">Address:</span>
                         <span className="text-amber-600 dark:text-amber-300">{currentData.address}</span>
@@ -312,7 +313,7 @@ export function EditableConfirmationDialog({
                         <span className="text-green-700 dark:text-green-400 font-semibold">{sanitizeAddress(currentData.address)}</span>
                       </div>
                     )}
-                    {!isValidForBCB(currentData.city, false) && (
+                    {(needsTransliteration(currentData.city) || !isValidForBCB(currentData.city, false)) && (
                       <div className="flex items-center gap-2">
                         <span className="text-amber-700 dark:text-amber-400">City:</span>
                         <span className="text-amber-600 dark:text-amber-300">{currentData.city}</span>

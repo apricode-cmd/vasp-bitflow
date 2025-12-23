@@ -3,6 +3,8 @@
  * BCB requires ASCII-only characters in most fields
  */
 
+import { transliterateToASCII } from './universal-transliterate';
+
 /**
  * Common character transliterations for European languages
  */
@@ -78,12 +80,17 @@ export function sanitizeForBCB(input: string | null | undefined, allowComma: boo
   
   let result = input;
   
-  // Step 1: Transliterate common non-ASCII characters
+  // Step 1: Universal transliteration (Greek, Cyrillic, and all non-Latin scripts)
+  // This handles: ΖΑΓΟΡΑ → ZAGORA, Москва → Moskva, etc.
+  result = transliterateToASCII(result);
+  
+  // Step 2: Apply existing Latin diacritics map (for compatibility and edge cases)
+  // This handles: Søren → Soren, Müller → Muller, etc.
   for (const [char, replacement] of Object.entries(TRANSLITERATION_MAP)) {
     result = result.replace(new RegExp(char, 'g'), replacement);
   }
   
-  // Step 2: Remove any remaining non-ASCII characters
+  // Step 3: Remove any remaining non-ASCII characters
   // Keep only: a-z A-Z 0-9 / - ? : ( ) . ' + space (and comma if allowed)
   const allowedPattern = allowComma 
     ? /[^a-zA-Z0-9\/\-\?:().'+ ,]/g
@@ -91,13 +98,13 @@ export function sanitizeForBCB(input: string | null | undefined, allowComma: boo
   
   result = result.replace(allowedPattern, '');
   
-  // Step 3: Remove leading spaces (BCB requirement)
+  // Step 4: Remove leading spaces (BCB requirement)
   result = result.replace(/^ +/, '');
   
-  // Step 4: Collapse multiple spaces into one
+  // Step 5: Collapse multiple spaces into one
   result = result.replace(/ {2,}/g, ' ');
   
-  // Step 5: Trim trailing spaces
+  // Step 6: Trim trailing spaces
   result = result.trim();
   
   return result;
