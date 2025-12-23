@@ -31,12 +31,10 @@ import {
   Landmark,
   Info,
   Edit2,
-  ArrowRight,
   AlertTriangle
 } from 'lucide-react';
 import type { UserData } from './types';
-import { sanitizeName, sanitizeAddress, sanitizeCity, sanitizePostcode, isValidForBCB } from '@/lib/utils/bcb-sanitize';
-import { needsTransliteration, detectScript } from '@/lib/utils/universal-transliterate';
+import { transliterateToASCII } from '@/lib/utils/universal-transliterate';
 
 interface EditableConfirmationDialogProps {
   open: boolean;
@@ -73,29 +71,22 @@ export function EditableConfirmationDialog({
 }: EditableConfirmationDialogProps): JSX.Element {
   const [isEditing, setIsEditing] = useState(false);
   const [editedData, setEditedData] = useState<Partial<UserData>>({});
-  const [showSanitizationWarning, setShowSanitizationWarning] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [hasChanges, setHasChanges] = useState(false); // Track if user made changes
 
   // Reset edited data when dialog opens or userData changes
   useEffect(() => {
     if (userData) {
-      setEditedData({
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        address: userData.address,
-        city: userData.city,
-        postalCode: userData.postalCode,
-      });
+      // Auto-transliterate data when loading (so fields show ASCII version immediately)
+      const transliteratedData = {
+        firstName: userData.firstName ? transliterateToASCII(userData.firstName) : '',
+        lastName: userData.lastName ? transliterateToASCII(userData.lastName) : '',
+        address: userData.address ? transliterateToASCII(userData.address) : '',
+        city: userData.city ? transliterateToASCII(userData.city) : '',
+        postalCode: userData.postalCode ? transliterateToASCII(userData.postalCode) : '',
+      };
       
-      // Check if sanitization will occur (only for non-empty fields)
-      const needsSanitization = 
-        (userData.firstName && !isValidForBCB(`${userData.firstName} ${userData.lastName}`, false)) ||
-        (userData.address && !isValidForBCB(userData.address, true)) ||
-        (userData.city && !isValidForBCB(userData.city, false)) ||
-        (userData.postalCode && !isValidForBCB(userData.postalCode, false));
-      
-      setShowSanitizationWarning(!!needsSanitization);
+      setEditedData(transliteratedData);
 
       // Check if required fields are missing - auto-enable edit mode
       const hasEmptyRequiredFields = 
@@ -287,48 +278,6 @@ export function EditableConfirmationDialog({
               </Alert>
             )}
 
-            {/* Sanitization Warning */}
-            {showSanitizationWarning && !isEditing && (
-              <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                <AlertDescription className="text-amber-900 dark:text-amber-200 text-sm">
-                  <p className="font-semibold mb-2">Special Characters Detected</p>
-                  <p className="mb-2">
-                    BCB requires ASCII-only characters. Non-Latin characters (Greek, Cyrillic, diacritics) will be automatically converted:
-                  </p>
-                  <div className="space-y-1 text-xs bg-amber-100 dark:bg-amber-900/30 p-3 rounded-lg font-mono">
-                    {(needsTransliteration(fullName) || !isValidForBCB(fullName, false)) && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-amber-700 dark:text-amber-400">Name:</span>
-                        <span className="text-amber-600 dark:text-amber-300">{fullName}</span>
-                        <ArrowRight className="h-3 w-3 text-amber-600" />
-                        <span className="text-green-700 dark:text-green-400 font-semibold">{sanitizeName(fullName)}</span>
-                      </div>
-                    )}
-                    {(needsTransliteration(currentData.address) || !isValidForBCB(currentData.address, true)) && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-amber-700 dark:text-amber-400">Address:</span>
-                        <span className="text-amber-600 dark:text-amber-300">{currentData.address}</span>
-                        <ArrowRight className="h-3 w-3 text-amber-600" />
-                        <span className="text-green-700 dark:text-green-400 font-semibold">{sanitizeAddress(currentData.address)}</span>
-                      </div>
-                    )}
-                    {(needsTransliteration(currentData.city) || !isValidForBCB(currentData.city, false)) && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-amber-700 dark:text-amber-400">City:</span>
-                        <span className="text-amber-600 dark:text-amber-300">{currentData.city}</span>
-                        <ArrowRight className="h-3 w-3 text-amber-600" />
-                        <span className="text-green-700 dark:text-green-400 font-semibold">{sanitizeCity(currentData.city)}</span>
-                      </div>
-                    )}
-                  </div>
-                  <p className="mt-2 text-xs">
-                    This is automatic and safe. Click <button onClick={() => setIsEditing(true)} className="underline font-semibold">Edit</button> if you want to change anything.
-                  </p>
-                </AlertDescription>
-              </Alert>
-            )}
-
             {/* Personal Info */}
             <div className="space-y-3">
               <h4 className="text-sm font-semibold flex items-center gap-2 text-foreground">
@@ -382,7 +331,9 @@ export function EditableConfirmationDialog({
                         id="lastName"
                         value={editedData.lastName || ''}
                         onChange={(e) => {
-                          setEditedData({ ...editedData, lastName: e.target.value });
+                          // Auto-transliterate on input
+                          const transliterated = transliterateToASCII(e.target.value);
+                          setEditedData({ ...editedData, lastName: transliterated });
                           if (validationErrors.lastName) {
                             setValidationErrors({ ...validationErrors, lastName: '' });
                           }
@@ -444,7 +395,9 @@ export function EditableConfirmationDialog({
                       id="address"
                       value={editedData.address || ''}
                       onChange={(e) => {
-                        setEditedData({ ...editedData, address: e.target.value });
+                        // Auto-transliterate on input
+                        const transliterated = transliterateToASCII(e.target.value);
+                        setEditedData({ ...editedData, address: transliterated });
                         if (validationErrors.address) {
                           setValidationErrors({ ...validationErrors, address: '' });
                         }
@@ -471,7 +424,9 @@ export function EditableConfirmationDialog({
                         id="postalCode"
                         value={editedData.postalCode || ''}
                         onChange={(e) => {
-                          setEditedData({ ...editedData, postalCode: e.target.value });
+                          // Auto-transliterate on input
+                          const transliterated = transliterateToASCII(e.target.value);
+                          setEditedData({ ...editedData, postalCode: transliterated });
                           if (validationErrors.postalCode) {
                             setValidationErrors({ ...validationErrors, postalCode: '' });
                           }
@@ -495,7 +450,9 @@ export function EditableConfirmationDialog({
                         id="city"
                         value={editedData.city || ''}
                         onChange={(e) => {
-                          setEditedData({ ...editedData, city: e.target.value });
+                          // Auto-transliterate on input
+                          const transliterated = transliterateToASCII(e.target.value);
+                          setEditedData({ ...editedData, city: transliterated });
                           if (validationErrors.city) {
                             setValidationErrors({ ...validationErrors, city: '' });
                           }
