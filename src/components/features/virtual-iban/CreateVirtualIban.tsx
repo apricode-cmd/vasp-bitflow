@@ -40,7 +40,9 @@ export function CreateVirtualIban({
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   const handleConfirm = async (editedData?: Partial<UserData>) => {
+    console.log('[CreateVirtualIban] handleConfirm called with editedData:', editedData);
     const success = await onCreateAccount(editedData);
+    console.log('[CreateVirtualIban] onCreateAccount result:', success);
     if (success) {
       setShowConfirmDialog(false);
     }

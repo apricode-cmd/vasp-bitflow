@@ -120,10 +120,79 @@ export function sanitizeName(name: string | null | undefined): string {
 }
 
 /**
- * Sanitizes address line (allows comma)
+ * Common country names in various languages (to remove from address)
  */
-export function sanitizeAddress(address: string | null | undefined): string {
-  return sanitizeForBCB(address, true);
+const COUNTRY_NAMES = [
+  // English
+  'belgium', 'belgique', 'belgie', 'belgien',
+  'france', 'deutschland', 'germany', 'spain', 'espana', 'italy', 'italia',
+  'netherlands', 'nederland', 'poland', 'polska', 'denmark', 'danmark',
+  'sweden', 'sverige', 'norway', 'norge', 'finland', 'suomi',
+  'portugal', 'austria', 'osterreich', 'switzerland', 'schweiz',
+  'ireland', 'eire', 'greece', 'ellada', 'czech republic', 'ceska republika',
+  'hungary', 'magyarorszag', 'romania', 'romania', 'bulgaria', 'bulgariya',
+  'croatia', 'hrvatska', 'slovakia', 'slovensko', 'slovenia', 'slovenija',
+  'estonia', 'eesti', 'latvia', 'latvija', 'lithuania', 'lietuva',
+  'luxembourg', 'luxemburg', 'malta', 'cyprus', 'kypros',
+];
+
+/**
+ * Sanitizes address line (allows comma)
+ * Removes postal codes and country names that shouldn't be in address field
+ */
+export function sanitizeAddress(address: string | null | undefined, postalCode?: string | null): string {
+  if (!address) return '';
+  
+  let cleaned = address.trim();
+  
+  // Step 1: Remove postal code from beginning if it matches the provided postalCode
+  if (postalCode && cleaned.toLowerCase().startsWith(postalCode.toLowerCase())) {
+    // Remove postal code and any following space/comma
+    cleaned = cleaned.substring(postalCode.length).replace(/^[\s,]+/, '');
+  }
+  
+  // Step 2: Remove postal codes at the beginning (4-5 digit pattern)
+  // Match patterns like "4210 " or "4210," at the start
+  cleaned = cleaned.replace(/^(\d{4,5})[\s,]+/i, '');
+  
+  // Step 3: Remove country names from the end (case-insensitive)
+  const words = cleaned.toLowerCase().split(/\s+/);
+  const lastWords = words.slice(-2); // Check last 1-2 words
+  
+  for (const countryName of COUNTRY_NAMES) {
+    const countryWords = countryName.toLowerCase().split(/\s+/);
+    
+    // Check if last words match country name
+    if (lastWords.length >= countryWords.length) {
+      const addressEnd = lastWords.slice(-countryWords.length).join(' ');
+      if (addressEnd === countryWords.join(' ')) {
+        // Remove country name from end
+        cleaned = cleaned.substring(0, cleaned.length - addressEnd.length)
+          .replace(/\s*,\s*$/, '') // Remove trailing comma
+          .trim();
+        break;
+      }
+    }
+    
+    // Also check single word at the end
+    if (words.length > 0 && words[words.length - 1] === countryName.toLowerCase()) {
+      cleaned = cleaned.substring(0, cleaned.length - words[words.length - 1].length)
+        .replace(/\s*,\s*$/, '') // Remove trailing comma
+        .trim();
+      break;
+    }
+  }
+  
+  // Step 4: Apply standard BCB sanitization (ASCII conversion, etc.)
+  cleaned = sanitizeForBCB(cleaned, true);
+  
+  // Step 5: Ensure address is not empty after cleaning
+  if (!cleaned || cleaned.trim().length === 0) {
+    // If address became empty, try to use original (at least sanitized)
+    cleaned = sanitizeForBCB(address, true);
+  }
+  
+  return cleaned.trim();
 }
 
 /**

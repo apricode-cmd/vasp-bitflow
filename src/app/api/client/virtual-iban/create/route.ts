@@ -17,6 +17,8 @@ import { VirtualIbanCreationTimeoutError } from '@/lib/errors/VirtualIbanCreatio
 
 export async function POST(req: NextRequest) {
   try {
+    console.log('[VirtualIBAN API] POST /api/client/virtual-iban/create - Request received');
+    
     // Check client auth
     const { error, session } = await requireAuth();
     if (error) return error;
@@ -25,6 +27,7 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = session.user.id;
+    console.log('[VirtualIBAN API] User ID:', userId);
 
     // Parse request body for edited data (optional)
     let editedData: Partial<{
@@ -219,7 +222,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Create Virtual IBAN account (uses latest profile data from DB)
+    console.log('[VirtualIBAN API] Calling virtualIbanService.createAccountForUser...');
     const account = await virtualIbanService.createAccountForUser(userId);
+    console.log('[VirtualIBAN API] Account created successfully:', { accountId: account.id, iban: account.iban });
 
     return NextResponse.json({
       success: true,
@@ -308,6 +313,78 @@ export async function GET(req: NextRequest) {
       user.profile?.dateOfBirth
     );
 
+    // ✅ Get verified address from Sumsub API if available
+    let addressStreet = user.profile?.address || '';
+    let addressCity = user.profile?.city || '';
+    let addressPostalCode = user.profile?.postalCode || '';
+    let addressCountry = user.profile?.country || '';
+
+    if (kycApproved && user.kycSession?.applicantId && user.kycSession?.kycProviderId === 'sumsub') {
+      try {
+        console.log('[VirtualIBAN API GET] Fetching verified address from Sumsub API...');
+        console.log('[VirtualIBAN API GET] Applicant ID:', user.kycSession.applicantId);
+        
+        // Get KYC provider
+        const { integrationFactory } = await import('@/lib/integrations/IntegrationFactory');
+        const kycProvider = await integrationFactory.getProviderByService('sumsub');
+        
+        if (kycProvider && typeof kycProvider.getApplicant === 'function') {
+          console.log('[VirtualIBAN API GET] Calling Sumsub API getApplicant...');
+          const applicant = await kycProvider.getApplicant(user.kycSession.applicantId);
+          console.log('[VirtualIBAN API GET] Sumsub API response received');
+          
+          // Extract address from Sumsub response
+          const sumsubInfo = applicant.metadata?.info;
+          const sumsubFixedInfo = applicant.metadata?.fixedInfo;
+          const addresses = sumsubInfo?.addresses || 
+                          sumsubFixedInfo?.addresses || 
+                          sumsubInfo?.fixedInfo?.addresses || 
+                          [];
+          
+          console.log('[VirtualIBAN API GET] Extracted addresses from Sumsub:', {
+            addressesCount: addresses.length,
+            firstAddress: addresses[0] || null,
+          });
+          
+          if (addresses.length > 0) {
+            const sumsubAddress = addresses[0];
+            
+            if (sumsubAddress.street || sumsubAddress.town) {
+              addressStreet = sumsubAddress.street || '';
+              addressCity = sumsubAddress.town || '';
+              addressPostalCode = sumsubAddress.postCode || '';
+              
+              // Convert ISO-3 to ISO-2 for country
+              if (sumsubAddress.country) {
+                const { alpha3ToIso2 } = await import('@/lib/utils/country-codes');
+                addressCountry = alpha3ToIso2(sumsubAddress.country) || sumsubAddress.country;
+              }
+              
+              console.log('[VirtualIBAN API GET] ✅ Using verified address from Sumsub:', {
+                street: addressStreet,
+                city: addressCity,
+                postalCode: addressPostalCode,
+                country: addressCountry,
+              });
+            }
+          } else {
+            console.log('[VirtualIBAN API GET] ⚠️ Sumsub applicant found but no address in response');
+          }
+        } else {
+          console.log('[VirtualIBAN API GET] ⚠️ KYC provider not found or getApplicant method not available');
+        }
+      } catch (error) {
+        console.error('[VirtualIBAN API GET] ❌ Failed to fetch address from Sumsub API, using profile data:', error);
+        // Fallback to profile data (already set above)
+      }
+    } else {
+      console.log('[VirtualIBAN API GET] Skipping Sumsub API call:', {
+        kycApproved,
+        hasApplicantId: !!user.kycSession?.applicantId,
+        isSumsub: user.kycSession?.kycProviderId === 'sumsub',
+      });
+    }
+
     // Eligible if KYC approved, profile complete, and no active account
     const eligible = kycApproved && profileComplete && !activeAccount;
 
@@ -320,17 +397,17 @@ export async function GET(req: NextRequest) {
       kycStatus: user.kycSession?.status || 'NOT_STARTED',
       kycApproved,
       profileComplete,
-      // Data for confirmation dialog (from KYC verified profile)
+      // Data for confirmation dialog (with verified address from Sumsub if available)
       userData: kycApproved ? {
         firstName: user.profile?.firstName,
         lastName: user.profile?.lastName,
         email: user.email,
         dateOfBirth: user.profile?.dateOfBirth,
         nationality: user.profile?.nationality || user.profile?.country,
-        country: user.profile?.country,
-        city: user.profile?.city,
-        address: user.profile?.address,
-        postalCode: user.profile?.postalCode,
+        country: addressCountry || user.profile?.country,
+        city: addressCity || user.profile?.city,
+        address: addressStreet || user.profile?.address,
+        postalCode: addressPostalCode || user.profile?.postalCode,
       } : null,
     });
   } catch (error) {

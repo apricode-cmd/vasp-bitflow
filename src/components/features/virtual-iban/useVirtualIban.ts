@@ -87,10 +87,16 @@ export function useVirtualIban(): UseVirtualIbanReturn {
   }, []);
 
   const createAccount = useCallback(async (editedData?: Partial<UserData>): Promise<boolean> => {
+    console.log('[useVirtualIban] ========================================');
+    console.log('[useVirtualIban] createAccount called');
+    console.log('[useVirtualIban] editedData:', editedData);
+    console.log('[useVirtualIban] ========================================');
+    
     setCreating(true);
     
     try {
       console.log('[useVirtualIban] Creating account with edited data:', editedData);
+      console.log('[useVirtualIban] Making POST request to /api/client/virtual-iban/create');
       
       const response = await fetch('/api/client/virtual-iban/create', {
         method: 'POST',
@@ -98,6 +104,12 @@ export function useVirtualIban(): UseVirtualIbanReturn {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ editedData: editedData || undefined }),
+      });
+      
+      console.log('[useVirtualIban] Response received:', { 
+        ok: response.ok, 
+        status: response.status,
+        statusText: response.statusText 
       });
 
       const data = await response.json();

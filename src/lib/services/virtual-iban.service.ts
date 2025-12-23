@@ -100,12 +100,21 @@ class VirtualIbanService {
   ): Promise<VirtualIbanAccount> {
     const currency = options?.currency || 'EUR';
     
+    console.log('[VirtualIBAN] ========================================');
     console.log('[VirtualIBAN] Creating account for user:', { userId, currency });
+    console.log('[VirtualIBAN] ========================================');
 
-    // Get user and profile
+    // Get user with profile and KYC session
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: { profile: true },
+      include: { 
+        profile: true,
+        kycSession: {
+          include: {
+            profile: true, // KycProfile (may have address from webhook)
+          },
+        },
+      },
     });
 
     if (!user || !user.profile) {
@@ -143,6 +152,124 @@ class VirtualIbanService {
 
     console.log('[VirtualIBAN] Selected provider:', providerId);
 
+    // ✅ Priority: Get verified address from Sumsub API
+    // Fallback to KycProfile, then to user profile
+    let addressStreet = user.profile.address || '';
+    let addressCity = user.profile.city || '';
+    let addressPostalCode = user.profile.postalCode || '';
+    let addressCountry = user.profile.country;
+
+    // Try to get address from Sumsub API if KYC session exists
+    console.log('[VirtualIBAN] Checking KYC session for Sumsub address:', {
+      hasKycSession: !!user.kycSession,
+      applicantId: user.kycSession?.applicantId,
+      kycProviderId: user.kycSession?.kycProviderId,
+      willFetchFromSumsub: !!(user.kycSession?.applicantId && user.kycSession?.kycProviderId === 'sumsub'),
+    });
+
+    if (user.kycSession?.applicantId && user.kycSession?.kycProviderId === 'sumsub') {
+      try {
+        console.log('[VirtualIBAN] Fetching verified address from Sumsub API...');
+        
+        // Get KYC provider
+        const { integrationFactory } = await import('@/lib/integrations/IntegrationFactory');
+        const kycProvider = await integrationFactory.getProviderByService('sumsub');
+        
+        if (kycProvider && typeof kycProvider.getApplicant === 'function') {
+          console.log('[VirtualIBAN] Calling Sumsub API getApplicant with applicantId:', user.kycSession.applicantId);
+          const applicant = await kycProvider.getApplicant(user.kycSession.applicantId);
+          console.log('[VirtualIBAN] Sumsub API response received:', {
+            applicantId: applicant.applicantId,
+            hasMetadata: !!applicant.metadata,
+            hasInfo: !!applicant.metadata?.info,
+            hasFixedInfo: !!applicant.metadata?.fixedInfo,
+          });
+          
+          // Extract address from Sumsub response
+          // Sumsub stores address in:
+          // - data.info.addresses (from webhook/status)
+          // - data.fixedInfo.addresses (from fixedInfo)
+          const sumsubInfo = applicant.metadata?.info;
+          const sumsubFixedInfo = applicant.metadata?.fixedInfo;
+          const addresses = sumsubInfo?.addresses || 
+                          sumsubFixedInfo?.addresses || 
+                          sumsubInfo?.fixedInfo?.addresses || 
+                          [];
+          
+          console.log('[VirtualIBAN] Extracted addresses from Sumsub response:', {
+            addressesCount: addresses.length,
+            sumsubInfoHasAddresses: !!sumsubInfo?.addresses,
+            sumsubFixedInfoHasAddresses: !!sumsubFixedInfo?.addresses,
+            firstAddress: addresses[0] || null,
+          });
+          
+          if (addresses.length > 0) {
+            // Use first address (usually the main one)
+            const sumsubAddress = addresses[0];
+            
+            if (sumsubAddress.street || sumsubAddress.town) {
+              addressStreet = sumsubAddress.street || '';
+              addressCity = sumsubAddress.town || '';
+              addressPostalCode = sumsubAddress.postCode || '';
+              // Convert ISO-3 to ISO-2 for country
+              if (sumsubAddress.country) {
+                const { alpha3ToIso2 } = await import('@/lib/utils/country-codes');
+                addressCountry = alpha3ToIso2(sumsubAddress.country) || sumsubAddress.country;
+              }
+              
+              console.log('[VirtualIBAN] ✅ Using verified address from Sumsub API:', {
+                street: addressStreet,
+                city: addressCity,
+                postalCode: addressPostalCode,
+                country: addressCountry,
+              });
+            }
+          } else {
+            console.log('[VirtualIBAN] ⚠️ Sumsub applicant found but no address in response');
+          }
+        } else {
+          console.log('[VirtualIBAN] ⚠️ KYC provider not found or getApplicant method not available');
+        }
+      } catch (error) {
+        console.error('[VirtualIBAN] ❌ Failed to fetch address from Sumsub API, using fallback:', error);
+        console.error('[VirtualIBAN] Error details:', {
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
+        // Fallback to KycProfile or user profile
+      }
+    } else {
+      console.log('[VirtualIBAN] ⚠️ Skipping Sumsub API call - conditions not met:', {
+        hasApplicantId: !!user.kycSession?.applicantId,
+        isSumsub: user.kycSession?.kycProviderId === 'sumsub',
+      });
+    }
+    
+    // Fallback: Try KycProfile if Sumsub API didn't return address
+    if (!addressStreet && !addressCity) {
+      const kycProfile = user.kycSession?.profile;
+      if (kycProfile?.addressStreet && kycProfile?.addressCity) {
+        addressStreet = kycProfile.addressStreet;
+        addressCity = kycProfile.addressCity;
+        addressPostalCode = kycProfile.addressPostal || '';
+        addressCountry = kycProfile.addressCountry || user.profile.country;
+        
+        console.log('[VirtualIBAN] Using address from KycProfile (webhook data):', {
+          street: addressStreet,
+          city: addressCity,
+          postalCode: addressPostalCode,
+          country: addressCountry,
+        });
+      } else {
+        console.log('[VirtualIBAN] Using address from user profile:', {
+          street: addressStreet,
+          city: addressCity,
+          postalCode: addressPostalCode,
+          country: addressCountry,
+        });
+      }
+    }
+
     // Prepare request
     const createRequest: VirtualIbanCreateRequest = {
       userId: user.id,
@@ -169,10 +296,10 @@ class VirtualIbanService {
       country: user.profile.country,
       currency,
       address: {
-        street: user.profile.address || '',
-        city: user.profile.city || '',
-        postalCode: user.profile.postalCode || '',
-        country: user.profile.country,
+        street: addressStreet,
+        city: addressCity,
+        postalCode: addressPostalCode,
+        country: addressCountry,
       },
     };
 

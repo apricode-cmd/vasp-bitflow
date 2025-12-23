@@ -840,7 +840,8 @@ export class SumsubAdapter implements IKycProvider {
           email: data.email,
           phone: data.phone,
           createdAt: data.createdAt,
-          info: data.info,
+          info: data.info, // Contains addresses in info.addresses or info.fixedInfo.addresses
+          fixedInfo: data.fixedInfo, // Also check fixedInfo.addresses
           review: data.review,
           requiredIdDocs: data.requiredIdDocs
         }
